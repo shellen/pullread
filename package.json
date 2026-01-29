@@ -1,13 +1,12 @@
 {
-  "name": "implement",
+  "name": "pullread",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "directories": {
-    "doc": "docs"
-  },
+  "description": "Sync Drafty bookmarks to markdown files",
+  "main": "src/index.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "sync": "ts-node src/index.ts sync",
+    "sync:retry": "ts-node src/index.ts sync --retry-failed",
+    "test": "jest"
   },
   "keywords": [],
   "author": "",
