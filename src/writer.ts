@@ -3,6 +3,7 @@
 
 import { writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
+import { Enclosure } from './feed';
 
 export interface ArticleData {
   title: string;
@@ -10,7 +11,9 @@ export interface ArticleData {
   bookmarkedAt: string;
   domain: string;
   content: string;
+  feed?: string;
   annotation?: string;
+  enclosure?: Enclosure;
 }
 
 export function generateFilename(title: string, bookmarkedAt: string): string {
@@ -40,8 +43,21 @@ url: ${data.url}
 bookmarked: ${data.bookmarkedAt}
 domain: ${data.domain}`;
 
+  if (data.feed) {
+    frontmatter += `\nfeed: ${data.feed}`;
+  }
+
   if (data.annotation) {
     frontmatter += `\nannotation: "${escapeQuotes(data.annotation)}"`;
+  }
+
+  if (data.enclosure) {
+    frontmatter += `\nenclosure:`;
+    frontmatter += `\n  url: ${data.enclosure.url}`;
+    frontmatter += `\n  type: ${data.enclosure.type}`;
+    if (data.enclosure.duration) {
+      frontmatter += `\n  duration: "${data.enclosure.duration}"`;
+    }
   }
 
   frontmatter += '\n---';

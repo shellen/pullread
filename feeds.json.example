@@ -1,0 +1,5 @@
+{
+  "bookmarks": "https://example.com/user/bookmarks/feed.xml",
+  "instapaper": "https://www.instapaper.com/rss/...",
+  "podcasts": "https://anchor.fm/s/.../podcast/rss"
+}

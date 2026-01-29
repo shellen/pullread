@@ -10,6 +10,9 @@ dist/
 # Environment
 .env
 
+# Feed configuration
+feeds.json
+
 # SQLite database
 data/*.db
 
