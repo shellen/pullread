@@ -1,7 +1,6 @@
 // ABOUTME: CLI entry point for PullRead
 // ABOUTME: Syncs RSS and Atom feeds to markdown files
 
-import 'dotenv/config';
 import { readFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { fetchFeed, FeedEntry } from './feed';
@@ -9,23 +8,38 @@ import { fetchAndExtract } from './extractor';
 import { writeArticle } from './writer';
 import { Storage } from './storage';
 
-const OUTPUT_PATH = process.env.OUTPUT_PATH?.replace(/^~/, process.env.HOME || '');
 const DB_PATH = join(__dirname, '..', 'data', 'pullread.db');
-const FEEDS_PATH = join(__dirname, '..', 'feeds.json');
+const CONFIG_PATH = join(__dirname, '..', 'feeds.json');
 
-interface FeedsConfig {
-  [name: string]: string;
+interface Config {
+  outputPath: string;
+  feeds: { [name: string]: string };
 }
 
-function loadFeeds(): FeedsConfig {
-  if (!existsSync(FEEDS_PATH)) {
-    console.error('Error: feeds.json not found. Copy feeds.json.example to feeds.json and configure your feeds.');
+function loadConfig(): Config {
+  if (!existsSync(CONFIG_PATH)) {
+    console.error('Error: feeds.json not found. Copy feeds.json.example to feeds.json and configure.');
     process.exit(1);
   }
 
   try {
-    const content = readFileSync(FEEDS_PATH, 'utf-8');
-    return JSON.parse(content);
+    const content = readFileSync(CONFIG_PATH, 'utf-8');
+    const config = JSON.parse(content);
+
+    if (!config.outputPath) {
+      console.error('Error: feeds.json missing "outputPath"');
+      process.exit(1);
+    }
+
+    if (!config.feeds || Object.keys(config.feeds).length === 0) {
+      console.error('Error: feeds.json missing "feeds" or no feeds configured');
+      process.exit(1);
+    }
+
+    return {
+      outputPath: config.outputPath.replace(/^~/, process.env.HOME || ''),
+      feeds: config.feeds
+    };
   } catch (err) {
     console.error('Error: Could not parse feeds.json:', err instanceof Error ? err.message : err);
     process.exit(1);
@@ -128,20 +142,10 @@ async function syncFeed(
 }
 
 async function sync(feedFilter?: string, retryFailed = false): Promise<void> {
-  if (!OUTPUT_PATH) {
-    console.error('Error: OUTPUT_PATH must be set in .env');
-    process.exit(1);
-  }
+  const config = loadConfig();
+  const feedNames = Object.keys(config.feeds);
 
-  const feeds = loadFeeds();
-  const feedNames = Object.keys(feeds);
-
-  if (feedNames.length === 0) {
-    console.error('Error: No feeds configured in feeds.json');
-    process.exit(1);
-  }
-
-  if (feedFilter && !feeds[feedFilter]) {
+  if (feedFilter && !config.feeds[feedFilter]) {
     console.error(`Error: Feed "${feedFilter}" not found in feeds.json`);
     console.error(`Available feeds: ${feedNames.join(', ')}`);
     process.exit(1);
@@ -158,10 +162,12 @@ async function sync(feedFilter?: string, retryFailed = false): Promise<void> {
     let totalSuccess = 0;
     let totalFailed = 0;
 
-    const feedsToSync = feedFilter ? { [feedFilter]: feeds[feedFilter] } : feeds;
+    const feedsToSync = feedFilter
+      ? { [feedFilter]: config.feeds[feedFilter] }
+      : config.feeds;
 
     for (const [name, url] of Object.entries(feedsToSync)) {
-      const { success, failed } = await syncFeed(name, url, storage, OUTPUT_PATH, retryFailed);
+      const { success, failed } = await syncFeed(name, url, storage, config.outputPath, retryFailed);
       totalSuccess += success;
       totalFailed += failed;
     }
