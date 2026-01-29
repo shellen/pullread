@@ -7,5 +7,9 @@ module.exports = {
   testEnvironment: "node",
   transform: {
     ...tsJestTransformCfg,
+    "node_modules/.+\\.js$": "babel-jest",
   },
+  transformIgnorePatterns: [
+    "node_modules/(?!(@exodus/bytes|parse5|entities|html-encoding-sniffer)/)"
+  ],
 };
