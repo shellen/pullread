@@ -1,24 +1,34 @@
 # PullRead Design
 
-A TypeScript CLI that syncs Drafty bookmarks to markdown files.
+A TypeScript CLI that syncs RSS and Atom feeds to markdown files.
 
 ## Overview
 
-PullRead fetches an Atom feed of bookmarks, extracts article content using Mozilla Readability, and saves clean markdown files to a local folder (which can be synced via Dropbox/Drive).
+PullRead fetches entries from multiple feeds (bookmarks, link blogs, podcasts), extracts article content using Mozilla Readability, and saves clean markdown files to a local folder (which can be synced via Dropbox/Drive).
+
+Supports:
+- **Atom feeds** - Common for bookmark services and blogs
+- **RSS feeds** - Instapaper, Pinboard, podcasts, and most blogs
+- **Podcast feeds** - Saves episode metadata with audio link (no download)
 
 ## Core Flow
 
 ```
-Drafty Atom feed → fetch new entries → extract article content → save as .md
-                          ↓
-                   SQLite tracks processed URLs
+feeds.json → for each feed:
+                fetch → detect type (RSS/Atom) → parse entries
+                                    ↓
+                          SQLite tracks processed URLs
+                                    ↓
+                     for new entries: extract content → save as .md
 ```
 
 Running `pullread sync`:
-1. Fetches the Atom feed
-2. Compares entries against SQLite (by URL)
-3. For new entries: fetches the article, extracts with Readability, saves as markdown
-4. Records the URL as processed
+1. Loads feed URLs from `feeds.json`
+2. For each feed: fetches and parses (auto-detects RSS vs Atom)
+3. Compares entries against SQLite (by URL)
+4. For articles: fetches page, extracts with Readability, saves as markdown
+5. For podcasts: saves episode metadata with audio link (no extraction)
+6. Records each URL as processed
 
 ## File Structure
 
@@ -26,27 +36,95 @@ Running `pullread sync`:
 pullread/
 ├── src/
 │   ├── index.ts          # CLI entry point
-│   ├── feed.ts           # Fetch and parse Atom feed
+│   ├── feed.ts           # Fetch and parse RSS/Atom feeds
 │   ├── extractor.ts      # Readability + JSDOM article extraction
 │   ├── storage.ts        # SQLite operations (track processed URLs)
 │   └── writer.ts         # Markdown file generation
 ├── data/
-│   └── pullread.db       # SQLite database (gitignored, created at runtime)
+│   └── pullread.db       # SQLite database (gitignored)
+├── feeds.json            # Feed configuration (gitignored)
+├── feeds.json.example    # Example configuration
 ├── package.json
 ├── tsconfig.json
-└── .env                  # Feed URL, output path config
+└── .env                  # Output path config
 ```
 
 ## Configuration
 
-Environment variables in `.env`:
+### feeds.json
+
+```json
+{
+  "bookmarks": "https://example.com/user/bookmarks/feed.xml",
+  "instapaper": "https://instapaper.com/rss/...",
+  "podcasts": "https://anchor.fm/s/.../podcast/rss"
+}
+```
+
+Keys become the `feed` field in frontmatter and are used for logging.
+
+### Environment variables (.env)
 
 ```
-FEED_URL=https://www.drafty.com/@shellen/links/s/.../feed.xml
 OUTPUT_PATH=~/Dropbox/Articles
 ```
 
+## CLI Usage
+
+```bash
+# Sync all feeds
+npm run sync
+
+# Sync a specific feed
+npm run sync -- --feed bookmarks
+
+# Retry previously failed URLs
+npm run sync -- --retry-failed
+```
+
+## Feed Parsing
+
+### Auto-detection
+
+```typescript
+function detectFeedType(xml: string): 'atom' | 'rss' {
+  if (parsed.feed) return 'atom';
+  if (parsed.rss) return 'rss';
+  throw new Error('Unknown feed format');
+}
+```
+
+### Unified Entry Interface
+
+```typescript
+interface FeedEntry {
+  title: string;
+  url: string;
+  updatedAt: string;
+  domain: string;
+  annotation?: string;
+  enclosure?: {
+    url: string;
+    type: string;    // e.g., "audio/mpeg"
+    length?: number;
+    duration?: string;
+  };
+}
+```
+
+### RSS vs Atom Mapping
+
+| Field | Atom | RSS |
+|-------|------|-----|
+| title | `<title>` | `<title>` |
+| url | `<link href="...">` | `<link>` (text) |
+| date | `<updated>` | `<pubDate>` |
+| content | `<content>` | `<description>` |
+| enclosure | — | `<enclosure>` |
+
 ## Markdown Output Format
+
+### Article
 
 ```markdown
 ---
@@ -54,12 +132,33 @@ title: "Article Title Here"
 url: https://example.com/article
 bookmarked: 2024-01-29T19:05:18Z
 domain: example.com
-annotation: "Your note from Drafty, if any"
+feed: bookmarks
+annotation: "Your note, if any"
 ---
 
 # Article Title Here
 
 [Article content extracted by Readability, converted to markdown...]
+```
+
+### Podcast Episode
+
+```markdown
+---
+title: "Episode Title"
+url: https://podcast.com/episode
+bookmarked: 2024-01-29T19:05:18Z
+domain: podcast.com
+feed: podcasts
+enclosure:
+  url: https://cdn.com/episode.mp3
+  type: audio/mpeg
+  duration: "00:34:55"
+---
+
+# Episode Title
+
+[Episode description from feed...]
 ```
 
 Filename format: `2024-01-29-article-title.md` (date-prefixed, slugified, max ~60 chars)
@@ -75,13 +174,6 @@ Filename format: `2024-01-29-article-title.md` (date-prefixed, slugified, max ~6
     "better-sqlite3": "^11.x",
     "turndown": "^7.x",
     "dotenv": "^16.x"
-  },
-  "devDependencies": {
-    "typescript": "^5.x",
-    "@types/node": "^20.x",
-    "@types/jsdom": "^21.x",
-    "@types/better-sqlite3": "^7.x",
-    "@types/turndown": "^5.x"
   }
 }
 ```
@@ -91,8 +183,7 @@ Filename format: `2024-01-29-article-title.md` (date-prefixed, slugified, max ~6
 - **Log and skip** failed extractions, move on to next entry
 - **Track failures in SQLite** with a `status` column to avoid retrying every run
 - **`--retry-failed` flag** to re-attempt previously failed URLs
-
-Paywalled content gets whatever Readability can extract (often the lede). The bookmark URL is preserved for visiting the full article.
+- **Per-feed errors** don't stop other feeds from syncing
 
 ## SQLite Schema
 
@@ -104,58 +195,18 @@ CREATE TABLE processed (
   processed_at TEXT,
   status TEXT DEFAULT 'success',  -- 'success' or 'failed'
   error TEXT,                      -- error message if failed
-  output_file TEXT                 -- path to saved markdown file
+  output_file TEXT,                -- path to saved markdown file
+  feed TEXT                        -- source feed name
 );
 ```
 
 ## Scheduled Execution
 
-An AppleScript application runs PullRead on a schedule using macOS's built-in idle handler.
+An AppleScript application or launchd plist can run PullRead on a schedule.
 
-### AppleScript: PullRead Scheduler
+### launchd (recommended)
 
-Location: `scripts/PullReadScheduler.scpt` (compile to `.app` for use)
-
-```applescript
--- PullRead Scheduler
--- Runs pullread sync every 30 minutes while the app is open
-
-property syncInterval : 30 * 60 -- 30 minutes in seconds
-property pullreadPath : "/Users/shellen/Documents/Claude Stuff/pullread"
-
-on run
-    syncNow()
-end run
-
-on idle
-    syncNow()
-    return syncInterval
-end idle
-
-on syncNow()
-    try
-        do shell script "cd " & quoted form of pullreadPath & " && /usr/local/bin/npx ts-node src/index.ts sync 2>&1 >> /tmp/pullread.log"
-    on error errMsg
-        -- Log errors but don't crash
-        do shell script "echo " & quoted form of ("Error: " & errMsg) & " >> /tmp/pullread.log"
-    end try
-end syncNow
-
-on quit
-    continue quit
-end quit
-```
-
-### Usage
-
-1. Open in Script Editor, export as Application (File → Export → File Format: Application)
-2. Check "Stay open after run handler"
-3. Add to Login Items (System Preferences → Users & Groups → Login Items) for auto-start
-4. Logs written to `/tmp/pullread.log`
-
-### Alternative: launchd
-
-For headless operation, use a launchd plist instead:
+Save to `~/Library/LaunchAgents/com.pullread.sync.plist`:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -163,12 +214,12 @@ For headless operation, use a launchd plist instead:
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.shellen.pullread</string>
+    <string>com.pullread.sync</string>
     <key>ProgramArguments</key>
     <array>
         <string>/usr/local/bin/npx</string>
         <string>ts-node</string>
-        <string>/Users/shellen/Documents/Claude Stuff/pullread/src/index.ts</string>
+        <string>/path/to/pullread/src/index.ts</string>
         <string>sync</string>
     </array>
     <key>StartInterval</key>
@@ -178,12 +229,12 @@ For headless operation, use a launchd plist instead:
     <key>StandardErrorPath</key>
     <string>/tmp/pullread.log</string>
     <key>WorkingDirectory</key>
-    <string>/Users/shellen/Documents/Claude Stuff/pullread</string>
+    <string>/path/to/pullread</string>
 </dict>
 </plist>
 ```
 
-Save to `~/Library/LaunchAgents/com.shellen.pullread.plist` and load with:
+Load with:
 ```bash
-launchctl load ~/Library/LaunchAgents/com.shellen.pullread.plist
+launchctl load ~/Library/LaunchAgents/com.pullread.sync.plist
 ```
