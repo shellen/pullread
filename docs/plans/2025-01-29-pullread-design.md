@@ -107,3 +107,83 @@ CREATE TABLE processed (
   output_file TEXT                 -- path to saved markdown file
 );
 ```
+
+## Scheduled Execution
+
+An AppleScript application runs PullRead on a schedule using macOS's built-in idle handler.
+
+### AppleScript: PullRead Scheduler
+
+Location: `scripts/PullReadScheduler.scpt` (compile to `.app` for use)
+
+```applescript
+-- PullRead Scheduler
+-- Runs pullread sync every 30 minutes while the app is open
+
+property syncInterval : 30 * 60 -- 30 minutes in seconds
+property pullreadPath : "/Users/shellen/Documents/Claude Stuff/pullread"
+
+on run
+    syncNow()
+end run
+
+on idle
+    syncNow()
+    return syncInterval
+end idle
+
+on syncNow()
+    try
+        do shell script "cd " & quoted form of pullreadPath & " && /usr/local/bin/npx ts-node src/index.ts sync 2>&1 >> /tmp/pullread.log"
+    on error errMsg
+        -- Log errors but don't crash
+        do shell script "echo " & quoted form of ("Error: " & errMsg) & " >> /tmp/pullread.log"
+    end try
+end syncNow
+
+on quit
+    continue quit
+end quit
+```
+
+### Usage
+
+1. Open in Script Editor, export as Application (File → Export → File Format: Application)
+2. Check "Stay open after run handler"
+3. Add to Login Items (System Preferences → Users & Groups → Login Items) for auto-start
+4. Logs written to `/tmp/pullread.log`
+
+### Alternative: launchd
+
+For headless operation, use a launchd plist instead:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.shellen.pullread</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/npx</string>
+        <string>ts-node</string>
+        <string>/Users/shellen/Documents/Claude Stuff/pullread/src/index.ts</string>
+        <string>sync</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>1800</integer>
+    <key>StandardOutPath</key>
+    <string>/tmp/pullread.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/pullread.log</string>
+    <key>WorkingDirectory</key>
+    <string>/Users/shellen/Documents/Claude Stuff/pullread</string>
+</dict>
+</plist>
+```
+
+Save to `~/Library/LaunchAgents/com.shellen.pullread.plist` and load with:
+```bash
+launchctl load ~/Library/LaunchAgents/com.shellen.pullread.plist
+```
