@@ -41,18 +41,31 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
+      - name: Install xcpretty
+        run: gem install xcpretty
+
       - name: Run unit tests
         working-directory: PullReadTray
         run: |
+          set -o pipefail
           xcodebuild test \
             -project PullReadTray.xcodeproj \
             -scheme PullReadTray \
-            -destination 'platform=macOS' \
+            -destination 'platform=macOS,arch=arm64' \
             -only-testing:PullReadTrayTests \
+            -resultBundlePath TestResults \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            | xcpretty --color || true
+            2>&1 | xcpretty --test --color
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: PullReadTray/TestResults
+          retention-days: 7
 
       - name: Run UI tests
         working-directory: PullReadTray
@@ -61,12 +74,12 @@ jobs:
           xcodebuild test \
             -project PullReadTray.xcodeproj \
             -scheme PullReadTray \
-            -destination 'platform=macOS' \
+            -destination 'platform=macOS,arch=arm64' \
             -only-testing:PullReadTrayUITests \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            | xcpretty --color || true
+            2>&1 | xcpretty --test --color || true
 
   build:
     runs-on: macos-14
