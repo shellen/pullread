@@ -54,9 +54,8 @@ jobs:
             -destination 'platform=macOS,arch=arm64' \
             -only-testing:PullReadTrayTests \
             -resultBundlePath TestResults \
-            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
             2>&1 | xcpretty --test --color
 
       - name: Upload test results
@@ -76,9 +75,8 @@ jobs:
             -scheme PullReadTray \
             -destination 'platform=macOS,arch=arm64' \
             -only-testing:PullReadTrayUITests \
-            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
             2>&1 | xcpretty --test --color || true
 
   build:
@@ -103,10 +101,9 @@ jobs:
             -scheme PullReadTray \
             -configuration Release \
             -derivedDataPath build \
-            -destination 'platform=macOS' \
-            CODE_SIGN_IDENTITY="-" \
+            -destination 'platform=macOS,arch=arm64' \
+            CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
             build
 
       - name: Create app bundle
