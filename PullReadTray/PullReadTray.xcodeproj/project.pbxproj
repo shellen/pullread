@@ -11,7 +11,28 @@
 		A1000002200000010000000A /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002100000010000000A /* AppDelegate.swift */; };
 		A1000003200000010000000A /* SyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000003100000010000000A /* SyncService.swift */; };
 		A1000004200000010000000A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000004100000010000000A /* Assets.xcassets */; };
+		B1000001200000010000000A /* SyncServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000001100000010000000A /* SyncServiceTests.swift */; };
+		B1000002200000010000000A /* AppDelegateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002100000010000000A /* AppDelegateTests.swift */; };
+		C1000001200000010000000A /* PullReadTrayUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000001100000010000000A /* PullReadTrayUITests.swift */; };
+		C1000002200000010000000A /* PullReadTrayUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000002100000010000000A /* PullReadTrayUITestsLaunchTests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		B1000003300000010000000A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A1000010700000010000000A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A100000C500000010000000A;
+			remoteInfo = PullReadTray;
+		};
+		C1000003300000010000000A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A1000010700000010000000A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A100000C500000010000000A;
+			remoteInfo = PullReadTray;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		A1000001100000010000000A /* PullReadTrayApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PullReadTrayApp.swift; sourceTree = "<group>"; };
@@ -21,10 +42,30 @@
 		A1000005100000010000000A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A1000006100000010000000A /* PullReadTray.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PullReadTray.entitlements; sourceTree = "<group>"; };
 		A1000007100000010000000A /* PullReadTray.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PullReadTray.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B1000001100000010000000A /* SyncServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncServiceTests.swift; sourceTree = "<group>"; };
+		B1000002100000010000000A /* AppDelegateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegateTests.swift; sourceTree = "<group>"; };
+		B1000004100000010000000A /* PullReadTrayTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PullReadTrayTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C1000001100000010000000A /* PullReadTrayUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PullReadTrayUITests.swift; sourceTree = "<group>"; };
+		C1000002100000010000000A /* PullReadTrayUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PullReadTrayUITestsLaunchTests.swift; sourceTree = "<group>"; };
+		C1000004100000010000000A /* PullReadTrayUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PullReadTrayUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		A1000008300000010000000A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B1000005300000010000000A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C1000005300000010000000A /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -38,6 +79,8 @@
 			isa = PBXGroup;
 			children = (
 				A100000A400000010000000A /* PullReadTray */,
+				B1000006400000010000000A /* PullReadTrayTests */,
+				C1000006400000010000000A /* PullReadTrayUITests */,
 				A100000B400000010000000A /* Products */,
 			);
 			sourceTree = "<group>";
@@ -59,8 +102,28 @@
 			isa = PBXGroup;
 			children = (
 				A1000007100000010000000A /* PullReadTray.app */,
+				B1000004100000010000000A /* PullReadTrayTests.xctest */,
+				C1000004100000010000000A /* PullReadTrayUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		B1000006400000010000000A /* PullReadTrayTests */ = {
+			isa = PBXGroup;
+			children = (
+				B1000001100000010000000A /* SyncServiceTests.swift */,
+				B1000002100000010000000A /* AppDelegateTests.swift */,
+			);
+			path = PullReadTrayTests;
+			sourceTree = "<group>";
+		};
+		C1000006400000010000000A /* PullReadTrayUITests */ = {
+			isa = PBXGroup;
+			children = (
+				C1000001100000010000000A /* PullReadTrayUITests.swift */,
+				C1000002100000010000000A /* PullReadTrayUITestsLaunchTests.swift */,
+			);
+			path = PullReadTrayUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -83,6 +146,42 @@
 			productReference = A1000007100000010000000A /* PullReadTray.app */;
 			productType = "com.apple.product-type.application";
 		};
+		B1000007500000010000000A /* PullReadTrayTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B1000008600000010000000A /* Build configuration list for PBXNativeTarget "PullReadTrayTests" */;
+			buildPhases = (
+				B1000009300000010000000A /* Sources */,
+				B1000005300000010000000A /* Frameworks */,
+				B100000A300000010000000A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B100000B400000010000000A /* PBXTargetDependency */,
+			);
+			name = PullReadTrayTests;
+			productName = PullReadTrayTests;
+			productReference = B1000004100000010000000A /* PullReadTrayTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		C1000007500000010000000A /* PullReadTrayUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C1000008600000010000000A /* Build configuration list for PBXNativeTarget "PullReadTrayUITests" */;
+			buildPhases = (
+				C1000009300000010000000A /* Sources */,
+				C1000005300000010000000A /* Frameworks */,
+				C100000A300000010000000A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C100000B400000010000000A /* PBXTargetDependency */,
+			);
+			name = PullReadTrayUITests;
+			productName = PullReadTrayUITests;
+			productReference = C1000004100000010000000A /* PullReadTrayUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -95,6 +194,14 @@
 				TargetAttributes = {
 					A100000C500000010000000A = {
 						CreatedOnToolsVersion = 15.0;
+					};
+					B1000007500000010000000A = {
+						CreatedOnToolsVersion = 15.0;
+						TestTargetID = A100000C500000010000000A;
+					};
+					C1000007500000010000000A = {
+						CreatedOnToolsVersion = 15.0;
+						TestTargetID = A100000C500000010000000A;
 					};
 				};
 			};
@@ -112,6 +219,8 @@
 			projectRoot = "";
 			targets = (
 				A100000C500000010000000A /* PullReadTray */,
+				B1000007500000010000000A /* PullReadTrayTests */,
+				C1000007500000010000000A /* PullReadTrayUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -122,6 +231,20 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1000004200000010000000A /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B100000A300000010000000A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C100000A300000010000000A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -138,7 +261,38 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B1000009300000010000000A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B1000001200000010000000A /* SyncServiceTests.swift in Sources */,
+				B1000002200000010000000A /* AppDelegateTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C1000009300000010000000A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C1000001200000010000000A /* PullReadTrayUITests.swift in Sources */,
+				C1000002200000010000000A /* PullReadTrayUITestsLaunchTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		B100000B400000010000000A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A100000C500000010000000A /* PullReadTray */;
+			targetProxy = B1000003300000010000000A /* PBXContainerItemProxy */;
+		};
+		C100000B400000010000000A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A100000C500000010000000A /* PullReadTray */;
+			targetProxy = C1000003300000010000000A /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		A1000012800000010000000A /* Debug */ = {
@@ -313,6 +467,76 @@
 			};
 			name = Release;
 		};
+		B100000C800000010000000A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.pullread.tray.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PullReadTray.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PullReadTray";
+			};
+			name = Debug;
+		};
+		B100000D800000010000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.pullread.tray.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PullReadTray.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PullReadTray";
+			};
+			name = Release;
+		};
+		C100000C800000010000000A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.pullread.tray.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = PullReadTray;
+			};
+			name = Debug;
+		};
+		C100000D800000010000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.pullread.tray.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = PullReadTray;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -330,6 +554,24 @@
 			buildConfigurations = (
 				A1000012800000010000000A /* Debug */,
 				A1000013800000010000000A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B1000008600000010000000A /* Build configuration list for PBXNativeTarget "PullReadTrayTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B100000C800000010000000A /* Debug */,
+				B100000D800000010000000A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C1000008600000010000000A /* Build configuration list for PBXNativeTarget "PullReadTrayUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C100000C800000010000000A /* Debug */,
+				C100000D800000010000000A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
