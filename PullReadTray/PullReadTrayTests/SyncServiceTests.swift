@@ -127,14 +127,21 @@ final class SyncServiceTests: XCTestCase {
     }
 
     // MARK: - Performance Tests
+    // Skipped in CI as measure{} blocks can hang
 
     func testConfigPathPerformance() throws {
+        if isCI {
+            throw XCTSkip("Performance tests skipped in CI")
+        }
         measure {
             _ = syncService.getConfigPath()
         }
     }
 
     func testOutputPathPerformance() throws {
+        if isCI {
+            throw XCTSkip("Performance tests skipped in CI")
+        }
         measure {
             _ = syncService.getOutputPath()
         }
