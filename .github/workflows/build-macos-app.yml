@@ -170,3 +170,36 @@ jobs:
           draft: ${{ github.event.inputs.create_release == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Auto-update "latest" release on every push to main
+  latest-release:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download DMG artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: PullReadTray-dmg
+          path: ./
+
+      - name: Update latest release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: latest
+          name: Latest Build
+          body: |
+            This is the latest build of PullReadTray from the main branch.
+
+            **Download:** [PullReadTray.dmg](https://github.com/${{ github.repository }}/releases/download/latest/PullReadTray.dmg)
+
+            _Last updated: ${{ github.event.head_commit.timestamp }}_
+            _Commit: ${{ github.sha }}_
+          files: PullReadTray.dmg
+          prerelease: true
+          make_latest: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
