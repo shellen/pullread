@@ -8,6 +8,12 @@ final class SyncServiceTests: XCTestCase {
 
     var syncService: SyncService!
 
+    /// Check if running in CI environment
+    var isCI: Bool {
+        ProcessInfo.processInfo.environment["CI"] == "true" ||
+        ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] == "true"
+    }
+
     override func setUpWithError() throws {
         syncService = SyncService()
     }
@@ -60,8 +66,18 @@ final class SyncServiceTests: XCTestCase {
     }
 
     // MARK: - Sync Execution Tests
+    // Note: These tests are skipped in CI because they require:
+    // 1. Node.js installed
+    // 2. npm dependencies installed
+    // 3. feeds.json configured
+    // Without all three, the sync process can hang indefinitely.
 
     func testSyncCompletesWithResult() throws {
+        // Skip in CI - sync requires full project setup
+        if isCI {
+            throw XCTSkip("Skipping sync test in CI environment")
+        }
+
         // Skip if Node.js is not available
         guard syncService.isNodeAvailable() else {
             throw XCTSkip("Node.js not available on this machine")
@@ -81,10 +97,15 @@ final class SyncServiceTests: XCTestCase {
             expectation.fulfill()
         }
 
-        wait(for: [expectation], timeout: 30.0)
+        wait(for: [expectation], timeout: 10.0)
     }
 
     func testSyncRetryFailedCompletesWithResult() throws {
+        // Skip in CI - sync requires full project setup
+        if isCI {
+            throw XCTSkip("Skipping sync retry test in CI environment")
+        }
+
         // Skip if Node.js is not available
         guard syncService.isNodeAvailable() else {
             throw XCTSkip("Node.js not available on this machine")
@@ -102,7 +123,7 @@ final class SyncServiceTests: XCTestCase {
             expectation.fulfill()
         }
 
-        wait(for: [expectation], timeout: 30.0)
+        wait(for: [expectation], timeout: 10.0)
     }
 
     // MARK: - Performance Tests
