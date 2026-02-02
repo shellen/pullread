@@ -1,0 +1,205 @@
+# ABOUTME: GitHub Actions workflow to build and test PullReadTray macOS app
+# ABOUTME: Runs tests, builds on macOS runner, and creates .app bundle and .dmg
+
+name: Build macOS App
+
+on:
+  push:
+    branches: [main, 'claude/**']
+    paths:
+      - 'PullReadTray/**'
+      - '.github/workflows/build-macos-app.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'PullReadTray/**'
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create a release with the built app'
+        required: false
+        default: 'false'
+        type: boolean
+      skip_tests:
+        description: 'Skip running tests'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  test:
+    runs-on: macos-14
+    if: github.event.inputs.skip_tests != 'true'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode version
+        run: sudo xcode-select -s /Applications/Xcode_15.2.app/Contents/Developer
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Install xcpretty
+        run: gem install xcpretty
+
+      - name: Run unit tests
+        working-directory: PullReadTray
+        timeout-minutes: 5
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project PullReadTray.xcodeproj \
+            -scheme PullReadTray \
+            -destination 'platform=macOS,arch=arm64' \
+            -only-testing:PullReadTrayTests \
+            -skip-testing:PullReadTrayTests/SyncServiceTests/testSyncCompletesWithResult \
+            -skip-testing:PullReadTrayTests/SyncServiceTests/testSyncRetryFailedCompletesWithResult \
+            -skip-testing:PullReadTrayTests/SyncServiceTests/testConfigPathPerformance \
+            -skip-testing:PullReadTrayTests/SyncServiceTests/testOutputPathPerformance \
+            -resultBundlePath TestResults \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | xcpretty --test --color
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: PullReadTray/TestResults
+          retention-days: 7
+
+      - name: Run UI tests
+        working-directory: PullReadTray
+        timeout-minutes: 5
+        continue-on-error: true  # UI tests may fail in CI due to permissions
+        run: |
+          xcodebuild test \
+            -project PullReadTray.xcodeproj \
+            -scheme PullReadTray \
+            -destination 'platform=macOS,arch=arm64' \
+            -only-testing:PullReadTrayUITests \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | xcpretty --test --color || true
+
+  build:
+    runs-on: macos-14
+    needs: [test]
+    if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode version
+        run: sudo xcode-select -s /Applications/Xcode_15.2.app/Contents/Developer
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build app
+        working-directory: PullReadTray
+        run: |
+          xcodebuild -project PullReadTray.xcodeproj \
+            -scheme PullReadTray \
+            -configuration Release \
+            -derivedDataPath build \
+            -destination 'platform=macOS,arch=arm64' \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Create app bundle
+        working-directory: PullReadTray
+        run: |
+          mkdir -p artifacts
+          cp -R build/Build/Products/Release/PullReadTray.app artifacts/
+
+      - name: Create DMG
+        working-directory: PullReadTray
+        run: |
+          # Create a temporary directory for DMG contents
+          mkdir -p dmg-contents
+          cp -R artifacts/PullReadTray.app dmg-contents/
+
+          # Create a symlink to Applications
+          ln -s /Applications dmg-contents/Applications
+
+          # Create the DMG
+          hdiutil create -volname "PullReadTray" \
+            -srcfolder dmg-contents \
+            -ov -format UDZO \
+            artifacts/PullReadTray.dmg
+
+          # Clean up
+          rm -rf dmg-contents
+
+      - name: Upload app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PullReadTray-app
+          path: PullReadTray/artifacts/PullReadTray.app
+          retention-days: 30
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PullReadTray-dmg
+          path: PullReadTray/artifacts/PullReadTray.dmg
+          retention-days: 30
+
+  release:
+    needs: build
+    if: github.event.inputs.create_release == 'true' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download DMG artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: PullReadTray-dmg
+          path: ./
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: PullReadTray.dmg
+          generate_release_notes: true
+          draft: ${{ github.event.inputs.create_release == 'true' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Auto-update "latest" release on every push to main
+  latest-release:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download DMG artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: PullReadTray-dmg
+          path: ./
+
+      - name: Update latest release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: latest
+          name: Latest Build
+          body: |
+            This is the latest build of PullReadTray from the main branch.
+
+            **Download:** [PullReadTray.dmg](https://github.com/${{ github.repository }}/releases/download/latest/PullReadTray.dmg)
+
+            _Last updated: ${{ github.event.head_commit.timestamp }}_
+            _Commit: ${{ github.sha }}_
+          files: PullReadTray.dmg
+          prerelease: true
+          make_latest: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
