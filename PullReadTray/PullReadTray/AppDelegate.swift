@@ -15,7 +15,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Returns true if running in a unit test environment
     private var isRunningTests: Bool {
-        return ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        // Check if XCTest framework is loaded (most reliable method)
+        if NSClassFromString("XCTestCase") != nil {
+            return true
+        }
+        // Fallback: check environment variables
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            return true
+        }
+        // Also check for CI environment running tests
+        if ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] == "true" {
+            return true
+        }
+        return false
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
