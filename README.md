@@ -6,8 +6,22 @@ PullRead fetches entries from your RSS/Atom feeds, extracts article content usin
 
 ---
 
+## Download
+
+**[Download the latest release](https://github.com/shellen/pullread/releases/latest)**
+
+| Platform | Download | Notes |
+|----------|----------|-------|
+| **macOS** | [PullReadTray.dmg](https://github.com/shellen/pullread/releases/latest/download/PullReadTray.dmg) | Menu bar app for one-click sync |
+| **CLI** | Clone this repo | Works on macOS, Linux, Windows |
+
+> **Quick install:** Download the DMG, open it, drag PullReadTray to your Applications folder, and launch it. The app will guide you through setup on first run.
+
+---
+
 ## Table of Contents
 
+- [Download](#download)
 - [Features](#features)
 - [Quick Start](#quick-start)
 - [Installation](#installation)
