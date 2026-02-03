@@ -6,6 +6,7 @@ import SwiftUI
 
 class SettingsWindowController {
     private var window: NSWindow?
+    private var windowDelegate: WindowDelegate?
     private var isPresented: Bool = true
 
     func showSettings(configPath: String, isFirstRun: Bool = false, onSave: (() -> Void)? = nil) {
@@ -53,10 +54,12 @@ class SettingsWindowController {
         // Set window level to floating so it appears above menu bar app
         newWindow.level = .floating
 
-        // Handle window close button
-        newWindow.delegate = WindowDelegate { [weak self] in
+        // Handle window close button - store delegate to prevent deallocation
+        let delegate = WindowDelegate { [weak self] in
             self?.isPresented = false
         }
+        self.windowDelegate = delegate
+        newWindow.delegate = delegate
 
         self.window = newWindow
 
