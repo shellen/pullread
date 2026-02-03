@@ -270,12 +270,10 @@ struct SettingsView: View {
     }
 }
 
-struct SettingsView_Previews: PreviewProvider {
-    static var previews: some View {
-        SettingsView(
-            isPresented: .constant(true),
-            configPath: "/tmp/feeds.json",
-            isFirstRun: true
-        )
-    }
+#Preview {
+    SettingsView(
+        isPresented: .constant(true),
+        configPath: "/tmp/feeds.json",
+        isFirstRun: true
+    )
 }
