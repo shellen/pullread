@@ -21,7 +21,7 @@ struct SettingsView: View {
     @State private var selectedFeed: FeedItem.ID?
 
     let configPath: String
-    var onSave: (() -> Void)?
+    var onSave: (() -> Void)? = nil
     var isFirstRun: Bool = false
 
     var body: some View {
