@@ -13,11 +13,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusMenuItem: NSMenuItem!
     private var settingsWindowController: SettingsWindowController!
 
+    /// Returns true if running in a unit test environment
+    private var isRunningTests: Bool {
+        return ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         syncService = SyncService()
         settingsWindowController = SettingsWindowController()
         setupStatusBar()
         requestNotificationPermission()
+
+        // Skip modal dialogs during tests - they block indefinitely in CI
+        guard !isRunningTests else { return }
 
         // Check for Node.js on launch
         if !syncService.isNodeAvailable() {
