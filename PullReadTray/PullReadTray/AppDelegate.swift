@@ -21,11 +21,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         syncService = SyncService()
         settingsWindowController = SettingsWindowController()
+
+        // Skip ALL UI setup during tests - UI operations block/hang in headless CI
+        guard !isRunningTests else { return }
+
         setupStatusBar()
         requestNotificationPermission()
-
-        // Skip modal dialogs during tests - they block indefinitely in CI
-        guard !isRunningTests else { return }
 
         // Check for Node.js on launch
         if !syncService.isNodeAvailable() {
