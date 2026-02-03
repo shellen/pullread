@@ -19,14 +19,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if NSClassFromString("XCTestCase") != nil {
             return true
         }
-        // Fallback: check environment variables
+        // Fallback: check environment variable set by xcodebuild test
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
             return true
         }
-        // Also check for CI environment running tests
-        if ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] == "true" {
-            return true
-        }
+        // Note: Do NOT check GITHUB_ACTIONS here - that's too broad and would
+        // treat all CI runs (including release builds) as test runs
         return false
     }
 

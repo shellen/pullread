@@ -58,8 +58,9 @@ jobs:
       - name: Run unit tests (without rebuilding)
         if: github.event.inputs.skip_tests != 'true'
         working-directory: PullReadTray
-        timeout-minutes: 3
+        timeout-minutes: 5
         run: |
+          set -o pipefail
           xcodebuild test-without-building \
             -project PullReadTray.xcodeproj \
             -scheme PullReadTray \
@@ -71,7 +72,7 @@ jobs:
             -skip-testing:PullReadTrayTests/SyncServiceTests/testConfigPathPerformance \
             -skip-testing:PullReadTrayTests/SyncServiceTests/testOutputPathPerformance \
             -resultBundlePath TestResults \
-            2>&1 | xcpretty --test --color || true
+            2>&1 | xcpretty --test --color
 
       - name: Upload test results
         if: always() && github.event.inputs.skip_tests != 'true'
