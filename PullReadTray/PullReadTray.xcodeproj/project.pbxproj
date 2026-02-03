@@ -11,6 +11,8 @@
 		A1000002200000010000000A /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002100000010000000A /* AppDelegate.swift */; };
 		A1000003200000010000000A /* SyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000003100000010000000A /* SyncService.swift */; };
 		A1000004200000010000000A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000004100000010000000A /* Assets.xcassets */; };
+		A1000005200000010000000A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000005100000010000000B /* SettingsView.swift */; };
+		A1000006200000010000000A /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000006100000010000000B /* SettingsWindowController.swift */; };
 		B1000001200000010000000A /* SyncServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000001100000010000000A /* SyncServiceTests.swift */; };
 		B1000002200000010000000A /* AppDelegateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002100000010000000A /* AppDelegateTests.swift */; };
 		C1000001200000010000000A /* PullReadTrayUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000001100000010000000A /* PullReadTrayUITests.swift */; };
@@ -40,7 +42,9 @@
 		A1000003100000010000000A /* SyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncService.swift; sourceTree = "<group>"; };
 		A1000004100000010000000A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1000005100000010000000A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A1000005100000010000000B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A1000006100000010000000A /* PullReadTray.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PullReadTray.entitlements; sourceTree = "<group>"; };
+		A1000006100000010000000B /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 		A1000007100000010000000A /* PullReadTray.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PullReadTray.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B1000001100000010000000A /* SyncServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncServiceTests.swift; sourceTree = "<group>"; };
 		B1000002100000010000000A /* AppDelegateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegateTests.swift; sourceTree = "<group>"; };
@@ -91,6 +95,8 @@
 				A1000001100000010000000A /* PullReadTrayApp.swift */,
 				A1000002100000010000000A /* AppDelegate.swift */,
 				A1000003100000010000000A /* SyncService.swift */,
+				A1000005100000010000000B /* SettingsView.swift */,
+				A1000006100000010000000B /* SettingsWindowController.swift */,
 				A1000004100000010000000A /* Assets.xcassets */,
 				A1000005100000010000000A /* Info.plist */,
 				A1000006100000010000000A /* PullReadTray.entitlements */,
@@ -258,6 +264,8 @@
 				A1000001200000010000000A /* PullReadTrayApp.swift in Sources */,
 				A1000002200000010000000A /* AppDelegate.swift in Sources */,
 				A1000003200000010000000A /* SyncService.swift in Sources */,
+				A1000005200000010000000A /* SettingsView.swift in Sources */,
+				A1000006200000010000000A /* SettingsWindowController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

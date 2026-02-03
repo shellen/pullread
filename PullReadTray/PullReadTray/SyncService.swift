@@ -72,6 +72,28 @@ class SyncService {
         return outputPath
     }
 
+    /// Checks if the configuration file exists and has valid content
+    func isConfigValid() -> Bool {
+        let configPath = getConfigPath()
+
+        guard FileManager.default.fileExists(atPath: configPath),
+              let data = FileManager.default.contents(atPath: configPath),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let outputPath = json["outputPath"] as? String,
+              !outputPath.isEmpty,
+              let feeds = json["feeds"] as? [String: String],
+              !feeds.isEmpty else {
+            return false
+        }
+
+        return true
+    }
+
+    /// Checks if this appears to be a first run (no config file exists)
+    func isFirstRun() -> Bool {
+        return !FileManager.default.fileExists(atPath: getConfigPath())
+    }
+
     func sync(retryFailed: Bool, completion: @escaping (Result<String, Error>) -> Void) {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
