@@ -21,8 +21,15 @@ struct SettingsView: View {
     @State private var selectedFeed: FeedItem.ID?
 
     let configPath: String
-    var onSave: (() -> Void)? = nil
-    var isFirstRun: Bool = false
+    var onSave: (() -> Void)?
+    var isFirstRun: Bool
+
+    init(isPresented: Binding<Bool>, configPath: String, onSave: (() -> Void)? = nil, isFirstRun: Bool = false) {
+        self._isPresented = isPresented
+        self.configPath = configPath
+        self.onSave = onSave
+        self.isFirstRun = isFirstRun
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
