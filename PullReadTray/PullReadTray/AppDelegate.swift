@@ -11,15 +11,60 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var lastSyncMenuItem: NSMenuItem!
     private var syncMenuItem: NSMenuItem!
     private var statusMenuItem: NSMenuItem!
+    private var settingsWindowController: SettingsWindowController!
+
+    /// Returns true if running in a unit test environment
+    private var isRunningTests: Bool {
+        // Check if XCTest framework is loaded (most reliable method)
+        if NSClassFromString("XCTestCase") != nil {
+            return true
+        }
+        // Fallback: check environment variables
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            return true
+        }
+        // Also check for CI environment running tests
+        if ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] == "true" {
+            return true
+        }
+        return false
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         syncService = SyncService()
+        settingsWindowController = SettingsWindowController()
+
+        // Skip ALL UI setup during tests - UI operations block/hang in headless CI
+        guard !isRunningTests else { return }
+
         setupStatusBar()
         requestNotificationPermission()
 
         // Check for Node.js on launch
         if !syncService.isNodeAvailable() {
             showNodeNotFoundAlert()
+        }
+
+        // Check for first run or invalid config
+        checkFirstRunOrInvalidConfig()
+    }
+
+    private func checkFirstRunOrInvalidConfig() {
+        // Small delay to let the app fully initialize
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self = self else { return }
+
+            if self.syncService.isFirstRun() {
+                // First run - show welcome/setup
+                self.showSettings(isFirstRun: true)
+            } else if !self.syncService.isConfigValid() {
+                // Config exists but is invalid
+                self.showAlert(
+                    title: "Configuration Required",
+                    message: "Your feeds.json configuration appears to be incomplete. Please configure your settings."
+                )
+                self.showSettings(isFirstRun: false)
+            }
         }
     }
 
@@ -76,8 +121,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         openFolderMenuItem.target = self
         menu.addItem(openFolderMenuItem)
 
-        // Open feeds.json
-        let openConfigMenuItem = NSMenuItem(title: "Edit Configuration...", action: #selector(openConfig), keyEquivalent: ",")
+        // Settings
+        let openConfigMenuItem = NSMenuItem(title: "Settings...", action: #selector(openConfig), keyEquivalent: ",")
         openConfigMenuItem.target = self
         menu.addItem(openConfigMenuItem)
 
@@ -198,9 +243,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openConfig() {
-        let configPath = syncService.getConfigPath()
-        let url = URL(fileURLWithPath: configPath)
-        NSWorkspace.shared.open(url)
+        showSettings(isFirstRun: false)
+    }
+
+    private func showSettings(isFirstRun: Bool) {
+        settingsWindowController.showSettings(
+            configPath: syncService.getConfigPath(),
+            isFirstRun: isFirstRun
+        ) { [weak self] in
+            // Callback after save - could trigger a sync or update UI
+            self?.showNotification(title: "Settings Saved", body: "Your configuration has been updated.")
+        }
     }
 
     @objc private func viewLogs() {
