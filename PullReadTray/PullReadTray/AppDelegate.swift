@@ -264,6 +264,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func showSettings(isFirstRun: Bool) {
         settingsWindowController.showSettings(
             configPath: syncService.getConfigPath(),
+            projectPath: syncService.getProjectPath(),
             isFirstRun: isFirstRun
         ) { [weak self] in
             // Callback after save - could trigger a sync or update UI

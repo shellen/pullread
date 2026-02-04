@@ -1,0 +1,138 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.0.0)'
+        required: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install Apple certificate
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          # Create temporary keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Import certificate
+          echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security import $RUNNER_TEMP/certificate.p12 \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+
+          # Allow codesign to access keychain
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+
+          # Clean up certificate file
+          rm $RUNNER_TEMP/certificate.p12
+
+      - name: Build app
+        run: |
+          cd PullReadTray
+          xcodebuild -project PullReadTray.xcodeproj \
+            -scheme PullReadTray \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="Developer ID Application" \
+            clean build
+
+      - name: Notarize app
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+        run: |
+          APP_PATH="PullReadTray/build/Build/Products/Release/Pull Read.app"
+
+          # Create ZIP for notarization
+          ditto -c -k --keepParent "$APP_PATH" PullRead-app.zip
+
+          # Submit for notarization
+          xcrun notarytool submit PullRead-app.zip \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_ID_PASSWORD" \
+            --wait
+
+          # Staple the ticket
+          xcrun stapler staple "$APP_PATH"
+
+          rm PullRead-app.zip
+
+      - name: Create DMG
+        run: |
+          APP_PATH="PullReadTray/build/Build/Products/Release/Pull Read.app"
+
+          # Create DMG
+          hdiutil create -volname "Pull Read" \
+            -srcfolder "$APP_PATH" \
+            -ov -format UDZO \
+            PullRead.dmg
+
+          # Sign DMG
+          codesign --sign "Developer ID Application" PullRead.dmg
+
+      - name: Notarize DMG
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+        run: |
+          xcrun notarytool submit PullRead.dmg \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_ID_PASSWORD" \
+            --wait
+
+          xcrun stapler staple PullRead.dmg
+
+      - name: Verify signature
+        run: |
+          echo "Verifying DMG..."
+          codesign -dv --verbose=2 PullRead.dmg
+          spctl -a -v PullRead.dmg
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Pull Read v${{ steps.version.outputs.VERSION }}
+          files: PullRead.dmg
+          draft: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clean up keychain
+        if: always()
+        run: |
+          security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true

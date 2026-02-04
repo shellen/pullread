@@ -8,9 +8,14 @@ class SyncService {
     private let nodePath: String
     private let npmPath: String
 
+    static let projectPathKey = "PullReadProjectPath"
+
     init() {
-        // Determine project path - look for bundled or development location
-        if let bundlePath = Bundle.main.resourcePath,
+        // Determine project path - check UserDefaults first, then auto-detect
+        if let savedPath = UserDefaults.standard.string(forKey: SyncService.projectPathKey),
+           FileManager.default.fileExists(atPath: "\(savedPath)/package.json") {
+            projectPath = savedPath
+        } else if let bundlePath = Bundle.main.resourcePath,
            FileManager.default.fileExists(atPath: "\(bundlePath)/pullread/package.json") {
             projectPath = "\(bundlePath)/pullread"
         } else {
@@ -20,9 +25,16 @@ class SyncService {
             if FileManager.default.fileExists(atPath: "\(parentDir)/package.json") {
                 projectPath = parentDir
             } else {
-                // Fallback: use home directory location
+                // Check common locations
                 let home = FileManager.default.homeDirectoryForCurrentUser.path
-                projectPath = "\(home)/Projects/pullread"
+                let commonPaths = [
+                    "\(home)/Documents/pullread",
+                    "\(home)/Projects/pullread",
+                    "\(home)/Developer/pullread",
+                    "\(home)/Code/pullread"
+                ]
+                projectPath = commonPaths.first { FileManager.default.fileExists(atPath: "\($0)/package.json") }
+                    ?? "\(home)/Documents/pullread"  // Default for first-time setup
             }
         }
 
@@ -51,6 +63,14 @@ class SyncService {
 
     func getConfigPath() -> String {
         return "\(projectPath)/feeds.json"
+    }
+
+    func getProjectPath() -> String {
+        return projectPath
+    }
+
+    static func setProjectPath(_ path: String) {
+        UserDefaults.standard.set(path, forKey: projectPathKey)
     }
 
     func getOutputPath() -> String? {

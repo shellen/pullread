@@ -13,6 +13,7 @@ struct FeedItem: Identifiable, Equatable {
 struct SettingsView: View {
     @Binding var isPresented: Bool
     @State private var outputPath: String = "~/Articles"
+    @State private var projectPath: String = ""
     @State private var feeds: [FeedItem] = []
     @State private var newFeedName: String = ""
     @State private var newFeedURL: String = ""
@@ -21,12 +22,14 @@ struct SettingsView: View {
     @State private var selectedFeed: FeedItem.ID?
 
     let configPath: String
+    let initialProjectPath: String
     var onSave: (() -> Void)?
     var isFirstRun: Bool
 
-    init(isPresented: Binding<Bool>, configPath: String, onSave: (() -> Void)? = nil, isFirstRun: Bool = false) {
+    init(isPresented: Binding<Bool>, configPath: String, projectPath: String = "", onSave: (() -> Void)? = nil, isFirstRun: Bool = false) {
         self._isPresented = isPresented
         self.configPath = configPath
+        self.initialProjectPath = projectPath
         self.onSave = onSave
         self.isFirstRun = isFirstRun
     }
@@ -36,6 +39,10 @@ struct SettingsView: View {
             if isFirstRun {
                 welcomeHeader
             }
+
+            projectPathSection
+
+            Divider()
 
             outputFolderSection
 
@@ -48,8 +55,9 @@ struct SettingsView: View {
             buttonRow
         }
         .padding(20)
-        .frame(width: 500, height: isFirstRun ? 520 : 480)
+        .frame(width: 500, height: isFirstRun ? 580 : 540)
         .onAppear {
+            projectPath = initialProjectPath
             loadConfig()
         }
         .alert("Error", isPresented: $showingError) {
@@ -61,11 +69,30 @@ struct SettingsView: View {
 
     private var welcomeHeader: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Welcome to PullRead!")
+            Text("Welcome to Pull Read!")
                 .font(.title2)
                 .fontWeight(.semibold)
             Text("Let's configure your RSS feed sync settings.")
                 .foregroundColor(.secondary)
+        }
+    }
+
+    private var projectPathSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("PullRead Project Folder")
+                .font(.headline)
+            Text("Location of the PullRead project (contains package.json).")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            HStack {
+                TextField("~/Documents/pullread", text: $projectPath)
+                    .textFieldStyle(.roundedBorder)
+
+                Button("Browse...") {
+                    selectProjectFolder()
+                }
+            }
         }
     }
 
@@ -165,6 +192,27 @@ struct SettingsView: View {
         }
     }
 
+    private func selectProjectFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = false
+        panel.prompt = "Select"
+        panel.message = "Choose the PullRead project folder (contains package.json)"
+
+        if panel.runModal() == .OK, let url = panel.url {
+            let path = url.path
+            // Validate it contains package.json
+            if FileManager.default.fileExists(atPath: "\(path)/package.json") {
+                projectPath = path
+            } else {
+                errorMessage = "Selected folder doesn't contain package.json. Please select the PullRead project folder."
+                showingError = true
+            }
+        }
+    }
+
     private func selectOutputFolder() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
@@ -223,7 +271,20 @@ struct SettingsView: View {
     }
 
     private func saveConfig() {
-        // Validate
+        // Validate project path
+        guard !projectPath.isEmpty else {
+            errorMessage = "Please select the PullRead project folder."
+            showingError = true
+            return
+        }
+
+        guard FileManager.default.fileExists(atPath: "\(projectPath)/package.json") else {
+            errorMessage = "Project folder doesn't contain package.json. Please select the correct PullRead project folder."
+            showingError = true
+            return
+        }
+
+        // Validate output path
         guard !outputPath.isEmpty else {
             errorMessage = "Please select an output folder."
             showingError = true
@@ -235,6 +296,9 @@ struct SettingsView: View {
             showingError = true
             return
         }
+
+        // Save project path to UserDefaults
+        SyncService.setProjectPath(projectPath)
 
         // Build config dictionary
         var feedsDict: [String: String] = [:]
@@ -282,6 +346,7 @@ struct SettingsView: View {
     SettingsView(
         isPresented: .constant(true),
         configPath: "/tmp/feeds.json",
+        projectPath: "/tmp/pullread",
         isFirstRun: true
     )
 }

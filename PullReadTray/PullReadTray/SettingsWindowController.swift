@@ -9,7 +9,7 @@ class SettingsWindowController {
     private var windowDelegate: WindowDelegate?
     private var isPresented: Bool = true
 
-    func showSettings(configPath: String, isFirstRun: Bool = false, onSave: (() -> Void)? = nil) {
+    func showSettings(configPath: String, projectPath: String, isFirstRun: Bool = false, onSave: (() -> Void)? = nil) {
         // If window exists and is visible, just bring it to front
         if let existingWindow = window, existingWindow.isVisible {
             existingWindow.makeKeyAndOrderFront(nil)
@@ -30,6 +30,7 @@ class SettingsWindowController {
                 }
             ),
             configPath: configPath,
+            projectPath: projectPath,
             onSave: {
                 onSave?()
                 self.closeWindow()
@@ -40,13 +41,13 @@ class SettingsWindowController {
         let hostingController = NSHostingController(rootView: settingsView)
 
         let newWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 500, height: isFirstRun ? 520 : 480),
+            contentRect: NSRect(x: 0, y: 0, width: 500, height: isFirstRun ? 580 : 540),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
 
-        newWindow.title = isFirstRun ? "Welcome to PullRead" : "PullRead Settings"
+        newWindow.title = isFirstRun ? "Welcome to Pull Read" : "Pull Read Settings"
         newWindow.contentViewController = hostingController
         newWindow.center()
         newWindow.isReleasedWhenClosed = false

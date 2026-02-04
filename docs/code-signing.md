@@ -155,9 +155,77 @@ The project already has hardened runtime enabled. If you add new entitlements, e
 
 ## GitHub Actions (CI/CD)
 
-For automated signing in CI, you'll need to:
-1. Export your signing certificate as a .p12 file
-2. Store the certificate and password as GitHub secrets
-3. Import the certificate in the workflow before building
+The repository includes a GitHub Actions workflow (`.github/workflows/release.yml`) that automatically builds, signs, and notarizes the app when you push a version tag.
 
-See Apple's documentation on [Creating a CI/CD workflow for signing](https://developer.apple.com/documentation/xcode/notarizing-macos-software-before-distribution).
+### One-Time Setup
+
+#### 1. Export Your Signing Certificate
+
+On your Mac with the Developer ID certificate installed:
+
+```bash
+# Open Keychain Access
+# 1. Click "login" keychain in sidebar
+# 2. Search for "Developer ID Application"
+# 3. Select both the certificate AND private key (Cmd+click)
+# 4. File → Export Items
+# 5. Save as .p12, create a password
+```
+
+#### 2. Get Base64 of Certificate
+
+```bash
+base64 -i developer-id.p12 | pbcopy
+# This copies the base64 string to your clipboard
+```
+
+#### 3. Create App-Specific Password
+
+1. Go to https://appleid.apple.com/account/manage
+2. Sign in → App-Specific Passwords
+3. Generate a password for "GitHub Actions"
+
+#### 4. Add GitHub Secrets
+
+Go to your repository → Settings → Secrets and variables → Actions → New repository secret
+
+Add these secrets:
+
+| Secret Name | Value |
+|-------------|-------|
+| `APPLE_CERTIFICATE_BASE64` | The base64 string from step 2 |
+| `APPLE_CERTIFICATE_PASSWORD` | Password you created when exporting .p12 |
+| `APPLE_TEAM_ID` | Your Team ID (from developer.apple.com) |
+| `APPLE_ID` | Your Apple ID email |
+| `APPLE_ID_PASSWORD` | App-specific password from step 3 |
+
+#### 5. Delete Local Certificate File
+
+```bash
+rm developer-id.p12
+```
+
+### Creating a Release
+
+#### Option A: Push a Tag
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The workflow automatically triggers and creates a GitHub Release with the signed DMG.
+
+#### Option B: Manual Trigger
+
+1. Go to Actions → Build and Release
+2. Click "Run workflow"
+3. Enter version number (e.g., `1.0.0`)
+4. Click "Run workflow"
+
+### Security Notes
+
+- GitHub Secrets are encrypted and never exposed in logs
+- Secrets are masked if accidentally printed
+- Fork PRs cannot access secrets
+- The .p12 file is imported to a temporary keychain that's deleted after the build
