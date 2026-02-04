@@ -12,4 +12,7 @@ module.exports = {
   transformIgnorePatterns: [
     "node_modules/(?!(entities)/)"
   ],
+  moduleNameMapper: {
+    "^bun:sqlite$": "<rootDir>/src/__mocks__/bun-sqlite.js",
+  },
 };

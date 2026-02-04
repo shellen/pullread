@@ -19,6 +19,30 @@ const turndown = new TurndownService({
   codeBlockStyle: 'fenced'
 });
 
+export function resolveRelativeUrls(markdown: string, baseUrl: string): string {
+  let origin: string;
+  try {
+    const parsed = new URL(baseUrl);
+    origin = parsed.origin;
+  } catch {
+    return markdown;
+  }
+
+  // Resolve root-relative URLs in markdown images: ![alt](/path) -> ![alt](https://domain.com/path)
+  markdown = markdown.replace(
+    /!\[([^\]]*)\]\((\/[^)]+)\)/g,
+    (_, alt, path) => `![${alt}](${origin}${path})`
+  );
+
+  // Resolve root-relative URLs in markdown links: [text](/path) -> [text](https://domain.com/path)
+  markdown = markdown.replace(
+    /(?<!!)\[([^\]]*)\]\((\/[^)]+)\)/g,
+    (_, text, path) => `[${text}](${origin}${path})`
+  );
+
+  return markdown;
+}
+
 export function extractArticle(html: string, url: string): ExtractedArticle | null {
   const { document } = parseHTML(html);
   // Set document URL for Readability
@@ -30,7 +54,10 @@ export function extractArticle(html: string, url: string): ExtractedArticle | nu
     return null;
   }
 
-  const markdown = turndown.turndown(article.content);
+  const markdown = resolveRelativeUrls(
+    turndown.turndown(article.content),
+    url
+  );
 
   return {
     title: article.title || 'Untitled',
