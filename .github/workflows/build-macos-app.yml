@@ -43,6 +43,18 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Build PullRead CLI binary
+        run: |
+          bun install
+          mkdir -p dist
+          bun build src/index.ts --compile --target=bun-darwin-arm64 --outfile dist/pullread-arm64
+          bun build src/index.ts --compile --target=bun-darwin-x64 --outfile dist/pullread-x64
+          lipo -create dist/pullread-arm64 dist/pullread-x64 -output dist/pullread
+          file dist/pullread
+
       - name: Install xcpretty
         run: gem install xcpretty
 
@@ -101,24 +113,33 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
 
-      - name: Create app bundle
+      - name: Create app bundle with CLI
         working-directory: PullReadTray
         run: |
           mkdir -p artifacts
-          cp -R build/Build/Products/Release/PullReadTray.app artifacts/
+          APP_PATH="build/Build/Products/Release/PullReadTray.app"
+
+          # Copy app to artifacts
+          cp -R "$APP_PATH" artifacts/
+
+          # Bundle CLI binary into app resources
+          cp ../dist/pullread "artifacts/PullReadTray.app/Contents/Resources/"
+
+          # Verify
+          ls -la "artifacts/PullReadTray.app/Contents/Resources/"
 
       - name: Create DMG
         working-directory: PullReadTray
         run: |
           # Create a temporary directory for DMG contents
           mkdir -p dmg-contents
-          cp -R artifacts/PullReadTray.app dmg-contents/
+          cp -R "artifacts/PullReadTray.app" dmg-contents/
 
           # Create a symlink to Applications
           ln -s /Applications dmg-contents/Applications
 
-          # Create the DMG
-          hdiutil create -volname "PullRead" \
+          # Create the DMG (volume name shows as "Pull Read" to users)
+          hdiutil create -volname "Pull Read" \
             -srcfolder dmg-contents \
             -ov -format UDZO \
             artifacts/PullRead.dmg
@@ -129,7 +150,7 @@ jobs:
       - name: Upload app artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PullReadTray-app
+          name: PullRead-app
           path: PullReadTray/artifacts/PullReadTray.app
           retention-days: 30
 
@@ -184,7 +205,9 @@ jobs:
           tag_name: latest
           name: Latest Build
           body: |
-            This is the latest build of PullRead from the main branch.
+            This is the latest build of Pull Read from the main branch.
+
+            The app is self-contained with the CLI binary bundled—no Node.js required.
 
             **Download:** [PullRead.dmg](https://github.com/${{ github.repository }}/releases/download/latest/PullRead.dmg)
 
