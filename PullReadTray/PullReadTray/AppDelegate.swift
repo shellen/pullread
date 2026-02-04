@@ -14,19 +14,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindowController: SettingsWindowController!
 
     /// Returns true if running in a unit test environment
+    /// Uses multiple detection methods for reliability across different test runners
     private var isRunningTests: Bool {
-        // Check if XCTest framework is loaded (most reliable method)
+        // 1. Explicit CI test flag (most reliable - we control this)
+        if ProcessInfo.processInfo.environment["RUNNING_XCTEST"] == "1" {
+            return true
+        }
+
+        // 2. Check for XCTest launch arguments (xcodebuild passes these to test host)
+        let args = ProcessInfo.processInfo.arguments
+        if args.contains(where: { $0.contains("XCTest") || $0.contains("xctest") }) {
+            return true
+        }
+
+        // 3. Check if XCTest framework is loaded
         if NSClassFromString("XCTestCase") != nil {
             return true
         }
-        // Fallback: check environment variables
+
+        // 4. Check xcodebuild's test configuration env var
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
             return true
         }
-        // Also check for CI environment running tests
-        if ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] == "true" {
+
+        // 5. Check for test bundle path env var
+        if ProcessInfo.processInfo.environment["XCTestBundlePath"] != nil {
             return true
         }
+
         return false
     }
 
