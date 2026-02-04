@@ -3,13 +3,35 @@
 
 import { readFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { homedir } from 'os';
 import { fetchFeed, FeedEntry } from './feed';
 import { fetchAndExtract } from './extractor';
 import { writeArticle } from './writer';
 import { Storage } from './storage';
 
-const DB_PATH = join(__dirname, '..', 'data', 'pullread.db');
-const CONFIG_PATH = join(__dirname, '..', 'feeds.json');
+// Default paths for standalone binary
+const DEFAULT_CONFIG_DIR = join(homedir(), '.config', 'pullread');
+const DEFAULT_DB_PATH = join(DEFAULT_CONFIG_DIR, 'pullread.db');
+const DEFAULT_CONFIG_PATH = join(DEFAULT_CONFIG_DIR, 'feeds.json');
+
+// Allow overriding via command line args: --config-path and --data-path
+function getPaths(): { configPath: string; dbPath: string } {
+  const args = process.argv;
+  const configIndex = args.indexOf('--config-path');
+  const dataIndex = args.indexOf('--data-path');
+
+  const configPath = configIndex !== -1 && args[configIndex + 1]
+    ? args[configIndex + 1]
+    : DEFAULT_CONFIG_PATH;
+
+  const dbPath = dataIndex !== -1 && args[dataIndex + 1]
+    ? args[dataIndex + 1]
+    : DEFAULT_DB_PATH;
+
+  return { configPath, dbPath };
+}
+
+const { configPath: CONFIG_PATH, dbPath: DB_PATH } = getPaths();
 
 interface Config {
   outputPath: string;
@@ -151,9 +173,10 @@ async function sync(feedFilter?: string, retryFailed = false): Promise<void> {
     process.exit(1);
   }
 
-  const dataDir = join(__dirname, '..', 'data');
-  if (!existsSync(dataDir)) {
-    mkdirSync(dataDir, { recursive: true });
+  // Ensure config directory exists for database
+  const configDir = join(DB_PATH, '..');
+  if (!existsSync(configDir)) {
+    mkdirSync(configDir, { recursive: true });
   }
 
   const storage = new Storage(DB_PATH);

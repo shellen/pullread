@@ -6,6 +6,9 @@
   "scripts": {
     "sync": "ts-node src/index.ts sync",
     "sync:retry": "ts-node src/index.ts sync --retry-failed",
+    "build": "bun build src/index.ts --compile --outfile dist/pullread",
+    "build:macos-arm64": "bun build src/index.ts --compile --target=bun-darwin-arm64 --outfile dist/pullread-arm64",
+    "build:macos-x64": "bun build src/index.ts --compile --target=bun-darwin-x64 --outfile dist/pullread-x64",
     "test": "jest"
   },
   "keywords": [],
@@ -13,7 +16,6 @@
   "license": "ISC",
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
-    "better-sqlite3": "^12.6.2",
     "fast-xml-parser": "^5.3.3",
     "jsdom": "^27.4.0",
     "turndown": "^7.2.2"
@@ -21,7 +23,6 @@
   "devDependencies": {
     "@babel/core": "^7.28.6",
     "@babel/preset-env": "^7.28.6",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/jest": "^30.0.0",
     "@types/jsdom": "^27.0.0",
     "@types/node": "^25.1.0",

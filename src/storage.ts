@@ -1,7 +1,9 @@
-// ABOUTME: SQLite storage for tracking processed URLs
+// ABOUTME: JSON file storage for tracking processed URLs
 // ABOUTME: Persists sync state to avoid re-processing articles
 
-import Database from 'better-sqlite3';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { dirname } from 'path';
+import { mkdirSync } from 'fs';
 
 export interface ProcessedEntry {
   url: string;
@@ -10,57 +12,90 @@ export interface ProcessedEntry {
   outputFile: string;
 }
 
+interface StoredEntry {
+  url: string;
+  title?: string;
+  bookmarkedAt?: string;
+  processedAt: string;
+  status: 'success' | 'failed';
+  error?: string;
+  outputFile?: string;
+}
+
+interface StorageData {
+  entries: { [url: string]: StoredEntry };
+}
+
 export class Storage {
-  private db: Database.Database;
+  private data: StorageData;
+  private dbPath: string;
 
   constructor(dbPath: string) {
-    this.db = new Database(dbPath);
-    this.init();
+    // Use .json extension instead of .db
+    this.dbPath = dbPath.replace(/\.db$/, '.json');
+    this.data = this.load();
   }
 
-  private init(): void {
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS processed (
-        url TEXT PRIMARY KEY,
-        title TEXT,
-        bookmarked_at TEXT,
-        processed_at TEXT,
-        status TEXT DEFAULT 'success',
-        error TEXT,
-        output_file TEXT
-      )
-    `);
+  private load(): StorageData {
+    if (existsSync(this.dbPath)) {
+      try {
+        const content = readFileSync(this.dbPath, 'utf-8');
+        return JSON.parse(content);
+      } catch {
+        return { entries: {} };
+      }
+    }
+    return { entries: {} };
+  }
+
+  private save(): void {
+    const dir = dirname(this.dbPath);
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+    writeFileSync(this.dbPath, JSON.stringify(this.data, null, 2));
   }
 
   isProcessed(url: string): boolean {
-    const row = this.db.prepare('SELECT 1 FROM processed WHERE url = ?').get(url);
-    return row !== undefined;
+    return url in this.data.entries;
   }
 
   markProcessed(entry: ProcessedEntry): void {
-    this.db.prepare(`
-      INSERT OR REPLACE INTO processed (url, title, bookmarked_at, processed_at, status, output_file)
-      VALUES (?, ?, ?, datetime('now'), 'success', ?)
-    `).run(entry.url, entry.title, entry.bookmarkedAt, entry.outputFile);
+    this.data.entries[entry.url] = {
+      url: entry.url,
+      title: entry.title,
+      bookmarkedAt: entry.bookmarkedAt,
+      processedAt: new Date().toISOString(),
+      status: 'success',
+      outputFile: entry.outputFile
+    };
+    this.save();
   }
 
   markFailed(url: string, error: string): void {
-    this.db.prepare(`
-      INSERT OR REPLACE INTO processed (url, processed_at, status, error)
-      VALUES (?, datetime('now'), 'failed', ?)
-    `).run(url, error);
+    this.data.entries[url] = {
+      url,
+      processedAt: new Date().toISOString(),
+      status: 'failed',
+      error
+    };
+    this.save();
   }
 
   getFailedUrls(): string[] {
-    const rows = this.db.prepare("SELECT url FROM processed WHERE status = 'failed'").all() as { url: string }[];
-    return rows.map(r => r.url);
+    return Object.values(this.data.entries)
+      .filter(e => e.status === 'failed')
+      .map(e => e.url);
   }
 
   clearFailed(url: string): void {
-    this.db.prepare("DELETE FROM processed WHERE url = ? AND status = 'failed'").run(url);
+    if (this.data.entries[url]?.status === 'failed') {
+      delete this.data.entries[url];
+      this.save();
+    }
   }
 
   close(): void {
-    this.db.close();
+    // No-op for JSON storage, but kept for API compatibility
   }
 }

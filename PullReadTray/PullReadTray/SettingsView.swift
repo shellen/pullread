@@ -48,7 +48,7 @@ struct SettingsView: View {
             buttonRow
         }
         .padding(20)
-        .frame(width: 500, height: isFirstRun ? 520 : 480)
+        .frame(width: 500, height: isFirstRun ? 500 : 460)
         .onAppear {
             loadConfig()
         }
@@ -61,7 +61,7 @@ struct SettingsView: View {
 
     private var welcomeHeader: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Welcome to PullRead!")
+            Text("Welcome to Pull Read!")
                 .font(.title2)
                 .fontWeight(.semibold)
             Text("Let's configure your RSS feed sync settings.")
@@ -223,7 +223,7 @@ struct SettingsView: View {
     }
 
     private func saveConfig() {
-        // Validate
+        // Validate output path
         guard !outputPath.isEmpty else {
             errorMessage = "Please select an output folder."
             showingError = true

@@ -1,56 +1,35 @@
 // ABOUTME: Service layer for running PullRead sync commands
-// ABOUTME: Handles Node.js process execution and configuration reading
+// ABOUTME: Executes bundled pullread binary for article syncing
 
 import Foundation
 
 class SyncService {
-    private let projectPath: String
-    private let nodePath: String
-    private let npmPath: String
+    private let configDir: String
+    private let binaryPath: String
 
     init() {
-        // Determine project path - look for bundled or development location
-        if let bundlePath = Bundle.main.resourcePath,
-           FileManager.default.fileExists(atPath: "\(bundlePath)/pullread/package.json") {
-            projectPath = "\(bundlePath)/pullread"
+        // Config is stored in ~/.config/pullread/
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        configDir = "\(home)/.config/pullread"
+
+        // Binary is bundled in app resources
+        if let resourcePath = Bundle.main.resourcePath {
+            binaryPath = "\(resourcePath)/pullread"
         } else {
-            // Development: assume project is in parent directory of app
-            let appPath = Bundle.main.bundlePath
-            let parentDir = (appPath as NSString).deletingLastPathComponent
-            if FileManager.default.fileExists(atPath: "\(parentDir)/package.json") {
-                projectPath = parentDir
-            } else {
-                // Fallback: use home directory location
-                let home = FileManager.default.homeDirectoryForCurrentUser.path
-                projectPath = "\(home)/Projects/pullread"
-            }
+            binaryPath = ""
         }
-
-        // Find Node.js - check common locations
-        let possibleNodePaths = [
-            "/usr/local/bin/node",
-            "/opt/homebrew/bin/node",
-            "/usr/bin/node",
-            "\(FileManager.default.homeDirectoryForCurrentUser.path)/.nvm/versions/node/*/bin/node"
-        ]
-
-        nodePath = possibleNodePaths.first { FileManager.default.fileExists(atPath: $0) } ?? "/usr/local/bin/node"
-
-        let possibleNpmPaths = [
-            "/usr/local/bin/npm",
-            "/opt/homebrew/bin/npm",
-            "/usr/bin/npm"
-        ]
-
-        npmPath = possibleNpmPaths.first { FileManager.default.fileExists(atPath: $0) } ?? "/usr/local/bin/npm"
     }
 
-    func isNodeAvailable() -> Bool {
-        return FileManager.default.fileExists(atPath: nodePath)
+    func isBinaryAvailable() -> Bool {
+        return FileManager.default.fileExists(atPath: binaryPath)
     }
 
     func getConfigPath() -> String {
-        return "\(projectPath)/feeds.json"
+        return "\(configDir)/feeds.json"
+    }
+
+    func getConfigDir() -> String {
+        return configDir
     }
 
     func getOutputPath() -> String? {
@@ -104,28 +83,26 @@ class SyncService {
     }
 
     private func runSyncCommand(retryFailed: Bool) -> Result<String, Error> {
+        guard isBinaryAvailable() else {
+            return .failure(NSError(
+                domain: "PullRead",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "PullRead binary not found in app bundle"]
+            ))
+        }
+
         let process = Process()
         let pipe = Pipe()
         let errorPipe = Pipe()
 
-        process.executableURL = URL(fileURLWithPath: npmPath)
-        process.currentDirectoryURL = URL(fileURLWithPath: projectPath)
+        process.executableURL = URL(fileURLWithPath: binaryPath)
 
+        // Build arguments
+        var args = ["sync", "--config-path", getConfigPath(), "--data-path", "\(configDir)/pullread.db"]
         if retryFailed {
-            process.arguments = ["run", "sync:retry"]
-        } else {
-            process.arguments = ["run", "sync"]
+            args.append("--retry-failed")
         }
-
-        // Set up environment with PATH including node
-        var env = ProcessInfo.processInfo.environment
-        let nodeBinDir = (nodePath as NSString).deletingLastPathComponent
-        if let existingPath = env["PATH"] {
-            env["PATH"] = "\(nodeBinDir):\(existingPath)"
-        } else {
-            env["PATH"] = nodeBinDir
-        }
-        process.environment = env
+        process.arguments = args
 
         process.standardOutput = pipe
         process.standardError = errorPipe
