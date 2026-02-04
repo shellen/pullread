@@ -12,10 +12,10 @@ PullRead fetches entries from your RSS/Atom feeds, extracts article content usin
 
 | Platform | Download | Notes |
 |----------|----------|-------|
-| **macOS** | [PullRead.dmg](https://github.com/shellen/pullread/releases/latest/download/PullRead.dmg) | Menu bar app for one-click sync |
-| **CLI** | Clone this repo | Works on macOS, Linux, Windows |
+| **macOS** | [PullRead.dmg](https://github.com/shellen/pullread/releases/latest/download/PullRead.dmg) | Self-contained menu bar app with bundled CLI |
+| **CLI** | Clone this repo | For development or running on Linux/Windows |
 
-> **Quick install:** Download the DMG, open it, drag Pull Read to your Applications folder, and launch it. The app will guide you through setup on first run.
+> **Quick install:** Download the DMG, open it, drag Pull Read to your Applications folder, and launch it. The app is fully self-contained—no Node.js or other dependencies required. Configure your feeds in Settings and start syncing.
 
 ---
 
@@ -47,10 +47,10 @@ PullRead fetches entries from your RSS/Atom feeds, extracts article content usin
 - **Multi-format feed support** - Atom, RSS, and podcast feeds with automatic detection
 - **Clean article extraction** - Uses Mozilla's Readability algorithm (same as Firefox Reader View)
 - **Markdown output** - Converts HTML to clean, readable markdown with YAML frontmatter
-- **Intelligent deduplication** - SQLite database tracks processed URLs to avoid re-fetching
+- **Intelligent deduplication** - Tracks processed URLs to avoid re-fetching
 - **Retry mechanism** - Failed extractions are tracked and can be retried later
 - **Podcast support** - Saves episode metadata with audio links (perfect for show notes)
-- **macOS menu bar app** - Native Swift app for one-click sync with notifications
+- **Self-contained macOS app** - Native Swift menu bar app with bundled CLI binary (no Node.js required)
 - **Flexible scheduling** - Run on-demand, via launchd, or with AppleScript
 - **Cloud-sync friendly** - Output folder can be Dropbox, iCloud, Google Drive, etc.
 
@@ -78,9 +78,12 @@ npm run sync
 
 ### Prerequisites
 
-- **Node.js** 16 or higher
-- **npm** (comes with Node.js)
-- **macOS** 11+ (for the menu bar app)
+**For the macOS menu bar app:**
+- **macOS** 11+ (no other dependencies required—the app is self-contained)
+
+**For CLI development:**
+- **Node.js** 16 or higher (for development with ts-node)
+- **Bun** (optional, for building standalone binaries)
 - **Xcode** 15.2+ (only if building the menu bar app from source)
 
 ### CLI Installation
@@ -104,11 +107,19 @@ npm run sync -- --help
 1. Download `PullRead.dmg` from [GitHub Releases](https://github.com/shellen/pullread/releases)
 2. Open the DMG and drag Pull Read to Applications
 3. Launch Pull Read from Applications
-4. (Optional) Add to Login Items for auto-start
+4. Open Settings to configure your feeds and output path
+5. (Optional) Add to Login Items for auto-start
+
+The app bundles its own CLI binary—no Node.js or npm required.
 
 **Option B: Build from Source**
 
 ```bash
+# First, build the CLI binary (requires Bun)
+npm install
+./scripts/build-release.sh
+
+# Then build the Xcode project
 cd PullReadTray
 xcodebuild -project PullReadTray.xcodeproj \
   -scheme PullReadTray \
@@ -124,11 +135,15 @@ xcodebuild -project PullReadTray.xcodeproj \
 
 ## Configuration
 
-Create your configuration file:
+**For the macOS app:** Open Pull Read's Settings window to configure your feeds and output path. Configuration is stored at `~/.config/pullread/feeds.json`.
+
+**For CLI development:** Create a configuration file in the project directory:
 
 ```bash
 cp feeds.json.example feeds.json
 ```
+
+The bundled CLI binary uses `~/.config/pullread/feeds.json` by default, but you can override with `--config-path` and `--data-path` flags.
 
 Edit `feeds.json`:
 
@@ -329,7 +344,7 @@ Examples:
 
 ## macOS Menu Bar App
 
-Pull Read is a native Swift menu bar application that provides a convenient GUI for PullRead.
+Pull Read is a self-contained native Swift menu bar application. It bundles the CLI binary, so no external dependencies (Node.js, npm) are required.
 
 ### Menu Structure
 
@@ -338,11 +353,11 @@ Pull Read is a native Swift menu bar application that provides a convenient GUI 
 │ Status: Idle           │  ← Current sync state
 │ Last sync: 2:34 PM     │  ← Time of last sync
 ├────────────────────────┤
-│ Sync Now          ⌘S   │  → Runs npm run sync
+│ Sync Now          ⌘S   │  → Runs the bundled CLI
 │ Retry Failed      ⌘R   │  → Retries failed URLs
 ├────────────────────────┤
 │ Open Output Folder ⌘O  │  → Opens your Articles folder
-│ Edit Configuration ⌘,  │  → Opens feeds.json
+│ Settings          ⌘,   │  → Configure feeds and output path
 │ View Logs...      ⌘L   │  → Opens sync log
 ├────────────────────────┤
 │ About PullRead         │
@@ -352,11 +367,11 @@ Pull Read is a native Swift menu bar application that provides a convenient GUI 
 
 ### Features
 
+- **Self-contained** - Bundled CLI binary, no Node.js required
 - **Status indicator** showing idle/syncing state
 - **Icon animation** during sync operations
 - **Native notifications** on sync completion or failure
 - **Keyboard shortcuts** for common actions
-- **Automatic Node.js detection** on launch
 - **No dock icon** - runs quietly in the menu bar
 
 ### Auto-Start on Login
@@ -436,22 +451,27 @@ pullread/
 │   ├── feed.ts                    # RSS/Atom parsing (auto-detects format)
 │   ├── extractor.ts               # Article extraction with Readability
 │   ├── writer.ts                  # Markdown generation with frontmatter
-│   ├── storage.ts                 # SQLite database operations
+│   ├── storage.ts                 # JSON file storage operations
 │   └── *.test.ts                  # Unit tests
 │
 ├── PullReadTray/                  # macOS menu bar app (Swift)
 │   ├── PullReadTray/
 │   │   ├── PullReadTrayApp.swift  # SwiftUI entry point
 │   │   ├── AppDelegate.swift      # Menu bar setup, notifications
-│   │   └── SyncService.swift      # Process execution layer
+│   │   └── SyncService.swift      # Bundled CLI binary execution
 │   ├── PullReadTrayTests/         # XCTest unit tests
 │   └── PullReadTrayUITests/       # XCTest UI tests
 │
-├── scripts/                       # Scheduler scripts
+├── scripts/                       # Build and scheduler scripts
+│   └── build-release.sh           # Builds universal CLI binary
+├── dist/                          # Compiled CLI binaries (gitignored)
 ├── docs/plans/                    # Design documentation
-├── data/                          # SQLite database (gitignored)
-├── feeds.json                     # Your configuration (gitignored)
+├── feeds.json                     # Dev configuration (gitignored)
 └── feeds.json.example             # Configuration template
+
+~/.config/pullread/                # User config directory (created by app)
+├── feeds.json                     # User's feed configuration
+└── pullread.json                  # Processed URL tracking database
 ```
 
 ### Data Flow
@@ -491,19 +511,29 @@ feeds.json
                └── 2024-01-29-article-title.md
 ```
 
-### Database Schema
+### Storage Format
 
-```sql
-CREATE TABLE processed (
-  url TEXT PRIMARY KEY,
-  title TEXT,
-  bookmarked_at TEXT,
-  processed_at TEXT,
-  status TEXT DEFAULT 'success',  -- 'success' or 'failed'
-  error TEXT,                      -- error message if failed
-  output_file TEXT,                -- path to saved markdown
-  feed TEXT                        -- source feed name
-);
+The processed URL database is stored as a JSON file at `~/.config/pullread/pullread.json`:
+
+```json
+{
+  "entries": {
+    "https://example.com/article": {
+      "url": "https://example.com/article",
+      "title": "Article Title",
+      "bookmarkedAt": "2024-01-29T19:05:18Z",
+      "processedAt": "2024-01-29T20:00:00Z",
+      "status": "success",
+      "outputFile": "~/Dropbox/Articles/2024-01-29-article-title.md"
+    },
+    "https://example.com/failed-article": {
+      "url": "https://example.com/failed-article",
+      "processedAt": "2024-01-29T20:01:00Z",
+      "status": "failed",
+      "error": "Failed to fetch content (timeout)"
+    }
+  }
+}
 ```
 
 ---
@@ -544,7 +574,9 @@ node dist/index.js sync
 | `@mozilla/readability` | Article content extraction |
 | `jsdom` | DOM simulation for Readability |
 | `turndown` | HTML to Markdown conversion |
-| `better-sqlite3` | Persistent URL tracking |
+
+**Build tooling:**
+- **Bun** - Used to compile TypeScript to standalone binaries for the macOS app
 
 ---
 
@@ -597,19 +629,11 @@ xcodebuild test \
 
 ### Common Issues
 
-**"Cannot find module" errors**
+**"Cannot find module" errors (CLI development)**
 ```bash
 # Reinstall dependencies
 rm -rf node_modules
 npm install
-```
-
-**"Node.js Not Found" (macOS app)**
-```bash
-# Install Node.js via Homebrew
-brew install node
-
-# Or download from https://nodejs.org
 ```
 
 **Feed returns 403/401 errors**
@@ -622,11 +646,11 @@ brew install node
 - Readability may fail on non-article pages
 - Check the `--retry-failed` output for specific errors
 
-**Database is corrupted**
+**Storage file is corrupted**
 ```bash
-# Reset the database (will re-fetch all articles)
-rm data/pullread.db
-npm run sync
+# Reset the storage file (will re-fetch all articles)
+rm ~/.config/pullread/pullread.json
+# Then run a new sync from the app or CLI
 ```
 
 ### Viewing Logs
@@ -756,7 +780,7 @@ ISC License
 - [Mozilla Readability](https://github.com/mozilla/readability) - The excellent article extraction algorithm
 - [Turndown](https://github.com/mixmark-io/turndown) - HTML to Markdown conversion
 - [fast-xml-parser](https://github.com/NaturalIntelligence/fast-xml-parser) - Fast and reliable XML parsing
-- [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) - The best SQLite library for Node.js
+- [Bun](https://bun.sh) - Fast JavaScript runtime used to build standalone binaries
 
 ---
 
