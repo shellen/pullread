@@ -250,7 +250,15 @@ struct SettingsView: View {
         // Write to file
         do {
             let data = try JSONSerialization.data(withJSONObject: config, options: [.prettyPrinted, .sortedKeys])
-            try data.write(to: URL(fileURLWithPath: configPath))
+
+            // Create parent directory if it doesn't exist
+            let configURL = URL(fileURLWithPath: configPath)
+            let parentDir = configURL.deletingLastPathComponent().path
+            if !FileManager.default.fileExists(atPath: parentDir) {
+                try FileManager.default.createDirectory(atPath: parentDir, withIntermediateDirectories: true)
+            }
+
+            try data.write(to: configURL)
 
             // Create output directory if it doesn't exist
             let expandedPath = outputPath.hasPrefix("~")

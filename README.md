@@ -12,10 +12,10 @@ PullRead fetches entries from your RSS/Atom feeds, extracts article content usin
 
 | Platform | Download | Notes |
 |----------|----------|-------|
-| **macOS** | [PullReadTray.dmg](https://github.com/shellen/pullread/releases/latest/download/PullReadTray.dmg) | Menu bar app for one-click sync |
+| **macOS** | [PullRead.dmg](https://github.com/shellen/pullread/releases/latest/download/PullRead.dmg) | Menu bar app for one-click sync |
 | **CLI** | Clone this repo | Works on macOS, Linux, Windows |
 
-> **Quick install:** Download the DMG, open it, drag PullReadTray to your Applications folder, and launch it. The app will guide you through setup on first run.
+> **Quick install:** Download the DMG, open it, drag Pull Read to your Applications folder, and launch it. The app will guide you through setup on first run.
 
 ---
 
@@ -101,9 +101,9 @@ npm run sync -- --help
 
 **Option A: Download Release (Recommended)**
 
-1. Download `PullReadTray.dmg` from [GitHub Releases](https://github.com/shellen/pullread/releases)
-2. Open the DMG and drag PullReadTray to Applications
-3. Launch PullReadTray from Applications
+1. Download `PullRead.dmg` from [GitHub Releases](https://github.com/shellen/pullread/releases)
+2. Open the DMG and drag Pull Read to Applications
+3. Launch Pull Read from Applications
 4. (Optional) Add to Login Items for auto-start
 
 **Option B: Build from Source**
@@ -329,7 +329,7 @@ Examples:
 
 ## macOS Menu Bar App
 
-PullReadTray is a native Swift menu bar application that provides a convenient GUI for PullRead.
+Pull Read is a native Swift menu bar application that provides a convenient GUI for PullRead.
 
 ### Menu Structure
 
@@ -364,11 +364,11 @@ PullReadTray is a native Swift menu bar application that provides a convenient G
 **Via System Preferences:**
 1. Open System Preferences > Users & Groups
 2. Select your user, then "Login Items"
-3. Click + and add PullReadTray.app
+3. Click + and add Pull Read.app
 
 **Via command line:**
 ```bash
-osascript -e 'tell application "System Events" to make login item at end with properties {path:"/Applications/PullReadTray.app", hidden:false}'
+osascript -e 'tell application "System Events" to make login item at end with properties {path:"/Applications/Pull Read.app", hidden:false}'
 ```
 
 ---
