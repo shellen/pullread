@@ -5,7 +5,9 @@
 set -e  # Exit on error
 
 # Configuration
-PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)/PullReadTray"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_DIR="$ROOT_DIR/PullReadTray"
 PROJECT_FILE="PullReadTray.xcodeproj"
 SCHEME="PullReadTray"
 APP_NAME="Pull Read"
@@ -39,6 +41,11 @@ check_prerequisites() {
         exit 1
     fi
 
+    if ! command -v bun &> /dev/null; then
+        echo_error "bun not found. Install from https://bun.sh"
+        exit 1
+    fi
+
     if ! xcrun notarytool history --keychain-profile "$KEYCHAIN_PROFILE" &> /dev/null; then
         echo_error "Notarization credentials not found."
         echo ""
@@ -66,7 +73,27 @@ check_prerequisites() {
 clean_build() {
     echo_step "Cleaning previous build..."
     rm -rf "$PROJECT_DIR/build"
+    rm -rf "$ROOT_DIR/dist"
     rm -f "$PROJECT_DIR/$DMG_NAME"
+}
+
+# Build CLI binary
+build_cli() {
+    echo_step "Building PullRead CLI binary..."
+    cd "$ROOT_DIR"
+
+    # Install dependencies
+    bun install
+
+    # Build for current architecture
+    ARCH=$(uname -m)
+    if [ "$ARCH" = "arm64" ]; then
+        bun build src/index.ts --compile --target=bun-darwin-arm64 --outfile dist/pullread
+    else
+        bun build src/index.ts --compile --target=bun-darwin-x64 --outfile dist/pullread
+    fi
+
+    echo "  Built: dist/pullread"
 }
 
 # Build the app
@@ -89,6 +116,24 @@ build_app() {
     fi
 
     echo "  Built: $APP_PATH"
+}
+
+# Bundle CLI into app
+bundle_cli() {
+    echo_step "Bundling CLI binary into app..."
+    APP_PATH="$PROJECT_DIR/build/Build/Products/Release/$APP_NAME.app"
+    RESOURCES_PATH="$APP_PATH/Contents/Resources"
+
+    # Copy binary
+    cp "$ROOT_DIR/dist/pullread" "$RESOURCES_PATH/"
+
+    # Sign the binary
+    codesign --force --sign "Developer ID Application" "$RESOURCES_PATH/pullread"
+
+    # Re-sign the entire app bundle
+    codesign --force --deep --sign "Developer ID Application" "$APP_PATH"
+
+    echo "  CLI bundled and signed."
 }
 
 # Notarize the app
@@ -199,7 +244,9 @@ main() {
 
     check_prerequisites
     clean_build
+    build_cli
     build_app
+    bundle_cli
     notarize_app
     create_dmg
     sign_dmg

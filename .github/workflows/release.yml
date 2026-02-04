@@ -27,6 +27,25 @@ jobs:
             echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
           fi
 
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Build PullRead CLI binary
+        run: |
+          # Install dependencies
+          bun install
+
+          # Build for both architectures
+          bun build src/index.ts --compile --target=bun-darwin-arm64 --outfile dist/pullread-arm64
+          bun build src/index.ts --compile --target=bun-darwin-x64 --outfile dist/pullread-x64
+
+          # Create universal binary
+          mkdir -p dist
+          lipo -create dist/pullread-arm64 dist/pullread-x64 -output dist/pullread
+
+          # Verify
+          file dist/pullread
+
       - name: Install Apple certificate
         env:
           APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
@@ -65,6 +84,20 @@ jobs:
             -derivedDataPath build \
             CODE_SIGN_IDENTITY="Developer ID Application" \
             clean build
+
+      - name: Bundle CLI binary into app
+        run: |
+          APP_PATH="PullReadTray/build/Build/Products/Release/Pull Read.app"
+          RESOURCES_PATH="$APP_PATH/Contents/Resources"
+
+          # Copy binary to app resources
+          cp dist/pullread "$RESOURCES_PATH/"
+
+          # Sign the binary
+          codesign --force --sign "Developer ID Application" "$RESOURCES_PATH/pullread"
+
+          # Re-sign the entire app bundle
+          codesign --force --deep --sign "Developer ID Application" "$APP_PATH"
 
       - name: Notarize app
         env:
