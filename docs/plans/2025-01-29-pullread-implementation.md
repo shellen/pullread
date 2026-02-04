@@ -21,7 +21,7 @@
 **Step 1: Initialize package.json**
 
 ```bash
-cd /Users/shellen/Documents/Claude\ Stuff/pullread/.worktrees/implement
+cd /path/to/pullread
 npm init -y
 ```
 
@@ -291,7 +291,7 @@ import { parseFeed, FeedEntry } from './feed';
 
 const SAMPLE_FEED = `<?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
-  <title>@shellen's bookmarks</title>
+  <title>My bookmarks</title>
   <entry>
     <title>Test Article Title</title>
     <link href="https://example.com/article"/>
@@ -910,7 +910,7 @@ git commit -m "feat: add CLI entry point with sync command"
 
 **Files:**
 - Create: `scripts/PullReadScheduler.applescript`
-- Create: `scripts/com.shellen.pullread.plist`
+- Create: `scripts/com.pullread.sync.plist`
 
 **Step 1: Create scripts directory**
 
@@ -926,7 +926,7 @@ Create `scripts/PullReadScheduler.applescript`:
 -- ABOUTME: Uses idle handler to sync every 30 minutes while running
 
 property syncInterval : 30 * 60 -- 30 minutes in seconds
-property pullreadPath : "/Users/shellen/Documents/Claude Stuff/pullread"
+property pullreadPath : "/path/to/pullread"
 
 on run
 	syncNow()
@@ -955,19 +955,19 @@ end quit
 
 **Step 3: Create launchd plist**
 
-Create `scripts/com.shellen.pullread.plist`:
+Create `scripts/com.pullread.sync.plist`:
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.shellen.pullread</string>
+    <string>com.pullread.sync</string>
     <key>ProgramArguments</key>
     <array>
         <string>/usr/local/bin/npx</string>
         <string>ts-node</string>
-        <string>/Users/shellen/Documents/Claude Stuff/pullread/src/index.ts</string>
+        <string>/path/to/pullread/src/index.ts</string>
         <string>sync</string>
     </array>
     <key>StartInterval</key>
@@ -977,7 +977,7 @@ Create `scripts/com.shellen.pullread.plist`:
     <key>StandardErrorPath</key>
     <string>/tmp/pullread.log</string>
     <key>WorkingDirectory</key>
-    <string>/Users/shellen/Documents/Claude Stuff/pullread</string>
+    <string>/path/to/pullread</string>
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
@@ -1005,7 +1005,7 @@ git commit -m "feat: add AppleScript scheduler and launchd plist"
 
 Create `.env` with actual values:
 ```
-FEED_URL=https://www.drafty.com/@shellen/links/s/nhSgIkkcXNfLV_6vsC7CoxmZBAbc70GN/feed.xml
+FEED_URL=https://www.drafty.com/@username/links/s/YOUR_TOKEN_HERE/feed.xml
 OUTPUT_PATH=/tmp/pullread-test-output
 ```
 
@@ -1048,4 +1048,4 @@ After all tasks complete:
 1. Update `OUTPUT_PATH` in `.env` to actual Dropbox/Drive folder
 2. Export AppleScript as application (Script Editor → Export → Application, check "Stay open")
 3. Add to Login Items for auto-start
-4. Or install launchd: `launchctl load ~/Library/LaunchAgents/com.shellen.pullread.plist`
+4. Or install launchd: `launchctl load ~/Library/LaunchAgents/com.pullread.sync.plist`

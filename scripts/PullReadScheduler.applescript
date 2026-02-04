@@ -2,7 +2,7 @@
 -- ABOUTME: Uses idle handler to sync every 30 minutes while running
 
 property syncInterval : 30 * 60 -- 30 minutes in seconds
-property pullreadPath : "/Users/shellen/Documents/Claude Stuff/pullread"
+property pullreadPath : "/path/to/pullread" -- UPDATE THIS to your pullread directory
 
 on run
 	syncNow()
