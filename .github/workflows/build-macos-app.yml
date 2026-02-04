@@ -8,11 +8,17 @@ on:
     branches: [main, 'claude/**']
     paths:
       - 'PullReadTray/**'
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/build-macos-app.yml'
   pull_request:
     branches: [main]
     paths:
       - 'PullReadTray/**'
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
   workflow_dispatch:
     inputs:
       create_release:
