@@ -5,7 +5,7 @@ import { readFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { fetchFeed, FeedEntry } from './feed';
-import { fetchAndExtract } from './extractor';
+import { fetchAndExtract, FetchOptions } from './extractor';
 import { writeArticle } from './writer';
 import { Storage } from './storage';
 
@@ -36,6 +36,7 @@ const { configPath: CONFIG_PATH, dbPath: DB_PATH } = getPaths();
 interface Config {
   outputPath: string;
   feeds: { [name: string]: string };
+  useBrowserCookies?: boolean;
 }
 
 function loadConfig(): Config {
@@ -60,7 +61,8 @@ function loadConfig(): Config {
 
     return {
       outputPath: config.outputPath.replace(/^~/, process.env.HOME || ''),
-      feeds: config.feeds
+      feeds: config.feeds,
+      useBrowserCookies: config.useBrowserCookies || false
     };
   } catch (err) {
     console.error('Error: Could not parse feeds.json:', err instanceof Error ? err.message : err);
@@ -73,7 +75,8 @@ async function syncFeed(
   feedUrl: string,
   storage: Storage,
   outputPath: string,
-  retryFailed: boolean
+  retryFailed: boolean,
+  fetchOptions: FetchOptions = {}
 ): Promise<{ success: number; failed: number }> {
   console.log(`\nSyncing ${feedName}...`);
 
@@ -118,7 +121,7 @@ async function syncFeed(
       if (entry.enclosure) {
         content = entry.annotation || 'No description available.';
       } else {
-        const article = await fetchAndExtract(entry.url);
+        const article = await fetchAndExtract(entry.url, fetchOptions);
 
         if (!article) {
           console.log(`      Skipped: Could not extract content`);
@@ -189,8 +192,16 @@ async function sync(feedFilter?: string, retryFailed = false): Promise<void> {
       ? { [feedFilter]: config.feeds[feedFilter] }
       : config.feeds;
 
+    const fetchOptions: FetchOptions = {
+      useBrowserCookies: config.useBrowserCookies
+    };
+
+    if (config.useBrowserCookies) {
+      console.log('Browser cookies enabled - using Chrome login sessions');
+    }
+
     for (const [name, url] of Object.entries(feedsToSync)) {
-      const { success, failed } = await syncFeed(name, url, storage, config.outputPath, retryFailed);
+      const { success, failed } = await syncFeed(name, url, storage, config.outputPath, retryFailed, fetchOptions);
       totalSuccess += success;
       totalFailed += failed;
     }

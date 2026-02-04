@@ -40,13 +40,15 @@ class SettingsWindowController {
         let hostingController = NSHostingController(rootView: settingsView)
 
         let newWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 500, height: isFirstRun ? 500 : 460),
-            styleMask: [.titled, .closable],
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: isFirstRun ? 620 : 580),
+            styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
 
-        newWindow.title = isFirstRun ? "Welcome to Pull Read" : "Pull Read Settings"
+        newWindow.title = isFirstRun ? "Welcome to PullRead" : "PullRead Settings"
+        newWindow.titlebarAppearsTransparent = true
+        newWindow.backgroundColor = .clear
         newWindow.contentViewController = hostingController
         newWindow.center()
         newWindow.isReleasedWhenClosed = false
