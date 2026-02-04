@@ -10,6 +10,6 @@ module.exports = {
     "node_modules/.+\\.js$": "babel-jest",
   },
   transformIgnorePatterns: [
-    "node_modules/(?!(@exodus/bytes|parse5|entities|html-encoding-sniffer)/)"
+    "node_modules/(?!(entities)/)"
   ],
 };
