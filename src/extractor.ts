@@ -1,7 +1,7 @@
 // ABOUTME: Extracts article content from web pages using Readability
 // ABOUTME: Converts HTML to clean markdown for storage
 
-import { JSDOM } from 'jsdom';
+import { parseHTML } from 'linkedom';
 import { Readability } from '@mozilla/readability';
 import TurndownService from 'turndown';
 
@@ -19,8 +19,10 @@ const turndown = new TurndownService({
 });
 
 export function extractArticle(html: string, url: string): ExtractedArticle | null {
-  const dom = new JSDOM(html, { url });
-  const reader = new Readability(dom.window.document);
+  const { document } = parseHTML(html);
+  // Set document URL for Readability
+  Object.defineProperty(document, 'URL', { value: url });
+  const reader = new Readability(document);
   const article = reader.parse();
 
   if (!article || !article.content) {
