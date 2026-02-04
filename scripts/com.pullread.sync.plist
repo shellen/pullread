@@ -3,12 +3,12 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.shellen.pullread</string>
+    <string>com.pullread.sync</string>
     <key>ProgramArguments</key>
     <array>
         <string>/usr/local/bin/npx</string>
         <string>ts-node</string>
-        <string>/Users/shellen/Documents/Claude Stuff/pullread/src/index.ts</string>
+        <string>/path/to/pullread/src/index.ts</string>
         <string>sync</string>
     </array>
     <key>StartInterval</key>
@@ -18,7 +18,7 @@
     <key>StandardErrorPath</key>
     <string>/tmp/pullread.log</string>
     <key>WorkingDirectory</key>
-    <string>/Users/shellen/Documents/Claude Stuff/pullread</string>
+    <string>/path/to/pullread</string>
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
