@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PullRead Viewer</title>
+<title>PullRead</title>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
   :root {
@@ -14,6 +14,9 @@
     --code-bg: #f5f5f5;
     --link: #1a6daa;
     --toolbar-bg: #fafafa;
+    --sidebar-bg: #f7f7f7;
+    --sidebar-hover: #eeeeee;
+    --sidebar-active: #e4e4e4;
   }
   [data-theme="dark"] {
     --bg: #1a1a1a;
@@ -23,6 +26,9 @@
     --code-bg: #2a2a2a;
     --link: #6db3e8;
     --toolbar-bg: #222222;
+    --sidebar-bg: #1e1e1e;
+    --sidebar-hover: #2a2a2a;
+    --sidebar-active: #333333;
   }
   [data-theme="sepia"] {
     --bg: #f4ecd8;
@@ -32,6 +38,9 @@
     --code-bg: #ebe3cf;
     --link: #8b5e3c;
     --toolbar-bg: #efe6d0;
+    --sidebar-bg: #ede4cd;
+    --sidebar-hover: #e5dbc2;
+    --sidebar-active: #ddd1b6;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -40,26 +49,33 @@
     background: var(--bg);
     color: var(--fg);
     transition: background 0.2s, color 0.2s;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* Layout */
+  .app {
+    display: flex;
+    height: 100vh;
+    flex-direction: column;
   }
 
   .toolbar {
-    position: sticky;
-    top: 0;
+    flex-shrink: 0;
     z-index: 10;
     background: var(--toolbar-bg);
     border-bottom: 1px solid var(--border);
-    padding: 8px 16px;
+    padding: 6px 12px;
     display: flex;
     align-items: center;
-    gap: 16px;
-    flex-wrap: wrap;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    gap: 12px;
     font-size: 13px;
   }
 
   .toolbar label {
     color: var(--muted);
-    font-size: 11px;
+    font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
@@ -67,7 +83,7 @@
   .toolbar-group {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
   }
 
   .toolbar button, .toolbar select {
@@ -75,9 +91,10 @@
     color: var(--fg);
     border: 1px solid var(--border);
     border-radius: 4px;
-    padding: 4px 10px;
-    font-size: 13px;
+    padding: 3px 8px;
+    font-size: 12px;
     cursor: pointer;
+    line-height: 1.4;
   }
   .toolbar button:hover, .toolbar select:hover {
     border-color: var(--muted);
@@ -91,158 +108,236 @@
   .brand {
     font-weight: 600;
     font-size: 14px;
-    margin-right: auto;
     color: var(--fg);
+    cursor: pointer;
   }
 
-  #drop-zone {
+  .toolbar-spacer { flex: 1; }
+
+  .sidebar-toggle {
+    background: none !important;
+    border: none !important;
+    font-size: 18px !important;
+    padding: 2px 6px !important;
+    color: var(--fg) !important;
+    cursor: pointer;
+  }
+  .sidebar-toggle:hover {
+    color: var(--link) !important;
+  }
+
+  /* Main area */
+  .main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 300px;
+    min-width: 300px;
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    transition: margin-left 0.2s ease, opacity 0.2s ease;
+    overflow: hidden;
+  }
+  .sidebar.collapsed {
+    margin-left: -300px;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .sidebar-search {
+    padding: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar-search input {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--bg);
+    color: var(--fg);
+    font-size: 13px;
+    outline: none;
+  }
+  .sidebar-search input:focus {
+    border-color: var(--link);
+  }
+  .sidebar-search input::placeholder {
+    color: var(--muted);
+  }
+
+  .file-list {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .file-item {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .file-item:hover {
+    background: var(--sidebar-hover);
+  }
+  .file-item.active {
+    background: var(--sidebar-active);
+  }
+  .file-item-title {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.3;
+    margin-bottom: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .file-item-meta {
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    gap: 6px;
+  }
+
+  .file-count {
+    padding: 8px 12px;
+    font-size: 11px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Content pane */
+  .content-pane {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .content-wrap {
     max-width: 720px;
     margin: 0 auto;
-    min-height: calc(100vh - 50px);
-    padding: 48px 24px 96px;
+    padding: 40px 28px 96px;
   }
 
-  #drop-zone.empty {
+  .empty-state {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    height: 100%;
     color: var(--muted);
     text-align: center;
-    gap: 16px;
+    gap: 12px;
   }
-  #drop-zone.empty .hint {
+  .empty-state .hint {
     font-size: 18px;
   }
-  #drop-zone.empty .subhint {
+  .empty-state .subhint {
     font-size: 14px;
   }
 
-  .drop-highlight {
-    outline: 3px dashed var(--link);
-    outline-offset: -3px;
-  }
+  /* Typography classes */
+  .font-sans .content-wrap { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, sans-serif; }
+  .font-serif .content-wrap { font-family: "Georgia", "Times New Roman", "Iowan Old Style", serif; }
+  .font-mono .content-wrap { font-family: "SF Mono", "Fira Code", "Menlo", monospace; }
+  .font-system .content-wrap { font-family: "Charter", "Bitstream Charter", "Sitka Text", Cambria, serif; }
 
-  /* Typography */
-  .font-sans #content { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, sans-serif; }
-  .font-serif #content { font-family: "Georgia", "Times New Roman", "Iowan Old Style", serif; }
-  .font-mono #content { font-family: "SF Mono", "Fira Code", "Menlo", monospace; }
-  .font-system #content { font-family: "Charter", "Bitstream Charter", "Sitka Text", Cambria, serif; }
-
-  #content {
+  .content-wrap {
     line-height: 1.7;
     font-size: 17px;
   }
+  .size-small .content-wrap { font-size: 15px; }
+  .size-medium .content-wrap { font-size: 17px; }
+  .size-large .content-wrap { font-size: 20px; }
 
-  #content h1 {
-    font-size: 2em;
-    margin: 0.6em 0 0.3em;
-    line-height: 1.2;
-  }
-  #content h2 {
-    font-size: 1.5em;
-    margin: 1.2em 0 0.3em;
-    line-height: 1.3;
-  }
-  #content h3 {
-    font-size: 1.2em;
-    margin: 1em 0 0.3em;
-  }
-  #content p {
-    margin: 0.8em 0;
-  }
-  #content a {
-    color: var(--link);
-    text-decoration: none;
-  }
-  #content a:hover {
-    text-decoration: underline;
-  }
-  #content img {
-    max-width: 100%;
-    height: auto;
-    border-radius: 4px;
-    margin: 1em 0;
-  }
-  #content blockquote {
+  /* Article content */
+  .content-wrap h1 { font-size: 1.8em; margin: 0.5em 0 0.3em; line-height: 1.2; }
+  .content-wrap h2 { font-size: 1.4em; margin: 1.2em 0 0.3em; line-height: 1.3; }
+  .content-wrap h3 { font-size: 1.15em; margin: 1em 0 0.3em; }
+  .content-wrap p { margin: 0.8em 0; }
+  .content-wrap a { color: var(--link); text-decoration: none; }
+  .content-wrap a:hover { text-decoration: underline; }
+  .content-wrap img { max-width: 100%; height: auto; border-radius: 4px; margin: 1em 0; display: block; }
+  .content-wrap blockquote {
     border-left: 3px solid var(--border);
     padding-left: 16px;
     margin: 1em 0;
     color: var(--muted);
   }
-  #content pre {
+  .content-wrap pre {
     background: var(--code-bg);
-    padding: 16px;
+    padding: 14px;
     border-radius: 6px;
     overflow-x: auto;
     margin: 1em 0;
     font-size: 14px;
     line-height: 1.5;
   }
-  #content code {
+  .content-wrap code {
     background: var(--code-bg);
     padding: 2px 5px;
     border-radius: 3px;
     font-size: 0.9em;
   }
-  #content pre code {
-    background: none;
-    padding: 0;
-  }
-  #content ul, #content ol {
-    padding-left: 1.5em;
-    margin: 0.8em 0;
-  }
-  #content li {
-    margin: 0.3em 0;
-  }
-  #content hr {
-    border: none;
-    border-top: 1px solid var(--border);
-    margin: 2em 0;
-  }
-  #content table {
-    border-collapse: collapse;
-    width: 100%;
-    margin: 1em 0;
-  }
-  #content th, #content td {
-    border: 1px solid var(--border);
-    padding: 8px 12px;
-    text-align: left;
-  }
-  #content th {
-    background: var(--code-bg);
-  }
+  .content-wrap pre code { background: none; padding: 0; }
+  .content-wrap ul, .content-wrap ol { padding-left: 1.5em; margin: 0.8em 0; }
+  .content-wrap li { margin: 0.3em 0; }
+  .content-wrap hr { border: none; border-top: 1px solid var(--border); margin: 2em 0; }
+  .content-wrap table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+  .content-wrap th, .content-wrap td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; }
+  .content-wrap th { background: var(--code-bg); }
 
-  .meta {
+  .article-meta {
     color: var(--muted);
     font-size: 14px;
     border-bottom: 1px solid var(--border);
     padding-bottom: 16px;
     margin-bottom: 24px;
     line-height: 1.6;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
-  .meta a {
-    color: var(--link);
-    text-decoration: none;
+  .article-meta a { color: var(--link); text-decoration: none; }
+  .article-meta strong { color: var(--fg); font-size: 15px; }
+
+  /* Keyboard nav hint */
+  .nav-hint {
+    font-size: 11px;
+    color: var(--muted);
+    padding: 8px 12px;
+    border-top: 1px solid var(--border);
   }
-  .meta strong {
-    color: var(--fg);
+  .nav-hint kbd {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 11px;
+    font-family: inherit;
   }
 
-  #file-input {
-    display: none;
+  /* Drop file highlight */
+  .drop-highlight .content-pane {
+    outline: 3px dashed var(--link);
+    outline-offset: -3px;
   }
-
-  .size-small #content { font-size: 15px; }
-  .size-medium #content { font-size: 17px; }
-  .size-large #content { font-size: 20px; }
 </style>
 </head>
 <body data-theme="light" class="font-serif size-medium">
+<div class="app">
+
   <div class="toolbar">
-    <span class="brand">PullRead</span>
+    <button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">&#9776;</button>
+    <span class="brand" onclick="toggleSidebar()">PullRead</span>
+
+    <div class="toolbar-spacer"></div>
 
     <div class="toolbar-group">
       <label>Theme</label>
@@ -253,7 +348,7 @@
 
     <div class="toolbar-group">
       <label>Font</label>
-      <select onchange="setFont(this.value)">
+      <select onchange="setFont(this.value)" id="font-select">
         <option value="serif" selected>Serif</option>
         <option value="sans">Sans-serif</option>
         <option value="system">Charter</option>
@@ -264,26 +359,45 @@
     <div class="toolbar-group">
       <label>Size</label>
       <button onclick="setSize('small')" data-size-btn="small">A</button>
-      <button onclick="setSize('medium')" data-size-btn="medium" class="active" style="font-size:15px">A</button>
-      <button onclick="setSize('large')" data-size-btn="large" style="font-size:18px">A</button>
+      <button onclick="setSize('medium')" data-size-btn="medium" class="active" style="font-size:14px">A</button>
+      <button onclick="setSize('large')" data-size-btn="large" style="font-size:17px">A</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-search">
+        <input type="text" id="search" placeholder="Search articles..." oninput="filterFiles()" />
+      </div>
+      <div class="file-count" id="file-count"></div>
+      <div class="file-list" id="file-list"></div>
+      <div class="nav-hint"><kbd>&uarr;</kbd><kbd>&darr;</kbd> navigate &middot; <kbd>Enter</kbd> open &middot; <kbd>/</kbd> search &middot; <kbd>[</kbd> sidebar</div>
     </div>
 
-    <button onclick="document.getElementById('file-input').click()">Open File</button>
-    <input type="file" id="file-input" accept=".md,.markdown,.txt" multiple onchange="handleFiles(this.files)">
+    <div class="content-pane" id="content-pane">
+      <div class="empty-state" id="empty-state">
+        <div class="hint">Select an article</div>
+        <div class="subhint">or drop a .md file here</div>
+      </div>
+      <div class="content-wrap" id="content" style="display:none;"></div>
+    </div>
   </div>
 
-  <div id="drop-zone" class="empty">
-    <div class="hint">Drop .md files here</div>
-    <div class="subhint">or click "Open File" above</div>
-    <div id="content"></div>
-  </div>
+</div>
 
 <script>
+// State
+let allFiles = [];
+let filteredFiles = [];
+let activeFile = null;
+let serverMode = false;
+
+// Preferences
 function setTheme(theme) {
   document.body.setAttribute('data-theme', theme);
-  document.querySelectorAll('[data-theme-btn]').forEach(b => {
-    b.classList.toggle('active', b.getAttribute('data-theme-btn') === theme);
-  });
+  document.querySelectorAll('[data-theme-btn]').forEach(b =>
+    b.classList.toggle('active', b.getAttribute('data-theme-btn') === theme)
+  );
   localStorage.setItem('pr-theme', theme);
 }
 
@@ -294,12 +408,18 @@ function setFont(font) {
 
 function setSize(size) {
   document.body.className = document.body.className.replace(/size-\w+/, 'size-' + size);
-  document.querySelectorAll('[data-size-btn]').forEach(b => {
-    b.classList.toggle('active', b.getAttribute('data-size-btn') === size);
-  });
+  document.querySelectorAll('[data-size-btn]').forEach(b =>
+    b.classList.toggle('active', b.getAttribute('data-size-btn') === size)
+  );
   localStorage.setItem('pr-size', size);
 }
 
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('collapsed');
+  localStorage.setItem('pr-sidebar', document.getElementById('sidebar').classList.contains('collapsed') ? '0' : '1');
+}
+
+// Frontmatter
 function parseFrontmatter(text) {
   const match = text.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
   if (!match) return { meta: null, body: text };
@@ -315,17 +435,26 @@ function parseFrontmatter(text) {
   return { meta, body: match[2] };
 }
 
-function renderMarkdown(text, filename) {
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// Rendering
+function renderArticle(text, filename) {
   const { meta, body } = parseFrontmatter(text);
-  const dropZone = document.getElementById('drop-zone');
   const content = document.getElementById('content');
-  dropZone.classList.remove('empty');
+  const empty = document.getElementById('empty-state');
+
+  empty.style.display = 'none';
+  content.style.display = 'block';
 
   let html = '';
   if (meta && (meta.title || meta.url || meta.domain)) {
-    html += '<div class="meta">';
+    html += '<div class="article-meta">';
     if (meta.title) html += '<strong>' + escapeHtml(meta.title) + '</strong><br>';
-    if (meta.url) html += '<a href="' + escapeHtml(meta.url) + '">' + escapeHtml(meta.domain || meta.url) + '</a><br>';
+    if (meta.url) html += '<a href="' + escapeHtml(meta.url) + '" target="_blank">' + escapeHtml(meta.domain || meta.url) + '</a><br>';
     if (meta.bookmarked) html += escapeHtml(meta.bookmarked.slice(0, 10));
     if (meta.feed) html += ' &middot; ' + escapeHtml(meta.feed);
     html += '</div>';
@@ -333,53 +462,195 @@ function renderMarkdown(text, filename) {
 
   html += marked.parse(body);
   content.innerHTML = html;
-  document.title = (meta && meta.title) || filename || 'PullRead Viewer';
+  document.title = (meta && meta.title) || filename || 'PullRead';
+
+  // Scroll to top
+  document.getElementById('content-pane').scrollTop = 0;
 }
 
-function escapeHtml(s) {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
+// File list
+function renderFileList() {
+  const list = document.getElementById('file-list');
+  const count = document.getElementById('file-count');
+  count.textContent = filteredFiles.length + ' article' + (filteredFiles.length !== 1 ? 's' : '');
+
+  list.innerHTML = filteredFiles.map((f, i) => {
+    const date = f.bookmarked ? f.bookmarked.slice(0, 10) : '';
+    const isActive = activeFile === f.filename ? ' active' : '';
+    return '<div class="file-item' + isActive + '" data-index="' + i + '" onclick="loadFile(' + i + ')">'
+      + '<div class="file-item-title">' + escapeHtml(f.title) + '</div>'
+      + '<div class="file-item-meta">'
+      + (date ? '<span>' + date + '</span>' : '')
+      + (f.domain ? '<span>' + escapeHtml(f.domain) + '</span>' : '')
+      + (f.feed ? '<span>' + escapeHtml(f.feed) + '</span>' : '')
+      + '</div></div>';
+  }).join('');
 }
 
-function handleFiles(files) {
-  if (!files.length) return;
-  const file = files[0];
-  const reader = new FileReader();
-  reader.onload = () => renderMarkdown(reader.result, file.name);
-  reader.readAsText(file);
+function filterFiles() {
+  const q = document.getElementById('search').value.toLowerCase();
+  if (!q) {
+    filteredFiles = allFiles;
+  } else {
+    filteredFiles = allFiles.filter(f =>
+      f.title.toLowerCase().includes(q) ||
+      f.domain.toLowerCase().includes(q) ||
+      f.feed.toLowerCase().includes(q)
+    );
+  }
+  renderFileList();
 }
 
-// Drag and drop
-const dropZone = document.getElementById('drop-zone');
+async function loadFile(index) {
+  const file = filteredFiles[index];
+  if (!file) return;
+  activeFile = file.filename;
+  renderFileList();
+
+  if (serverMode) {
+    const res = await fetch('/api/file?name=' + encodeURIComponent(file.filename));
+    if (res.ok) {
+      const text = await res.text();
+      renderArticle(text, file.filename);
+    }
+  }
+}
+
+// Keyboard navigation
+document.addEventListener('keydown', e => {
+  // "/" focuses search
+  if (e.key === '/' && document.activeElement !== document.getElementById('search')) {
+    e.preventDefault();
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar.classList.contains('collapsed')) toggleSidebar();
+    document.getElementById('search').focus();
+    return;
+  }
+
+  // "[" toggles sidebar
+  if (e.key === '[' && document.activeElement.tagName !== 'INPUT') {
+    e.preventDefault();
+    toggleSidebar();
+    return;
+  }
+
+  // Escape clears search
+  if (e.key === 'Escape') {
+    const search = document.getElementById('search');
+    if (document.activeElement === search) {
+      search.value = '';
+      filterFiles();
+      search.blur();
+      return;
+    }
+  }
+
+  // Up/Down navigate file list
+  if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && document.activeElement.tagName !== 'INPUT') {
+    e.preventDefault();
+    const currentIdx = filteredFiles.findIndex(f => f.filename === activeFile);
+    let next;
+    if (e.key === 'ArrowDown') {
+      next = currentIdx < filteredFiles.length - 1 ? currentIdx + 1 : 0;
+    } else {
+      next = currentIdx > 0 ? currentIdx - 1 : filteredFiles.length - 1;
+    }
+    loadFile(next);
+
+    // Scroll file into view
+    const el = document.querySelector('.file-item[data-index="' + next + '"]');
+    if (el) el.scrollIntoView({ block: 'nearest' });
+    return;
+  }
+
+  // Enter loads current selection (when not in search)
+  if (e.key === 'Enter' && document.activeElement.tagName !== 'INPUT') {
+    const currentIdx = filteredFiles.findIndex(f => f.filename === activeFile);
+    if (currentIdx >= 0) loadFile(currentIdx);
+  }
+});
+
+// Drag and drop (for standalone use)
 document.addEventListener('dragover', e => {
   e.preventDefault();
-  dropZone.classList.add('drop-highlight');
+  document.body.classList.add('drop-highlight');
 });
 document.addEventListener('dragleave', e => {
   if (!e.relatedTarget || !document.contains(e.relatedTarget)) {
-    dropZone.classList.remove('drop-highlight');
+    document.body.classList.remove('drop-highlight');
   }
 });
 document.addEventListener('drop', e => {
   e.preventDefault();
-  dropZone.classList.remove('drop-highlight');
+  document.body.classList.remove('drop-highlight');
   const files = Array.from(e.dataTransfer.files).filter(f =>
     f.name.endsWith('.md') || f.name.endsWith('.markdown') || f.name.endsWith('.txt')
   );
-  if (files.length) handleFiles(files);
+  if (files.length) {
+    // Add dropped files to the sidebar list
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = reader.result;
+      const { meta } = parseFrontmatter(text);
+      const file = files[0];
+      // Create a virtual entry
+      const entry = {
+        filename: file.name,
+        title: (meta && meta.title) || file.name.replace(/\.md$/, ''),
+        url: (meta && meta.url) || '',
+        domain: (meta && meta.domain) || '',
+        bookmarked: (meta && meta.bookmarked) || '',
+        feed: (meta && meta.feed) || '',
+        _content: text
+      };
+      allFiles.unshift(entry);
+      filterFiles();
+      activeFile = entry.filename;
+      renderFileList();
+      renderArticle(text, file.name);
+    };
+    reader.readAsText(files[0]);
+  }
 });
 
-// Restore preferences
-const savedTheme = localStorage.getItem('pr-theme');
-const savedFont = localStorage.getItem('pr-font');
-const savedSize = localStorage.getItem('pr-size');
-if (savedTheme) setTheme(savedTheme);
-if (savedFont) {
-  setFont(savedFont);
-  document.querySelector('.toolbar select').value = savedFont;
+// Init: try to load from server, fall back to standalone mode
+async function init() {
+  // Restore preferences
+  const savedTheme = localStorage.getItem('pr-theme');
+  const savedFont = localStorage.getItem('pr-font');
+  const savedSize = localStorage.getItem('pr-size');
+  const savedSidebar = localStorage.getItem('pr-sidebar');
+  if (savedTheme) setTheme(savedTheme);
+  if (savedFont) {
+    setFont(savedFont);
+    document.getElementById('font-select').value = savedFont;
+  }
+  if (savedSize) setSize(savedSize);
+  if (savedSidebar === '0') document.getElementById('sidebar').classList.add('collapsed');
+
+  try {
+    const res = await fetch('/api/files');
+    if (res.ok) {
+      allFiles = await res.json();
+      serverMode = true;
+      filteredFiles = allFiles;
+      renderFileList();
+
+      // Auto-load first article
+      if (allFiles.length > 0) {
+        loadFile(0);
+      }
+      return;
+    }
+  } catch {}
+
+  // Standalone mode - show drop hint
+  filteredFiles = [];
+  renderFileList();
+  document.getElementById('file-count').textContent = 'Drop files or use pullread view';
 }
-if (savedSize) setSize(savedSize);
+
+init();
 </script>
 </body>
 </html>
