@@ -55,9 +55,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupStatusBar()
         requestNotificationPermission()
 
-        // Check for Node.js on launch
-        if !syncService.isNodeAvailable() {
-            showNodeNotFoundAlert()
+        // Check for bundled binary on launch
+        if !syncService.isBinaryAvailable() {
+            showBinaryNotFoundAlert()
         }
 
         // Check for first run or invalid config
@@ -295,10 +295,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApplication.shared.terminate(nil)
     }
 
-    private func showNodeNotFoundAlert() {
+    private func showBinaryNotFoundAlert() {
         showAlert(
-            title: "Node.js Not Found",
-            message: "PullRead requires Node.js to run. Please install Node.js from https://nodejs.org"
+            title: "Sync Binary Not Found",
+            message: "The PullRead sync binary is missing from the app bundle. Please reinstall the app."
         )
     }
 

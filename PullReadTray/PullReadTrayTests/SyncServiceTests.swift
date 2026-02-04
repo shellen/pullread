@@ -22,12 +22,12 @@ final class SyncServiceTests: XCTestCase {
         syncService = nil
     }
 
-    // MARK: - Node.js Discovery Tests
+    // MARK: - Binary Discovery Tests
 
-    func testIsNodeAvailable() throws {
-        // This test verifies that the node availability check works
-        // Result depends on whether Node.js is installed on the test machine
-        let isAvailable = syncService.isNodeAvailable()
+    func testIsBinaryAvailable() throws {
+        // This test verifies that the binary availability check works
+        // Result depends on whether the binary is bundled in the app
+        let isAvailable = syncService.isBinaryAvailable()
 
         // We just verify it returns a boolean without crashing
         XCTAssertTrue(isAvailable == true || isAvailable == false)
@@ -43,6 +43,9 @@ final class SyncServiceTests: XCTestCase {
 
         // Config path should be absolute
         XCTAssertTrue(configPath.hasPrefix("/"), "Config path should be absolute")
+
+        // Config path should be in ~/.config/pullread/
+        XCTAssertTrue(configPath.contains(".config/pullread"), "Config path should be in ~/.config/pullread/")
     }
 
     func testGetOutputPathReturnsNilWhenConfigMissing() throws {
@@ -67,20 +70,19 @@ final class SyncServiceTests: XCTestCase {
 
     // MARK: - Sync Execution Tests
     // Note: These tests are skipped in CI because they require:
-    // 1. Node.js installed
-    // 2. npm dependencies installed
-    // 3. feeds.json configured
-    // Without all three, the sync process can hang indefinitely.
+    // 1. Bundled binary present
+    // 2. feeds.json configured
+    // Without both, the sync process can hang indefinitely.
 
     func testSyncCompletesWithResult() throws {
-        // Skip in CI - sync requires full project setup
+        // Skip in CI - sync requires full app bundle
         if isCI {
             throw XCTSkip("Skipping sync test in CI environment")
         }
 
-        // Skip if Node.js is not available
-        guard syncService.isNodeAvailable() else {
-            throw XCTSkip("Node.js not available on this machine")
+        // Skip if binary is not available
+        guard syncService.isBinaryAvailable() else {
+            throw XCTSkip("Sync binary not available in test environment")
         }
 
         let expectation = XCTestExpectation(description: "Sync completes")
@@ -101,14 +103,14 @@ final class SyncServiceTests: XCTestCase {
     }
 
     func testSyncRetryFailedCompletesWithResult() throws {
-        // Skip in CI - sync requires full project setup
+        // Skip in CI - sync requires full app bundle
         if isCI {
             throw XCTSkip("Skipping sync retry test in CI environment")
         }
 
-        // Skip if Node.js is not available
-        guard syncService.isNodeAvailable() else {
-            throw XCTSkip("Node.js not available on this machine")
+        // Skip if binary is not available
+        guard syncService.isBinaryAvailable() else {
+            throw XCTSkip("Sync binary not available in test environment")
         }
 
         let expectation = XCTestExpectation(description: "Retry sync completes")
