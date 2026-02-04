@@ -8,8 +8,12 @@ struct PullReadTrayApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        Settings {
+        // Use Window instead of Settings to avoid showing an empty settings panel
+        // The actual settings are shown via SettingsWindowController from the menu bar
+        Window("PullRead", id: "main") {
             EmptyView()
         }
+        .windowResizability(.contentSize)
+        .defaultSize(width: 0, height: 0)
     }
 }

@@ -107,12 +107,40 @@ class SyncService {
         process.standardOutput = pipe
         process.standardError = errorPipe
 
+        // Collect output asynchronously to prevent pipe buffer deadlock
+        // If we wait for exit before reading, and the process writes more than
+        // the pipe buffer (~64KB), the process blocks on write while we block on exit
+        var outputData = Data()
+        var errorData = Data()
+
+        let outputHandle = pipe.fileHandleForReading
+        let errorHandle = errorPipe.fileHandleForReading
+
+        let outputQueue = DispatchQueue(label: "pullread.stdout")
+        let errorQueue = DispatchQueue(label: "pullread.stderr")
+
+        let outputGroup = DispatchGroup()
+        let errorGroup = DispatchGroup()
+
+        outputGroup.enter()
+        outputQueue.async {
+            outputData = outputHandle.readDataToEndOfFile()
+            outputGroup.leave()
+        }
+
+        errorGroup.enter()
+        errorQueue.async {
+            errorData = errorHandle.readDataToEndOfFile()
+            errorGroup.leave()
+        }
+
         do {
             try process.run()
             process.waitUntilExit()
 
-            let outputData = pipe.fileHandleForReading.readDataToEndOfFile()
-            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+            // Wait for both reads to complete
+            outputGroup.wait()
+            errorGroup.wait()
 
             let output = String(data: outputData, encoding: .utf8) ?? ""
             let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
