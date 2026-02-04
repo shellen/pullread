@@ -45,7 +45,7 @@
 		A1000005100000010000000B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A1000006100000010000000A /* PullReadTray.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PullReadTray.entitlements; sourceTree = "<group>"; };
 		A1000006100000010000000B /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
-		A1000007100000010000000A /* Pull Read.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Pull Read.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1000007100000010000000A /* PullReadTray.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PullReadTray.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B1000001100000010000000A /* SyncServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncServiceTests.swift; sourceTree = "<group>"; };
 		B1000002100000010000000A /* AppDelegateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegateTests.swift; sourceTree = "<group>"; };
 		B1000004100000010000000A /* PullReadTrayTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PullReadTrayTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -107,7 +107,7 @@
 		A100000B400000010000000A /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A1000007100000010000000A /* Pull Read.app */,
+				A1000007100000010000000A /* PullReadTray.app */,
 				B1000004100000010000000A /* PullReadTrayTests.xctest */,
 				C1000004100000010000000A /* PullReadTrayUITests.xctest */,
 			);
@@ -149,7 +149,7 @@
 			);
 			name = PullReadTray;
 			productName = PullReadTray;
-			productReference = A1000007100000010000000A /* Pull Read.app */;
+			productReference = A1000007100000010000000A /* PullReadTray.app */;
 			productType = "com.apple.product-type.application";
 		};
 		B1000007500000010000000A /* PullReadTrayTests */ = {
@@ -441,7 +441,7 @@
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.pullread.tray;
-				PRODUCT_NAME = "Pull Read";
+				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -469,7 +469,7 @@
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.pullread.tray;
-				PRODUCT_NAME = "Pull Read";
+				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -489,7 +489,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Pull Read.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Pull Read";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PullReadTray.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PullReadTray";
 			};
 			name = Debug;
 		};
@@ -507,7 +507,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Pull Read.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Pull Read";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PullReadTray.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PullReadTray";
 			};
 			name = Release;
 		};
