@@ -45,39 +45,59 @@ jobs:
           # For PRs, checkout the PR head commit (not the merge commit) to match push behavior
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
+      - name: Free disk space
+        run: |
+          # Remove large pre-installed tools we don't need
+          sudo rm -rf /usr/local/lib/android || true
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /Library/Developer/CoreSimulator/Volumes/* || true
+          sudo rm -rf /Library/Developer/CoreSimulator/Caches/* || true
+          df -h .
+
       - name: Select Xcode version
         run: sudo xcode-select -s /Applications/Xcode_15.2.app/Contents/Developer
 
-      - name: Show Xcode version
-        run: xcodebuild -version
-
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb', '**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-bun-
 
       - name: Build PullRead CLI binary
         run: |
           bun install
           bun scripts/embed-viewer.ts
+
+          # Only build arm64 on CI (runner is arm64). Universal binary built in release workflow.
           mkdir -p dist
-          bun build src/index.ts --compile --target=bun-darwin-arm64 --outfile dist/pullread-arm64
-          bun build src/index.ts --compile --target=bun-darwin-x64 --outfile dist/pullread-x64
-          lipo -create dist/pullread-arm64 dist/pullread-x64 -output dist/pullread
+          bun build src/index.ts --compile --target=bun-darwin-arm64 --outfile dist/pullread
+
           file dist/pullread
+
+          # Free space: remove node_modules and bun cache immediately
+          rm -rf node_modules
 
       - name: Install xcpretty
         run: gem install xcpretty
 
-      - name: Build for testing and release
+      - name: Build release app
         working-directory: PullReadTray
         run: |
-          # Build both Debug (for tests) and Release (for distribution) in one step
+          # Single build: Release with testing enabled (satisfies both test and release needs)
+          set -o pipefail
           xcodebuild build-for-testing \
             -project PullReadTray.xcodeproj \
             -scheme PullReadTray \
-            -configuration Debug \
+            -configuration Release \
             -derivedDataPath build \
             -destination 'platform=macOS,arch=arm64' \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            ENABLE_TESTABILITY=YES \
+            2>&1 | xcpretty --color
 
       - name: Run unit tests (without rebuilding)
         if: github.event.inputs.skip_tests != 'true'
@@ -92,6 +112,7 @@ jobs:
           xcodebuild test-without-building \
             -project PullReadTray.xcodeproj \
             -scheme PullReadTray \
+            -configuration Release \
             -destination 'platform=macOS,arch=arm64' \
             -derivedDataPath build \
             -only-testing:PullReadTrayTests \
@@ -111,17 +132,6 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-      - name: Build release app
-        working-directory: PullReadTray
-        run: |
-          xcodebuild -project PullReadTray.xcodeproj \
-            -scheme PullReadTray \
-            -configuration Release \
-            -derivedDataPath build \
-            -destination 'platform=macOS,arch=arm64' \
-            CODE_SIGNING_ALLOWED=NO \
-            build
-
       - name: Create app bundle with CLI
         working-directory: PullReadTray
         run: |
@@ -137,10 +147,9 @@ jobs:
           # Verify
           ls -la "artifacts/Pull Read.app/Contents/Resources/"
 
-          # Free disk space: remove intermediate build artifacts
+          # Free disk space: remove everything we no longer need
           rm -rf ../dist
-          rm -rf build/Build/Intermediates*
-          rm -rf build/Build/Products/Debug
+          rm -rf build
           df -h .
 
       - name: Create DMG
