@@ -448,7 +448,7 @@
       </div>
       <div class="file-count" id="file-count"></div>
       <div class="file-list" id="file-list"></div>
-      <div class="nav-hint"><kbd>j</kbd><kbd>k</kbd> next/prev &middot; <kbd>&uarr;</kbd><kbd>&darr;</kbd> scroll &middot; <kbd>/</kbd> search &middot; <kbd>[</kbd> sidebar</div>
+      <div class="nav-hint"><kbd>j</kbd><kbd>k</kbd> <kbd>&larr;</kbd><kbd>&rarr;</kbd> next/prev &middot; <kbd>&uarr;</kbd><kbd>&darr;</kbd> scroll &middot; <kbd>/</kbd> search &middot; <kbd>[</kbd> sidebar</div>
     </div>
 
     <div class="content-pane" id="content-pane">
@@ -467,8 +467,9 @@
     <h2>Welcome to PullRead</h2>
     <p>Browse your synced articles in a clean, distraction-free reader. Use the sidebar to search and select articles, or customize the theme and font above.</p>
     <div class="onboarding-shortcuts">
-      <kbd>j</kbd> <span>Next article</span>
-      <kbd>k</kbd> <span>Previous article</span>
+      <kbd>j</kbd> / <kbd>&rarr;</kbd> <span>Next article</span>
+      <kbd>k</kbd> / <kbd>&larr;</kbd> <span>Previous article</span>
+      <kbd>&uarr;</kbd> <kbd>&darr;</kbd> <span>Scroll (jumps articles at edges)</span>
       <kbd>/</kbd> <span>Search articles</span>
       <kbd>[</kbd> <span>Toggle sidebar</span>
       <kbd>Esc</kbd> <span>Clear search</span>
@@ -626,6 +627,21 @@ async function loadFile(index) {
   }
 }
 
+// Navigate to next (+1) or previous (-1) article with wrapping
+function navigateArticle(direction) {
+  if (!filteredFiles.length) return;
+  const currentIdx = filteredFiles.findIndex(f => f.filename === activeFile);
+  let next;
+  if (direction > 0) {
+    next = currentIdx < filteredFiles.length - 1 ? currentIdx + 1 : 0;
+  } else {
+    next = currentIdx > 0 ? currentIdx - 1 : filteredFiles.length - 1;
+  }
+  loadFile(next);
+  const el = document.querySelector('.file-item[data-index="' + next + '"]');
+  if (el) el.scrollIntoView({ block: 'nearest' });
+}
+
 // Keyboard navigation
 document.addEventListener('keydown', e => {
   // "/" focuses search
@@ -658,26 +674,31 @@ document.addEventListener('keydown', e => {
   // j/k navigate file list (next/prev)
   if ((e.key === 'j' || e.key === 'k') && document.activeElement.tagName !== 'INPUT') {
     e.preventDefault();
-    const currentIdx = filteredFiles.findIndex(f => f.filename === activeFile);
-    let next;
-    if (e.key === 'j') {
-      next = currentIdx < filteredFiles.length - 1 ? currentIdx + 1 : 0;
-    } else {
-      next = currentIdx > 0 ? currentIdx - 1 : filteredFiles.length - 1;
-    }
-    loadFile(next);
-
-    // Scroll file into view in sidebar
-    const el = document.querySelector('.file-item[data-index="' + next + '"]');
-    if (el) el.scrollIntoView({ block: 'nearest' });
+    navigateArticle(e.key === 'j' ? 1 : -1);
     return;
   }
 
-  // Up/Down scroll the content pane
+  // Left/Right arrow navigate prev/next article
+  if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && document.activeElement.tagName !== 'INPUT') {
+    e.preventDefault();
+    navigateArticle(e.key === 'ArrowRight' ? 1 : -1);
+    return;
+  }
+
+  // Up/Down scroll the content pane; navigate articles at boundaries
   if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && document.activeElement.tagName !== 'INPUT') {
     const pane = document.getElementById('content-pane');
     const scrollAmount = 80;
-    if (e.key === 'ArrowDown') {
+    const atTop = pane.scrollTop <= 0;
+    const atBottom = pane.scrollTop + pane.clientHeight >= pane.scrollHeight - 2;
+
+    if (e.key === 'ArrowDown' && atBottom) {
+      e.preventDefault();
+      navigateArticle(1);
+    } else if (e.key === 'ArrowUp' && atTop) {
+      e.preventDefault();
+      navigateArticle(-1);
+    } else if (e.key === 'ArrowDown') {
       pane.scrollTop += scrollAmount;
     } else {
       pane.scrollTop -= scrollAmount;

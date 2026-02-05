@@ -50,7 +50,7 @@ PullRead fetches entries from your RSS/Atom feeds, extracts article content usin
 - **Intelligent deduplication** - Tracks processed URLs to avoid re-fetching
 - **Retry mechanism** - Failed extractions are tracked and can be retried later
 - **Podcast support** - Saves episode metadata with audio links (perfect for show notes)
-- **Built-in article reader** - Two-pane local web UI to browse and read synced articles
+- **Built-in article reader** - Two-pane local web UI with full keyboard navigation (j/k, arrow keys, boundary-aware scrolling)
 - **Self-contained macOS app** - Native Swift menu bar app with bundled CLI binary (no Node.js required)
 - **Flexible scheduling** - Run on-demand, via launchd, or with AppleScript
 - **Cloud-sync friendly** - Output folder can be Dropbox, iCloud, Google Drive, etc.
@@ -376,6 +376,24 @@ Pull Read is a self-contained native Swift menu bar application. It bundles the 
 - **Native notifications** on sync completion or failure
 - **Keyboard shortcuts** for common actions
 - **No dock icon** - runs quietly in the menu bar
+
+### Article Reader
+
+The built-in article reader (`pullread view` or **View Articles** in the menu bar app) is a two-pane web UI served on `localhost:7777`. It supports themes (Light, Dark, Sepia), multiple font families, adjustable text sizes, and full keyboard navigation.
+
+#### Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `j` / `Right Arrow` | Next article |
+| `k` / `Left Arrow` | Previous article |
+| `Up Arrow` / `Down Arrow` | Scroll content (navigates to prev/next article at top/bottom) |
+| `/` | Focus search (opens sidebar if collapsed) |
+| `[` | Toggle sidebar |
+| `Escape` | Clear search |
+| `Enter` | Reload current article |
+
+Arrow key scrolling is boundary-aware: when you reach the bottom of an article and press Down, or the top and press Up, it automatically advances to the next or previous article.
 
 ### Auto-Start on Login
 
@@ -715,31 +733,107 @@ This project works well for its intended purpose, but there are several areas th
 
 Ideas that would extend PullRead's capabilities:
 
-### Near-term
+### Highlights, Notes & Read State
+
+These features would turn PullRead from a read-only archive into an active reading tool. Here's a design for how each could work within the existing architecture.
+
+#### Read State
+
+Track which articles have been opened and how far the user scrolled.
+
+**Storage:** A JSON file at `~/.config/pullread/reading-state.json`:
+```json
+{
+  "2024-01-29-article-title.md": {
+    "read": true,
+    "openedAt": "2024-01-30T10:00:00Z",
+    "scrollPercent": 100,
+    "lastReadAt": "2024-01-30T10:05:00Z"
+  }
+}
+```
+
+**Implementation:**
+- **Server:** Add `GET /api/read-state` and `POST /api/read-state` endpoints to `viewer.ts` for loading/saving per-article state
+- **Client:** On article load, mark it as opened and send a `POST`. Track `scrollTop / scrollHeight` on scroll (debounced) and persist the percentage. Show unread articles with a visual indicator (bold title or dot) in the sidebar. Add a filter toggle ("Unread only") next to the search bar
+- **Frontmatter option:** Alternatively, append `read: true` directly to each markdown file's YAML frontmatter, making state portable across devices via cloud sync — no separate JSON needed
+
+#### Highlights
+
+Let users select text in an article and save highlights.
+
+**Storage:** A JSON file at `~/.config/pullread/highlights.json`:
+```json
+{
+  "2024-01-29-article-title.md": [
+    {
+      "id": "h1a2b3",
+      "text": "the exact selected text",
+      "contextBefore": "preceding words for anchoring",
+      "contextAfter": "following words for anchoring",
+      "color": "yellow",
+      "createdAt": "2024-01-30T10:02:00Z"
+    }
+  ]
+}
+```
+
+**Implementation:**
+- **Server:** Add `GET /api/highlights?name=<file>` and `POST /api/highlights` endpoints
+- **Client:** Listen for `mouseup` / `selectionchange` events. When the user selects text, show a small floating toolbar with color options. On highlight creation, save the selected text plus surrounding context (for fuzzy re-anchoring if content changes). After rendering markdown to HTML, walk the DOM text nodes and wrap matched ranges in `<mark>` elements with a `data-highlight-id` attribute. Clicking an existing highlight could show a popover to change color or delete
+- **CSS:** Add `.highlight-yellow`, `.highlight-green`, `.highlight-blue`, `.highlight-pink` classes with appropriate background colors per theme
+- **Export:** Add `pullread export-highlights` CLI command that outputs all highlights as a markdown file grouped by article
+
+#### Notes / Annotations
+
+Let users attach freeform notes to specific passages or to an article as a whole.
+
+**Storage:** Extend `highlights.json` or use a separate `~/.config/pullread/notes.json`:
+```json
+{
+  "2024-01-29-article-title.md": {
+    "articleNote": "Overall thoughts about this piece...",
+    "annotations": [
+      {
+        "id": "n4d5e6",
+        "anchorText": "text the note is attached to",
+        "contextBefore": "...",
+        "contextAfter": "...",
+        "note": "My comment on this passage",
+        "createdAt": "2024-01-30T10:03:00Z"
+      }
+    ]
+  }
+}
+```
+
+**Implementation:**
+- **Inline annotations:** After selecting text and clicking an "Add note" button, show a small textarea popover anchored to the selection. Save the note with the same context-anchoring approach as highlights. Render a margin icon or underline in the article to indicate annotated passages; hover/click to reveal the note
+- **Article-level notes:** Add a collapsible "Notes" panel below the article metadata header. This is a simple textarea that persists via the API. Could also be written back into the markdown frontmatter as an `notes:` field for portability
+- **Server:** `GET /api/notes?name=<file>` and `POST /api/notes` endpoints in `viewer.ts`
+- **Keyboard shortcut:** `n` to open the article-level notes panel, `h` to highlight current selection
+
+#### Shared Design Principles
+
+- **File-based storage** — JSON files in `~/.config/pullread/` keeps everything portable and inspectable. No database needed
+- **Frontmatter as source of truth (optional)** — For maximum portability (Dropbox/iCloud sync), read state and article-level notes could be written directly into each markdown file's YAML frontmatter. Highlights and inline annotations are better suited to a sidecar JSON since they reference DOM positions
+- **Offline-first** — All state is local. The viewer reads/writes through the local HTTP API. No external services
+- **Graceful degradation** — If state files are missing, the viewer works exactly as it does today. Features appear only when state exists
+
+### Other Ideas
 
 - **Browser extension** - "Send to PullRead" button that adds URLs directly to a local feed
 - **Tags/categories** - Support for preserving tags from bookmark services
 - **Full-text search** - Index markdown content for quick searching
-
-### Medium-term
-
 - **Multi-platform tray app** - Electron or Tauri version for Windows/Linux
 - **Kindle/epub export** - Convert markdown collection to ebook format
-- **Reading statistics** - Track which articles have been read (via modification date)
 - **Webhook support** - Trigger sync via webhook for real-time updates
-
-### Long-term
-
 - **Self-hosted option** - Run as a service with web interface
 - **Sync to Obsidian/Notion** - Direct integration with note-taking apps
 - **AI summarization** - Generate summaries for long articles
 - **Recommendations** - Suggest similar articles based on reading history
-
-### Platform Expansion
-
 - **iOS companion app** - View synced articles with iCloud sync
 - **Alfred/Raycast extension** - Quick actions for macOS power users
-- **CLI improvements** - Interactive selection of articles to sync
 
 ---
 
