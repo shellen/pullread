@@ -3,26 +3,9 @@
 
 import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
-import { join, dirname, extname } from 'path';
+import { join, extname } from 'path';
 import { exec } from 'child_process';
-
-// Resolve viewer.html location. In compiled binaries (bun --compile), __dirname
-// is baked in at compile time and won't exist on user machines. Use the actual
-// executable path at runtime to find viewer.html alongside the binary.
-function resolveViewerHtml(): string {
-  const candidates = [
-    join(dirname(process.execPath), 'viewer.html'),   // compiled binary: same dir as executable
-    join(__dirname, '..', 'viewer.html'),              // development: src/../viewer.html
-    join(__dirname, 'viewer.html'),                    // fallback
-  ];
-  for (const p of candidates) {
-    if (existsSync(p)) return p;
-  }
-  // Return the most likely path so the error message is useful
-  return candidates[0];
-}
-
-const VIEWER_HTML_PATH = resolveViewerHtml();
+import { VIEWER_HTML } from './viewer-html';
 
 interface FileMeta {
   filename: string;
@@ -111,15 +94,8 @@ export function startViewer(outputPath: string, port = 7777): void {
     res.setHeader('Access-Control-Allow-Origin', '*');
 
     if (url.pathname === '/' || url.pathname === '/index.html') {
-      if (!existsSync(VIEWER_HTML_PATH)) {
-        const msg = `viewer.html not found at: ${VIEWER_HTML_PATH}\nexecPath: ${process.execPath}\n__dirname: ${__dirname}`;
-        console.error(msg);
-        res.writeHead(500, { 'Content-Type': 'text/plain' });
-        res.end(msg);
-        return;
-      }
       res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(readFileSync(VIEWER_HTML_PATH, 'utf-8'));
+      res.end(VIEWER_HTML);
       return;
     }
 

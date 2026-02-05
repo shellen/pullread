@@ -9,6 +9,7 @@ on:
     paths:
       - 'PullReadTray/**'
       - 'src/**'
+      - 'viewer.html'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/build-macos-app.yml'
@@ -17,6 +18,7 @@ on:
     paths:
       - 'PullReadTray/**'
       - 'src/**'
+      - 'viewer.html'
       - 'package.json'
       - 'package-lock.json'
   workflow_dispatch:
@@ -55,6 +57,7 @@ jobs:
       - name: Build PullRead CLI binary
         run: |
           bun install
+          bun scripts/embed-viewer.ts
           mkdir -p dist
           bun build src/index.ts --compile --target=bun-darwin-arm64 --outfile dist/pullread-arm64
           bun build src/index.ts --compile --target=bun-darwin-x64 --outfile dist/pullread-x64
@@ -133,6 +136,12 @@ jobs:
 
           # Verify
           ls -la "artifacts/Pull Read.app/Contents/Resources/"
+
+          # Free disk space: remove intermediate build artifacts
+          rm -rf ../dist
+          rm -rf build/Build/Intermediates*
+          rm -rf build/Build/Products/Debug
+          df -h .
 
       - name: Create DMG
         working-directory: PullReadTray

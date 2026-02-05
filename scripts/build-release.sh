@@ -85,6 +85,10 @@ build_cli() {
     # Install dependencies
     bun install
 
+    # Embed viewer.html into the TypeScript source so the compiled
+    # binary serves the viewer from memory (no external file needed)
+    bun scripts/embed-viewer.ts
+
     # Build for current architecture
     ARCH=$(uname -m)
     if [ "$ARCH" = "arm64" ]; then
@@ -124,9 +128,8 @@ bundle_cli() {
     APP_PATH="$PROJECT_DIR/build/Build/Products/Release/$APP_NAME.app"
     RESOURCES_PATH="$APP_PATH/Contents/Resources"
 
-    # Copy binary and viewer.html
+    # Copy binary (viewer.html is embedded in the binary at compile time)
     cp "$ROOT_DIR/dist/pullread" "$RESOURCES_PATH/"
-    cp "$ROOT_DIR/viewer.html" "$RESOURCES_PATH/"
 
     # Sign the binary
     codesign --force --sign "Developer ID Application" "$RESOURCES_PATH/pullread"
