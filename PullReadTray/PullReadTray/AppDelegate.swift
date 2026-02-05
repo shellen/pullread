@@ -4,6 +4,8 @@
 import Cocoa
 import SwiftUI
 import UserNotifications
+// Sparkle import - uncomment when Sparkle SPM package is added:
+// import Sparkle
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
@@ -11,7 +13,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var lastSyncMenuItem: NSMenuItem!
     private var syncMenuItem: NSMenuItem!
     private var statusMenuItem: NSMenuItem!
+    private var checkForUpdatesMenuItem: NSMenuItem!
     private var settingsWindowController: SettingsWindowController!
+
+    // Sparkle updater - uncomment when Sparkle SPM package is added:
+    // private let updaterController = SPUStandardUpdaterController(
+    //     startingUpdater: true,
+    //     updaterDelegate: nil,
+    //     userDriverDelegate: nil
+    // )
 
     /// Returns true if running in a unit test environment
     /// Uses multiple detection methods for reliability across different test runners
@@ -62,6 +72,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Check for first run or invalid config
         checkFirstRunOrInvalidConfig()
+
+        // Check if we should show "What's New" after an update
+        checkForVersionUpdate()
     }
 
     private func checkFirstRunOrInvalidConfig() {
@@ -150,6 +163,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let logsMenuItem = NSMenuItem(title: "View Logs...", action: #selector(viewLogs), keyEquivalent: "l")
         logsMenuItem.target = self
         menu.addItem(logsMenuItem)
+
+        // Check for Updates (Sparkle)
+        checkForUpdatesMenuItem = NSMenuItem(title: "Check for Updates...", action: #selector(checkForUpdates), keyEquivalent: "")
+        checkForUpdatesMenuItem.target = self
+        menu.addItem(checkForUpdatesMenuItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -279,7 +297,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func showSettings(isFirstRun: Bool) {
         settingsWindowController.showSettings(
             configPath: syncService.getConfigPath(),
-            isFirstRun: isFirstRun
+            isFirstRun: isFirstRun,
+            onFirstRunComplete: isFirstRun ? { [weak self] in
+                // Trigger first sync automatically after setup
+                self?.showNotification(
+                    title: "Welcome to PullRead!",
+                    body: "Your first sync is running. Articles will appear in your output folder shortly."
+                )
+                self?.runSync(retryFailed: false)
+            } : nil
         ) { [weak self] in
             // Callback after save - could trigger a sync or update UI
             self?.showNotification(title: "Settings Saved", body: "Your configuration has been updated.")
@@ -297,10 +323,44 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    @objc private func checkForUpdates() {
+        // Sparkle handles the update check UI - uncomment when Sparkle is added:
+        // updaterController.checkForUpdates(nil)
+
+        // Placeholder until Sparkle is integrated
+        showAlert(
+            title: "Updates",
+            message: "Auto-update support via Sparkle will be available in a future release."
+        )
+    }
+
+    private func checkForVersionUpdate() {
+        let currentVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+        let lastSeenVersion = UserDefaults.standard.string(forKey: "lastSeenVersion")
+
+        if lastSeenVersion == nil {
+            // First install - store version silently, don't show What's New
+            UserDefaults.standard.set(currentVersion, forKey: "lastSeenVersion")
+        } else if lastSeenVersion != currentVersion {
+            // Updated - show What's New
+            UserDefaults.standard.set(currentVersion, forKey: "lastSeenVersion")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                self?.showWhatsNew(version: currentVersion)
+            }
+        }
+    }
+
+    private func showWhatsNew(version: String) {
+        let whatsNewController = SettingsWindowController()
+        whatsNewController.showWhatsNew(version: version)
+    }
+
     @objc private func showAbout() {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
         let alert = NSAlert()
         alert.messageText = "PullRead"
-        alert.informativeText = "RSS to Markdown Sync\n\nVersion 1.0.0\n\nSyncs RSS and Atom feeds to markdown files for offline reading."
+        alert.informativeText = "RSS to Markdown Sync\n\nVersion \(version) (\(build))\n\nSyncs RSS and Atom feeds to markdown files for offline reading."
         alert.alertStyle = .informational
         alert.addButton(withTitle: "OK")
         alert.runModal()

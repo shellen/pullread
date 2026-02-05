@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PullRead</title>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Literata:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #ffffff;
@@ -249,6 +252,10 @@
   .font-serif .content-wrap { font-family: "Georgia", "Times New Roman", "Iowan Old Style", serif; }
   .font-mono .content-wrap { font-family: "SF Mono", "Fira Code", "Menlo", monospace; }
   .font-system .content-wrap { font-family: "Charter", "Bitstream Charter", "Sitka Text", Cambria, serif; }
+  .font-inter .content-wrap { font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif; }
+  .font-lora .content-wrap { font-family: "Lora", "Georgia", serif; }
+  .font-literata .content-wrap { font-family: "Literata", "Georgia", serif; }
+  .font-source-serif .content-wrap { font-family: "Source Serif 4", "Georgia", serif; }
 
   .content-wrap {
     line-height: 1.7;
@@ -328,6 +335,72 @@
     outline: 3px dashed var(--link);
     outline-offset: -3px;
   }
+
+  /* Onboarding overlay */
+  .onboarding-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .onboarding-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px 36px;
+    max-width: 440px;
+    width: 90%;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.2);
+  }
+  .onboarding-card h2 {
+    font-size: 20px;
+    margin-bottom: 16px;
+    color: var(--fg);
+  }
+  .onboarding-card p {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .onboarding-shortcuts {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 6px 14px;
+    margin: 16px 0;
+    font-size: 13px;
+  }
+  .onboarding-shortcuts kbd {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 2px 7px;
+    font-size: 12px;
+    font-family: inherit;
+    text-align: center;
+  }
+  .onboarding-shortcuts span {
+    color: var(--fg);
+  }
+  .onboarding-dismiss {
+    display: block;
+    margin: 20px auto 0;
+    padding: 8px 24px;
+    background: var(--fg);
+    color: var(--bg);
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .onboarding-dismiss:hover {
+    opacity: 0.85;
+  }
 </style>
 </head>
 <body data-theme="light" class="font-serif size-medium">
@@ -353,6 +426,10 @@
         <option value="sans">Sans-serif</option>
         <option value="system">Charter</option>
         <option value="mono">Monospace</option>
+        <option value="inter">Inter</option>
+        <option value="lora">Lora</option>
+        <option value="literata">Literata</option>
+        <option value="source-serif">Source Serif</option>
       </select>
     </div>
 
@@ -371,7 +448,7 @@
       </div>
       <div class="file-count" id="file-count"></div>
       <div class="file-list" id="file-list"></div>
-      <div class="nav-hint"><kbd>&uarr;</kbd><kbd>&darr;</kbd> navigate &middot; <kbd>Enter</kbd> open &middot; <kbd>/</kbd> search &middot; <kbd>[</kbd> sidebar</div>
+      <div class="nav-hint"><kbd>j</kbd><kbd>k</kbd> next/prev &middot; <kbd>&uarr;</kbd><kbd>&darr;</kbd> scroll &middot; <kbd>/</kbd> search &middot; <kbd>[</kbd> sidebar</div>
     </div>
 
     <div class="content-pane" id="content-pane">
@@ -383,6 +460,21 @@
     </div>
   </div>
 
+</div>
+
+<div class="onboarding-overlay" id="onboarding" style="display:none" onclick="dismissOnboarding(event)">
+  <div class="onboarding-card" onclick="event.stopPropagation()">
+    <h2>Welcome to PullRead</h2>
+    <p>Browse your synced articles in a clean, distraction-free reader. Use the sidebar to search and select articles, or customize the theme and font above.</p>
+    <div class="onboarding-shortcuts">
+      <kbd>j</kbd> <span>Next article</span>
+      <kbd>k</kbd> <span>Previous article</span>
+      <kbd>/</kbd> <span>Search articles</span>
+      <kbd>[</kbd> <span>Toggle sidebar</span>
+      <kbd>Esc</kbd> <span>Clear search</span>
+    </div>
+    <button class="onboarding-dismiss" onclick="dismissOnboarding()">Got it</button>
+  </div>
 </div>
 
 <script>
@@ -402,7 +494,7 @@ function setTheme(theme) {
 }
 
 function setFont(font) {
-  document.body.className = document.body.className.replace(/font-\w+/, 'font-' + font);
+  document.body.className = document.body.className.replace(/font-[\w-]+/, 'font-' + font);
   localStorage.setItem('pr-font', font);
 }
 
@@ -441,6 +533,24 @@ function escapeHtml(s) {
   return d.innerHTML;
 }
 
+// Clean up broken markdown patterns that marked.js can't handle
+function cleanMarkdown(md) {
+  // Fix image/link patterns split across lines:
+  // [\n![alt](img)\n]\n(url) -> [![alt](img)](url)
+  md = md.replace(/\[\s*\n\s*(!\[[^\]]*\]\([^)]*\))\s*\n\s*\]\s*\n\s*(\([^)]*\))/g, '[$1]$2');
+
+  // Fix simpler case: [text\n](url) -> [text](url)
+  md = md.replace(/\[([^\]]*?)\s*\n\s*\]\s*\n?\s*(\([^)]*\))/g, '[$1]$2');
+
+  // Fix standalone brackets around images: [\n![alt](url)\n] without a link
+  md = md.replace(/\[\s*\n(!\[[^\]]*\]\([^)]*\))\s*\n\]/g, '$1');
+
+  // Fix image syntax broken by newlines: ![\nalt\n]\n(url) -> ![alt](url)
+  md = md.replace(/!\[\s*\n?\s*([^\]]*?)\s*\n?\s*\]\s*\n\s*(\([^)]*\))/g, '![$1]$2');
+
+  return md;
+}
+
 // Rendering
 function renderArticle(text, filename) {
   const { meta, body } = parseFrontmatter(text);
@@ -460,7 +570,7 @@ function renderArticle(text, filename) {
     html += '</div>';
   }
 
-  html += marked.parse(body);
+  html += marked.parse(cleanMarkdown(body));
   content.innerHTML = html;
   document.title = (meta && meta.title) || filename || 'PullRead';
 
@@ -545,21 +655,33 @@ document.addEventListener('keydown', e => {
     }
   }
 
-  // Up/Down navigate file list
-  if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && document.activeElement.tagName !== 'INPUT') {
+  // j/k navigate file list (next/prev)
+  if ((e.key === 'j' || e.key === 'k') && document.activeElement.tagName !== 'INPUT') {
     e.preventDefault();
     const currentIdx = filteredFiles.findIndex(f => f.filename === activeFile);
     let next;
-    if (e.key === 'ArrowDown') {
+    if (e.key === 'j') {
       next = currentIdx < filteredFiles.length - 1 ? currentIdx + 1 : 0;
     } else {
       next = currentIdx > 0 ? currentIdx - 1 : filteredFiles.length - 1;
     }
     loadFile(next);
 
-    // Scroll file into view
+    // Scroll file into view in sidebar
     const el = document.querySelector('.file-item[data-index="' + next + '"]');
     if (el) el.scrollIntoView({ block: 'nearest' });
+    return;
+  }
+
+  // Up/Down scroll the content pane
+  if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && document.activeElement.tagName !== 'INPUT') {
+    const pane = document.getElementById('content-pane');
+    const scrollAmount = 80;
+    if (e.key === 'ArrowDown') {
+      pane.scrollTop += scrollAmount;
+    } else {
+      pane.scrollTop -= scrollAmount;
+    }
     return;
   }
 
@@ -613,6 +735,19 @@ document.addEventListener('drop', e => {
   }
 });
 
+// Onboarding overlay
+function dismissOnboarding(e) {
+  if (e && e.target && e.target.id !== 'onboarding' && e.target.className !== 'onboarding-dismiss') return;
+  document.getElementById('onboarding').style.display = 'none';
+  localStorage.setItem('pr-onboarded', '1');
+}
+
+function showOnboardingIfNeeded() {
+  if (!localStorage.getItem('pr-onboarded')) {
+    document.getElementById('onboarding').style.display = 'flex';
+  }
+}
+
 // Init: try to load from server, fall back to standalone mode
 async function init() {
   // Restore preferences
@@ -640,6 +775,7 @@ async function init() {
       if (allFiles.length > 0) {
         loadFile(0);
       }
+      showOnboardingIfNeeded();
       return;
     }
   } catch {}

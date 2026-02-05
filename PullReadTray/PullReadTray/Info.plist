@@ -26,5 +26,8 @@
     <string>Copyright 2026. All rights reserved.</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
+    <!-- Sparkle auto-update keys: configure these when Sparkle is integrated -->
+    <!-- SUFeedURL: URL to appcast.xml for update checks -->
+    <!-- SUPublicEDKey: Ed25519 public key for update signature verification -->
 </dict>
 </plist>

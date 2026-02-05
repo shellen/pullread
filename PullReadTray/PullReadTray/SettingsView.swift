@@ -24,12 +24,14 @@ struct SettingsView: View {
 
     let configPath: String
     var onSave: (() -> Void)?
+    var onFirstRunComplete: (() -> Void)?
     var isFirstRun: Bool
 
-    init(isPresented: Binding<Bool>, configPath: String, onSave: (() -> Void)? = nil, isFirstRun: Bool = false) {
+    init(isPresented: Binding<Bool>, configPath: String, onSave: (() -> Void)? = nil, onFirstRunComplete: (() -> Void)? = nil, isFirstRun: Bool = false) {
         self._isPresented = isPresented
         self.configPath = configPath
         self.onSave = onSave
+        self.onFirstRunComplete = onFirstRunComplete
         self.isFirstRun = isFirstRun
     }
 
@@ -90,7 +92,12 @@ struct SettingsView: View {
                         .foregroundColor(.secondary)
                 }
             }
-            .padding(.bottom, 8)
+            .padding(.bottom, 4)
+
+            Text("PullRead syncs your RSS and Atom feeds into clean markdown files, saved to a folder you choose. Add your feeds below and you're ready to go.")
+                .font(.callout)
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -99,9 +106,16 @@ struct SettingsView: View {
     private var outputFolderSection: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 12) {
-                Label("Output Folder", systemImage: "folder.fill")
-                    .font(.headline)
-                    .foregroundColor(.primary)
+                HStack {
+                    if isFirstRun {
+                        Text("1.")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                    }
+                    Label("Choose Output Folder", systemImage: "folder.fill")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                }
 
                 Text("Synced articles will be saved as markdown files here.")
                     .font(.caption)
@@ -128,9 +142,16 @@ struct SettingsView: View {
     private var feedsSection: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 12) {
-                Label("RSS Feeds", systemImage: "antenna.radiowaves.left.and.right")
-                    .font(.headline)
-                    .foregroundColor(.primary)
+                HStack {
+                    if isFirstRun {
+                        Text("2.")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                    }
+                    Label("Add Your Feeds", systemImage: "antenna.radiowaves.left.and.right")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                }
 
                 Text("Add RSS or Atom feed URLs to sync.")
                     .font(.caption)
@@ -206,7 +227,12 @@ struct SettingsView: View {
         GlassCard {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Label("Browser Cookies", systemImage: "key.fill")
+                    if isFirstRun {
+                        Text("3.")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                    }
+                    Label("Options", systemImage: "key.fill")
                         .font(.headline)
                         .foregroundColor(.primary)
 
@@ -380,6 +406,13 @@ struct SettingsView: View {
         guard FileManager.default.fileExists(atPath: configPath),
               let data = FileManager.default.contents(atPath: configPath),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            // Pre-fill defaults for first run
+            if isFirstRun {
+                outputPath = "~/Documents/PullRead"
+                feeds = [
+                    FeedItem(name: "Hacker News (100+)", url: "https://hnrss.org/newest?points=100")
+                ]
+            }
             return
         }
 
@@ -444,6 +477,9 @@ struct SettingsView: View {
             }
 
             isPresented = false
+            if isFirstRun {
+                onFirstRunComplete?()
+            }
             onSave?()
         } catch {
             errorMessage = "Failed to save configuration: \(error.localizedDescription)"
