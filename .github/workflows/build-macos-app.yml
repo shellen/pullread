@@ -96,6 +96,7 @@ jobs:
             -derivedDataPath build \
             -destination 'platform=macOS,arch=arm64' \
             CODE_SIGNING_ALLOWED=NO \
+            ENABLE_TESTABILITY=YES \
             2>&1 | xcpretty --color
 
       - name: Run unit tests (without rebuilding)
