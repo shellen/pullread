@@ -103,6 +103,10 @@ jobs:
           # Re-sign the entire app bundle
           codesign --force --deep --sign "Developer ID Application" "$APP_PATH"
 
+          # Free disk space: remove intermediate build artifacts
+          rm -rf dist
+          rm -rf PullReadTray/build/Build/Intermediates*
+
       - name: Notarize app
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}

@@ -137,6 +137,12 @@ jobs:
           # Verify
           ls -la "artifacts/Pull Read.app/Contents/Resources/"
 
+          # Free disk space: remove intermediate build artifacts
+          rm -rf ../dist
+          rm -rf build/Build/Intermediates*
+          rm -rf build/Build/Products/Debug
+          df -h .
+
       - name: Create DMG
         working-directory: PullReadTray
         run: |
