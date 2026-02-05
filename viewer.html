@@ -401,6 +401,176 @@
   .onboarding-dismiss:hover {
     opacity: 0.85;
   }
+
+  /* Highlights */
+  mark.pr-highlight {
+    border-radius: 2px;
+    padding: 1px 0;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  mark.pr-highlight:hover { opacity: 0.75; }
+  mark.pr-highlight.hl-yellow { background: rgba(255, 235, 59, 0.45); }
+  mark.pr-highlight.hl-green { background: rgba(76, 175, 80, 0.35); }
+  mark.pr-highlight.hl-blue { background: rgba(66, 165, 245, 0.3); }
+  mark.pr-highlight.hl-pink { background: rgba(236, 64, 122, 0.3); }
+  [data-theme="dark"] mark.pr-highlight.hl-yellow { background: rgba(255, 235, 59, 0.3); }
+  [data-theme="dark"] mark.pr-highlight.hl-green { background: rgba(76, 175, 80, 0.25); }
+  [data-theme="dark"] mark.pr-highlight.hl-blue { background: rgba(66, 165, 245, 0.25); }
+  [data-theme="dark"] mark.pr-highlight.hl-pink { background: rgba(236, 64, 122, 0.25); }
+
+  /* Highlight toolbar (floating) */
+  .hl-toolbar {
+    position: absolute;
+    z-index: 50;
+    display: flex;
+    gap: 4px;
+    padding: 5px 8px;
+    background: var(--toolbar-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    animation: fadeIn 0.15s ease;
+  }
+  .hl-toolbar button {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    cursor: pointer;
+    padding: 0;
+    transition: transform 0.1s;
+  }
+  .hl-toolbar button:hover { transform: scale(1.2); }
+  .hl-toolbar .hl-yellow-btn { background: #ffeb3b; }
+  .hl-toolbar .hl-green-btn { background: #4caf50; }
+  .hl-toolbar .hl-blue-btn { background: #42a5f5; }
+  .hl-toolbar .hl-pink-btn { background: #ec407a; }
+  .hl-toolbar .hl-note-btn {
+    background: var(--bg);
+    width: auto;
+    border-radius: 4px;
+    padding: 0 8px;
+    font-size: 11px;
+    color: var(--fg);
+  }
+
+  /* Notes panel */
+  .notes-panel {
+    border-top: 1px solid var(--border);
+    margin-top: 24px;
+    padding-top: 16px;
+  }
+  .notes-panel summary {
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    user-select: none;
+  }
+  .notes-panel summary:hover { color: var(--fg); }
+  .notes-panel textarea {
+    width: 100%;
+    min-height: 80px;
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.6;
+    resize: vertical;
+    outline: none;
+  }
+  .notes-panel textarea:focus { border-color: var(--link); }
+  .notes-save-hint {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  /* Inline annotation indicator */
+  .annotation-marker {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    background: var(--link);
+    color: var(--bg);
+    border-radius: 50%;
+    font-size: 9px;
+    text-align: center;
+    line-height: 14px;
+    cursor: pointer;
+    vertical-align: super;
+    margin-left: 2px;
+    font-family: -apple-system, sans-serif;
+  }
+  .annotation-marker:hover { opacity: 0.8; }
+
+  /* Annotation popover */
+  .annotation-popover {
+    position: absolute;
+    z-index: 51;
+    width: 280px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    padding: 12px;
+    animation: fadeIn 0.15s ease;
+  }
+  .annotation-popover textarea {
+    width: 100%;
+    min-height: 60px;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: inherit;
+    font-size: 13px;
+    resize: vertical;
+    outline: none;
+  }
+  .annotation-popover textarea:focus { border-color: var(--link); }
+  .annotation-popover .btn-row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .annotation-popover button {
+    padding: 4px 12px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--fg);
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .annotation-popover button.primary {
+    background: var(--fg);
+    color: var(--bg);
+    border-color: var(--fg);
+  }
+
+  /* Highlight indicator dot on sidebar items */
+  .file-item-indicators {
+    display: flex;
+    gap: 3px;
+    margin-top: 2px;
+  }
+  .file-item-indicators .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+  .dot-highlight { background: #ffeb3b; }
+  .dot-note { background: var(--link); }
 </style>
 </head>
 <body data-theme="light" class="font-serif size-medium">
@@ -448,7 +618,7 @@
       </div>
       <div class="file-count" id="file-count"></div>
       <div class="file-list" id="file-list"></div>
-      <div class="nav-hint"><kbd>j</kbd><kbd>k</kbd> <kbd>&larr;</kbd><kbd>&rarr;</kbd> next/prev &middot; <kbd>&uarr;</kbd><kbd>&darr;</kbd> scroll &middot; <kbd>/</kbd> search &middot; <kbd>[</kbd> sidebar</div>
+      <div class="nav-hint"><kbd>j</kbd><kbd>k</kbd> <kbd>&larr;</kbd><kbd>&rarr;</kbd> next/prev &middot; <kbd>&uarr;</kbd><kbd>&darr;</kbd> scroll &middot; <kbd>/</kbd> search &middot; <kbd>[</kbd> sidebar &middot; <kbd>h</kbd> highlight &middot; <kbd>n</kbd> notes</div>
     </div>
 
     <div class="content-pane" id="content-pane">
@@ -465,13 +635,15 @@
 <div class="onboarding-overlay" id="onboarding" style="display:none" onclick="dismissOnboarding(event)">
   <div class="onboarding-card" onclick="event.stopPropagation()">
     <h2>Welcome to PullRead</h2>
-    <p>Browse your synced articles in a clean, distraction-free reader. Use the sidebar to search and select articles, or customize the theme and font above.</p>
+    <p>Browse your synced articles in a clean, distraction-free reader. Select text to highlight passages, or add notes to articles. Use the sidebar to search and select articles, or customize the theme and font above.</p>
     <div class="onboarding-shortcuts">
       <kbd>j</kbd> / <kbd>&rarr;</kbd> <span>Next article</span>
       <kbd>k</kbd> / <kbd>&larr;</kbd> <span>Previous article</span>
       <kbd>&uarr;</kbd> <kbd>&darr;</kbd> <span>Scroll (jumps articles at edges)</span>
       <kbd>/</kbd> <span>Search articles</span>
       <kbd>[</kbd> <span>Toggle sidebar</span>
+      <kbd>h</kbd> <span>Highlight selected text</span>
+      <kbd>n</kbd> <span>Toggle article notes</span>
       <kbd>Esc</kbd> <span>Clear search</span>
     </div>
     <button class="onboarding-dismiss" onclick="dismissOnboarding()">Got it</button>
@@ -484,6 +656,12 @@ let allFiles = [];
 let filteredFiles = [];
 let activeFile = null;
 let serverMode = false;
+
+// Highlights & Notes state
+let articleHighlights = []; // highlights for current article
+let articleNotes = { articleNote: '', annotations: [] }; // notes for current article
+let allHighlightsIndex = {}; // { filename: [...] } for sidebar indicators
+let allNotesIndex = {}; // { filename: { articleNote, annotations } } for sidebar indicators
 
 // Preferences
 function setTheme(theme) {
@@ -588,13 +766,23 @@ function renderFileList() {
   list.innerHTML = filteredFiles.map((f, i) => {
     const date = f.bookmarked ? f.bookmarked.slice(0, 10) : '';
     const isActive = activeFile === f.filename ? ' active' : '';
+    const { hasHl, hasNote } = hasAnnotations(f.filename);
+    let indicators = '';
+    if (hasHl || hasNote) {
+      indicators = '<div class="file-item-indicators">'
+        + (hasHl ? '<span class="dot dot-highlight" title="Has highlights"></span>' : '')
+        + (hasNote ? '<span class="dot dot-note" title="Has notes"></span>' : '')
+        + '</div>';
+    }
     return '<div class="file-item' + isActive + '" data-index="' + i + '" onclick="loadFile(' + i + ')">'
       + '<div class="file-item-title">' + escapeHtml(f.title) + '</div>'
       + '<div class="file-item-meta">'
       + (date ? '<span>' + date + '</span>' : '')
       + (f.domain ? '<span>' + escapeHtml(f.domain) + '</span>' : '')
       + (f.feed ? '<span>' + escapeHtml(f.feed) + '</span>' : '')
-      + '</div></div>';
+      + '</div>'
+      + indicators
+      + '</div>';
   }).join('');
 }
 
@@ -617,12 +805,14 @@ async function loadFile(index) {
   if (!file) return;
   activeFile = file.filename;
   renderFileList();
+  removeHlToolbar();
 
   if (serverMode) {
     const res = await fetch('/api/file?name=' + encodeURIComponent(file.filename));
     if (res.ok) {
       const text = await res.text();
       renderArticle(text, file.filename);
+      await loadAnnotations(file.filename);
     }
   }
 }
@@ -640,6 +830,423 @@ function navigateArticle(direction) {
   loadFile(next);
   const el = document.querySelector('.file-item[data-index="' + next + '"]');
   if (el) el.scrollIntoView({ block: 'nearest' });
+}
+
+// ---- Highlights & Notes ----
+
+async function loadAnnotations(filename) {
+  if (!serverMode) return;
+  try {
+    const [hlRes, notesRes] = await Promise.all([
+      fetch('/api/highlights?name=' + encodeURIComponent(filename)),
+      fetch('/api/notes?name=' + encodeURIComponent(filename))
+    ]);
+    articleHighlights = hlRes.ok ? await hlRes.json() : [];
+    articleNotes = notesRes.ok ? await notesRes.json() : { articleNote: '', annotations: [] };
+  } catch {
+    articleHighlights = [];
+    articleNotes = { articleNote: '', annotations: [] };
+  }
+  applyHighlights();
+  renderNotesPanel();
+}
+
+async function loadAnnotationsIndex() {
+  if (!serverMode) return;
+  try {
+    const [hlRes, notesRes] = await Promise.all([
+      fetch('/api/highlights'),
+      fetch('/api/notes')
+    ]);
+    allHighlightsIndex = hlRes.ok ? await hlRes.json() : {};
+    allNotesIndex = notesRes.ok ? await notesRes.json() : {};
+  } catch {
+    allHighlightsIndex = {};
+    allNotesIndex = {};
+  }
+}
+
+function hasAnnotations(filename) {
+  const hasHl = allHighlightsIndex[filename] && allHighlightsIndex[filename].length > 0;
+  const notes = allNotesIndex[filename];
+  const hasNote = notes && (notes.articleNote || (notes.annotations && notes.annotations.length > 0));
+  return { hasHl, hasNote };
+}
+
+async function saveHighlights() {
+  if (!serverMode || !activeFile) return;
+  allHighlightsIndex[activeFile] = articleHighlights;
+  await fetch('/api/highlights', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: activeFile, highlights: articleHighlights })
+  });
+}
+
+async function saveNotes() {
+  if (!serverMode || !activeFile) return;
+  allNotesIndex[activeFile] = articleNotes;
+  await fetch('/api/notes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: activeFile, ...articleNotes })
+  });
+}
+
+function generateId() {
+  return 'h' + Math.random().toString(36).slice(2, 8);
+}
+
+function getTextContext(text, before, after) {
+  // Get surrounding context for anchoring
+  const content = document.getElementById('content');
+  const fullText = content.textContent || '';
+  const idx = fullText.indexOf(text);
+  if (idx < 0) return { contextBefore: '', contextAfter: '' };
+  return {
+    contextBefore: fullText.slice(Math.max(0, idx - 30), idx),
+    contextAfter: fullText.slice(idx + text.length, idx + text.length + 30)
+  };
+}
+
+function createHighlight(color) {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !sel.toString().trim()) return;
+
+  const text = sel.toString();
+  const { contextBefore, contextAfter } = getTextContext(text);
+
+  const highlight = {
+    id: generateId(),
+    text: text,
+    contextBefore,
+    contextAfter,
+    color: color,
+    createdAt: new Date().toISOString()
+  };
+
+  articleHighlights.push(highlight);
+  saveHighlights();
+  applyHighlights();
+  removeHlToolbar();
+  sel.removeAllRanges();
+  renderFileList(); // update indicator dots
+}
+
+function deleteHighlight(id) {
+  articleHighlights = articleHighlights.filter(h => h.id !== id);
+  saveHighlights();
+  applyHighlights();
+  renderFileList();
+}
+
+function applyHighlights() {
+  const content = document.getElementById('content');
+  if (!content) return;
+
+  // Remove existing highlights (re-render from raw HTML)
+  content.querySelectorAll('mark.pr-highlight').forEach(mark => {
+    const parent = mark.parentNode;
+    while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+    parent.removeChild(mark);
+    parent.normalize();
+  });
+
+  // Remove annotation markers
+  content.querySelectorAll('.annotation-marker').forEach(m => m.remove());
+
+  // Apply each highlight
+  for (const hl of articleHighlights) {
+    findAndWrap(content, hl);
+  }
+
+  // Apply inline annotations
+  for (const ann of (articleNotes.annotations || [])) {
+    findAndMarkAnnotation(content, ann);
+  }
+}
+
+function findAndWrap(container, hl) {
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  const searchText = hl.text;
+  let node;
+
+  while (node = walker.nextNode()) {
+    const idx = node.textContent.indexOf(searchText);
+    if (idx < 0) continue;
+
+    // Verify context if available
+    if (hl.contextBefore) {
+      const fullText = container.textContent || '';
+      const globalIdx = fullText.indexOf(searchText);
+      if (globalIdx > 0) {
+        const before = fullText.slice(Math.max(0, globalIdx - 30), globalIdx);
+        if (!before.includes(hl.contextBefore.slice(-10))) continue;
+      }
+    }
+
+    const range = document.createRange();
+    range.setStart(node, idx);
+    range.setEnd(node, idx + searchText.length);
+
+    const mark = document.createElement('mark');
+    mark.className = 'pr-highlight hl-' + hl.color;
+    mark.setAttribute('data-hl-id', hl.id);
+    mark.onclick = function(e) {
+      e.stopPropagation();
+      showHighlightContextMenu(e, hl);
+    };
+
+    range.surroundContents(mark);
+    return; // Only wrap first match
+  }
+}
+
+function findAndMarkAnnotation(container, ann) {
+  if (!ann.anchorText) return;
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  let node;
+  while (node = walker.nextNode()) {
+    const idx = node.textContent.indexOf(ann.anchorText);
+    if (idx < 0) continue;
+    // Insert a marker after the anchor text
+    const marker = document.createElement('span');
+    marker.className = 'annotation-marker';
+    marker.textContent = 'n';
+    marker.title = ann.note;
+    marker.onclick = function(e) {
+      e.stopPropagation();
+      showAnnotationPopover(e, ann);
+    };
+    const textAfter = node.splitText(idx + ann.anchorText.length);
+    textAfter.parentNode.insertBefore(marker, textAfter);
+    return;
+  }
+}
+
+// Floating highlight toolbar on text selection
+let hlToolbarEl = null;
+
+function removeHlToolbar() {
+  if (hlToolbarEl) {
+    hlToolbarEl.remove();
+    hlToolbarEl = null;
+  }
+  removeAnnotationPopover();
+}
+
+function removeAnnotationPopover() {
+  const existing = document.querySelector('.annotation-popover');
+  if (existing) existing.remove();
+}
+
+function showHlToolbar(x, y) {
+  removeHlToolbar();
+  const bar = document.createElement('div');
+  bar.className = 'hl-toolbar';
+  bar.innerHTML = `
+    <button class="hl-yellow-btn" title="Yellow" onclick="createHighlight('yellow')"></button>
+    <button class="hl-green-btn" title="Green" onclick="createHighlight('green')"></button>
+    <button class="hl-blue-btn" title="Blue" onclick="createHighlight('blue')"></button>
+    <button class="hl-pink-btn" title="Pink" onclick="createHighlight('pink')"></button>
+    <button class="hl-note-btn" title="Add note" onclick="addInlineNote()">+ Note</button>
+  `;
+  bar.style.left = x + 'px';
+  bar.style.top = y + 'px';
+  document.getElementById('content-pane').appendChild(bar);
+  hlToolbarEl = bar;
+}
+
+function showHighlightContextMenu(e, hl) {
+  removeHlToolbar();
+  const bar = document.createElement('div');
+  bar.className = 'hl-toolbar';
+  bar.innerHTML = `
+    <button class="hl-yellow-btn" title="Yellow" onclick="changeHighlightColor('${hl.id}','yellow')"></button>
+    <button class="hl-green-btn" title="Green" onclick="changeHighlightColor('${hl.id}','green')"></button>
+    <button class="hl-blue-btn" title="Blue" onclick="changeHighlightColor('${hl.id}','blue')"></button>
+    <button class="hl-pink-btn" title="Pink" onclick="changeHighlightColor('${hl.id}','pink')"></button>
+    <button class="hl-note-btn" style="color:red;border-color:red" title="Delete" onclick="deleteHighlight('${hl.id}')">Delete</button>
+  `;
+  const pane = document.getElementById('content-pane');
+  bar.style.left = (e.clientX - pane.getBoundingClientRect().left) + 'px';
+  bar.style.top = (e.clientY - pane.getBoundingClientRect().top + pane.scrollTop - 40) + 'px';
+  pane.appendChild(bar);
+  hlToolbarEl = bar;
+}
+
+function changeHighlightColor(id, color) {
+  const hl = articleHighlights.find(h => h.id === id);
+  if (hl) {
+    hl.color = color;
+    saveHighlights();
+    applyHighlights();
+  }
+  removeHlToolbar();
+}
+
+// Listen for text selection in content pane
+document.addEventListener('mouseup', e => {
+  const contentEl = document.getElementById('content');
+  if (!contentEl || !contentEl.contains(e.target)) {
+    // Don't remove toolbar if clicking on the toolbar itself
+    if (hlToolbarEl && hlToolbarEl.contains(e.target)) return;
+    removeHlToolbar();
+    return;
+  }
+
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !sel.toString().trim()) return;
+
+  const pane = document.getElementById('content-pane');
+  const range = sel.getRangeAt(0);
+  const rect = range.getBoundingClientRect();
+  const paneRect = pane.getBoundingClientRect();
+
+  const x = rect.left - paneRect.left + rect.width / 2 - 70;
+  const y = rect.top - paneRect.top + pane.scrollTop - 40;
+  showHlToolbar(Math.max(10, x), y);
+});
+
+// Inline annotations
+function addInlineNote() {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !sel.toString().trim()) return;
+  const anchorText = sel.toString();
+  const pane = document.getElementById('content-pane');
+  const range = sel.getRangeAt(0);
+  const rect = range.getBoundingClientRect();
+  const paneRect = pane.getBoundingClientRect();
+
+  removeHlToolbar();
+
+  const popover = document.createElement('div');
+  popover.className = 'annotation-popover';
+  popover.style.left = (rect.left - paneRect.left) + 'px';
+  popover.style.top = (rect.bottom - paneRect.top + pane.scrollTop + 5) + 'px';
+  popover.innerHTML = `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Note on: "${escapeHtml(anchorText.slice(0, 50))}${anchorText.length > 50 ? '...' : ''}"</div>
+    <textarea placeholder="Add your note..." autofocus></textarea>
+    <div class="btn-row">
+      <button onclick="removeAnnotationPopover()">Cancel</button>
+      <button class="primary" onclick="saveInlineNote(this, '${escapeHtml(anchorText.replace(/'/g, "\\'"))}')">Save</button>
+    </div>
+  `;
+  popover.onclick = function(e) { e.stopPropagation(); };
+  pane.appendChild(popover);
+  popover.querySelector('textarea').focus();
+  sel.removeAllRanges();
+}
+
+function saveInlineNote(btn, anchorText) {
+  const popover = btn.closest('.annotation-popover');
+  const note = popover.querySelector('textarea').value.trim();
+  if (!note) { removeAnnotationPopover(); return; }
+
+  const { contextBefore, contextAfter } = getTextContext(anchorText);
+  const annotation = {
+    id: generateId(),
+    anchorText,
+    contextBefore,
+    contextAfter,
+    note,
+    createdAt: new Date().toISOString()
+  };
+  if (!articleNotes.annotations) articleNotes.annotations = [];
+  articleNotes.annotations.push(annotation);
+  saveNotes();
+  applyHighlights();
+  removeAnnotationPopover();
+  renderFileList();
+}
+
+function showAnnotationPopover(e, ann) {
+  removeAnnotationPopover();
+  removeHlToolbar();
+
+  const pane = document.getElementById('content-pane');
+  const paneRect = pane.getBoundingClientRect();
+  const popover = document.createElement('div');
+  popover.className = 'annotation-popover';
+  popover.style.left = (e.clientX - paneRect.left) + 'px';
+  popover.style.top = (e.clientY - paneRect.top + pane.scrollTop + 10) + 'px';
+  popover.innerHTML = `
+    <textarea>${escapeHtml(ann.note)}</textarea>
+    <div class="btn-row">
+      <button style="color:red;border-color:red" onclick="deleteAnnotation('${ann.id}')">Delete</button>
+      <button onclick="removeAnnotationPopover()">Cancel</button>
+      <button class="primary" onclick="updateAnnotation('${ann.id}', this)">Save</button>
+    </div>
+  `;
+  popover.onclick = function(e) { e.stopPropagation(); };
+  pane.appendChild(popover);
+}
+
+function deleteAnnotation(id) {
+  articleNotes.annotations = (articleNotes.annotations || []).filter(a => a.id !== id);
+  saveNotes();
+  applyHighlights();
+  removeAnnotationPopover();
+  renderFileList();
+}
+
+function updateAnnotation(id, btn) {
+  const popover = btn.closest('.annotation-popover');
+  const note = popover.querySelector('textarea').value.trim();
+  const ann = (articleNotes.annotations || []).find(a => a.id === id);
+  if (ann) {
+    ann.note = note;
+    saveNotes();
+  }
+  removeAnnotationPopover();
+}
+
+// Article-level notes panel
+function renderNotesPanel() {
+  // Remove existing panel
+  const existing = document.querySelector('.notes-panel');
+  if (existing) existing.remove();
+
+  const content = document.getElementById('content');
+  if (!content || content.style.display === 'none') return;
+
+  const panel = document.createElement('details');
+  panel.className = 'notes-panel';
+  const noteText = articleNotes.articleNote || '';
+  const annCount = (articleNotes.annotations || []).length;
+  const hlCount = articleHighlights.length;
+
+  let summaryText = 'Notes';
+  const badges = [];
+  if (hlCount) badges.push(hlCount + ' highlight' + (hlCount !== 1 ? 's' : ''));
+  if (annCount) badges.push(annCount + ' annotation' + (annCount !== 1 ? 's' : ''));
+  if (badges.length) summaryText += ' (' + badges.join(', ') + ')';
+
+  panel.innerHTML = `
+    <summary>${summaryText}</summary>
+    <textarea placeholder="Add notes about this article...">${escapeHtml(noteText)}</textarea>
+    <div class="notes-save-hint">Notes auto-save on blur</div>
+  `;
+
+  if (noteText) panel.setAttribute('open', '');
+
+  content.appendChild(panel);
+
+  const textarea = panel.querySelector('textarea');
+  let saveTimeout;
+  textarea.addEventListener('input', () => {
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => {
+      articleNotes.articleNote = textarea.value;
+      saveNotes();
+      renderFileList();
+    }, 800);
+  });
+  textarea.addEventListener('blur', () => {
+    articleNotes.articleNote = textarea.value;
+    saveNotes();
+    renderFileList();
+  });
 }
 
 // Keyboard navigation
@@ -660,13 +1267,40 @@ document.addEventListener('keydown', e => {
     return;
   }
 
-  // Escape clears search
+  // Escape clears search or dismisses popovers
   if (e.key === 'Escape') {
+    if (hlToolbarEl || document.querySelector('.annotation-popover')) {
+      removeHlToolbar();
+      return;
+    }
     const search = document.getElementById('search');
     if (document.activeElement === search) {
       search.value = '';
       filterFiles();
       search.blur();
+      return;
+    }
+  }
+
+  // h to highlight selection (yellow)
+  if (e.key === 'h' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed && sel.toString().trim()) {
+      e.preventDefault();
+      createHighlight('yellow');
+      return;
+    }
+  }
+
+  // n to toggle notes panel
+  if (e.key === 'n' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+    const panel = document.querySelector('.notes-panel');
+    if (panel) {
+      e.preventDefault();
+      panel.toggleAttribute('open');
+      if (panel.hasAttribute('open')) {
+        panel.querySelector('textarea').focus();
+      }
       return;
     }
   }
@@ -790,6 +1424,10 @@ async function init() {
       allFiles = await res.json();
       serverMode = true;
       filteredFiles = allFiles;
+
+      // Load annotations index for sidebar indicators
+      await loadAnnotationsIndex();
+
       renderFileList();
 
       // Auto-load first article

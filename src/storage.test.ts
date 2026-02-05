@@ -2,21 +2,40 @@
 // ABOUTME: Verifies URL tracking and status management
 
 import { Storage } from './storage';
-import { existsSync, unlinkSync } from 'fs';
+import { existsSync, unlinkSync, writeFileSync, mkdirSync, rmdirSync } from 'fs';
+import { join } from 'path';
 
 const TEST_DB = '/tmp/pullread-test.db';
+const TEST_OUTPUT = '/tmp/pullread-test-output';
 
 function cleanup() {
+  // Clean up .json version (Storage converts .db to .json)
+  const jsonPath = TEST_DB.replace(/\.db$/, '.json');
+  if (existsSync(jsonPath)) unlinkSync(jsonPath);
   if (existsSync(TEST_DB)) unlinkSync(TEST_DB);
+  // Clean up test output dir
+  try {
+    const files = require('fs').readdirSync(TEST_OUTPUT);
+    for (const f of files) unlinkSync(join(TEST_OUTPUT, f));
+    rmdirSync(TEST_OUTPUT);
+  } catch {}
 }
 
 describe('Storage', () => {
   beforeEach(cleanup);
   afterAll(cleanup);
 
-  test('creates database and table on init', () => {
+  test('creates storage file on first write', () => {
+    const jsonPath = TEST_DB.replace(/\.db$/, '.json');
     const storage = new Storage(TEST_DB);
-    expect(existsSync(TEST_DB)).toBe(true);
+    // File is created lazily on first write, not on init
+    storage.markProcessed({
+      url: 'https://example.com/init-test',
+      title: 'Init Test',
+      bookmarkedAt: '2024-01-29T12:00:00Z',
+      outputFile: 'init-test.md'
+    });
+    expect(existsSync(jsonPath)).toBe(true);
     storage.close();
   });
 
@@ -66,6 +85,43 @@ describe('Storage', () => {
     storage.markFailed('https://example.com/retry', 'Error');
     storage.clearFailed('https://example.com/retry');
     expect(storage.isProcessed('https://example.com/retry')).toBe(false);
+    storage.close();
+  });
+
+  test('isProcessed returns false when output file is deleted (resync recovery)', () => {
+    mkdirSync(TEST_OUTPUT, { recursive: true });
+    const outputFile = '2024-01-29-test-article.md';
+    writeFileSync(join(TEST_OUTPUT, outputFile), '# Test');
+
+    const storage = new Storage(TEST_DB, TEST_OUTPUT);
+    storage.markProcessed({
+      url: 'https://example.com/article',
+      title: 'Test Article',
+      bookmarkedAt: '2024-01-29T12:00:00Z',
+      outputFile
+    });
+
+    // File exists — should be processed
+    expect(storage.isProcessed('https://example.com/article')).toBe(true);
+
+    // Delete the output file
+    unlinkSync(join(TEST_OUTPUT, outputFile));
+
+    // File gone — should no longer be considered processed
+    expect(storage.isProcessed('https://example.com/article')).toBe(false);
+    storage.close();
+  });
+
+  test('isProcessed still returns true for entries without outputPath set', () => {
+    const storage = new Storage(TEST_DB);
+    storage.markProcessed({
+      url: 'https://example.com/article',
+      title: 'Test Article',
+      bookmarkedAt: '2024-01-29T12:00:00Z',
+      outputFile: '2024-01-29-test-article.md'
+    });
+    // No outputPath — skip file check, return true
+    expect(storage.isProcessed('https://example.com/article')).toBe(true);
     storage.close();
   });
 });

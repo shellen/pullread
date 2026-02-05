@@ -15,6 +15,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusMenuItem: NSMenuItem!
     private var checkForUpdatesMenuItem: NSMenuItem!
     private var settingsWindowController: SettingsWindowController!
+    private var whatsNewWindowController: SettingsWindowController?
 
     // Sparkle updater - uncomment when Sparkle SPM package is added:
     // private let updaterController = SPUStandardUpdaterController(
@@ -324,13 +325,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func checkForUpdates() {
-        // Sparkle handles the update check UI - uncomment when Sparkle is added:
+        // When Sparkle SPM package is added, uncomment:
         // updaterController.checkForUpdates(nil)
+        // And remove the placeholder below.
 
-        // Placeholder until Sparkle is integrated
+        // Placeholder until Sparkle is fully integrated:
+        // 1. Add Sparkle 2.x via SPM: https://github.com/sparkle-project/Sparkle
+        // 2. Run generate_keys to create Ed25519 keypair
+        // 3. Add SUPublicEDKey to Info.plist
+        // 4. Uncomment `import Sparkle` and `updaterController` above
         showAlert(
-            title: "Updates",
-            message: "Auto-update support via Sparkle will be available in a future release."
+            title: "Check for Updates",
+            message: "Automatic updates via Sparkle are configured but not yet active.\n\nTo complete setup:\n1. Add Sparkle 2.x as an SPM dependency\n2. Generate Ed25519 signing keys\n3. Uncomment the Sparkle code in AppDelegate\n\nVisit the project README for details."
         )
     }
 
@@ -351,8 +357,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showWhatsNew(version: String) {
-        let whatsNewController = SettingsWindowController()
-        whatsNewController.showWhatsNew(version: version)
+        let controller = SettingsWindowController()
+        self.whatsNewWindowController = controller
+        controller.showWhatsNew(version: version)
     }
 
     @objc private func showAbout() {
@@ -360,7 +367,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
         let alert = NSAlert()
         alert.messageText = "PullRead"
-        alert.informativeText = "RSS to Markdown Sync\n\nVersion \(version) (\(build))\n\nSyncs RSS and Atom feeds to markdown files for offline reading."
+        alert.informativeText = "RSS to Markdown Sync\n\nVersion \(version) (\(build))\n\nSyncs RSS and Atom feeds to markdown files for offline reading.\n\nBy A Little Drive\nhttps://alittledrive.com"
         alert.alertStyle = .informational
         alert.addButton(withTitle: "OK")
         alert.runModal()

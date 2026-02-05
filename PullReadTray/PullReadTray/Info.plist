@@ -23,11 +23,18 @@
     <key>LSUIElement</key>
     <true/>
     <key>NSHumanReadableCopyright</key>
-    <string>Copyright 2026. All rights reserved.</string>
+    <string>Copyright 2026 A Little Drive. All rights reserved.</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
-    <!-- Sparkle auto-update keys: configure these when Sparkle is integrated -->
-    <!-- SUFeedURL: URL to appcast.xml for update checks -->
-    <!-- SUPublicEDKey: Ed25519 public key for update signature verification -->
+    <!-- Sparkle auto-update configuration -->
+    <key>SUFeedURL</key>
+    <string>https://shellen.github.io/pullread/appcast.xml</string>
+    <!-- SUPublicEDKey: generate with Sparkle's generate_keys tool, then paste base64 key here -->
+    <!-- <key>SUPublicEDKey</key> -->
+    <!-- <string>YOUR_ED25519_PUBLIC_KEY_HERE</string> -->
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUScheduledCheckInterval</key>
+    <integer>86400</integer>
 </dict>
 </plist>

@@ -371,6 +371,8 @@ Pull Read is a self-contained native Swift menu bar application. It bundles the 
 
 - **Self-contained** - Bundled CLI binary, no Node.js required
 - **Article reader** - Built-in two-pane markdown viewer via "View Articles..." menu
+- **Highlights & notes** - Select text to highlight, add inline annotations, and write article-level notes
+- **Resync recovery** - Deleted output files are detected and re-synced automatically
 - **Status indicator** showing idle/syncing state
 - **Icon animation** during sync operations
 - **Native notifications** on sync completion or failure
@@ -379,7 +381,17 @@ Pull Read is a self-contained native Swift menu bar application. It bundles the 
 
 ### Article Reader
 
-The built-in article reader (`pullread view` or **View Articles** in the menu bar app) is a two-pane web UI served on `localhost:7777`. It supports themes (Light, Dark, Sepia), multiple font families, adjustable text sizes, and full keyboard navigation.
+The built-in article reader (`pullread view` or **View Articles** in the menu bar app) is a two-pane web UI served on `localhost:7777`. It supports themes (Light, Dark, Sepia), multiple font families, adjustable text sizes, highlights, notes, and full keyboard navigation.
+
+#### Highlights & Notes
+
+Select any text in an article to see a floating toolbar with highlight color options (yellow, green, blue, pink) and an "Add note" button. Click an existing highlight to change its color or delete it.
+
+- **Highlights** are saved per-article at `~/.config/pullread/highlights.json`
+- **Notes** are saved per-article at `~/.config/pullread/notes.json`
+- **Article-level notes** can be written in a collapsible "Notes" panel at the bottom of each article
+- **Inline annotations** attach a note to a specific text passage, shown with a marker icon
+- Sidebar items show indicator dots for articles with highlights (yellow) or notes (blue)
 
 #### Keyboard Shortcuts
 
@@ -390,7 +402,9 @@ The built-in article reader (`pullread view` or **View Articles** in the menu ba
 | `Up Arrow` / `Down Arrow` | Scroll content (navigates to prev/next article at top/bottom) |
 | `/` | Focus search (opens sidebar if collapsed) |
 | `[` | Toggle sidebar |
-| `Escape` | Clear search |
+| `h` | Highlight selected text (yellow) |
+| `n` | Toggle article notes panel |
+| `Escape` | Clear search / dismiss popover |
 | `Enter` | Reload current article |
 
 Arrow key scrolling is boundary-aware: when you reach the bottom of an article and press Down, or the top and press Up, it automatically advances to the next or previous article.
@@ -735,7 +749,9 @@ Ideas that would extend PullRead's capabilities:
 
 ### Highlights, Notes & Read State
 
-These features would turn PullRead from a read-only archive into an active reading tool. Here's a design for how each could work within the existing architecture.
+> **Note:** Highlights and Notes are now implemented. See the [Article Reader](#article-reader) section above for usage. Read State tracking remains a future idea.
+
+These features turn PullRead from a read-only archive into an active reading tool. Here's the design for how each works within the existing architecture.
 
 #### Read State
 

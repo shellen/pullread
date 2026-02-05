@@ -2,9 +2,10 @@
 // ABOUTME: Serves viewer UI and provides API for listing/reading articles
 
 import { createServer, IncomingMessage, ServerResponse } from 'http';
-import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
-import { join, extname } from 'path';
+import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, mkdirSync } from 'fs';
+import { join, extname, dirname } from 'path';
 import { exec } from 'child_process';
+import { homedir } from 'os';
 import { VIEWER_HTML } from './viewer-html';
 
 interface FileMeta {
@@ -76,6 +77,37 @@ function listFiles(outputPath: string): FileMeta[] {
   return files;
 }
 
+// Annotations storage path
+const ANNOTATIONS_DIR = join(homedir(), '.config', 'pullread');
+const HIGHLIGHTS_PATH = join(ANNOTATIONS_DIR, 'highlights.json');
+const NOTES_PATH = join(ANNOTATIONS_DIR, 'notes.json');
+
+function loadJsonFile(path: string): Record<string, unknown> {
+  if (!existsSync(path)) return {};
+  try {
+    return JSON.parse(readFileSync(path, 'utf-8'));
+  } catch {
+    return {};
+  }
+}
+
+function saveJsonFile(path: string, data: unknown): void {
+  const dir = dirname(path);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+  writeFileSync(path, JSON.stringify(data, null, 2));
+}
+
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
+    req.on('error', reject);
+  });
+}
+
 function sendJson(res: ServerResponse, data: unknown) {
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(data));
@@ -87,11 +119,19 @@ function send404(res: ServerResponse) {
 }
 
 export function startViewer(outputPath: string, port = 7777): void {
-  const server = createServer((req: IncomingMessage, res: ServerResponse) => {
+  const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url || '/', `http://localhost:${port}`);
 
     // CORS for local dev
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
 
     if (url.pathname === '/' || url.pathname === '/index.html') {
       res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -118,6 +158,72 @@ export function startViewer(outputPath: string, port = 7777): void {
       res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end(readFileSync(filePath, 'utf-8'));
       return;
+    }
+
+    // Highlights API
+    if (url.pathname === '/api/highlights') {
+      if (req.method === 'GET') {
+        const name = url.searchParams.get('name');
+        const allHighlights = loadJsonFile(HIGHLIGHTS_PATH) as Record<string, unknown[]>;
+        if (name) {
+          sendJson(res, allHighlights[name] || []);
+        } else {
+          sendJson(res, allHighlights);
+        }
+        return;
+      }
+      if (req.method === 'POST') {
+        try {
+          const body = JSON.parse(await readBody(req));
+          const { name, highlights } = body;
+          if (!name) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'name is required' }));
+            return;
+          }
+          const allHighlights = loadJsonFile(HIGHLIGHTS_PATH) as Record<string, unknown[]>;
+          allHighlights[name] = highlights || [];
+          saveJsonFile(HIGHLIGHTS_PATH, allHighlights);
+          sendJson(res, { ok: true });
+        } catch (err) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid request body' }));
+        }
+        return;
+      }
+    }
+
+    // Notes API
+    if (url.pathname === '/api/notes') {
+      if (req.method === 'GET') {
+        const name = url.searchParams.get('name');
+        const allNotes = loadJsonFile(NOTES_PATH) as Record<string, unknown>;
+        if (name) {
+          sendJson(res, allNotes[name] || { articleNote: '', annotations: [] });
+        } else {
+          sendJson(res, allNotes);
+        }
+        return;
+      }
+      if (req.method === 'POST') {
+        try {
+          const body = JSON.parse(await readBody(req));
+          const { name, articleNote, annotations } = body;
+          if (!name) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'name is required' }));
+            return;
+          }
+          const allNotes = loadJsonFile(NOTES_PATH) as Record<string, unknown>;
+          allNotes[name] = { articleNote: articleNote || '', annotations: annotations || [] };
+          saveJsonFile(NOTES_PATH, allNotes);
+          sendJson(res, { ok: true });
+        } catch (err) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid request body' }));
+        }
+        return;
+      }
     }
 
     send404(res);

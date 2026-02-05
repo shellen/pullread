@@ -183,7 +183,12 @@ async function sync(feedFilter?: string, retryFailed = false): Promise<void> {
     mkdirSync(configDir, { recursive: true });
   }
 
-  const storage = new Storage(DB_PATH);
+  // Ensure output directory exists
+  if (!existsSync(config.outputPath)) {
+    mkdirSync(config.outputPath, { recursive: true });
+  }
+
+  const storage = new Storage(DB_PATH, config.outputPath);
 
   try {
     let totalSuccess = 0;
