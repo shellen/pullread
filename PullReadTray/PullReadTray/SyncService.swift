@@ -2,10 +2,13 @@
 // ABOUTME: Executes bundled pullread binary for article syncing
 
 import Foundation
+import AppKit
 
 class SyncService {
     private let configDir: String
     private let binaryPath: String
+    private var viewerProcess: Process?
+    private let viewerPort = 7777
 
     init() {
         // Config is stored in ~/.config/pullread/
@@ -157,6 +160,59 @@ class SyncService {
         } catch {
             return .failure(error)
         }
+    }
+
+    /// Returns true if the article viewer server is currently running
+    func isViewerRunning() -> Bool {
+        guard let process = viewerProcess else { return false }
+        return process.isRunning
+    }
+
+    /// Starts the article viewer server, or opens the browser if already running
+    func openViewer(completion: @escaping (Result<Void, Error>) -> Void) {
+        // If viewer is already running, just open the browser
+        if isViewerRunning() {
+            let url = URL(string: "http://localhost:\(viewerPort)")!
+            NSWorkspace.shared.open(url)
+            completion(.success(()))
+            return
+        }
+
+        guard isBinaryAvailable() else {
+            completion(.failure(NSError(
+                domain: "PullRead",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "PullRead binary not found in app bundle"]
+            )))
+            return
+        }
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: self.binaryPath)
+            process.arguments = ["view", "--config-path", self.getConfigPath()]
+
+            // Viewer output goes to log
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = pipe
+
+            do {
+                try process.run()
+                self.viewerProcess = process
+                completion(.success(()))
+            } catch {
+                completion(.failure(error))
+            }
+        }
+    }
+
+    /// Stops the article viewer server if running
+    func stopViewer() {
+        viewerProcess?.terminate()
+        viewerProcess = nil
     }
 
     private func logOutput(_ output: String) {

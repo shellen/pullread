@@ -136,6 +136,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         openFolderMenuItem.target = self
         menu.addItem(openFolderMenuItem)
 
+        // View Articles
+        let viewArticlesMenuItem = NSMenuItem(title: "View Articles...", action: #selector(viewArticles), keyEquivalent: "d")
+        viewArticlesMenuItem.target = self
+        menu.addItem(viewArticlesMenuItem)
+
         // Settings
         let openConfigMenuItem = NSMenuItem(title: "Settings...", action: #selector(openConfig), keyEquivalent: ",")
         openConfigMenuItem.target = self
@@ -257,6 +262,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    @objc private func viewArticles() {
+        syncService.openViewer { [weak self] result in
+            DispatchQueue.main.async {
+                if case .failure(let error) = result {
+                    self?.showAlert(title: "Viewer Error", message: error.localizedDescription)
+                }
+            }
+        }
+    }
+
     @objc private func openConfig() {
         showSettings(isFirstRun: false)
     }
@@ -292,6 +307,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func quit() {
+        syncService.stopViewer()
         NSApplication.shared.terminate(nil)
     }
 
