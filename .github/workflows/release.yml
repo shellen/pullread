@@ -35,6 +35,10 @@ jobs:
           # Install dependencies
           bun install
 
+          # Embed viewer.html into the TypeScript source so the compiled
+          # binary serves the viewer from memory (no external file needed)
+          bun scripts/embed-viewer.ts
+
           # Build for both architectures
           bun build src/index.ts --compile --target=bun-darwin-arm64 --outfile dist/pullread-arm64
           bun build src/index.ts --compile --target=bun-darwin-x64 --outfile dist/pullread-x64
