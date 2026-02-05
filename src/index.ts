@@ -8,6 +8,7 @@ import { fetchFeed, FeedEntry } from './feed';
 import { fetchAndExtract, FetchOptions } from './extractor';
 import { writeArticle } from './writer';
 import { Storage } from './storage';
+import { startViewer } from './viewer';
 
 // Default paths for standalone binary
 const DEFAULT_CONFIG_DIR = join(homedir(), '.config', 'pullread');
@@ -225,6 +226,13 @@ if (command === 'sync') {
     console.error('Fatal error:', err.message);
     process.exit(1);
   });
+} else if (command === 'view') {
+  const config = loadConfig();
+  const portIndex = args.indexOf('--port');
+  const port = portIndex !== -1 && args[portIndex + 1]
+    ? parseInt(args[portIndex + 1], 10)
+    : 7777;
+  startViewer(config.outputPath, port);
 } else {
   console.log(`Usage: pullread <command>
 
@@ -232,5 +240,7 @@ Commands:
   sync                    Sync all feeds
   sync --feed <name>      Sync a specific feed
   sync --retry-failed     Retry previously failed URLs
+  view                    Open article viewer in browser
+  view --port <number>    Use a custom port (default: 7777)
 `);
 }
