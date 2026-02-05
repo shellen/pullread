@@ -12,7 +12,7 @@ PullRead fetches entries from your RSS/Atom feeds, extracts article content usin
 
 | Platform | Download | Notes |
 |----------|----------|-------|
-| **macOS** | [PullRead.dmg](https://github.com/shellen/pullread/releases/latest/download/PullRead.dmg) | Self-contained menu bar app with bundled CLI |
+| **macOS** | [PullRead.dmg](https://github.com/shellen/pullread/releases/download/latest/PullRead.dmg) | Self-contained menu bar app with bundled CLI |
 | **CLI** | Clone this repo | For development or running on Linux/Windows |
 
 > **Quick install:** Download the DMG, open it, drag Pull Read to your Applications folder, and launch it. The app is fully self-contained—no Node.js or other dependencies required. Configure your feeds in Settings and start syncing.
