@@ -112,6 +112,7 @@ jobs:
           xcodebuild test-without-building \
             -project PullReadTray.xcodeproj \
             -scheme PullReadTray \
+            -configuration Release \
             -destination 'platform=macOS,arch=arm64' \
             -derivedDataPath build \
             -only-testing:PullReadTrayTests \
