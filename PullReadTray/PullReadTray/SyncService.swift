@@ -202,6 +202,14 @@ class SyncService {
             do {
                 try process.run()
                 self.viewerProcess = process
+
+                // Wait briefly for the server to start listening, then open the browser
+                Thread.sleep(forTimeInterval: 0.5)
+                DispatchQueue.main.async {
+                    let url = URL(string: "http://localhost:\(self.viewerPort)")!
+                    NSWorkspace.shared.open(url)
+                }
+
                 completion(.success(()))
             } catch {
                 completion(.failure(error))
