@@ -128,7 +128,7 @@ xcodebuild -project PullReadTray.xcodeproj \
   build
 
 # App bundle location:
-# build/Build/Products/Release/PullReadTray.app
+# build/Build/Products/Release/Pull Read.app
 ```
 
 ---
@@ -383,7 +383,7 @@ Pull Read is a self-contained native Swift menu bar application. It bundles the 
 
 **Via command line:**
 ```bash
-osascript -e 'tell application "System Events" to make login item at end with properties {path:"/Applications/PullReadTray.app", hidden:false}'
+osascript -e 'tell application "System Events" to make login item at end with properties {path:"/Applications/Pull Read.app", hidden:false}'
 ```
 
 ---

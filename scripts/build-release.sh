@@ -10,8 +10,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PROJECT_DIR="$ROOT_DIR/PullReadTray"
 PROJECT_FILE="PullReadTray.xcodeproj"
 SCHEME="PullReadTray"
-APP_NAME="PullReadTray"
-DISPLAY_NAME="Pull Read"
+APP_NAME="Pull Read"
 DMG_NAME="PullRead.dmg"
 KEYCHAIN_PROFILE="pullread-notarize"  # Created via: xcrun notarytool store-credentials
 
@@ -99,7 +98,7 @@ build_cli() {
 
 # Build the app
 build_app() {
-    echo_step "Building $DISPLAY_NAME..."
+    echo_step "Building $APP_NAME..."
     cd "$PROJECT_DIR"
 
     xcodebuild -project "$PROJECT_FILE" \
@@ -167,7 +166,7 @@ create_dmg() {
     cd "$PROJECT_DIR/build/Build/Products/Release"
 
     # Create DMG
-    hdiutil create -volname "$DISPLAY_NAME" \
+    hdiutil create -volname "$APP_NAME" \
         -srcfolder "$APP_NAME.app" \
         -ov -format UDZO \
         "$DMG_NAME"

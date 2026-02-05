@@ -123,23 +123,23 @@ jobs:
         working-directory: PullReadTray
         run: |
           mkdir -p artifacts
-          APP_PATH="build/Build/Products/Release/PullReadTray.app"
+          APP_PATH="build/Build/Products/Release/Pull Read.app"
 
           # Copy app to artifacts
           cp -R "$APP_PATH" artifacts/
 
           # Bundle CLI binary into app resources
-          cp ../dist/pullread "artifacts/PullReadTray.app/Contents/Resources/"
+          cp ../dist/pullread "artifacts/Pull Read.app/Contents/Resources/"
 
           # Verify
-          ls -la "artifacts/PullReadTray.app/Contents/Resources/"
+          ls -la "artifacts/Pull Read.app/Contents/Resources/"
 
       - name: Create DMG
         working-directory: PullReadTray
         run: |
           # Create a temporary directory for DMG contents
           mkdir -p dmg-contents
-          cp -R "artifacts/PullReadTray.app" dmg-contents/
+          cp -R "artifacts/Pull Read.app" dmg-contents/
 
           # Create a symlink to Applications
           ln -s /Applications dmg-contents/Applications
@@ -157,7 +157,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: PullRead-app
-          path: PullReadTray/artifacts/PullReadTray.app
+          path: PullReadTray/artifacts/Pull Read.app
           retention-days: 30
 
       - name: Upload DMG artifact

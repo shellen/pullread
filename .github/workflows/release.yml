@@ -87,7 +87,7 @@ jobs:
 
       - name: Bundle CLI binary into app
         run: |
-          APP_PATH="PullReadTray/build/Build/Products/Release/PullReadTray.app"
+          APP_PATH="PullReadTray/build/Build/Products/Release/Pull Read.app"
           RESOURCES_PATH="$APP_PATH/Contents/Resources"
 
           # Copy binary to app resources
@@ -105,7 +105,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
         run: |
-          APP_PATH="PullReadTray/build/Build/Products/Release/PullReadTray.app"
+          APP_PATH="PullReadTray/build/Build/Products/Release/Pull Read.app"
 
           # Create ZIP for notarization
           ditto -c -k --keepParent "$APP_PATH" PullRead-app.zip
@@ -124,7 +124,7 @@ jobs:
 
       - name: Create DMG
         run: |
-          APP_PATH="PullReadTray/build/Build/Products/Release/PullReadTray.app"
+          APP_PATH="PullReadTray/build/Build/Products/Release/Pull Read.app"
 
           # Create DMG
           hdiutil create -volname "Pull Read" \

@@ -15,7 +15,7 @@ PullReadTray is a lightweight macOS menu bar app that wraps the PullRead CLI. It
 
 ```
 ┌─────────────────────────────────────────┐
-│           PullReadTray.app              │
+│           Pull Read.app                 │
 ├─────────────────────────────────────────┤
 │  PullReadTrayApp.swift                  │
 │  └── @main SwiftUI App entry point      │
@@ -82,7 +82,7 @@ xcodebuild -project PullReadTray.xcodeproj \
   -derivedDataPath build \
   build
 
-# App bundle is at: build/Build/Products/Release/PullReadTray.app
+# App bundle is at: build/Build/Products/Release/Pull Read.app
 ```
 
 ### Option 3: Build with Xcode
@@ -207,7 +207,7 @@ Tests cover:
 
 ```bash
 # Run with console output
-open PullReadTray.app --stdout /dev/stdout --stderr /dev/stderr
+open "Pull Read.app" --stdout /dev/stdout --stderr /dev/stderr
 
 # View logs
 tail -f /tmp/pullread.log
@@ -241,9 +241,9 @@ brew install node
 
 1. Open System Preferences > Users & Groups
 2. Select your user, then "Login Items"
-3. Click + and add PullReadTray.app
+3. Click + and add Pull Read.app
 
 Or via command line:
 ```bash
-osascript -e 'tell application "System Events" to make login item at end with properties {path:"/Applications/PullReadTray.app", hidden:false}'
+osascript -e 'tell application "System Events" to make login item at end with properties {path:"/Applications/Pull Read.app", hidden:false}'
 ```
