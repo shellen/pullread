@@ -50,6 +50,7 @@ PullRead fetches entries from your RSS/Atom feeds, extracts article content usin
 - **Intelligent deduplication** - Tracks processed URLs to avoid re-fetching
 - **Retry mechanism** - Failed extractions are tracked and can be retried later
 - **Podcast support** - Saves episode metadata with audio links (perfect for show notes)
+- **Built-in article reader** - Two-pane local web UI to browse and read synced articles
 - **Self-contained macOS app** - Native Swift menu bar app with bundled CLI binary (no Node.js required)
 - **Flexible scheduling** - Run on-demand, via launchd, or with AppleScript
 - **Cloud-sync friendly** - Output folder can be Dropbox, iCloud, Google Drive, etc.
@@ -357,6 +358,7 @@ Pull Read is a self-contained native Swift menu bar application. It bundles the 
 │ Retry Failed      ⌘R   │  → Retries failed URLs
 ├────────────────────────┤
 │ Open Output Folder ⌘O  │  → Opens your Articles folder
+│ View Articles...  ⌘D   │  → Opens the markdown reader
 │ Settings          ⌘,   │  → Configure feeds and output path
 │ View Logs...      ⌘L   │  → Opens sync log
 ├────────────────────────┤
@@ -368,6 +370,7 @@ Pull Read is a self-contained native Swift menu bar application. It bundles the 
 ### Features
 
 - **Self-contained** - Bundled CLI binary, no Node.js required
+- **Article reader** - Built-in two-pane markdown viewer via "View Articles..." menu
 - **Status indicator** showing idle/syncing state
 - **Icon animation** during sync operations
 - **Native notifications** on sync completion or failure
@@ -451,6 +454,7 @@ pullread/
 │   ├── feed.ts                    # RSS/Atom parsing (auto-detects format)
 │   ├── extractor.ts               # Article extraction with Readability
 │   ├── writer.ts                  # Markdown generation with frontmatter
+│   ├── viewer.ts                  # Local article reader (HTTP server on port 7777)
 │   ├── storage.ts                 # JSON file storage operations
 │   └── *.test.ts                  # Unit tests
 │
@@ -714,7 +718,6 @@ Ideas that would extend PullRead's capabilities:
 ### Near-term
 
 - **Browser extension** - "Send to PullRead" button that adds URLs directly to a local feed
-- **Web interface** - Simple local web UI to browse synced articles
 - **Tags/categories** - Support for preserving tags from bookmark services
 - **Full-text search** - Index markdown content for quick searching
 
