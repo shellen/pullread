@@ -3,15 +3,26 @@
 
 import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
-import { join, extname } from 'path';
+import { join, dirname, extname } from 'path';
 import { exec } from 'child_process';
 
-// In development, __dirname is src/ so viewer.html is in the parent directory.
-// In compiled binaries (bun --compile), __dirname is the directory of the executable,
-// so viewer.html should be alongside the binary.
-const VIEWER_HTML_PATH = existsSync(join(__dirname, '..', 'viewer.html'))
-  ? join(__dirname, '..', 'viewer.html')
-  : join(__dirname, 'viewer.html');
+// Resolve viewer.html location. In compiled binaries (bun --compile), __dirname
+// is baked in at compile time and won't exist on user machines. Use the actual
+// executable path at runtime to find viewer.html alongside the binary.
+function resolveViewerHtml(): string {
+  const candidates = [
+    join(dirname(process.execPath), 'viewer.html'),   // compiled binary: same dir as executable
+    join(__dirname, '..', 'viewer.html'),              // development: src/../viewer.html
+    join(__dirname, 'viewer.html'),                    // fallback
+  ];
+  for (const p of candidates) {
+    if (existsSync(p)) return p;
+  }
+  // Return the most likely path so the error message is useful
+  return candidates[0];
+}
+
+const VIEWER_HTML_PATH = resolveViewerHtml();
 
 interface FileMeta {
   filename: string;
@@ -101,8 +112,10 @@ export function startViewer(outputPath: string, port = 7777): void {
 
     if (url.pathname === '/' || url.pathname === '/index.html') {
       if (!existsSync(VIEWER_HTML_PATH)) {
+        const msg = `viewer.html not found at: ${VIEWER_HTML_PATH}\nexecPath: ${process.execPath}\n__dirname: ${__dirname}`;
+        console.error(msg);
         res.writeHead(500, { 'Content-Type': 'text/plain' });
-        res.end('viewer.html not found');
+        res.end(msg);
         return;
       }
       res.writeHead(200, { 'Content-Type': 'text/html' });
