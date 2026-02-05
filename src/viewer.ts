@@ -6,7 +6,12 @@ import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
 import { join, extname } from 'path';
 import { exec } from 'child_process';
 
-const VIEWER_HTML_PATH = join(__dirname, '..', 'viewer.html');
+// In development, __dirname is src/ so viewer.html is in the parent directory.
+// In compiled binaries (bun --compile), __dirname is the directory of the executable,
+// so viewer.html should be alongside the binary.
+const VIEWER_HTML_PATH = existsSync(join(__dirname, '..', 'viewer.html'))
+  ? join(__dirname, '..', 'viewer.html')
+  : join(__dirname, 'viewer.html');
 
 interface FileMeta {
   filename: string;

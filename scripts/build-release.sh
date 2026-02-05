@@ -124,8 +124,9 @@ bundle_cli() {
     APP_PATH="$PROJECT_DIR/build/Build/Products/Release/$APP_NAME.app"
     RESOURCES_PATH="$APP_PATH/Contents/Resources"
 
-    # Copy binary
+    # Copy binary and viewer.html
     cp "$ROOT_DIR/dist/pullread" "$RESOURCES_PATH/"
+    cp "$ROOT_DIR/viewer.html" "$RESOURCES_PATH/"
 
     # Sign the binary
     codesign --force --sign "Developer ID Application" "$RESOURCES_PATH/pullread"
