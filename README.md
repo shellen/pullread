@@ -128,7 +128,7 @@ xcodebuild -project PullReadTray.xcodeproj \
   build
 
 # App bundle location:
-# build/Build/Products/Release/PullReadTray.app
+# build/Build/Products/Release/Pull Read.app
 ```
 
 ---
