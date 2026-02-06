@@ -571,6 +571,76 @@
   }
   .dot-highlight { background: #ffeb3b; }
   .dot-note { background: var(--link); }
+  .dot-summary { background: #ab47bc; }
+
+  /* Summary display */
+  .article-summary {
+    background: var(--code-bg);
+    border-left: 3px solid #ab47bc;
+    padding: 12px 16px;
+    margin: 12px 0 20px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--fg);
+    border-radius: 0 6px 6px 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .article-summary .summary-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .summarize-btn {
+    display: inline-block;
+    padding: 3px 10px;
+    font-size: 12px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--fg);
+    cursor: pointer;
+    margin-left: 8px;
+    vertical-align: middle;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .summarize-btn:hover { border-color: #ab47bc; color: #ab47bc; }
+  .summarize-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* LLM settings panel */
+  .llm-settings {
+    position: fixed;
+    top: 0; right: 0;
+    width: 340px;
+    height: 100vh;
+    background: var(--bg);
+    border-left: 1px solid var(--border);
+    box-shadow: -4px 0 16px rgba(0,0,0,0.1);
+    z-index: 60;
+    padding: 20px;
+    overflow-y: auto;
+    animation: slideIn 0.2s ease;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+  .llm-settings h3 { font-size: 16px; margin-bottom: 16px; }
+  .llm-settings label {
+    display: block; font-size: 12px; color: var(--muted);
+    margin-bottom: 4px; margin-top: 12px;
+  }
+  .llm-settings select, .llm-settings input[type="text"], .llm-settings input[type="password"] {
+    width: 100%; padding: 8px; border: 1px solid var(--border);
+    border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 13px;
+  }
+  .llm-settings select:focus, .llm-settings input:focus { border-color: var(--link); outline: none; }
+  .llm-settings .btn-row { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+  .llm-settings button {
+    padding: 6px 16px; border: 1px solid var(--border);
+    border-radius: 4px; background: var(--bg); color: var(--fg); font-size: 13px; cursor: pointer;
+  }
+  .llm-settings button.primary { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+  .llm-settings .hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
 </style>
 </head>
 <body data-theme="light" class="font-serif size-medium">
@@ -608,6 +678,10 @@
       <button onclick="setSize('small')" data-size-btn="small">A</button>
       <button onclick="setSize('medium')" data-size-btn="medium" class="active" style="font-size:14px">A</button>
       <button onclick="setSize('large')" data-size-btn="large" style="font-size:17px">A</button>
+    </div>
+
+    <div class="toolbar-group">
+      <button onclick="toggleLLMSettings()" title="AI Settings" style="font-size:15px">&#9881;</button>
     </div>
   </div>
 
@@ -746,7 +820,13 @@ function renderArticle(text, filename) {
     if (meta.url) html += '<a href="' + escapeHtml(meta.url) + '" target="_blank">' + escapeHtml(meta.domain || meta.url) + '</a><br>';
     if (meta.bookmarked) html += escapeHtml(meta.bookmarked.slice(0, 10));
     if (meta.feed) html += ' &middot; ' + escapeHtml(meta.feed);
+    html += ' <button class="summarize-btn" onclick="summarizeArticle()" id="summarize-btn">Summarize</button>';
     html += '</div>';
+  }
+
+  // Show existing summary if present in frontmatter
+  if (meta && meta.summary) {
+    html += '<div class="article-summary"><div class="summary-label">Summary</div>' + escapeHtml(meta.summary) + '</div>';
   }
 
   html += marked.parse(cleanMarkdown(body));
@@ -767,11 +847,13 @@ function renderFileList() {
     const date = f.bookmarked ? f.bookmarked.slice(0, 10) : '';
     const isActive = activeFile === f.filename ? ' active' : '';
     const { hasHl, hasNote } = hasAnnotations(f.filename);
+    const hasSummary = f.hasSummary;
     let indicators = '';
-    if (hasHl || hasNote) {
+    if (hasHl || hasNote || hasSummary) {
       indicators = '<div class="file-item-indicators">'
         + (hasHl ? '<span class="dot dot-highlight" title="Has highlights"></span>' : '')
         + (hasNote ? '<span class="dot dot-note" title="Has notes"></span>' : '')
+        + (hasSummary ? '<span class="dot dot-summary" title="Has summary"></span>' : '')
         + '</div>';
     }
     return '<div class="file-item' + isActive + '" data-index="' + i + '" onclick="loadFile(' + i + ')">'
@@ -1249,6 +1331,143 @@ function renderNotesPanel() {
   });
 }
 
+// ---- LLM Summarization ----
+
+let llmConfigured = false;
+
+async function checkLLMConfig() {
+  if (!serverMode) return;
+  try {
+    const res = await fetch('/api/settings');
+    if (res.ok) {
+      const data = await res.json();
+      llmConfigured = !!(data.llm && data.llm.hasKey);
+    }
+  } catch {}
+}
+
+async function summarizeArticle() {
+  if (!serverMode || !activeFile) return;
+  const btn = document.getElementById('summarize-btn');
+  if (!btn) return;
+
+  if (!llmConfigured) {
+    toggleLLMSettings();
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Summarizing...';
+
+  try {
+    const res = await fetch('/api/summarize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: activeFile })
+    });
+    const data = await res.json();
+    if (data.error) {
+      btn.textContent = 'Error';
+      setTimeout(() => { btn.textContent = 'Summarize'; btn.disabled = false; }, 2000);
+      return;
+    }
+
+    // Insert summary into the DOM
+    const content = document.getElementById('content');
+    const existingSummary = content.querySelector('.article-summary');
+    if (existingSummary) existingSummary.remove();
+
+    const summaryDiv = document.createElement('div');
+    summaryDiv.className = 'article-summary';
+    summaryDiv.innerHTML = '<div class="summary-label">Summary</div>' + escapeHtml(data.summary);
+
+    const articleMeta = content.querySelector('.article-meta');
+    if (articleMeta) {
+      articleMeta.after(summaryDiv);
+    } else {
+      content.prepend(summaryDiv);
+    }
+
+    btn.textContent = 'Summarized';
+    btn.disabled = true;
+  } catch (err) {
+    btn.textContent = 'Failed';
+    setTimeout(() => { btn.textContent = 'Summarize'; btn.disabled = false; }, 2000);
+  }
+}
+
+function toggleLLMSettings() {
+  const existing = document.querySelector('.llm-settings');
+  if (existing) { existing.remove(); return; }
+
+  const panel = document.createElement('div');
+  panel.className = 'llm-settings';
+  panel.onclick = function(e) { e.stopPropagation(); };
+
+  panel.innerHTML = `
+    <h3>&#9881; AI Summary Settings</h3>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Bring your own API key to generate article summaries on demand. Keys are stored locally.</p>
+    <label>Provider</label>
+    <select id="llm-provider">
+      <option value="anthropic">Anthropic (Claude)</option>
+      <option value="openai">OpenAI (GPT)</option>
+    </select>
+    <label>API Key</label>
+    <input type="password" id="llm-key" placeholder="sk-..." />
+    <div class="hint">Get a key at <a href="https://console.anthropic.com" target="_blank" style="color:var(--link)">console.anthropic.com</a> or <a href="https://platform.openai.com" target="_blank" style="color:var(--link)">platform.openai.com</a></div>
+    <label>Model (optional)</label>
+    <input type="text" id="llm-model" placeholder="Leave blank for default" />
+    <div class="hint">Anthropic: claude-sonnet-4-5-20250929 &middot; OpenAI: gpt-4o-mini</div>
+    <div class="btn-row">
+      <button onclick="document.querySelector('.llm-settings').remove()">Cancel</button>
+      <button class="primary" onclick="saveLLMSettings()">Save</button>
+    </div>
+  `;
+  document.body.appendChild(panel);
+
+  // Load existing settings
+  fetch('/api/settings').then(r => r.json()).then(data => {
+    if (data.llm) {
+      document.getElementById('llm-provider').value = data.llm.provider || 'anthropic';
+      document.getElementById('llm-model').value = data.llm.model || '';
+      // Don't show the key itself, just indicate it's set
+      if (data.llm.hasKey) {
+        document.getElementById('llm-key').placeholder = '(key is set — enter new to replace)';
+      }
+    }
+  }).catch(() => {});
+}
+
+async function saveLLMSettings() {
+  const provider = document.getElementById('llm-provider').value;
+  const apiKey = document.getElementById('llm-key').value;
+  const model = document.getElementById('llm-model').value;
+
+  if (!apiKey && !llmConfigured) {
+    alert('Please enter an API key.');
+    return;
+  }
+
+  // Only send key if user entered one (otherwise keep existing)
+  if (apiKey) {
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, apiKey, model: model || undefined })
+      });
+      if (res.ok) {
+        llmConfigured = true;
+        document.querySelector('.llm-settings').remove();
+      }
+    } catch (err) {
+      alert('Failed to save settings.');
+    }
+  } else {
+    document.querySelector('.llm-settings').remove();
+  }
+}
+
 // Keyboard navigation
 document.addEventListener('keydown', e => {
   // "/" focuses search
@@ -1425,8 +1644,8 @@ async function init() {
       serverMode = true;
       filteredFiles = allFiles;
 
-      // Load annotations index for sidebar indicators
-      await loadAnnotationsIndex();
+      // Load annotations index and LLM config
+      await Promise.all([loadAnnotationsIndex(), checkLLMConfig()]);
 
       renderFileList();
 

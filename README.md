@@ -53,6 +53,7 @@ PullRead fetches entries from your RSS/Atom feeds, extracts article content usin
 - **Built-in article reader** - Two-pane local web UI with full keyboard navigation (j/k, arrow keys, boundary-aware scrolling)
 - **Self-contained macOS app** - Native Swift menu bar app with bundled CLI binary (no Node.js required)
 - **Flexible scheduling** - Run on-demand, via launchd, or with AppleScript
+- **AI summaries (BYOK)** - On-demand article summarization via Anthropic or OpenAI APIs with your own key
 - **Cloud-sync friendly** - Output folder can be Dropbox, iCloud, Google Drive, etc.
 
 ---
@@ -205,6 +206,12 @@ npm run sync -- --retry-failed
 
 # Combine flags
 npm run sync -- --feed instapaper --retry-failed
+
+# Summarize articles missing summaries (requires LLM API key)
+npm run summarize -- --batch
+
+# Summarize articles over 1000 characters
+npm run summarize -- --batch --min-size 1000
 ```
 
 ### What Happens During Sync
@@ -393,6 +400,44 @@ Select any text in an article to see a floating toolbar with highlight color opt
 - **Inline annotations** attach a note to a specific text passage, shown with a marker icon
 - Sidebar items show indicator dots for articles with highlights (yellow) or notes (blue)
 
+#### AI Summaries
+
+PullRead supports on-demand article summarization using your own API key (BYOK — Bring Your Own Key). Summaries are stored directly in each article's YAML frontmatter.
+
+**Setup:**
+1. Click the gear icon in the viewer toolbar to open AI Settings
+2. Choose a provider (Anthropic or OpenAI)
+3. Enter your API key and optionally customize the model
+4. Click Save
+
+**Usage:**
+- Click the "Summarize" button on any article to generate a summary
+- Summaries appear at the top of the article with a purple accent
+- Articles with summaries show a purple dot in the sidebar
+- Use the CLI for batch summarization: `pullread summarize --batch`
+
+**CLI batch mode:**
+```bash
+# Summarize all articles missing summaries (over 500 chars)
+pullread summarize --batch
+
+# Customize minimum article size
+pullread summarize --batch --min-size 1000
+```
+
+**Configuration:** LLM settings are stored at `~/.config/pullread/settings.json`:
+```json
+{
+  "llm": {
+    "provider": "anthropic",
+    "apiKey": "sk-ant-...",
+    "model": "claude-sonnet-4-5-20250929"
+  }
+}
+```
+
+Supported providers: **Anthropic** (Claude) and **OpenAI** (GPT). Default models are `claude-sonnet-4-5-20250929` and `gpt-4o-mini` respectively.
+
 #### Keyboard Shortcuts
 
 | Key | Action |
@@ -488,6 +533,7 @@ pullread/
 │   ├── writer.ts                  # Markdown generation with frontmatter
 │   ├── viewer.ts                  # Local article reader (HTTP server on port 7777)
 │   ├── storage.ts                 # JSON file storage operations
+│   ├── summarizer.ts              # BYOK LLM summarization (Anthropic/OpenAI)
 │   └── *.test.ts                  # Unit tests
 │
 ├── PullReadTray/                  # macOS menu bar app (Swift)
@@ -507,7 +553,10 @@ pullread/
 
 ~/.config/pullread/                # User config directory (created by app)
 ├── feeds.json                     # User's feed configuration
-└── pullread.json                  # Processed URL tracking database
+├── pullread.json                  # Processed URL tracking database
+├── settings.json                  # LLM API key configuration (BYOK)
+├── highlights.json                # Article highlights
+└── notes.json                     # Article notes and annotations
 ```
 
 ### Data Flow
@@ -846,7 +895,7 @@ Let users attach freeform notes to specific passages or to an article as a whole
 - **Webhook support** - Trigger sync via webhook for real-time updates
 - **Self-hosted option** - Run as a service with web interface
 - **Sync to Obsidian/Notion** - Direct integration with note-taking apps
-- **AI summarization** - Generate summaries for long articles
+- ~~**AI summarization**~~ - Implemented. See [AI Summaries](#ai-summaries) above
 - **Recommendations** - Suggest similar articles based on reading history
 - **iOS companion app** - View synced articles with iCloud sync
 - **Alfred/Raycast extension** - Quick actions for macOS power users

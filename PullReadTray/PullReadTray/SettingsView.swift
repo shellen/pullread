@@ -21,6 +21,9 @@ struct SettingsView: View {
     @State private var selectedFeed: FeedItem.ID?
     @State private var useBrowserCookies: Bool = false
     @State private var showingCookieInfo: Bool = false
+    @State private var llmProvider: String = "anthropic"
+    @State private var llmApiKey: String = ""
+    @State private var llmModel: String = ""
 
     let configPath: String
     var onSave: (() -> Void)?
@@ -52,6 +55,8 @@ struct SettingsView: View {
                     feedsSection
 
                     browserCookiesSection
+
+                    llmSection
 
                     buttonRow
                 }
@@ -278,6 +283,82 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - LLM Section
+
+    private var llmSection: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    if isFirstRun {
+                        Text("4.")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                    }
+                    Label("AI Summaries (Optional)", systemImage: "sparkles")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                }
+
+                Text("Add your own API key to generate article summaries on demand. Your key is stored locally and never shared.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                HStack(spacing: 8) {
+                    Text("Provider")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(width: 60, alignment: .trailing)
+                    Picker("", selection: $llmProvider) {
+                        Text("Anthropic").tag("anthropic")
+                        Text("OpenAI").tag("openai")
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 200)
+                }
+
+                HStack(spacing: 8) {
+                    Text("API Key")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(width: 60, alignment: .trailing)
+                    SecureField(llmProvider == "anthropic" ? "sk-ant-..." : "sk-...", text: $llmApiKey)
+                        .textFieldStyle(.plain)
+                        .padding(8)
+                        .background(Color(NSColor.textBackgroundColor).opacity(0.5))
+                        .cornerRadius(6)
+                }
+
+                HStack(spacing: 8) {
+                    Text("Model")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(width: 60, alignment: .trailing)
+                    TextField(llmProvider == "anthropic" ? "claude-sonnet-4-5-20250929" : "gpt-4o-mini", text: $llmModel)
+                        .textFieldStyle(.plain)
+                        .padding(8)
+                        .background(Color(NSColor.textBackgroundColor).opacity(0.5))
+                        .cornerRadius(6)
+                    Text("optional")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+
+                if !llmApiKey.isEmpty {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.shield.fill")
+                            .foregroundColor(.green)
+                        Text("Key stored locally at ~/.config/pullread/settings.json")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(10)
+                    .background(Color.green.opacity(0.1))
+                    .cornerRadius(8)
+                }
+            }
+        }
+    }
+
     // MARK: - Cookie Info Sheet
 
     private var cookieInfoSheet: some View {
@@ -428,6 +509,16 @@ struct SettingsView: View {
         if let cookies = json["useBrowserCookies"] as? Bool {
             useBrowserCookies = cookies
         }
+
+        // Load LLM settings from settings.json
+        let settingsPath = (configPath as NSString).deletingLastPathComponent + "/settings.json"
+        if let settingsData = FileManager.default.contents(atPath: settingsPath),
+           let settings = try? JSONSerialization.jsonObject(with: settingsData) as? [String: Any],
+           let llm = settings["llm"] as? [String: Any] {
+            llmProvider = (llm["provider"] as? String) ?? "anthropic"
+            llmApiKey = (llm["apiKey"] as? String) ?? ""
+            llmModel = (llm["model"] as? String) ?? ""
+        }
     }
 
     private func saveConfig() {
@@ -474,6 +565,26 @@ struct SettingsView: View {
 
             if !FileManager.default.fileExists(atPath: expandedPath) {
                 try FileManager.default.createDirectory(atPath: expandedPath, withIntermediateDirectories: true)
+            }
+
+            // Save LLM settings to settings.json (separate from feeds config)
+            if !llmApiKey.isEmpty {
+                let settingsPath = (configPath as NSString).deletingLastPathComponent + "/settings.json"
+                var existingSettings: [String: Any] = [:]
+                if let settingsData = FileManager.default.contents(atPath: settingsPath),
+                   let parsed = try? JSONSerialization.jsonObject(with: settingsData) as? [String: Any] {
+                    existingSettings = parsed
+                }
+                var llm: [String: Any] = [
+                    "provider": llmProvider,
+                    "apiKey": llmApiKey
+                ]
+                if !llmModel.isEmpty {
+                    llm["model"] = llmModel
+                }
+                existingSettings["llm"] = llm
+                let settingsData = try JSONSerialization.data(withJSONObject: existingSettings, options: [.prettyPrinted, .sortedKeys])
+                try settingsData.write(to: URL(fileURLWithPath: settingsPath))
             }
 
             isPresented = false

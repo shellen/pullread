@@ -9,6 +9,7 @@ import { fetchAndExtract, FetchOptions } from './extractor';
 import { writeArticle } from './writer';
 import { Storage } from './storage';
 import { startViewer } from './viewer';
+import { summarizeText, loadLLMConfig } from './summarizer';
 
 // Default paths for standalone binary
 const DEFAULT_CONFIG_DIR = join(homedir(), '.config', 'pullread');
@@ -238,6 +239,85 @@ if (command === 'sync') {
     ? parseInt(args[portIndex + 1], 10)
     : 7777;
   startViewer(config.outputPath, port);
+} else if (command === 'summarize') {
+  const config = loadConfig();
+  const batchMode = args.includes('--batch');
+  const minSizeIndex = args.indexOf('--min-size');
+  const minSize = minSizeIndex !== -1 && args[minSizeIndex + 1]
+    ? parseInt(args[minSizeIndex + 1], 10)
+    : 500; // minimum character count to summarize
+
+  const llmConfig = loadLLMConfig();
+  if (!llmConfig) {
+    console.error('Error: No LLM API key configured.');
+    console.error('Add your key via the viewer settings or create ~/.config/pullread/settings.json:');
+    console.error('  { "llm": { "provider": "anthropic", "apiKey": "sk-...", "model": "claude-sonnet-4-5-20250929" } }');
+    process.exit(1);
+  }
+
+  (async () => {
+    const { readdirSync } = require('fs');
+    const { extname } = require('path');
+    const files = readdirSync(config.outputPath)
+      .filter((f: string) => extname(f) === '.md');
+
+    let summarized = 0;
+    let skipped = 0;
+
+    for (const file of files) {
+      const filePath = join(config.outputPath, file);
+      const content = readFileSync(filePath, 'utf-8');
+
+      // Check if already has summary
+      const hasSummary = /^summary: /m.test(content.split('---')[1] || '');
+      if (hasSummary && batchMode) {
+        skipped++;
+        continue;
+      }
+
+      // Get article body (strip frontmatter)
+      const match = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
+      const body = match ? match[1] : content;
+
+      if (body.length < minSize) {
+        skipped++;
+        continue;
+      }
+
+      if (!batchMode && !hasSummary) {
+        skipped++;
+        continue;
+      }
+
+      const titleMatch = content.match(/^title: "?(.*?)"?\s*$/m);
+      const title = titleMatch ? titleMatch[1].slice(0, 50) : file;
+
+      try {
+        process.stdout.write(`  ${title}...`);
+        const result = await summarizeText(body, llmConfig);
+
+        // Write summary to frontmatter
+        const fmMatch = content.match(/^(---\n)([\s\S]*?)(\n---)([\s\S]*)$/);
+        if (fmMatch) {
+          let fm = fmMatch[2].replace(/\nsummary: ".*?"$/m, '').replace(/\nsummary: .*$/m, '');
+          const escaped = result.summary.replace(/"/g, '\\"').replace(/\n/g, ' ');
+          fm += `\nsummary: "${escaped}"`;
+          const { writeFileSync: wf } = require('fs');
+          wf(filePath, `${fmMatch[1]}${fm}${fmMatch[3]}${fmMatch[4]}`);
+        }
+
+        console.log(' done');
+        summarized++;
+      } catch (err) {
+        console.log(` failed: ${err instanceof Error ? err.message : err}`);
+      }
+    }
+
+    console.log(`\nDone: ${summarized} summarized, ${skipped} skipped`);
+  })().catch(err => {
+    console.error('Fatal error:', err.message);
+    process.exit(1);
+  });
 } else {
   console.log(`Usage: pullread <command>
 
@@ -247,5 +327,7 @@ Commands:
   sync --retry-failed     Retry previously failed URLs
   view                    Open article viewer in browser
   view --port <number>    Use a custom port (default: 7777)
+  summarize --batch       Summarize articles missing summaries
+  summarize --min-size N  Skip articles under N chars (default: 500)
 `);
 }

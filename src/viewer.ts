@@ -7,6 +7,7 @@ import { join, extname, dirname } from 'path';
 import { exec } from 'child_process';
 import { homedir } from 'os';
 import { VIEWER_HTML } from './viewer-html';
+import { summarizeText, loadLLMConfig, saveLLMConfig, getDefaultModel, LLMConfig } from './summarizer';
 
 interface FileMeta {
   filename: string;
@@ -16,6 +17,7 @@ interface FileMeta {
   bookmarked: string;
   feed: string;
   mtime: string;
+  hasSummary: boolean;
 }
 
 function parseFrontmatter(content: string): Record<string, string> {
@@ -61,6 +63,7 @@ function listFiles(outputPath: string): FileMeta[] {
         bookmarked: meta.bookmarked || '',
         feed: meta.feed || '',
         mtime: stat.mtime.toISOString(),
+        hasSummary: !!meta.summary,
       });
     } catch {
       // Skip unreadable files
@@ -116,6 +119,24 @@ function sendJson(res: ServerResponse, data: unknown) {
 function send404(res: ServerResponse) {
   res.writeHead(404, { 'Content-Type': 'text/plain' });
   res.end('Not found');
+}
+
+function writeSummaryToFile(filePath: string, summary: string): void {
+  if (!existsSync(filePath)) return;
+  const content = readFileSync(filePath, 'utf-8');
+  const match = content.match(/^(---\n)([\s\S]*?)(\n---)([\s\S]*)$/);
+  if (!match) return;
+
+  let frontmatter = match[2];
+  // Remove existing summary if present
+  frontmatter = frontmatter.replace(/\nsummary: ".*?"$/m, '');
+  frontmatter = frontmatter.replace(/\nsummary: .*$/m, '');
+
+  // Add summary to frontmatter
+  const escaped = summary.replace(/"/g, '\\"').replace(/\n/g, ' ');
+  frontmatter += `\nsummary: "${escaped}"`;
+
+  writeFileSync(filePath, `${match[1]}${frontmatter}${match[3]}${match[4]}`);
 }
 
 export function startViewer(outputPath: string, port = 7777): void {
@@ -224,6 +245,78 @@ export function startViewer(outputPath: string, port = 7777): void {
         }
         return;
       }
+    }
+
+    // Settings API (LLM config)
+    if (url.pathname === '/api/settings') {
+      if (req.method === 'GET') {
+        const config = loadLLMConfig();
+        sendJson(res, {
+          llm: config ? {
+            provider: config.provider,
+            model: config.model || getDefaultModel(config.provider),
+            hasKey: true
+          } : null
+        });
+        return;
+      }
+      if (req.method === 'POST') {
+        try {
+          const body = JSON.parse(await readBody(req));
+          const { provider, apiKey, model } = body;
+          if (!provider || !apiKey) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'provider and apiKey are required' }));
+            return;
+          }
+          saveLLMConfig({ provider, apiKey, model: model || getDefaultModel(provider) });
+          sendJson(res, { ok: true });
+        } catch (err) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid request body' }));
+        }
+        return;
+      }
+    }
+
+    // Summarize API
+    if (url.pathname === '/api/summarize' && req.method === 'POST') {
+      try {
+        const body = JSON.parse(await readBody(req));
+        const { name, text } = body;
+        if (!text && !name) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'text or name is required' }));
+          return;
+        }
+
+        let articleText = text;
+        if (!articleText && name) {
+          const filePath = join(outputPath, name);
+          if (!existsSync(filePath)) {
+            send404(res);
+            return;
+          }
+          const content = readFileSync(filePath, 'utf-8');
+          // Strip frontmatter
+          const match = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
+          articleText = match ? match[1] : content;
+        }
+
+        const result = await summarizeText(articleText);
+
+        // If summarized by filename, write the summary into the markdown frontmatter
+        if (name) {
+          writeSummaryToFile(join(outputPath, name), result.summary);
+        }
+
+        sendJson(res, { summary: result.summary, model: result.model });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Summarization failed';
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: msg }));
+      }
+      return;
     }
 
     send404(res);
