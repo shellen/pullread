@@ -5,7 +5,7 @@ import { readFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { fetchFeed, FeedEntry } from './feed';
-import { fetchAndExtract, FetchOptions } from './extractor';
+import { fetchAndExtract, FetchOptions, shouldSkipUrl, classifyFetchError } from './extractor';
 import { writeArticle } from './writer';
 import { Storage } from './storage';
 import { startViewer } from './viewer';
@@ -117,6 +117,15 @@ async function syncFeed(
       const titlePreview = entry.title.slice(0, 50);
       console.log(`    ${titlePreview}${entry.title.length > 50 ? '...' : ''}`);
 
+      // Check if URL should be skipped before attempting fetch
+      const skipReason = shouldSkipUrl(entry.url);
+      if (skipReason) {
+        console.log(`      Skipped: ${skipReason}`);
+        storage.markFailed(entry.url, skipReason);
+        failed++;
+        continue;
+      }
+
       let content: string;
       let title = entry.title;
       let author: string | undefined;
@@ -165,7 +174,11 @@ async function syncFeed(
 
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.log(`      Failed: ${message}`);
+      // Try to extract HTTP status from error message for classification
+      const statusMatch = message.match(/: (\d{3})$/);
+      const status = statusMatch ? parseInt(statusMatch[1], 10) : undefined;
+      const label = classifyFetchError(err, status);
+      console.log(`      Failed: ${label} — ${message}`);
       storage.markFailed(entry.url, message);
       failed++;
     }

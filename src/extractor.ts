@@ -1,5 +1,5 @@
 // ABOUTME: Extracts article content from web pages using Readability
-// ABOUTME: Converts HTML to clean markdown for storage
+// ABOUTME: Converts HTML to clean markdown for storage, with retry and fallback extraction
 
 import { parseHTML } from 'linkedom';
 import { Readability } from '@mozilla/readability';
@@ -18,6 +18,56 @@ const turndown = new TurndownService({
   headingStyle: 'atx',
   codeBlockStyle: 'fenced'
 });
+
+// URLs that are never articles (apps, login walls, product pages, etc.)
+const SKIP_PATTERNS = [
+  /^https?:\/\/(www\.)?instagram\.com/,
+  /^https?:\/\/(www\.)?tiktok\.com/,
+  /^https?:\/\/play\.tailwindcss\.com/,
+  /^https?:\/\/(www\.)?figma\.com\/file/,
+  /^https?:\/\/(www\.)?amazon\.com\/gp\/product/,
+  /^https?:\/\/(www\.)?amazon\.com\/dp\//,
+];
+
+// Tracking parameters to strip from URLs before fetching
+const TRACKING_PARAMS = [
+  'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
+  'fbclid', 'gclid', 'mc_cid', 'mc_eid',
+  'share_id', 'ref', 'ref_', 'referer',
+];
+
+// Site-specific URL transforms
+function normalizeUrl(url: string): string {
+  let u: URL;
+  try { u = new URL(url); } catch { return url; }
+
+  // Strip tracking parameters
+  for (const param of TRACKING_PARAMS) {
+    u.searchParams.delete(param);
+  }
+
+  // Medium: follow redirects by using clean URL
+  if (u.hostname === 'medium.com' || u.hostname.endsWith('.medium.com')) {
+    u.searchParams.delete('source');
+    u.searchParams.delete('sk');
+  }
+
+  // Reddit: use old.reddit.com for better HTML extraction
+  if (u.hostname === 'www.reddit.com' || u.hostname === 'reddit.com') {
+    u.hostname = 'old.reddit.com';
+  }
+
+  return u.toString();
+}
+
+export function shouldSkipUrl(url: string): string | null {
+  for (const pattern of SKIP_PATTERNS) {
+    if (pattern.test(url)) {
+      return 'Non-article URL (app/product/login page)';
+    }
+  }
+  return null;
+}
 
 export function resolveRelativeUrls(markdown: string, baseUrl: string): string {
   let origin: string;
@@ -43,6 +93,10 @@ export function resolveRelativeUrls(markdown: string, baseUrl: string): string {
   return markdown;
 }
 
+/**
+ * Extract article using Readability. If that fails, try fallback extraction
+ * from OpenGraph/meta tags + JSON-LD structured data.
+ */
 export function extractArticle(html: string, url: string): ExtractedArticle | null {
   const { document } = parseHTML(html);
   // Set document URL for Readability
@@ -50,21 +104,60 @@ export function extractArticle(html: string, url: string): ExtractedArticle | nu
   const reader = new Readability(document);
   const article = reader.parse();
 
-  if (!article || !article.content) {
-    return null;
+  if (article && article.content) {
+    const markdown = resolveRelativeUrls(
+      turndown.turndown(article.content),
+      url
+    );
+    return {
+      title: article.title || 'Untitled',
+      content: article.content,
+      markdown,
+      byline: article.byline || undefined,
+      excerpt: article.excerpt || undefined
+    };
   }
 
-  const markdown = resolveRelativeUrls(
-    turndown.turndown(article.content),
-    url
-  );
+  // Fallback: try OpenGraph and JSON-LD extraction
+  return extractFallback(document, url);
+}
 
+function extractFallback(document: any, url: string): ExtractedArticle | null {
+  const getMeta = (prop: string): string => {
+    const el = document.querySelector(`meta[property="${prop}"], meta[name="${prop}"]`);
+    return el?.getAttribute('content') || '';
+  };
+
+  const title = getMeta('og:title') || getMeta('twitter:title') || document.querySelector('title')?.textContent || '';
+  const description = getMeta('og:description') || getMeta('twitter:description') || getMeta('description') || '';
+  const author = getMeta('author') || getMeta('article:author') || '';
+
+  // Try JSON-LD for structured article content
+  let jsonLdContent = '';
+  const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+  for (const script of scripts) {
+    try {
+      const data = JSON.parse(script.textContent || '');
+      const items = Array.isArray(data) ? data : [data];
+      for (const item of items) {
+        if (item['@type'] === 'Article' || item['@type'] === 'NewsArticle' || item['@type'] === 'BlogPosting') {
+          jsonLdContent = item.articleBody || item.text || '';
+          break;
+        }
+      }
+    } catch { /* ignore parse errors */ }
+  }
+
+  const body = jsonLdContent || description;
+  if (!title || !body) return null;
+
+  const markdown = body;
   return {
-    title: article.title || 'Untitled',
-    content: article.content,
+    title,
+    content: `<p>${body}</p>`,
     markdown,
-    byline: article.byline || undefined,
-    excerpt: article.excerpt || undefined
+    byline: author || undefined,
+    excerpt: description || undefined
   };
 }
 
@@ -72,31 +165,137 @@ export interface FetchOptions {
   useBrowserCookies?: boolean;
 }
 
+// Modern Chrome-like headers to pass bot detection
+function getBrowserHeaders(url: string): Record<string, string> {
+  const parsed = new URL(url);
+  return {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Cache-Control': 'max-age=0',
+    'DNT': '1',
+    'Sec-Ch-Ua': '"Chromium";v="131", "Not_A Brand";v="24"',
+    'Sec-Ch-Ua-Mobile': '?0',
+    'Sec-Ch-Ua-Platform': '"macOS"',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+    'Upgrade-Insecure-Requests': '1',
+    'Referer': parsed.origin + '/',
+  };
+}
+
+// Classify an error for better logging and to decide whether to retry
+type ErrorClass = 'bot_blocked' | 'not_found' | 'server_error' | 'timeout' | 'connection' | 'redirect_loop' | 'header_too_large' | 'unknown';
+
+function classifyError(err: any, status?: number): { cls: ErrorClass; retryable: boolean } {
+  const msg = err?.message || String(err);
+  if (status === 403 || status === 401) return { cls: 'bot_blocked', retryable: false };
+  if (status === 404 || status === 410) return { cls: 'not_found', retryable: false };
+  if (status === 494 || status === 431) return { cls: 'header_too_large', retryable: true };
+  if (status && status >= 500) return { cls: 'server_error', retryable: true };
+  if (msg.includes('timed out') || msg.includes('timeout') || msg.includes('AbortError')) return { cls: 'timeout', retryable: true };
+  if (msg.includes('socket') || msg.includes('ECONNRESET') || msg.includes('closed unexpectedly')) return { cls: 'connection', retryable: true };
+  if (msg.includes('redirect')) return { cls: 'redirect_loop', retryable: false };
+  return { cls: 'unknown', retryable: false };
+}
+
+export function classifyFetchError(err: any, status?: number): string {
+  const { cls } = classifyError(err, status);
+  const labels: Record<ErrorClass, string> = {
+    bot_blocked: 'Blocked by site (403)',
+    not_found: 'Page not found',
+    server_error: 'Server error (retrying)',
+    timeout: 'Request timed out',
+    connection: 'Connection failed',
+    redirect_loop: 'Too many redirects (login wall?)',
+    header_too_large: 'Cookie header too large',
+    unknown: 'Fetch failed',
+  };
+  return labels[cls];
+}
+
+const FETCH_TIMEOUT_MS = 30_000;
+const MAX_RETRIES = 2;
+const RETRY_DELAYS = [2_000, 5_000];
+
+async function fetchWithTimeout(url: string, headers: Record<string, string>, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      headers,
+      signal: controller.signal,
+      redirect: 'follow',
+    });
+    return response;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function fetchAndExtract(
   url: string,
   options: FetchOptions = {}
 ): Promise<ExtractedArticle | null> {
-  const headers: Record<string, string> = {
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.9'
-  };
+  // Check if URL should be skipped entirely
+  const skipReason = shouldSkipUrl(url);
+  if (skipReason) {
+    throw new Error(skipReason);
+  }
+
+  // Normalize URL (strip tracking, site-specific transforms)
+  const cleanUrl = normalizeUrl(url);
+  const headers = getBrowserHeaders(cleanUrl);
 
   // Add browser cookies if enabled
   if (options.useBrowserCookies) {
-    const domain = getDomainFromUrl(url);
+    const domain = getDomainFromUrl(cleanUrl);
     const cookies = getCookiesForDomain(domain);
     if (cookies) {
       headers['Cookie'] = cookies;
     }
   }
 
-  const response = await fetch(url, { headers });
+  let lastError: any;
+  let lastStatus: number | undefined;
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${url}: ${response.status}`);
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      // On retry for header_too_large, drop cookies
+      const attemptHeaders = { ...headers };
+      if (attempt > 0 && lastStatus && (lastStatus === 494 || lastStatus === 431)) {
+        delete attemptHeaders['Cookie'];
+      }
+
+      const response = await fetchWithTimeout(cleanUrl, attemptHeaders, FETCH_TIMEOUT_MS);
+
+      if (!response.ok) {
+        const { retryable } = classifyError(null, response.status);
+        if (retryable && attempt < MAX_RETRIES) {
+          lastError = new Error(`HTTP ${response.status}`);
+          lastStatus = response.status;
+          await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
+          continue;
+        }
+        throw new Error(`Failed to fetch ${url}: ${response.status}`);
+      }
+
+      const html = await response.text();
+      return extractArticle(html, cleanUrl);
+
+    } catch (err: any) {
+      lastError = err;
+      const { retryable } = classifyError(err, lastStatus);
+      if (retryable && attempt < MAX_RETRIES) {
+        await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
+        continue;
+      }
+      throw err;
+    }
   }
 
-  const html = await response.text();
-  return extractArticle(html, url);
+  throw lastError;
 }
