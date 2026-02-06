@@ -1721,6 +1721,37 @@ function renderNotesPanel() {
   const isFav = articleNotes.isFavorite || false;
   const tagsHtml = tags.map(t => '<span class="tag">' + escapeHtml(t) + '<span class="tag-remove" onclick="removeTag(\'' + escapeHtml(t.replace(/'/g, "\\'")) + '\')">&times;</span></span>').join('');
 
+  // Build list of highlight notes and inline annotations for display
+  let hlNotesHtml = '';
+  const hlsWithNotes = articleHighlights.filter(h => h.note);
+  const annotations = articleNotes.annotations || [];
+
+  if (hlsWithNotes.length || annotations.length) {
+    hlNotesHtml += '<div style="margin-top:12px;font-size:12px">';
+
+    for (const hl of hlsWithNotes) {
+      const preview = hl.text.length > 60 ? hl.text.slice(0, 60) + '...' : hl.text;
+      hlNotesHtml += '<div style="padding:8px 0;border-bottom:1px solid var(--border)">'
+        + '<div style="color:var(--muted);font-size:11px;margin-bottom:3px">'
+        + '<span class="pr-highlight hl-' + hl.color + '" style="padding:1px 4px;border-radius:2px;cursor:pointer" onclick="scrollToHighlight(\'' + hl.id + '\')">' + escapeHtml(preview) + '</span>'
+        + '</div>'
+        + '<div style="white-space:pre-wrap;word-break:break-word">' + escapeHtml(hl.note) + '</div>'
+        + '</div>';
+    }
+
+    for (const ann of annotations) {
+      const preview = (ann.anchorText || '').slice(0, 60);
+      hlNotesHtml += '<div style="padding:8px 0;border-bottom:1px solid var(--border)">'
+        + '<div style="color:var(--muted);font-size:11px;margin-bottom:3px">'
+        + '<span style="color:var(--link);cursor:pointer">' + escapeHtml(preview) + (ann.anchorText && ann.anchorText.length > 60 ? '...' : '') + '</span>'
+        + '</div>'
+        + '<div style="white-space:pre-wrap;word-break:break-word">' + escapeHtml(ann.note) + '</div>'
+        + '</div>';
+    }
+
+    hlNotesHtml += '</div>';
+  }
+
   panel.innerHTML = `
     <summary>${summaryText}</summary>
     <div class="favorite-row">
@@ -1733,9 +1764,10 @@ function renderNotesPanel() {
     </div>
     <textarea placeholder="Add notes about this article...">${escapeHtml(noteText)}</textarea>
     <div class="notes-save-hint">Notes auto-save on blur</div>
+    ${hlNotesHtml}
   `;
 
-  if (noteText || isFav || tags.length) panel.setAttribute('open', '');
+  if (noteText || isFav || tags.length || hlsWithNotes.length || annotations.length) panel.setAttribute('open', '');
 
   content.appendChild(panel);
 
@@ -1779,6 +1811,15 @@ function toggleNotesFromHeader() {
     if (panel.hasAttribute('open')) {
       panel.querySelector('textarea').focus();
     }
+  }
+}
+
+function scrollToHighlight(id) {
+  const mark = document.querySelector('mark[data-hl-id="' + id + '"]');
+  if (mark) {
+    mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    mark.style.outline = '2px solid var(--link)';
+    setTimeout(() => { mark.style.outline = ''; }, 1500);
   }
 }
 

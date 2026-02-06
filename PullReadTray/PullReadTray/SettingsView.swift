@@ -31,15 +31,21 @@ struct SettingsView: View {
         "anthropic": ["claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001", "claude-opus-4-6"],
         "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "o3-mini"],
         "gemini": ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-pro"],
-        "openrouter": ["anthropic/claude-sonnet-4-5", "openai/gpt-4o", "google/gemini-2.0-flash-001", "meta-llama/llama-4-scout"]
+        "openrouter": ["anthropic/claude-sonnet-4-5", "openai/gpt-4o", "google/gemini-2.0-flash-001", "meta-llama/llama-4-scout"],
+        "apple": ["on-device"]
     ]
 
     private static let defaultModels: [String: String] = [
         "anthropic": "claude-sonnet-4-5-20250929",
         "openai": "gpt-4o-mini",
         "gemini": "gemini-2.0-flash",
-        "openrouter": "anthropic/claude-sonnet-4-5"
+        "openrouter": "anthropic/claude-sonnet-4-5",
+        "apple": "on-device"
     ]
+
+    private var isAppleProvider: Bool {
+        llmProvider == "apple"
+    }
 
     private var modelsForProvider: [String] {
         Self.knownModels[llmProvider] ?? []
@@ -51,6 +57,7 @@ struct SettingsView: View {
         case "openai": return "sk-..."
         case "gemini": return "AIza..."
         case "openrouter": return "sk-or-..."
+        case "apple": return "No key needed"
         default: return "API key"
         }
     }
@@ -343,6 +350,7 @@ struct SettingsView: View {
                         Text("OpenAI").tag("openai")
                         Text("Gemini").tag("gemini")
                         Text("OpenRouter").tag("openrouter")
+                        Text("Apple Intelligence").tag("apple")
                     }
                     .pickerStyle(.segmented)
                     .onChange(of: llmProvider) { _ in
@@ -353,57 +361,77 @@ struct SettingsView: View {
                     }
                 }
 
-                HStack(spacing: 8) {
-                    Text("API Key")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .frame(width: 60, alignment: .trailing)
-                    SecureField(keyPlaceholder, text: $llmApiKey)
-                        .textFieldStyle(.plain)
-                        .padding(8)
-                        .background(Color(NSColor.textBackgroundColor).opacity(0.5))
-                        .cornerRadius(6)
+                if isAppleProvider {
+                    HStack(spacing: 8) {
+                        Image(systemName: "apple.intelligence")
+                            .foregroundColor(.blue)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Uses on-device model via Foundation Models framework")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text("Requires macOS 26 (Tahoe) · No API key needed · Free & private")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(10)
+                    .background(Color.blue.opacity(0.08))
+                    .cornerRadius(8)
                 }
 
-                HStack(spacing: 8) {
-                    Text("Model")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .frame(width: 60, alignment: .trailing)
-
-                    if useCustomModel {
-                        TextField("Enter model ID...", text: $llmModelCustom)
+                if !isAppleProvider {
+                    HStack(spacing: 8) {
+                        Text("API Key")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .frame(width: 60, alignment: .trailing)
+                        SecureField(keyPlaceholder, text: $llmApiKey)
                             .textFieldStyle(.plain)
                             .padding(8)
                             .background(Color(NSColor.textBackgroundColor).opacity(0.5))
                             .cornerRadius(6)
-                        Button("Back") {
-                            useCustomModel = false
-                            llmModelCustom = ""
-                        }
-                        .font(.caption)
-                    } else {
-                        Picker("", selection: $llmModel) {
-                            ForEach(modelsForProvider, id: \.self) { model in
-                                Text(model).tag(model)
+                    }
+
+                    HStack(spacing: 8) {
+                        Text("Model")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .frame(width: 60, alignment: .trailing)
+
+                        if useCustomModel {
+                            TextField("Enter model ID...", text: $llmModelCustom)
+                                .textFieldStyle(.plain)
+                                .padding(8)
+                                .background(Color(NSColor.textBackgroundColor).opacity(0.5))
+                                .cornerRadius(6)
+                            Button("Back") {
+                                useCustomModel = false
+                                llmModelCustom = ""
                             }
+                            .font(.caption)
+                        } else {
+                            Picker("", selection: $llmModel) {
+                                ForEach(modelsForProvider, id: \.self) { model in
+                                    Text(model).tag(model)
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            Button("Custom") {
+                                useCustomModel = true
+                            }
+                            .font(.caption)
                         }
-                        .frame(maxWidth: .infinity)
-                        Button("Custom") {
-                            useCustomModel = true
-                        }
-                        .font(.caption)
+                    }
+
+                    if useCustomModel {
+                        Text("Enter any model ID. Useful for newer models not yet listed.")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .padding(.leading, 68)
                     }
                 }
 
-                if useCustomModel {
-                    Text("Enter any model ID. Useful for newer models not yet listed.")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .padding(.leading, 68)
-                }
-
-                if !llmApiKey.isEmpty {
+                if !isAppleProvider && !llmApiKey.isEmpty {
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.shield.fill")
                             .foregroundColor(.green)
@@ -637,20 +665,25 @@ struct SettingsView: View {
             }
 
             // Save LLM settings to settings.json (separate from feeds config)
-            if !llmApiKey.isEmpty {
+            if isAppleProvider || !llmApiKey.isEmpty {
                 let settingsPath = (configPath as NSString).deletingLastPathComponent + "/settings.json"
                 var existingSettings: [String: Any] = [:]
                 if let settingsData = FileManager.default.contents(atPath: settingsPath),
                    let parsed = try? JSONSerialization.jsonObject(with: settingsData) as? [String: Any] {
                     existingSettings = parsed
                 }
-                let effectiveModel = useCustomModel ? llmModelCustom : llmModel
                 var llm: [String: Any] = [
-                    "provider": llmProvider,
-                    "apiKey": llmApiKey
+                    "provider": llmProvider
                 ]
-                if !effectiveModel.isEmpty {
-                    llm["model"] = effectiveModel
+                if isAppleProvider {
+                    llm["model"] = "on-device"
+                    // Apple Intelligence doesn't need an API key
+                } else {
+                    llm["apiKey"] = llmApiKey
+                    let effectiveModel = useCustomModel ? llmModelCustom : llmModel
+                    if !effectiveModel.isEmpty {
+                        llm["model"] = effectiveModel
+                    }
                 }
                 existingSettings["llm"] = llm
                 let settingsData = try JSONSerialization.data(withJSONObject: existingSettings, options: [.prettyPrinted, .sortedKeys])

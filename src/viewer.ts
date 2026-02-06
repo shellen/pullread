@@ -262,7 +262,7 @@ export function startViewer(outputPath: string, port = 7777): void {
           llm: config ? {
             provider: config.provider,
             model: config.model || getDefaultModel(config.provider),
-            hasKey: true
+            hasKey: config.provider === 'apple' || !!config.apiKey
           } : null
         });
         return;
