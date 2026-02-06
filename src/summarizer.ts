@@ -1,16 +1,26 @@
 // ABOUTME: Article summarization using user-provided API keys
-// ABOUTME: Supports Anthropic Claude and OpenAI model providers
+// ABOUTME: Supports Anthropic, OpenAI, Gemini, and OpenRouter providers
 
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { request } from 'https';
 
+export type Provider = 'anthropic' | 'openai' | 'gemini' | 'openrouter';
+
 export interface LLMConfig {
-  provider: 'anthropic' | 'openai';
+  provider: Provider;
   apiKey: string;
   model?: string;
 }
+
+// Known models per provider — used for dropdown guidance
+export const KNOWN_MODELS: Record<Provider, string[]> = {
+  anthropic: ['claude-sonnet-4-5-20250929', 'claude-haiku-4-5-20251001', 'claude-opus-4-6'],
+  openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-4.1-mini', 'o3-mini'],
+  gemini: ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-pro'],
+  openrouter: ['anthropic/claude-sonnet-4-5', 'openai/gpt-4o', 'google/gemini-2.0-flash-001', 'meta-llama/llama-4-scout']
+};
 
 interface SummarizeResult {
   summary: string;
@@ -121,22 +131,78 @@ async function callOpenAI(apiKey: string, model: string, articleText: string): P
   return { summary: text.trim(), model: data.model || model };
 }
 
+async function callGemini(apiKey: string, model: string, articleText: string): Promise<SummarizeResult> {
+  const trimmed = articleText.split(/\s+/).slice(0, 6000).join(' ');
+
+  const body = JSON.stringify({
+    contents: [{
+      parts: [{ text: `${SUMMARIZE_PROMPT}\n\n---\n\n${trimmed}` }]
+    }],
+    generationConfig: { maxOutputTokens: 300 }
+  });
+
+  const response = await httpPost(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    {},
+    body
+  );
+
+  const data = JSON.parse(response);
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return { summary: text.trim(), model };
+}
+
+async function callOpenRouter(apiKey: string, model: string, articleText: string): Promise<SummarizeResult> {
+  const trimmed = articleText.split(/\s+/).slice(0, 6000).join(' ');
+
+  const body = JSON.stringify({
+    model,
+    max_tokens: 300,
+    messages: [
+      { role: 'system', content: SUMMARIZE_PROMPT },
+      { role: 'user', content: trimmed }
+    ]
+  });
+
+  const response = await httpPost('https://openrouter.ai/api/v1/chat/completions', {
+    'Authorization': `Bearer ${apiKey}`,
+    'HTTP-Referer': 'https://github.com/shellen/pullread',
+    'X-Title': 'PullRead'
+  }, body);
+
+  const data = JSON.parse(response);
+  const text = data.choices?.[0]?.message?.content || '';
+  return { summary: text.trim(), model: data.model || model };
+}
+
 export async function summarizeText(articleText: string, config?: LLMConfig): Promise<SummarizeResult> {
   const llmConfig = config || loadLLMConfig();
   if (!llmConfig) {
-    throw new Error('No LLM API key configured. Add your key in Settings or ~/.config/pullread/settings.json');
+    throw new Error('No API key configured. Add your key in the PullRead Settings window.');
   }
 
-  if (llmConfig.provider === 'anthropic') {
-    const model = llmConfig.model || 'claude-sonnet-4-5-20250929';
-    return callAnthropic(llmConfig.apiKey, model, articleText);
-  } else {
-    const model = llmConfig.model || 'gpt-4o-mini';
-    return callOpenAI(llmConfig.apiKey, model, articleText);
+  const model = llmConfig.model || getDefaultModel(llmConfig.provider);
+
+  switch (llmConfig.provider) {
+    case 'anthropic':
+      return callAnthropic(llmConfig.apiKey, model, articleText);
+    case 'openai':
+      return callOpenAI(llmConfig.apiKey, model, articleText);
+    case 'gemini':
+      return callGemini(llmConfig.apiKey, model, articleText);
+    case 'openrouter':
+      return callOpenRouter(llmConfig.apiKey, model, articleText);
+    default:
+      throw new Error(`Unknown provider: ${llmConfig.provider}`);
   }
 }
 
 export function getDefaultModel(provider: string): string {
-  if (provider === 'anthropic') return 'claude-sonnet-4-5-20250929';
-  return 'gpt-4o-mini';
+  switch (provider) {
+    case 'anthropic': return 'claude-sonnet-4-5-20250929';
+    case 'openai': return 'gpt-4o-mini';
+    case 'gemini': return 'gemini-2.0-flash';
+    case 'openrouter': return 'anthropic/claude-sonnet-4-5';
+    default: return 'gpt-4o-mini';
+  }
 }

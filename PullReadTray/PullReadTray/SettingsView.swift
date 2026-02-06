@@ -24,6 +24,36 @@ struct SettingsView: View {
     @State private var llmProvider: String = "anthropic"
     @State private var llmApiKey: String = ""
     @State private var llmModel: String = ""
+    @State private var llmModelCustom: String = ""
+    @State private var useCustomModel: Bool = false
+
+    private static let knownModels: [String: [String]] = [
+        "anthropic": ["claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001", "claude-opus-4-6"],
+        "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "o3-mini"],
+        "gemini": ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-pro"],
+        "openrouter": ["anthropic/claude-sonnet-4-5", "openai/gpt-4o", "google/gemini-2.0-flash-001", "meta-llama/llama-4-scout"]
+    ]
+
+    private static let defaultModels: [String: String] = [
+        "anthropic": "claude-sonnet-4-5-20250929",
+        "openai": "gpt-4o-mini",
+        "gemini": "gemini-2.0-flash",
+        "openrouter": "anthropic/claude-sonnet-4-5"
+    ]
+
+    private var modelsForProvider: [String] {
+        Self.knownModels[llmProvider] ?? []
+    }
+
+    private var keyPlaceholder: String {
+        switch llmProvider {
+        case "anthropic": return "sk-ant-..."
+        case "openai": return "sk-..."
+        case "gemini": return "AIza..."
+        case "openrouter": return "sk-or-..."
+        default: return "API key"
+        }
+    }
 
     let configPath: String
     var onSave: (() -> Void)?
@@ -304,16 +334,23 @@ struct SettingsView: View {
                     .foregroundColor(.secondary)
 
                 HStack(spacing: 8) {
-                    Text("Model")
+                    Text("Provider")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .frame(width: 60, alignment: .trailing)
                     Picker("", selection: $llmProvider) {
                         Text("Anthropic").tag("anthropic")
                         Text("OpenAI").tag("openai")
+                        Text("Gemini").tag("gemini")
+                        Text("OpenRouter").tag("openrouter")
                     }
                     .pickerStyle(.segmented)
-                    .frame(width: 200)
+                    .onChange(of: llmProvider) { _ in
+                        // Reset model selection when provider changes
+                        useCustomModel = false
+                        llmModel = Self.defaultModels[llmProvider] ?? ""
+                        llmModelCustom = ""
+                    }
                 }
 
                 HStack(spacing: 8) {
@@ -321,7 +358,7 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .frame(width: 60, alignment: .trailing)
-                    SecureField(llmProvider == "anthropic" ? "sk-ant-..." : "sk-...", text: $llmApiKey)
+                    SecureField(keyPlaceholder, text: $llmApiKey)
                         .textFieldStyle(.plain)
                         .padding(8)
                         .background(Color(NSColor.textBackgroundColor).opacity(0.5))
@@ -333,14 +370,37 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .frame(width: 60, alignment: .trailing)
-                    TextField(llmProvider == "anthropic" ? "claude-sonnet-4-5-20250929" : "gpt-4o-mini", text: $llmModel)
-                        .textFieldStyle(.plain)
-                        .padding(8)
-                        .background(Color(NSColor.textBackgroundColor).opacity(0.5))
-                        .cornerRadius(6)
-                    Text("optional")
+
+                    if useCustomModel {
+                        TextField("Enter model ID...", text: $llmModelCustom)
+                            .textFieldStyle(.plain)
+                            .padding(8)
+                            .background(Color(NSColor.textBackgroundColor).opacity(0.5))
+                            .cornerRadius(6)
+                        Button("Back") {
+                            useCustomModel = false
+                            llmModelCustom = ""
+                        }
+                        .font(.caption)
+                    } else {
+                        Picker("", selection: $llmModel) {
+                            ForEach(modelsForProvider, id: \.self) { model in
+                                Text(model).tag(model)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        Button("Custom") {
+                            useCustomModel = true
+                        }
+                        .font(.caption)
+                    }
+                }
+
+                if useCustomModel {
+                    Text("Enter any model ID. Useful for newer models not yet listed.")
                         .font(.caption2)
                         .foregroundColor(.secondary)
+                        .padding(.leading, 68)
                 }
 
                 if !llmApiKey.isEmpty {
@@ -517,7 +577,16 @@ struct SettingsView: View {
            let llm = settings["llm"] as? [String: Any] {
             llmProvider = (llm["provider"] as? String) ?? "anthropic"
             llmApiKey = (llm["apiKey"] as? String) ?? ""
-            llmModel = (llm["model"] as? String) ?? ""
+            let savedModel = (llm["model"] as? String) ?? ""
+            let knownList = Self.knownModels[llmProvider] ?? []
+            if knownList.contains(savedModel) || savedModel.isEmpty {
+                llmModel = savedModel.isEmpty ? (Self.defaultModels[llmProvider] ?? "") : savedModel
+                useCustomModel = false
+            } else {
+                llmModelCustom = savedModel
+                llmModel = Self.defaultModels[llmProvider] ?? ""
+                useCustomModel = true
+            }
         }
     }
 
@@ -575,12 +644,13 @@ struct SettingsView: View {
                    let parsed = try? JSONSerialization.jsonObject(with: settingsData) as? [String: Any] {
                     existingSettings = parsed
                 }
+                let effectiveModel = useCustomModel ? llmModelCustom : llmModel
                 var llm: [String: Any] = [
                     "provider": llmProvider,
                     "apiKey": llmApiKey
                 ]
-                if !llmModel.isEmpty {
-                    llm["model"] = llmModel
+                if !effectiveModel.isEmpty {
+                    llm["model"] = effectiveModel
                 }
                 existingSettings["llm"] = llm
                 let settingsData = try JSONSerialization.data(withJSONObject: existingSettings, options: [.prettyPrinted, .sortedKeys])

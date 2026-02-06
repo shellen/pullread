@@ -838,39 +838,6 @@
   .summarize-btn:hover { border-color: #ab47bc; color: #ab47bc; }
   .summarize-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  /* LLM settings panel */
-  .llm-settings {
-    position: fixed;
-    top: 0; right: 0;
-    width: 340px;
-    height: 100vh;
-    background: var(--bg);
-    border-left: 1px solid var(--border);
-    box-shadow: -4px 0 16px rgba(0,0,0,0.1);
-    z-index: 60;
-    padding: 20px;
-    overflow-y: auto;
-    animation: slideIn 0.2s ease;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  }
-  @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
-  .llm-settings h3 { font-size: 16px; margin-bottom: 16px; }
-  .llm-settings label {
-    display: block; font-size: 12px; color: var(--muted);
-    margin-bottom: 4px; margin-top: 12px;
-  }
-  .llm-settings select, .llm-settings input[type="text"], .llm-settings input[type="password"] {
-    width: 100%; padding: 8px; border: 1px solid var(--border);
-    border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 13px;
-  }
-  .llm-settings select:focus, .llm-settings input:focus { border-color: var(--link); outline: none; }
-  .llm-settings .btn-row { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
-  .llm-settings button {
-    padding: 6px 16px; border: 1px solid var(--border);
-    border-radius: 4px; background: var(--bg); color: var(--fg); font-size: 13px; cursor: pointer;
-  }
-  .llm-settings button.primary { background: var(--fg); color: var(--bg); border-color: var(--fg); }
-  .llm-settings .hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
 </style>
 </head>
 <body data-theme="light" class="font-serif size-medium">
@@ -1004,8 +971,6 @@ function toggleSettingsDropdown() {
       <button onclick="setSize('medium');updateDropdownState()" ${currentSize==='medium'?'class="active"':''} style="font-size:14px">A</button>
       <button onclick="setSize('large');updateDropdownState()" ${currentSize==='large'?'class="active"':''} style="font-size:17px">A</button>
     </div>
-    <hr>
-    <button onclick="toggleLLMSettings();toggleSettingsDropdown()" style="width:100%;text-align:left;padding:6px 8px">Summary settings...</button>
   `;
   document.querySelector('.settings-dropdown').appendChild(panel);
 }
@@ -1872,7 +1837,7 @@ async function summarizeArticle() {
   if (!btn) return;
 
   if (!llmConfigured) {
-    toggleLLMSettings();
+    alert('No API key configured. Add your key in PullRead Settings (click the menu bar icon \u2192 Settings).');
     return;
   }
 
@@ -1916,77 +1881,6 @@ async function summarizeArticle() {
   }
 }
 
-function toggleLLMSettings() {
-  const existing = document.querySelector('.llm-settings');
-  if (existing) { existing.remove(); return; }
-
-  const panel = document.createElement('div');
-  panel.className = 'llm-settings';
-  panel.onclick = function(e) { e.stopPropagation(); };
-
-  panel.innerHTML = `
-    <h3>&#9881; Summary Settings</h3>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Add your API key to generate article summaries on demand. Keys are stored locally.</p>
-    <label>Model Provider</label>
-    <select id="llm-provider">
-      <option value="anthropic">Anthropic (Claude)</option>
-      <option value="openai">OpenAI (GPT)</option>
-    </select>
-    <label>API Key</label>
-    <input type="password" id="llm-key" placeholder="sk-..." />
-    <div class="hint">Get a key at <a href="https://console.anthropic.com" target="_blank" style="color:var(--link)">console.anthropic.com</a> or <a href="https://platform.openai.com" target="_blank" style="color:var(--link)">platform.openai.com</a></div>
-    <label>Model (optional)</label>
-    <input type="text" id="llm-model" placeholder="Leave blank for default" />
-    <div class="hint">Anthropic: claude-sonnet-4-5-20250929 &middot; OpenAI: gpt-4o-mini</div>
-    <div class="btn-row">
-      <button onclick="document.querySelector('.llm-settings').remove()">Cancel</button>
-      <button class="primary" onclick="saveLLMSettings()">Save</button>
-    </div>
-  `;
-  document.body.appendChild(panel);
-
-  // Load existing settings
-  fetch('/api/settings').then(r => r.json()).then(data => {
-    if (data.llm) {
-      document.getElementById('llm-provider').value = data.llm.provider || 'anthropic';
-      document.getElementById('llm-model').value = data.llm.model || '';
-      // Don't show the key itself, just indicate it's set
-      if (data.llm.hasKey) {
-        document.getElementById('llm-key').placeholder = '(key is set — enter new to replace)';
-      }
-    }
-  }).catch(() => {});
-}
-
-async function saveLLMSettings() {
-  const provider = document.getElementById('llm-provider').value;
-  const apiKey = document.getElementById('llm-key').value;
-  const model = document.getElementById('llm-model').value;
-
-  if (!apiKey && !llmConfigured) {
-    alert('Please enter an API key.');
-    return;
-  }
-
-  // Only send key if user entered one (otherwise keep existing)
-  if (apiKey) {
-    try {
-      const res = await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider, apiKey, model: model || undefined })
-      });
-      if (res.ok) {
-        llmConfigured = true;
-        document.querySelector('.llm-settings').remove();
-      }
-    } catch (err) {
-      alert('Failed to save settings.');
-    }
-  } else {
-    document.querySelector('.llm-settings').remove();
-  }
-}
 
 // Keyboard navigation
 document.addEventListener('keydown', e => {
