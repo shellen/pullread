@@ -821,7 +821,25 @@
     letter-spacing: 0.5px;
     color: var(--muted);
     margin-bottom: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
+  .article-summary .summary-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .article-summary .summary-actions button {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 0 2px;
+    line-height: 1;
+  }
+  .article-summary .summary-actions button:hover { color: var(--fg); }
   .summarize-btn {
     display: inline-block;
     padding: 3px 10px;
@@ -1066,7 +1084,7 @@ function renderArticle(text, filename) {
 
   // Show existing summary if present in frontmatter
   if (meta && meta.summary) {
-    html += '<div class="article-summary"><div class="summary-label">Summary</div>' + escapeHtml(meta.summary) + '</div>';
+    html += '<div class="article-summary"><div class="summary-label"><span>Summary</span><span class="summary-actions"><button onclick="hideSummary()" title="Hide summary">&times;</button></span></div>' + escapeHtml(meta.summary) + '</div>';
   }
 
   // Strip the leading H1 from markdown body if it matches the title (avoid duplication)
@@ -1770,7 +1788,7 @@ function renderNotesPanel() {
       <input type="text" placeholder="Add tag..." onkeydown="handleTagKey(event)" />
     </div>
     <textarea placeholder="Add notes about this article...">${escapeHtml(noteText)}</textarea>
-    <div class="notes-save-hint">Notes auto-save on blur</div>
+    <div class="notes-save-hint">Auto-saved</div>
     ${hlNotesHtml}
   `;
 
@@ -1937,7 +1955,7 @@ async function summarizeArticle() {
 
     const summaryDiv = document.createElement('div');
     summaryDiv.className = 'article-summary';
-    summaryDiv.innerHTML = '<div class="summary-label">Summary</div>'
+    summaryDiv.innerHTML = '<div class="summary-label"><span>Summary</span><span class="summary-actions"><button onclick="hideSummary()" title="Hide summary">&times;</button></span></div>'
       + escapeHtml(data.summary)
       + '<div style="font-size:10px;color:var(--muted);margin-top:6px">'
       + providerLabel(lastSummaryProvider) + ' · ' + escapeHtml(lastSummaryModel)
@@ -1961,6 +1979,19 @@ async function summarizeArticle() {
   }
 }
 
+function hideSummary() {
+  const content = document.getElementById('content');
+  const summary = content.querySelector('.article-summary');
+  if (summary) summary.remove();
+  // Reset summarize button
+  const btn = document.getElementById('summarize-btn');
+  if (btn) {
+    btn.innerHTML = '&#10024; Summarize';
+    btn.title = 'Summarize';
+    btn.disabled = false;
+    btn.onclick = null;
+  }
+}
 
 // Keyboard navigation
 document.addEventListener('keydown', e => {

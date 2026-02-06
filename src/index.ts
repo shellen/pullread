@@ -10,6 +10,7 @@ import { writeArticle } from './writer';
 import { Storage } from './storage';
 import { startViewer } from './viewer';
 import { summarizeText, loadLLMConfig } from './summarizer';
+import { parseBookmarksHtml, bookmarksToEntries } from './bookmarks';
 
 // Default paths for standalone binary
 const DEFAULT_CONFIG_DIR = join(homedir(), '.config', 'pullread');
@@ -337,6 +338,107 @@ if (command === 'sync') {
     console.error('Fatal error:', err.message);
     process.exit(1);
   });
+} else if (command === 'import') {
+  const filePath = args[1];
+  if (!filePath) {
+    console.error('Usage: pullread import <bookmarks.html>');
+    process.exit(1);
+  }
+
+  if (!existsSync(filePath)) {
+    console.error(`Error: File not found: ${filePath}`);
+    process.exit(1);
+  }
+
+  const config = loadConfig();
+  const html = readFileSync(filePath, 'utf-8');
+  const bookmarks = parseBookmarksHtml(html);
+
+  if (bookmarks.length === 0) {
+    console.error('No bookmarks found in file');
+    process.exit(1);
+  }
+
+  console.log(`Found ${bookmarks.length} bookmarks in ${filePath}`);
+
+  const entries = bookmarksToEntries(bookmarks);
+  const configDir = join(DB_PATH, '..');
+  if (!existsSync(configDir)) mkdirSync(configDir, { recursive: true });
+  if (!existsSync(config.outputPath)) mkdirSync(config.outputPath, { recursive: true });
+
+  const storage = new Storage(DB_PATH, config.outputPath);
+  const fetchOptions: FetchOptions = { useBrowserCookies: config.useBrowserCookies };
+
+  (async () => {
+    let success = 0;
+    let failed = 0;
+    let skipped = 0;
+
+    for (const entry of entries) {
+      if (storage.isProcessed(entry.url)) {
+        skipped++;
+        continue;
+      }
+
+      const titlePreview = entry.title.slice(0, 50);
+      process.stdout.write(`  ${titlePreview}${entry.title.length > 50 ? '...' : ''}`);
+
+      const skipReason = shouldSkipUrl(entry.url);
+      if (skipReason) {
+        console.log(` — Skipped: ${skipReason}`);
+        storage.markFailed(entry.url, skipReason);
+        failed++;
+        continue;
+      }
+
+      try {
+        const article = await fetchAndExtract(entry.url, fetchOptions);
+        if (!article) {
+          console.log(' — No content');
+          storage.markFailed(entry.url, 'No extractable content');
+          failed++;
+          continue;
+        }
+
+        const filename = writeArticle(config.outputPath, {
+          title: article.title || entry.title,
+          url: entry.url,
+          bookmarkedAt: entry.updatedAt,
+          domain: entry.domain,
+          content: article.markdown,
+          feed: 'import',
+          annotation: entry.annotation,
+          author: article.byline,
+          excerpt: article.excerpt
+        });
+
+        storage.markProcessed({
+          url: entry.url,
+          title: article.title || entry.title,
+          bookmarkedAt: entry.updatedAt,
+          outputFile: filename
+        });
+
+        console.log(` — Saved: ${filename}`);
+        success++;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        const statusMatch = message.match(/: (\d{3})$/);
+        const status = statusMatch ? parseInt(statusMatch[1], 10) : undefined;
+        const label = classifyFetchError(err, status);
+        console.log(` — Failed: ${label}`);
+        storage.markFailed(entry.url, message);
+        failed++;
+      }
+    }
+
+    storage.close();
+    console.log(`\nDone: ${success} saved, ${failed} failed, ${skipped} already imported`);
+  })().catch(err => {
+    storage.close();
+    console.error('Fatal error:', err.message);
+    process.exit(1);
+  });
 } else {
   console.log(`Usage: pullread <command>
 
@@ -348,5 +450,6 @@ Commands:
   view --port <number>    Use a custom port (default: 7777)
   summarize --batch       Summarize articles missing summaries
   summarize --min-size N  Skip articles under N chars (default: 500)
+  import <file.html>      Import bookmarks from HTML file (Netscape format)
 `);
 }

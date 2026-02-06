@@ -145,6 +145,58 @@ describe('parseFeed - Podcast', () => {
   });
 });
 
+const RDF_FEED = `<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF
+ xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+ xmlns="http://purl.org/rss/1.0/"
+ xmlns:dc="http://purl.org/dc/elements/1.1/"
+ xmlns:taxo="http://purl.org/rss/1.0/modules/taxonomy/">
+  <channel rdf:about="https://pinboard.in/u:testuser">
+    <title>Pinboard (testuser)</title>
+    <link>https://pinboard.in/u:testuser</link>
+    <description></description>
+  </channel>
+  <item rdf:about="https://example.com/article1">
+    <title>Pinboard Article One</title>
+    <link>https://example.com/article1</link>
+    <dc:date>2025-01-15T10:30:00Z</dc:date>
+    <dc:creator>testuser</dc:creator>
+    <description>A great article about testing</description>
+  </item>
+  <item rdf:about="https://example.com/article2">
+    <title>Another Pinboard Bookmark</title>
+    <link>https://example.com/article2</link>
+    <dc:date>2025-01-14T08:00:00Z</dc:date>
+    <description></description>
+  </item>
+</rdf:RDF>`;
+
+describe('parseFeed - RDF/RSS 1.0 (Pinboard)', () => {
+  test('extracts entries from RDF feed', () => {
+    const entries = parseFeed(RDF_FEED);
+    expect(entries).toHaveLength(2);
+  });
+
+  test('parses RDF entry fields correctly', () => {
+    const entries = parseFeed(RDF_FEED);
+    const first = entries[0];
+
+    expect(first.title).toBe('Pinboard Article One');
+    expect(first.url).toBe('https://example.com/article1');
+    expect(first.updatedAt).toBe('2025-01-15T10:30:00.000Z');
+    expect(first.annotation).toBe('A great article about testing');
+    expect(first.domain).toBe('example.com');
+  });
+
+  test('handles empty description', () => {
+    const entries = parseFeed(RDF_FEED);
+    const second = entries[1];
+
+    expect(second.title).toBe('Another Pinboard Bookmark');
+    expect(second.annotation).toBeUndefined();
+  });
+});
+
 describe('parseFeed - Error handling', () => {
   test('throws on unknown feed format', () => {
     const invalidXml = '<?xml version="1.0"?><unknown><item/></unknown>';
