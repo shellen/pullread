@@ -856,19 +856,35 @@
   .summarize-btn:hover { border-color: #ab47bc; color: #ab47bc; }
   .summarize-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+  /* Inline SVG icons */
+  .icon { width: 1em; height: 1em; vertical-align: -0.125em; fill: currentColor; display: inline-block; }
+  .icon-sm { width: 0.85em; height: 0.85em; }
+  .icon-lg { width: 1.15em; height: 1.15em; }
+
 </style>
 </head>
 <body data-theme="light" class="font-serif size-medium">
+<!-- SVG icon sprite (FontAwesome Free solid/regular, inlined for fully offline use) -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="i-bars" viewBox="0 0 448 512"><path d="M0 96C0 78.3 14.3 64 32 64h384c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zm0 160c0-17.7 14.3-32 32-32h384c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zm448 160c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32h384c17.7 0 32 14.3 32 32z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 512 512"><path d="M495.9 166.6c3.2 8.7.5 18.4-6.4 24.6l-43.3 39.4c1.1 8.3 1.7 16.8 1.7 25.4s-.6 17.1-1.7 25.4l43.3 39.4c6.9 6.2 9.6 15.9 6.4 24.6-4.4 11.9-9.7 23.3-15.8 34.3l-4.7 8.1c-6.6 11-14 21.4-22.1 31.2-5.9 7.2-15.7 9.6-24.5 6.8l-55.7-17.7c-13.4 10.1-28.2 18.3-44 24.4l-12.5 57.1c-2 9.1-9.3 15.5-18.4 17.4-12.2 2.5-24.8 3.8-37.6 3.8s-25.5-1.3-37.6-3.8c-9.2-1.9-16.5-8.3-18.4-17.4l-12.5-57.1c-15.8-6.1-30.6-14.3-44-24.4l-55.7 17.7c-8.8 2.8-18.6.3-24.5-6.8-8.1-9.8-15.5-20.2-22.1-31.2l-4.7-8.1c-6.1-11-11.4-22.4-15.8-34.3-3.2-8.7-.5-18.4 6.4-24.6l43.3-39.4C64.6 273.1 64 264.6 64 256s.6-17.1 1.7-25.4L22.4 191.2c-6.9-6.2-9.6-15.9-6.4-24.6 4.4-11.9 9.7-23.3 15.8-34.3l4.7-8.1c6.6-11 14-21.4 22.1-31.2 5.9-7.2 15.7-9.6 24.5-6.8l55.7 17.7c13.4-10.1 28.2-18.3 44-24.4l12.5-57.1c2-9.1 9.3-15.5 18.4-17.4C226.5 1.3 239.2 0 252 0s25.5 1.3 37.6 3.8c9.2 1.9 16.5 8.3 18.4 17.4l12.5 57.1c15.8 6.1 30.6 14.3 44 24.4l55.7-17.7c8.8-2.8 18.6-.3 24.5 6.8 8.1 9.8 15.5 20.2 22.1 31.2l4.7 8.1c6.1 11 11.4 22.4 15.8 34.3zM256 336a80 80 0 1 0 0-160 80 80 0 1 0 0 160z"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 512 512"><path d="M47.6 300.4L228.3 469.1c7.5 7 17.4 10.9 27.7 10.9s20.2-3.9 27.7-10.9L464.4 300.4c30.4-28.3 47.6-68 47.6-109.5v-5.8c0-69.9-50.5-129.5-119.4-141C347 36.5 300.6 51.4 268 84L256 96 244 84c-32.6-32.6-79-47.5-124.6-39.9C50.5 55.6 0 115.2 0 185.1v5.8c0 41.5 17.2 81.2 47.6 109.5z"/></symbol>
+  <symbol id="i-heart-o" viewBox="0 0 512 512"><path d="M225.8 468.2l-2.5-2.3L48.1 303.2C17.4 274.7 0 234.7 0 192.8v-3.3c0-70.4 50-130.8 119.2-144C158.6 37.9 198.9 47 231 69.6c9 6.3 17.3 13.6 25 21.5 7.7-7.9 16-15.2 25-21.5 32.1-22.6 72.4-31.7 111.8-24.2C461.2 58.7 512 119.1 512 189.5v3.3c0 41.9-17.4 81.9-48.1 110.4L288.7 465.9l-2.5 2.3c-8.2 7.6-19 11.9-30.2 11.9s-22-4.2-30.2-11.9zM239.1 145c-25.9-26.4-60.9-41.2-97.5-34.8-47.6 8.4-83.7 51.3-83.7 100.1v3.3c0 29.4 12.2 57.7 33.6 77.8l166.3 152.2.5.5c2.5 2.3 5.7 3.5 9 3.5s6.5-1.2 9-3.5l.5-.5 166.3-152.2c21.5-20.1 33.6-48.4 33.6-77.8v-3.3c0-48.8-36.1-91.8-83.7-100.1-36.6-6.5-71.6 8.3-97.5 34.8l-17.8 18.2-17.8-18.2z"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 512 512"><path d="M362.7 19.3L314.3 67.7 444.3 197.7l48.4-48.4c25-25 25-65.5 0-90.5L453.3 19.3c-25-25-65.5-25-90.5 0zm-71 71L58.6 323.5c-10.4 10.4-18 23.3-22.2 37.4L1 481.2C-1.5 489.7.8 498.8 7 505s15.3 8.5 23.7 6.1l120.3-35.4c14.1-4.2 27-11.8 37.4-22.2L421.7 220.3 291.7 90.3z"/></symbol>
+  <symbol id="i-wand" viewBox="0 0 576 512"><path d="M234.7 42.7L197 56.8c-3 1.1-5 4-5 7.2s2 6.1 5 7.2l37.7 14.1L248.8 123c1.1 3 4 5 7.2 5s6.1-2 7.2-5l14.1-37.7L315 71.2c3-1.1 5-4 5-7.2s-2-6.1-5-7.2L277.3 42.7 263.2 5c-1.1-3-4-5-7.2-5s-6.1 2-7.2 5L234.7 42.7zM46.1 395.4c-18.7 18.7-18.7 49.1 0 67.9l34.6 34.6c18.7 18.7 49.1 18.7 67.9 0L529.9 116.5c18.7-18.7 18.7-49.1 0-67.9L495.3 14c-18.7-18.7-49.1-18.7-67.9 0L46.1 395.4zM484.6 82.6l-105 105-23.3-23.3 105-105 23.3 23.3zM7.5 117.2C3 118.9 0 123.2 0 128s3 9.1 7.5 10.8L64 160l21.2 56.5c1.7 4.5 6 7.5 10.8 7.5s9.1-3 10.8-7.5L128 160l56.5-21.2c4.5-1.7 7.5-6 7.5-10.8s-3-9.1-7.5-10.8L128 96 106.8 39.5C105.1 35 100.8 32 96 32s-9.1 3-10.8 7.5L64 96 7.5 117.2zm352 256c-4.5 1.7-7.5 6-7.5 10.8s3 9.1 7.5 10.8L416 416l21.2 56.5c1.7 4.5 6 7.5 10.8 7.5s9.1-3 10.8-7.5L480 416l56.5-21.2c4.5-1.7 7.5-6 7.5-10.8s-3-9.1-7.5-10.8L480 352l-21.2-56.5c-1.7-4.5-6-7.5-10.8-7.5s-9.1 3-10.8 7.5L416 352l-56.5 21.2z"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 512 512"><path d="M352 256c0 22.2-1.2 43.6-3.3 64H163.3c-2.2-20.4-3.3-41.8-3.3-64s1.2-43.6 3.3-64h185.4c2.2 20.4 3.3 41.8 3.3 64zm28.8-64h123.1c5.3 20.5 8.1 41.9 8.1 64s-2.8 43.5-8.1 64H380.8c2.1-20.6 3.2-42 3.2-64s-1.1-43.4-3.2-64zm112.6-32H376.7c-10-63.9-29.8-117.4-55.3-151.6C399.6 29 467.7 90.2 493.4 160zM256 16c30.6 0 66.7 56.5 82.3 144H173.7C189.3 72.5 225.4 16 256 16zM135.3 160H18.6c25.7-69.8 93.8-131 172-151.6-25.5 34.2-45.3 87.7-55.3 151.6zM8.1 192H131.2c-2.1 20.6-3.2 42-3.2 64s1.1 43.4 3.2 64H8.1C2.8 299.5 0 278.1 0 256s2.8-43.5 8.1-64zm10.5 160h116.7c10 63.9 29.8 117.4 55.3 151.6C112.4 483 44.3 421.8 18.6 352zM256 496c-30.6 0-66.7-56.5-82.3-144h164.7C322.7 439.5 286.6 496 256 496zm120.7 7.6c25.5-34.2 45.3-87.7 55.3-151.6h116.7c-25.7 69.8-93.8 131-172 151.6z"/></symbol>
+  <symbol id="i-xmark" viewBox="0 0 384 512"><path d="M342.6 150.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L192 210.7 86.6 105.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L146.7 256 41.4 361.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192 301.3l105.4 105.3c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L237.3 256l105.3-105.4z"/></symbol>
+</svg>
 <div class="app">
 
   <div class="toolbar">
-    <button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">&#9776;</button>
+    <button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar"><svg class="icon"><use href="#i-bars"/></svg></button>
     <span class="brand" onclick="toggleSidebar()">PullRead</span>
 
     <div class="toolbar-spacer"></div>
 
     <div class="settings-dropdown">
-      <button class="settings-dropdown-btn" onclick="toggleSettingsDropdown()" title="Reader settings">&#9881;</button>
+      <button class="settings-dropdown-btn" onclick="toggleSettingsDropdown()" title="Reader settings"><svg class="icon"><use href="#i-gear"/></svg></button>
     </div>
   </div>
 
@@ -1076,15 +1092,15 @@ function renderArticle(text, filename) {
   // Action buttons row
   html += '<div class="article-actions">';
   const isFav = articleNotes.isFavorite;
-  html += '<button onclick="toggleFavoriteFromHeader(this)" class="' + (isFav ? 'active-fav' : '') + '" title="Favorite">' + (isFav ? '&#9829;' : '&#9825;') + ' Favorite</button>';
-  html += '<button onclick="toggleNotesFromHeader()" title="Notes">&#9998; Notes</button>';
-  html += '<button onclick="summarizeArticle()" id="summarize-btn" title="Summarize">&#10024; Summarize</button>';
+  html += '<button onclick="toggleFavoriteFromHeader(this)" class="' + (isFav ? 'active-fav' : '') + '" title="Favorite"><svg class="icon icon-sm"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg> Favorite</button>';
+  html += '<button onclick="toggleNotesFromHeader()" title="Notes"><svg class="icon icon-sm"><use href="#i-pen"/></svg> Notes</button>';
+  html += '<button onclick="summarizeArticle()" id="summarize-btn" title="Summarize"><svg class="icon icon-sm"><use href="#i-wand"/></svg> Summarize</button>';
   html += '</div>';
   html += '</div>';
 
   // Show existing summary if present in frontmatter
   if (meta && meta.summary) {
-    html += '<div class="article-summary"><div class="summary-label"><span>Summary</span><span class="summary-actions"><button onclick="hideSummary()" title="Hide summary">&times;</button></span></div>' + escapeHtml(meta.summary) + '</div>';
+    html += '<div class="article-summary"><div class="summary-label"><span>Summary</span><span class="summary-actions"><button onclick="hideSummary()" title="Hide summary"><svg class="icon icon-sm"><use href="#i-xmark"/></svg></button></span></div>' + escapeHtml(meta.summary) + '</div>';
   }
 
   // Strip the leading H1 from markdown body if it matches the title (avoid duplication)
@@ -1118,7 +1134,7 @@ function renderFileList() {
     let indicators = '';
     if (hasHl || hasNote || hasSummary || isFavorite) {
       indicators = '<div class="file-item-indicators">'
-        + (isFavorite ? '<span class="dot dot-favorite" title="Favorite">&#9829;</span>' : '')
+        + (isFavorite ? '<span class="dot dot-favorite" title="Favorite"><svg class="icon icon-sm"><use href="#i-heart"/></svg></span>' : '')
         + (hasHl ? '<span class="dot dot-highlight" title="Has highlights"></span>' : '')
         + (hasNote ? '<span class="dot dot-note" title="Has notes"></span>' : '')
         + (hasSummary ? '<span class="dot dot-summary" title="Has summary"></span>' : '')
@@ -1127,8 +1143,8 @@ function renderFileList() {
     return '<div class="file-item' + isActive + '" data-index="' + i + '" onclick="loadFile(' + i + ')">'
       + '<div class="file-item-title">' + escapeHtml(f.title) + '</div>'
       + '<div class="file-item-meta">'
-      + (date ? '<span>' + date + '</span>' : '')
-      + (f.domain ? '<span>' + escapeHtml(f.domain) + '</span>' : '')
+      + (date ? '<span><svg class="icon icon-sm" style="opacity:0.5"><use href="#i-calendar"/></svg> ' + date + '</span>' : '')
+      + (f.domain ? '<span><svg class="icon icon-sm" style="opacity:0.5"><use href="#i-globe"/></svg> ' + escapeHtml(f.domain) + '</span>' : '')
       + '</div>'
       + indicators
       + '</div>';
@@ -1780,7 +1796,7 @@ function renderNotesPanel() {
   panel.innerHTML = `
     <summary>${summaryText}</summary>
     <div class="favorite-row">
-      <button class="favorite-btn${isFav ? ' active' : ''}" onclick="toggleFavorite(this)" title="Mark as favorite">${isFav ? '&#9829;' : '&#9825;'}</button>
+      <button class="favorite-btn${isFav ? ' active' : ''}" onclick="toggleFavorite(this)" title="Mark as favorite"><svg class="icon"><use href="#i-${isFav ? 'heart' : 'heart-o'}"/></svg></button>
       <span style="color:var(--muted);font-size:12px">${isFav ? 'Favorited' : 'Mark favorite'}</span>
     </div>
     <div class="tags-row">
@@ -1854,7 +1870,7 @@ function updateHeaderActions() {
   const favBtn = actions.querySelector('button');
   if (favBtn) {
     favBtn.className = articleNotes.isFavorite ? 'active-fav' : '';
-    favBtn.innerHTML = (articleNotes.isFavorite ? '&#9829;' : '&#9825;') + ' Favorite';
+    favBtn.innerHTML = '<svg class="icon icon-sm"><use href="#i-' + (articleNotes.isFavorite ? 'heart' : 'heart-o') + '"/></svg> Favorite';
   }
 }
 
@@ -1914,7 +1930,7 @@ async function summarizeArticle() {
   if (!btn) return;
 
   btn.disabled = true;
-  btn.innerHTML = '&#10024; Summarizing...';
+  btn.innerHTML = '<svg class="icon icon-sm"><use href="#i-wand"/></svg> Summarizing...';
   btn.title = 'Summarizing with ' + providerLabel(llmProvider) + '...';
 
   try {
@@ -1925,7 +1941,7 @@ async function summarizeArticle() {
     });
     const data = await res.json();
     if (data.error) {
-      btn.innerHTML = '&#10024; Retry';
+      btn.innerHTML = '<svg class="icon icon-sm"><use href="#i-wand"/></svg> Retry';
       btn.disabled = false;
       btn.title = data.error;
       // Show error inline under the header
@@ -1955,7 +1971,7 @@ async function summarizeArticle() {
 
     const summaryDiv = document.createElement('div');
     summaryDiv.className = 'article-summary';
-    summaryDiv.innerHTML = '<div class="summary-label"><span>Summary</span><span class="summary-actions"><button onclick="hideSummary()" title="Hide summary">&times;</button></span></div>'
+    summaryDiv.innerHTML = '<div class="summary-label"><span>Summary</span><span class="summary-actions"><button onclick="hideSummary()" title="Hide summary"><svg class="icon icon-sm"><use href="#i-xmark"/></svg></button></span></div>'
       + escapeHtml(data.summary)
       + '<div style="font-size:10px;color:var(--muted);margin-top:6px">'
       + providerLabel(lastSummaryProvider) + ' · ' + escapeHtml(lastSummaryModel)
@@ -1968,12 +1984,12 @@ async function summarizeArticle() {
       content.prepend(summaryDiv);
     }
 
-    btn.innerHTML = '&#10024; Summarized';
+    btn.innerHTML = '<svg class="icon icon-sm"><use href="#i-wand"/></svg> Summarized';
     btn.title = 'Summarized by ' + providerLabel(lastSummaryProvider) + ' (' + lastSummaryModel + '). Click to re-run.';
     btn.disabled = false;
     btn.onclick = function() { btn.onclick = null; summarizeArticle(); };
   } catch (err) {
-    btn.innerHTML = '&#10024; Retry';
+    btn.innerHTML = '<svg class="icon icon-sm"><use href="#i-wand"/></svg> Retry';
     btn.title = 'Summarization failed. Click to retry.';
     btn.disabled = false;
   }
@@ -1986,7 +2002,7 @@ function hideSummary() {
   // Reset summarize button
   const btn = document.getElementById('summarize-btn');
   if (btn) {
-    btn.innerHTML = '&#10024; Summarize';
+    btn.innerHTML = '<svg class="icon icon-sm"><use href="#i-wand"/></svg> Summarize';
     btn.title = 'Summarize';
     btn.disabled = false;
     btn.onclick = null;

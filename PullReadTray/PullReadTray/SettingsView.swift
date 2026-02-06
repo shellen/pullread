@@ -16,6 +16,7 @@ struct SettingsView: View {
     @State private var feeds: [FeedItem] = []
     @State private var newFeedName: String = ""
     @State private var newFeedURL: String = ""
+    @State private var isFetchingTitle: Bool = false
     @State private var showingError: Bool = false
     @State private var errorMessage: String = ""
     @State private var selectedFeed: FeedItem.ID?
@@ -192,9 +193,28 @@ struct SettingsView: View {
                         .foregroundColor(.primary)
                 }
 
-                Text("Add feed URLs for sites you follow.")
+                Text("Add feed URLs from your favorite sites and bookmark services.")
                     .font(.caption)
                     .foregroundColor(.secondary)
+
+                DisclosureGroup {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ServiceRow(name: "Instapaper", detail: "Settings \u{2192} Export \u{2192} RSS Feed URL")
+                        ServiceRow(name: "Pinboard", detail: "Use your RSS feed: pinboard.in/feeds/u:USERNAME/")
+                        ServiceRow(name: "Pocket", detail: "Not available as RSS \u{2014} export bookmarks.html instead")
+                        ServiceRow(name: "Raindrop", detail: "Collection \u{2192} Share \u{2192} RSS Feed")
+                        ServiceRow(name: "Omnivore", detail: "Settings \u{2192} Feeds \u{2192} RSS URL")
+                        Divider()
+                        Text("You can also import bookmarks.html files exported from Chrome, Safari, Firefox, or any service above via **pullread import**.")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.top, 4)
+                } label: {
+                    Label("Which services work?", systemImage: "questionmark.circle")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
 
                 // Feed list
                 List(selection: $selectedFeed) {
@@ -220,27 +240,41 @@ struct SettingsView: View {
                 .background(Color(NSColor.textBackgroundColor).opacity(0.3))
                 .cornerRadius(8)
 
-                // Add new feed
+                // Add new feed — just paste a URL, title is auto-fetched
                 HStack(spacing: 8) {
-                    TextField("Name", text: $newFeedName)
-                        .textFieldStyle(.plain)
-                        .padding(8)
-                        .frame(width: 100)
-                        .background(Color(NSColor.textBackgroundColor).opacity(0.5))
-                        .cornerRadius(6)
-
-                    TextField("Feed URL", text: $newFeedURL)
+                    TextField("Paste feed URL...", text: $newFeedURL)
                         .textFieldStyle(.plain)
                         .padding(8)
                         .background(Color(NSColor.textBackgroundColor).opacity(0.5))
                         .cornerRadius(6)
+                        .onSubmit { addFeed() }
 
-                    Button(action: addFeed) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title2)
+                    if isFetchingTitle {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                            .frame(width: 28)
+                    } else {
+                        Button(action: addFeed) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.title2)
+                        }
+                        .buttonStyle(.borderless)
+                        .disabled(newFeedURL.isEmpty)
                     }
-                    .buttonStyle(.borderless)
-                    .disabled(newFeedName.isEmpty || newFeedURL.isEmpty)
+                }
+
+                if !newFeedName.isEmpty {
+                    HStack(spacing: 8) {
+                        Text("Name:")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        TextField("Feed name", text: $newFeedName)
+                            .textFieldStyle(.plain)
+                            .padding(4)
+                            .background(Color(NSColor.textBackgroundColor).opacity(0.3))
+                            .cornerRadius(4)
+                            .font(.caption)
+                    }
                 }
 
                 // Remove selected button
@@ -561,16 +595,68 @@ struct SettingsView: View {
     }
 
     private func addFeed() {
-        guard !newFeedName.isEmpty, !newFeedURL.isEmpty else { return }
+        guard !newFeedURL.isEmpty else { return }
 
         var urlString = newFeedURL.trimmingCharacters(in: .whitespacesAndNewlines)
         if !urlString.hasPrefix("http://") && !urlString.hasPrefix("https://") {
             urlString = "https://" + urlString
         }
 
-        feeds.append(FeedItem(name: newFeedName.trimmingCharacters(in: .whitespaces), url: urlString))
-        newFeedName = ""
-        newFeedURL = ""
+        let finalUrl = urlString
+
+        if !newFeedName.isEmpty {
+            // User already provided or edited a name
+            feeds.append(FeedItem(name: newFeedName.trimmingCharacters(in: .whitespaces), url: finalUrl))
+            newFeedName = ""
+            newFeedURL = ""
+        } else {
+            // Auto-fetch the feed title
+            isFetchingTitle = true
+            fetchFeedTitle(from: finalUrl) { title in
+                let name = title ?? domainFromUrl(finalUrl)
+                feeds.append(FeedItem(name: name, url: finalUrl))
+                newFeedName = ""
+                newFeedURL = ""
+                isFetchingTitle = false
+            }
+        }
+    }
+
+    private func domainFromUrl(_ urlString: String) -> String {
+        guard let url = URL(string: urlString),
+              let host = url.host else {
+            return urlString
+        }
+        return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+    }
+
+    private func fetchFeedTitle(from urlString: String, completion: @escaping (String?) -> Void) {
+        guard let url = URL(string: urlString) else {
+            completion(nil)
+            return
+        }
+
+        URLSession.shared.dataTask(with: url) { data, _, _ in
+            guard let data = data, let xml = String(data: data, encoding: .utf8) else {
+                DispatchQueue.main.async { completion(nil) }
+                return
+            }
+
+            // Try <title>...</title> (works for RSS, Atom, and RDF)
+            var title: String?
+            if let startRange = xml.range(of: "<title>"),
+               let endRange = xml.range(of: "</title>", range: startRange.upperBound..<xml.endIndex) {
+                let raw = String(xml[startRange.upperBound..<endRange.lowerBound])
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .replacingOccurrences(of: "<![CDATA[", with: "")
+                    .replacingOccurrences(of: "]]>", with: "")
+                if !raw.isEmpty {
+                    title = raw
+                }
+            }
+
+            DispatchQueue.main.async { completion(title) }
+        }.resume()
     }
 
     private func deleteFeed(at offsets: IndexSet) {
@@ -723,6 +809,23 @@ struct GlassCard<Content: View>: View {
             .background(.ultraThinMaterial)
             .cornerRadius(12)
             .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+    }
+}
+
+struct ServiceRow: View {
+    let name: String
+    let detail: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(name)
+                .font(.caption)
+                .fontWeight(.medium)
+                .frame(width: 80, alignment: .leading)
+            Text(detail)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
     }
 }
 

@@ -1,7 +1,7 @@
 // ABOUTME: Tests for RSS and Atom feed parsing
 // ABOUTME: Verifies extraction of entries from various feed formats
 
-import { parseFeed } from './feed';
+import { parseFeed, parseFeedTitle } from './feed';
 
 const ATOM_FEED = `<?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
@@ -194,6 +194,32 @@ describe('parseFeed - RDF/RSS 1.0 (Pinboard)', () => {
 
     expect(second.title).toBe('Another Pinboard Bookmark');
     expect(second.annotation).toBeUndefined();
+  });
+});
+
+describe('parseFeedTitle', () => {
+  test('extracts title from Atom feed', () => {
+    expect(parseFeedTitle(ATOM_FEED)).toBe('Bookmarks');
+  });
+
+  test('extracts title from RSS feed', () => {
+    expect(parseFeedTitle(RSS_FEED)).toBe('My RSS Feed');
+  });
+
+  test('extracts title from RDF feed', () => {
+    expect(parseFeedTitle(RDF_FEED)).toBe('Pinboard (testuser)');
+  });
+
+  test('extracts title from podcast feed with CDATA', () => {
+    expect(parseFeedTitle(PODCAST_FEED)).toBe('My Podcast');
+  });
+
+  test('returns null for invalid XML', () => {
+    expect(parseFeedTitle('not xml at all')).toBeNull();
+  });
+
+  test('returns null for unknown format', () => {
+    expect(parseFeedTitle('<?xml version="1.0"?><unknown/>')).toBeNull();
   });
 });
 

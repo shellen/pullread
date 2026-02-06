@@ -82,6 +82,37 @@ describe('resolveRelativeUrls', () => {
     expect(result).toBe('![Screenshot 2026-02-02 at 10.49.54\u202FAM](https://blog.example.com/art/afterword/1770047479321-Screenshot_2026-02-02_at_10.49.54___AM.png)');
   });
 
+  test('resolves relative image paths (no leading slash)', () => {
+    const md = '![figure](x1.png)';
+    const result = resolveRelativeUrls(md, 'https://arxiv.org/html/2512.24601v1/');
+    expect(result).toBe('![figure](https://arxiv.org/html/2512.24601v1/x1.png)');
+  });
+
+  test('resolves relative link paths (no leading slash)', () => {
+    const md = '[see appendix](appendix.html)';
+    const result = resolveRelativeUrls(md, 'https://example.com/docs/guide/');
+    expect(result).toBe('[see appendix](https://example.com/docs/guide/appendix.html)');
+  });
+
+  test('resolves relative paths with subdirectories', () => {
+    const md = '![chart](images/chart.png)';
+    const result = resolveRelativeUrls(md, 'https://example.com/post/my-article/');
+    expect(result).toBe('![chart](https://example.com/post/my-article/images/chart.png)');
+  });
+
+  test('does not touch data: URIs or fragments', () => {
+    const md = '![img](data:image/png;base64,abc) and [link](#section)';
+    const result = resolveRelativeUrls(md, baseUrl);
+    expect(result).toBe(md);
+  });
+
+  test('resolves relative URLs with base URL lacking trailing slash', () => {
+    const md = '![fig](x1.png)';
+    // Without trailing slash, x1.png resolves relative to the parent directory
+    const result = resolveRelativeUrls(md, 'https://arxiv.org/html/2512.24601v1');
+    expect(result).toBe('![fig](https://arxiv.org/html/x1.png)');
+  });
+
   test('returns markdown unchanged for invalid base URL', () => {
     const md = '![img](/photo.jpg)';
     const result = resolveRelativeUrls(md, 'not-a-url');

@@ -167,6 +167,42 @@ export function parseFeed(xml: string): FeedEntry[] {
   }
 }
 
+export function parseFeedTitle(xml: string): string | null {
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: '@_',
+    cdataPropName: '__cdata'
+  });
+
+  try {
+    const parsed = parser.parse(xml);
+    const feedType = detectFeedType(parsed);
+
+    let title: any;
+    if (feedType === 'atom') {
+      title = parsed.feed?.title;
+    } else if (feedType === 'rss') {
+      title = parsed.rss?.channel?.title;
+    } else if (feedType === 'rdf') {
+      title = parsed['rdf:RDF']?.channel?.title;
+    }
+
+    if (!title) return null;
+
+    const raw = typeof title === 'object' ? (title.__cdata || title['#text'] || '') : String(title);
+    return raw.replace(/<[^>]+>/g, '').trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchFeedTitle(url: string): Promise<string | null> {
+  const response = await fetch(url);
+  if (!response.ok) return null;
+  const xml = await response.text();
+  return parseFeedTitle(xml);
+}
+
 export async function fetchFeed(url: string): Promise<FeedEntry[]> {
   const response = await fetch(url);
   if (!response.ok) {

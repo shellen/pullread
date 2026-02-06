@@ -254,6 +254,54 @@ export function startViewer(outputPath: string, port = 7777): void {
       }
     }
 
+    // Weekly review
+    if (url.pathname === '/api/review' && req.method === 'POST') {
+      try {
+        const body = JSON.parse(await readBody(req));
+        const days = body.days || 7;
+        const { generateAndSaveReview } = await import('./review');
+        const result = await generateAndSaveReview(outputPath, days);
+        if (!result) {
+          sendJson(res, { error: 'No articles found in the past ' + days + ' days' });
+        } else {
+          sendJson(res, { filename: result.filename, review: result.review });
+        }
+      } catch (err: any) {
+        sendJson(res, { error: err.message || 'Failed to generate review' });
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/review' && req.method === 'GET') {
+      try {
+        const days = parseInt(url.searchParams.get('days') || '7', 10);
+        const { getRecentArticles } = await import('./review');
+        const articles = getRecentArticles(outputPath, days);
+        sendJson(res, { count: articles.length, articles: articles.map(a => ({ title: a.title, domain: a.domain, bookmarked: a.bookmarked })) });
+      } catch {
+        sendJson(res, { count: 0, articles: [] });
+      }
+      return;
+    }
+
+    // Feed title discovery
+    if (url.pathname === '/api/feed-title' && req.method === 'GET') {
+      const feedUrl = url.searchParams.get('url');
+      if (!feedUrl) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'url parameter required' }));
+        return;
+      }
+      try {
+        const { fetchFeedTitle } = await import('./feed');
+        const title = await fetchFeedTitle(feedUrl);
+        sendJson(res, { title: title || null });
+      } catch {
+        sendJson(res, { title: null });
+      }
+      return;
+    }
+
     // Settings API (LLM config)
     if (url.pathname === '/api/settings') {
       if (req.method === 'GET') {

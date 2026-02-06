@@ -73,8 +73,7 @@ export function shouldSkipUrl(url: string): string | null {
 export function resolveRelativeUrls(markdown: string, baseUrl: string): string {
   let origin: string;
   try {
-    const parsed = new URL(baseUrl);
-    origin = parsed.origin;
+    origin = new URL(baseUrl).origin;
   } catch {
     return markdown;
   }
@@ -89,6 +88,31 @@ export function resolveRelativeUrls(markdown: string, baseUrl: string): string {
   markdown = markdown.replace(
     /(?<!!)\[([^\]]*)\]\((\/[^)]+)\)/g,
     (_, text, path) => `[${text}](${origin}${path})`
+  );
+
+  // Resolve relative URLs in images: ![alt](x1.png) -> ![alt](https://domain.com/path/x1.png)
+  // Skips absolute URLs, root-relative, data URIs, fragments, and mailto
+  markdown = markdown.replace(
+    /!\[([^\]]*)\]\((?!\/|https?:|data:|#|mailto:)([^)\s]+)\)/g,
+    (_, alt, relPath) => {
+      try {
+        return `![${alt}](${new URL(relPath, baseUrl).href})`;
+      } catch {
+        return `![${alt}](${relPath})`;
+      }
+    }
+  );
+
+  // Resolve relative URLs in links
+  markdown = markdown.replace(
+    /(?<!!)\[([^\]]*)\]\((?!\/|https?:|data:|#|mailto:)([^)\s]+)\)/g,
+    (_, text, relPath) => {
+      try {
+        return `[${text}](${new URL(relPath, baseUrl).href})`;
+      } catch {
+        return `[${text}](${relPath})`;
+      }
+    }
   );
 
   return markdown;
@@ -373,7 +397,8 @@ export async function fetchAndExtract(
       }
 
       const html = await response.text();
-      return extractArticle(html, cleanUrl);
+      // Use final URL after redirects for better relative URL resolution
+      return extractArticle(html, response.url || cleanUrl);
 
     } catch (err: any) {
       lastError = err;
