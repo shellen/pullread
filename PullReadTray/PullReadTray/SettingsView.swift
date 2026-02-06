@@ -294,17 +294,17 @@ struct SettingsView: View {
                             .font(.headline)
                             .foregroundColor(.secondary)
                     }
-                    Label("AI Summaries (Optional)", systemImage: "sparkles")
+                    Label("Summaries (Optional)", systemImage: "text.quote")
                         .font(.headline)
                         .foregroundColor(.primary)
                 }
 
-                Text("Add your own API key to generate article summaries on demand. Your key is stored locally and never shared.")
+                Text("Add your API key to generate article summaries on demand. Your key is stored locally and never shared.")
                     .font(.caption)
                     .foregroundColor(.secondary)
 
                 HStack(spacing: 8) {
-                    Text("Provider")
+                    Text("Model")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .frame(width: 60, alignment: .trailing)

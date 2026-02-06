@@ -1,5 +1,5 @@
-// ABOUTME: LLM summarization for articles using BYOK (Bring Your Own Key)
-// ABOUTME: Supports Anthropic Claude and OpenAI-compatible APIs
+// ABOUTME: Article summarization using user-provided API keys
+// ABOUTME: Supports Anthropic Claude and OpenAI model providers
 
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';

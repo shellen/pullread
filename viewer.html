@@ -681,7 +681,7 @@
     </div>
 
     <div class="toolbar-group">
-      <button onclick="toggleLLMSettings()" title="AI Settings" style="font-size:15px">&#9881;</button>
+      <button onclick="toggleLLMSettings()" title="Summary Settings" style="font-size:15px">&#9881;</button>
     </div>
   </div>
 
@@ -1405,9 +1405,9 @@ function toggleLLMSettings() {
   panel.onclick = function(e) { e.stopPropagation(); };
 
   panel.innerHTML = `
-    <h3>&#9881; AI Summary Settings</h3>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Bring your own API key to generate article summaries on demand. Keys are stored locally.</p>
-    <label>Provider</label>
+    <h3>&#9881; Summary Settings</h3>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Add your API key to generate article summaries on demand. Keys are stored locally.</p>
+    <label>Model Provider</label>
     <select id="llm-provider">
       <option value="anthropic">Anthropic (Claude)</option>
       <option value="openai">OpenAI (GPT)</option>
