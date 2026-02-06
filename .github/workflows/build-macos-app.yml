@@ -81,10 +81,71 @@ jobs:
           # Free space: remove node_modules and bun cache immediately
           rm -rf node_modules
 
+      - name: Check for signing secrets
+        id: check-cert
+        env:
+          CERT: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          NOTARIZE_ID: ${{ secrets.APPLE_ID }}
+        run: |
+          if [ -n "$CERT" ]; then
+            echo "has_cert=true" >> $GITHUB_OUTPUT
+            echo "HAS_SIGNING_CERT=true" >> $GITHUB_ENV
+          fi
+          if [ -n "$NOTARIZE_ID" ]; then
+            echo "has_notarize=true" >> $GITHUB_OUTPUT
+            echo "HAS_NOTARIZE_CREDS=true" >> $GITHUB_ENV
+          fi
+
+      - name: Install Apple certificate
+        if: steps.check-cert.outputs.has_cert == 'true'
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          # Create temporary keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Import certificate
+          echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security import $RUNNER_TEMP/certificate.p12 \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+
+          # Allow codesign to access keychain
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+
+          # Clean up certificate file
+          rm $RUNNER_TEMP/certificate.p12
+
       - name: Install xcpretty
         run: gem install xcpretty
 
-      - name: Build release app
+      - name: Build release app (signed)
+        if: env.HAS_SIGNING_CERT == 'true'
+        working-directory: PullReadTray
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing \
+            -project PullReadTray.xcodeproj \
+            -scheme PullReadTray \
+            -configuration Release \
+            -derivedDataPath build \
+            -destination 'platform=macOS,arch=arm64' \
+            CODE_SIGN_IDENTITY="Developer ID Application" \
+            ENABLE_TESTABILITY=YES \
+            2>&1 | xcpretty --color
+
+      - name: Build release app (unsigned)
+        if: env.HAS_SIGNING_CERT != 'true'
         working-directory: PullReadTray
         run: |
           # Single build: Release with testing enabled (satisfies both test and release needs)
@@ -152,6 +213,21 @@ jobs:
           rm -rf build
           df -h .
 
+      - name: Sign app bundle
+        if: env.HAS_SIGNING_CERT == 'true'
+        working-directory: PullReadTray
+        run: |
+          APP_PATH="artifacts/Pull Read.app"
+
+          # Sign the CLI binary
+          codesign --force --sign "Developer ID Application" "$APP_PATH/Contents/Resources/pullread"
+
+          # Deep sign the entire app bundle
+          codesign --force --deep --sign "Developer ID Application" "$APP_PATH"
+
+          # Verify
+          codesign -dv --verbose=2 "$APP_PATH"
+
       - name: Create DMG
         working-directory: PullReadTray
         run: |
@@ -171,6 +247,50 @@ jobs:
           # Clean up
           rm -rf dmg-contents
 
+      - name: Sign DMG
+        if: env.HAS_SIGNING_CERT == 'true'
+        working-directory: PullReadTray
+        run: |
+          codesign --sign "Developer ID Application" --timestamp artifacts/PullRead.dmg
+
+      - name: Notarize app
+        if: env.HAS_SIGNING_CERT == 'true' && env.HAS_NOTARIZE_CREDS == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+        run: |
+          APP_PATH="PullReadTray/artifacts/Pull Read.app"
+
+          # Create ZIP for notarization
+          ditto -c -k --keepParent "$APP_PATH" PullRead-app.zip
+
+          # Submit for notarization
+          xcrun notarytool submit PullRead-app.zip \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_ID_PASSWORD" \
+            --wait
+
+          # Staple the ticket
+          xcrun stapler staple "$APP_PATH"
+          rm PullRead-app.zip
+
+      - name: Notarize DMG
+        if: env.HAS_SIGNING_CERT == 'true' && env.HAS_NOTARIZE_CREDS == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+        run: |
+          xcrun notarytool submit PullReadTray/artifacts/PullRead.dmg \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_ID_PASSWORD" \
+            --wait
+
+          xcrun stapler staple PullReadTray/artifacts/PullRead.dmg
+
       - name: Upload app artifact
         uses: actions/upload-artifact@v4
         with:
@@ -184,6 +304,11 @@ jobs:
           name: PullRead-dmg
           path: PullReadTray/artifacts/PullRead.dmg
           retention-days: 30
+
+      - name: Clean up keychain
+        if: always() && env.HAS_SIGNING_CERT == 'true'
+        run: |
+          security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
 
   release:
     needs: build-and-test
