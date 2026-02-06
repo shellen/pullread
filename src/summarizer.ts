@@ -222,6 +222,59 @@ function runApplePrompt(prompt: string): string {
 }
 
 const CHUNK_WORD_LIMIT = 2000;
+const CHUNK_OVERLAP = 200; // words of overlap to preserve cross-boundary context
+
+// Split text into chunks on paragraph boundaries with overlap
+function splitIntoParagraphChunks(text: string, maxWords: number, overlapWords: number): string[] {
+  const paragraphs = text.split(/\n\s*\n/);
+  const chunks: string[] = [];
+  let current: string[] = [];
+  let currentWordCount = 0;
+
+  for (const para of paragraphs) {
+    const paraWords = para.split(/\s+/).length;
+    if (currentWordCount + paraWords > maxWords && current.length > 0) {
+      chunks.push(current.join('\n\n'));
+      // Keep trailing paragraphs as overlap for next chunk
+      const overlapParas: string[] = [];
+      let overlapCount = 0;
+      for (let i = current.length - 1; i >= 0 && overlapCount < overlapWords; i--) {
+        overlapParas.unshift(current[i]);
+        overlapCount += current[i].split(/\s+/).length;
+      }
+      current = overlapParas;
+      currentWordCount = overlapCount;
+    }
+    current.push(para);
+    currentWordCount += paraWords;
+  }
+  if (current.length > 0) {
+    chunks.push(current.join('\n\n'));
+  }
+  return chunks;
+}
+
+// Hierarchical summarization: summarize pairs of summaries in a tree
+function hierarchicalReduce(summaries: string[]): string {
+  if (summaries.length <= 3) {
+    // Few enough to combine in one pass
+    const combinePrompt = `Below are summaries of different sections of the same article. Combine them into a single 2-3 sentence summary that captures the main argument or finding. Do not use phrases like "This article discusses" — just state the main points directly.\n\n${summaries.map((s, i) => `Section ${i + 1}: ${s}`).join('\n\n')}`;
+    return runApplePrompt(combinePrompt);
+  }
+
+  // Pair up summaries and reduce
+  const reduced: string[] = [];
+  for (let i = 0; i < summaries.length; i += 2) {
+    if (i + 1 < summaries.length) {
+      const pairPrompt = `Combine these two section summaries into one concise summary (2-3 sentences). State the key points directly.\n\nSection A: ${summaries[i]}\n\nSection B: ${summaries[i + 1]}`;
+      reduced.push(runApplePrompt(pairPrompt));
+    } else {
+      reduced.push(summaries[i]); // Odd one out passes through
+    }
+  }
+
+  return hierarchicalReduce(reduced);
+}
 
 async function callApple(articleText: string): Promise<SummarizeResult> {
   const words = articleText.split(/\s+/);
@@ -232,21 +285,18 @@ async function callApple(articleText: string): Promise<SummarizeResult> {
     return { summary: runApplePrompt(prompt), model: 'apple-on-device' };
   }
 
-  // Long article — map-reduce: summarize chunks, then combine
-  const chunks: string[] = [];
-  for (let i = 0; i < words.length; i += CHUNK_WORD_LIMIT) {
-    chunks.push(words.slice(i, i + CHUNK_WORD_LIMIT).join(' '));
-  }
+  // Long article — paragraph-aware chunking with overlap, then hierarchical reduce
+  const chunks = splitIntoParagraphChunks(articleText, CHUNK_WORD_LIMIT, CHUNK_OVERLAP);
 
+  // Map: summarize each chunk
   const chunkSummaries: string[] = [];
   for (let i = 0; i < chunks.length; i++) {
     const chunkPrompt = `Summarize this section (part ${i + 1} of ${chunks.length}) in 1-2 sentences. Focus on the key points.\n\n---\n\n${chunks[i]}`;
     chunkSummaries.push(runApplePrompt(chunkPrompt));
   }
 
-  // Final combine pass
-  const combinePrompt = `Below are summaries of different sections of the same article. Combine them into a single 2-3 sentence summary that captures the main argument or finding. Do not use phrases like "This article discusses" — just state the main points directly.\n\n${chunkSummaries.map((s, i) => `Section ${i + 1}: ${s}`).join('\n\n')}`;
-  const finalSummary = runApplePrompt(combinePrompt);
+  // Reduce: hierarchical pairwise combination instead of flat combine
+  const finalSummary = hierarchicalReduce(chunkSummaries);
 
   return { summary: finalSummary, model: 'apple-on-device' };
 }
