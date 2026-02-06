@@ -155,8 +155,36 @@ export function getCookiesForDomain(domain: string): string | null {
       return null;
     }
 
-    // Format as Cookie header value
-    return cookies.map(c => `${c.name}=${c.value}`).join('; ');
+    // Filter out known tracking/analytics cookies to reduce header size
+    const TRACKING_PREFIXES = [
+      '_ga', '_gid', '_gat', '_gcl', // Google Analytics
+      '_fbp', '_fbc',                 // Facebook
+      '__utm',                        // Legacy GA UTM
+      '_hp2_', 'ajs_',               // Analytics trackers
+      'OptanonConsent', 'OptanonAlertBoxClosed', // Cookie consent
+      'euconsent', '_evidon',         // GDPR consent
+      'AMCV_', 'AMCVS_', 's_cc', 's_sq', 's_vi', // Adobe Analytics
+    ];
+
+    const filtered = cookies.filter(c => {
+      return !TRACKING_PREFIXES.some(prefix => c.name.startsWith(prefix));
+    });
+
+    if (filtered.length === 0) {
+      return null;
+    }
+
+    // Build cookie string, but cap at ~6KB to avoid 494 (header too large) errors
+    const MAX_COOKIE_BYTES = 6 * 1024;
+    let result = '';
+    for (const c of filtered) {
+      const pair = `${c.name}=${c.value}`;
+      if (result.length + pair.length + 2 > MAX_COOKIE_BYTES) break;
+      if (result) result += '; ';
+      result += pair;
+    }
+
+    return result || null;
 
   } catch (err) {
     console.error(`  Cookie error: ${err instanceof Error ? err.message : err}`);

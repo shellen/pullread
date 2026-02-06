@@ -163,6 +163,21 @@ jobs:
           codesign -dv --verbose=2 PullRead.dmg
           spctl -a -v PullRead.dmg
 
+      - name: Sign DMG for Sparkle
+        if: env.SPARKLE_PRIVATE_KEY != ''
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          # Download Sparkle tools
+          curl -L -o Sparkle.tar.xz "https://github.com/sparkle-project/Sparkle/releases/latest/download/Sparkle-2.7.5.tar.xz"
+          mkdir -p sparkle-tools
+          tar -xf Sparkle.tar.xz -C sparkle-tools
+
+          # Sign the DMG with Sparkle's EdDSA signature
+          SIGNATURE=$(echo "$SPARKLE_PRIVATE_KEY" | sparkle-tools/bin/sign_update PullRead.dmg)
+          echo "SPARKLE_SIGNATURE=$SIGNATURE" >> $GITHUB_ENV
+          echo "Sparkle signature generated"
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -172,6 +187,55 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Sparkle appcast
+        if: env.SPARKLE_PRIVATE_KEY != ''
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          DMG_SIZE=$(stat -f%z PullRead.dmg)
+          DMG_URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}/PullRead.dmg"
+
+          # Generate appcast.xml
+          cat > appcast.xml << APPCAST_EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+            <channel>
+              <title>Pull Read</title>
+              <link>https://shellen.github.io/pullread/appcast.xml</link>
+              <description>Pull Read updates</description>
+              <language>en</language>
+              <item>
+                <title>Version ${VERSION}</title>
+                <sparkle:version>${VERSION}</sparkle:version>
+                <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
+                <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+                <pubDate>$(date -R)</pubDate>
+                <enclosure url="${DMG_URL}"
+                           length="${DMG_SIZE}"
+                           type="application/octet-stream"
+                           ${SPARKLE_SIGNATURE} />
+              </item>
+            </channel>
+          </rss>
+          APPCAST_EOF
+
+          # Deploy to GitHub Pages
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Create/update gh-pages branch
+          git fetch origin gh-pages || true
+          git checkout gh-pages 2>/dev/null || git checkout --orphan gh-pages
+
+          # Keep only appcast.xml on this branch
+          git rm -rf . 2>/dev/null || true
+          mv appcast.xml .
+          git add appcast.xml
+          git commit -m "Update appcast for v${VERSION}"
+          git push origin gh-pages
 
       - name: Clean up keychain
         if: always()

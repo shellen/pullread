@@ -1,0 +1,57 @@
+# ABOUTME: One-time workflow to generate Sparkle Ed25519 signing keys
+# ABOUTME: Run once, then add the public key to Info.plist and private key as a secret
+
+name: Sparkle Key Generation (one-time)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  generate-keys:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Sparkle
+        run: |
+          curl -L -o Sparkle.tar.xz "https://github.com/sparkle-project/Sparkle/releases/latest/download/Sparkle-2.7.5.tar.xz"
+          mkdir -p sparkle-tools
+          tar -xf Sparkle.tar.xz -C sparkle-tools
+
+      - name: Generate Ed25519 keys
+        run: |
+          # Generate new Ed25519 keypair
+          OUTPUT=$(sparkle-tools/bin/generate_keys 2>&1)
+          echo "$OUTPUT"
+
+          echo ""
+          echo "============================================"
+          echo "  SETUP INSTRUCTIONS"
+          echo "============================================"
+          echo ""
+          echo "1. Copy the PRIVATE key from the output above"
+          echo "   Go to: Settings > Secrets and variables > Actions"
+          echo "   Create secret: SPARKLE_PRIVATE_KEY"
+          echo "   Paste the private key as the value"
+          echo ""
+          echo "2. Copy the PUBLIC key from the output above"
+          echo "   Replace YOUR_ED25519_PUBLIC_KEY_HERE in:"
+          echo "   PullReadTray/PullReadTray/Info.plist"
+          echo "   Uncomment the SUPublicEDKey lines"
+          echo ""
+          echo "3. Add Sparkle 2.x SPM dependency to PullReadTray.xcodeproj"
+          echo "   URL: https://github.com/sparkle-project/Sparkle"
+          echo "   Version: Up to Next Major (2.0.0)"
+          echo ""
+          echo "4. Uncomment Sparkle code in AppDelegate.swift:"
+          echo "   - import Sparkle"
+          echo "   - updaterController property"
+          echo "   - checkForUpdates menu item"
+          echo "   - checkForUpdates() method body"
+          echo ""
+          echo "5. Enable GitHub Pages for this repo:"
+          echo "   Settings > Pages > Source: Deploy from a branch"
+          echo "   Branch: gh-pages / root"
+          echo "============================================"

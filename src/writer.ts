@@ -14,6 +14,8 @@ export interface ArticleData {
   feed?: string;
   annotation?: string;
   enclosure?: Enclosure;
+  author?: string;
+  excerpt?: string;
 }
 
 export function generateFilename(title: string, bookmarkedAt: string): string {
@@ -45,6 +47,14 @@ domain: ${data.domain}`;
 
   if (data.feed) {
     frontmatter += `\nfeed: ${data.feed}`;
+  }
+
+  if (data.author) {
+    frontmatter += `\nauthor: "${escapeQuotes(data.author)}"`;
+  }
+
+  if (data.excerpt) {
+    frontmatter += `\nexcerpt: "${escapeQuotes(data.excerpt)}"`;
   }
 
   if (data.annotation) {

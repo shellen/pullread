@@ -2,7 +2,7 @@
 // ABOUTME: Persists sync state to avoid re-processing articles
 
 import { readFileSync, writeFileSync, existsSync } from 'fs';
-import { dirname } from 'path';
+import { dirname, join } from 'path';
 import { mkdirSync } from 'fs';
 
 export interface ProcessedEntry {
@@ -29,10 +29,12 @@ interface StorageData {
 export class Storage {
   private data: StorageData;
   private dbPath: string;
+  private outputPath: string | null;
 
-  constructor(dbPath: string) {
+  constructor(dbPath: string, outputPath?: string) {
     // Use .json extension instead of .db
     this.dbPath = dbPath.replace(/\.db$/, '.json');
+    this.outputPath = outputPath || null;
     this.data = this.load();
   }
 
@@ -57,7 +59,21 @@ export class Storage {
   }
 
   isProcessed(url: string): boolean {
-    return url in this.data.entries;
+    const entry = this.data.entries[url];
+    if (!entry) return false;
+
+    // If the entry was successful and we know the output path, verify the file still exists
+    if (entry.status === 'success' && entry.outputFile && this.outputPath) {
+      const filePath = join(this.outputPath, entry.outputFile);
+      if (!existsSync(filePath)) {
+        // Output file was deleted — clear the entry so it gets re-synced
+        delete this.data.entries[url];
+        this.save();
+        return false;
+      }
+    }
+
+    return true;
   }
 
   markProcessed(entry: ProcessedEntry): void {

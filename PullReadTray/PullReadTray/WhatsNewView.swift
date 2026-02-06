@@ -87,6 +87,32 @@ struct WhatsNewView: View {
 
     private var releaseNotes: [String: [Highlight]] {
         [
+            "1.1": [
+                Highlight(
+                    icon: "highlighter",
+                    color: .yellow,
+                    title: "Highlights & Notes",
+                    description: "Select text to highlight passages and add notes to articles. Your annotations are stored locally and persist across sessions."
+                ),
+                Highlight(
+                    icon: "arrow.triangle.2.circlepath",
+                    color: .green,
+                    title: "Resync Recovery",
+                    description: "Deleted output files are now detected automatically. Re-run sync to recover missing articles without manual database cleanup."
+                ),
+                Highlight(
+                    icon: "sparkles",
+                    color: .purple,
+                    title: "Auto-Update Ready",
+                    description: "Sparkle framework integration is configured. Automatic update checks will notify you when new versions are available."
+                ),
+                Highlight(
+                    icon: "person.crop.circle",
+                    color: .blue,
+                    title: "By A Little Drive",
+                    description: "PullRead is now proudly part of the A Little Drive family at alittledrive.com."
+                )
+            ],
             "1.0": [
                 Highlight(
                     icon: "doc.text.fill",
@@ -129,5 +155,5 @@ struct WhatsNewView: View {
 }
 
 #Preview {
-    WhatsNewView(version: "1.0")
+    WhatsNewView(version: "1.1")
 }

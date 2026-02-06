@@ -19,12 +19,13 @@ export interface FeedEntry {
   enclosure?: Enclosure;
 }
 
-type FeedType = 'atom' | 'rss';
+type FeedType = 'atom' | 'rss' | 'rdf';
 
 function detectFeedType(parsed: any): FeedType {
   if (parsed.feed) return 'atom';
   if (parsed.rss) return 'rss';
-  throw new Error('Unknown feed format: expected RSS or Atom');
+  if (parsed['rdf:RDF']) return 'rdf';
+  throw new Error('Unknown feed format: expected RSS, Atom, or RDF');
 }
 
 function parseAtomFeed(feed: any): FeedEntry[] {
@@ -92,6 +93,34 @@ function parseRssFeed(rss: any): FeedEntry[] {
   });
 }
 
+function parseRdfFeed(rdf: any): FeedEntry[] {
+  // RDF/RSS 1.0: items are siblings to channel, not children
+  const items = rdf.item ? (Array.isArray(rdf.item) ? rdf.item : [rdf.item]) : [];
+
+  return items.map((item: any) => {
+    const url = item.link || item['@_rdf:about'] || '';
+    let domain = '';
+    try { domain = new URL(url).hostname.replace(/^www\./, ''); } catch {}
+
+    const description = item.description
+      ? extractTextFromHtml(extractTitle(item.description))
+      : undefined;
+
+    // Dublin Core date (dc:date) is ISO 8601
+    const dateStr = item['dc:date'] || item.pubDate || '';
+    let updatedAt = dateStr;
+    try { updatedAt = new Date(dateStr).toISOString(); } catch {}
+
+    return {
+      title: extractTitle(item.title),
+      url,
+      updatedAt,
+      domain,
+      annotation: description || undefined
+    };
+  });
+}
+
 function extractTitle(title: any): string {
   if (typeof title === 'string') return title;
   if (title?.['#text']) return title['#text'];
@@ -131,6 +160,8 @@ export function parseFeed(xml: string): FeedEntry[] {
 
   if (feedType === 'atom') {
     return parseAtomFeed(parsed.feed);
+  } else if (feedType === 'rdf') {
+    return parseRdfFeed(parsed['rdf:RDF']);
   } else {
     return parseRssFeed(parsed.rss);
   }

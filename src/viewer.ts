@@ -2,10 +2,12 @@
 // ABOUTME: Serves viewer UI and provides API for listing/reading articles
 
 import { createServer, IncomingMessage, ServerResponse } from 'http';
-import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
-import { join, extname } from 'path';
+import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, mkdirSync } from 'fs';
+import { join, extname, dirname } from 'path';
 import { exec } from 'child_process';
+import { homedir } from 'os';
 import { VIEWER_HTML } from './viewer-html';
+import { summarizeText, loadLLMConfig, saveLLMConfig, getDefaultModel, KNOWN_MODELS, LLMConfig } from './summarizer';
 
 interface FileMeta {
   filename: string;
@@ -14,7 +16,9 @@ interface FileMeta {
   domain: string;
   bookmarked: string;
   feed: string;
+  author: string;
   mtime: string;
+  hasSummary: boolean;
 }
 
 function parseFrontmatter(content: string): Record<string, string> {
@@ -59,7 +63,9 @@ function listFiles(outputPath: string): FileMeta[] {
         domain: meta.domain || '',
         bookmarked: meta.bookmarked || '',
         feed: meta.feed || '',
+        author: meta.author || '',
         mtime: stat.mtime.toISOString(),
+        hasSummary: !!meta.summary,
       });
     } catch {
       // Skip unreadable files
@@ -76,6 +82,37 @@ function listFiles(outputPath: string): FileMeta[] {
   return files;
 }
 
+// Annotations storage path
+const ANNOTATIONS_DIR = join(homedir(), '.config', 'pullread');
+const HIGHLIGHTS_PATH = join(ANNOTATIONS_DIR, 'highlights.json');
+const NOTES_PATH = join(ANNOTATIONS_DIR, 'notes.json');
+
+function loadJsonFile(path: string): Record<string, unknown> {
+  if (!existsSync(path)) return {};
+  try {
+    return JSON.parse(readFileSync(path, 'utf-8'));
+  } catch {
+    return {};
+  }
+}
+
+function saveJsonFile(path: string, data: unknown): void {
+  const dir = dirname(path);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+  writeFileSync(path, JSON.stringify(data, null, 2));
+}
+
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
+    req.on('error', reject);
+  });
+}
+
 function sendJson(res: ServerResponse, data: unknown) {
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(data));
@@ -86,12 +123,38 @@ function send404(res: ServerResponse) {
   res.end('Not found');
 }
 
+function writeSummaryToFile(filePath: string, summary: string): void {
+  if (!existsSync(filePath)) return;
+  const content = readFileSync(filePath, 'utf-8');
+  const match = content.match(/^(---\n)([\s\S]*?)(\n---)([\s\S]*)$/);
+  if (!match) return;
+
+  let frontmatter = match[2];
+  // Remove existing summary if present
+  frontmatter = frontmatter.replace(/\nsummary: ".*?"$/m, '');
+  frontmatter = frontmatter.replace(/\nsummary: .*$/m, '');
+
+  // Add summary to frontmatter
+  const escaped = summary.replace(/"/g, '\\"').replace(/\n/g, ' ');
+  frontmatter += `\nsummary: "${escaped}"`;
+
+  writeFileSync(filePath, `${match[1]}${frontmatter}${match[3]}${match[4]}`);
+}
+
 export function startViewer(outputPath: string, port = 7777): void {
-  const server = createServer((req: IncomingMessage, res: ServerResponse) => {
+  const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url || '/', `http://localhost:${port}`);
 
     // CORS for local dev
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
 
     if (url.pathname === '/' || url.pathname === '/index.html') {
       res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -117,6 +180,161 @@ export function startViewer(outputPath: string, port = 7777): void {
       }
       res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end(readFileSync(filePath, 'utf-8'));
+      return;
+    }
+
+    // Highlights API
+    if (url.pathname === '/api/highlights') {
+      if (req.method === 'GET') {
+        const name = url.searchParams.get('name');
+        const allHighlights = loadJsonFile(HIGHLIGHTS_PATH) as Record<string, unknown[]>;
+        if (name) {
+          sendJson(res, allHighlights[name] || []);
+        } else {
+          sendJson(res, allHighlights);
+        }
+        return;
+      }
+      if (req.method === 'POST') {
+        try {
+          const body = JSON.parse(await readBody(req));
+          const { name, highlights } = body;
+          if (!name) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'name is required' }));
+            return;
+          }
+          const allHighlights = loadJsonFile(HIGHLIGHTS_PATH) as Record<string, unknown[]>;
+          allHighlights[name] = highlights || [];
+          saveJsonFile(HIGHLIGHTS_PATH, allHighlights);
+          sendJson(res, { ok: true });
+        } catch (err) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid request body' }));
+        }
+        return;
+      }
+    }
+
+    // Notes API
+    if (url.pathname === '/api/notes') {
+      if (req.method === 'GET') {
+        const name = url.searchParams.get('name');
+        const allNotes = loadJsonFile(NOTES_PATH) as Record<string, unknown>;
+        if (name) {
+          sendJson(res, allNotes[name] || { articleNote: '', annotations: [], tags: [], isFavorite: false });
+        } else {
+          sendJson(res, allNotes);
+        }
+        return;
+      }
+      if (req.method === 'POST') {
+        try {
+          const body = JSON.parse(await readBody(req));
+          const { name, articleNote, annotations, tags, isFavorite } = body;
+          if (!name) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'name is required' }));
+            return;
+          }
+          const allNotes = loadJsonFile(NOTES_PATH) as Record<string, unknown>;
+          allNotes[name] = {
+            articleNote: articleNote || '',
+            annotations: annotations || [],
+            tags: tags || [],
+            isFavorite: !!isFavorite
+          };
+          saveJsonFile(NOTES_PATH, allNotes);
+          sendJson(res, { ok: true });
+        } catch (err) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid request body' }));
+        }
+        return;
+      }
+    }
+
+    // Settings API (LLM config)
+    if (url.pathname === '/api/settings') {
+      if (req.method === 'GET') {
+        const config = loadLLMConfig();
+        sendJson(res, {
+          llm: config ? {
+            provider: config.provider,
+            model: config.model || getDefaultModel(config.provider),
+            hasKey: config.provider === 'apple' || !!config.apiKey
+          } : { provider: 'apple', model: 'on-device', hasKey: true }
+        });
+        return;
+      }
+      if (req.method === 'POST') {
+        try {
+          const body = JSON.parse(await readBody(req));
+          const { provider, apiKey, model } = body;
+          if (!provider || !apiKey) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'provider and apiKey are required' }));
+            return;
+          }
+          saveLLMConfig({ provider, apiKey, model: model || getDefaultModel(provider) });
+          sendJson(res, { ok: true });
+        } catch (err) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid request body' }));
+        }
+        return;
+      }
+    }
+
+    // Summarize API
+    if (url.pathname === '/api/summarize' && req.method === 'POST') {
+      try {
+        const body = JSON.parse(await readBody(req));
+        const { name, text } = body;
+        if (!text && !name) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'text or name is required' }));
+          return;
+        }
+
+        const config = loadLLMConfig();
+        const provider = config?.provider || 'apple';
+
+        let articleText = text;
+        if (!articleText && name) {
+          const filePath = join(outputPath, name);
+          if (!existsSync(filePath)) {
+            send404(res);
+            return;
+          }
+          const content = readFileSync(filePath, 'utf-8');
+          // Strip frontmatter
+          const match = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
+          articleText = match ? match[1] : content;
+        }
+
+        const result = await summarizeText(articleText);
+
+        // If summarized by filename, write the summary into the markdown frontmatter
+        if (name) {
+          writeSummaryToFile(join(outputPath, name), result.summary);
+        }
+
+        sendJson(res, { summary: result.summary, model: result.model, provider });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Summarization failed';
+        // Provide user-friendly error messages
+        let userMsg = msg;
+        if (msg.includes('Apple Intelligence requires')) {
+          userMsg = 'Apple Intelligence requires macOS 26. Configure a cloud provider in Settings.';
+        } else if (msg.includes('context window') || msg.includes('too long') || msg.includes('max_tokens') || msg.includes('exceededContextWindowSize')) {
+          userMsg = 'Article too long for this model. Try a cloud provider with a larger context window.';
+        } else if (msg.includes('No API key')) {
+          userMsg = 'No model configured. Open Settings to add a provider.';
+        }
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: userMsg }));
+      }
       return;
     }
 

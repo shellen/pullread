@@ -53,6 +53,7 @@ PullRead fetches entries from your RSS/Atom feeds, extracts article content usin
 - **Built-in article reader** - Two-pane local web UI with full keyboard navigation (j/k, arrow keys, boundary-aware scrolling)
 - **Self-contained macOS app** - Native Swift menu bar app with bundled CLI binary (no Node.js required)
 - **Flexible scheduling** - Run on-demand, via launchd, or with AppleScript
+- **Article summaries** - On-demand summarization with your own API key (Anthropic or OpenAI)
 - **Cloud-sync friendly** - Output folder can be Dropbox, iCloud, Google Drive, etc.
 
 ---
@@ -205,6 +206,12 @@ npm run sync -- --retry-failed
 
 # Combine flags
 npm run sync -- --feed instapaper --retry-failed
+
+# Summarize articles missing summaries (requires LLM API key)
+npm run summarize -- --batch
+
+# Summarize articles over 1000 characters
+npm run summarize -- --batch --min-size 1000
 ```
 
 ### What Happens During Sync
@@ -371,6 +378,8 @@ Pull Read is a self-contained native Swift menu bar application. It bundles the 
 
 - **Self-contained** - Bundled CLI binary, no Node.js required
 - **Article reader** - Built-in two-pane markdown viewer via "View Articles..." menu
+- **Highlights & notes** - Select text to highlight, add inline annotations, and write article-level notes
+- **Resync recovery** - Deleted output files are detected and re-synced automatically
 - **Status indicator** showing idle/syncing state
 - **Icon animation** during sync operations
 - **Native notifications** on sync completion or failure
@@ -379,7 +388,57 @@ Pull Read is a self-contained native Swift menu bar application. It bundles the 
 
 ### Article Reader
 
-The built-in article reader (`pullread view` or **View Articles** in the menu bar app) is a two-pane web UI served on `localhost:7777`. It supports themes (Light, Dark, Sepia), multiple font families, adjustable text sizes, and full keyboard navigation.
+The built-in article reader (`pullread view` or **View Articles** in the menu bar app) is a two-pane web UI served on `localhost:7777`. It supports themes (Light, Dark, Sepia), multiple font families, adjustable text sizes, highlights, notes, and full keyboard navigation.
+
+#### Highlights & Notes
+
+Select any text in an article to see a floating toolbar with highlight color options (yellow, green, blue, pink) and an "Add note" button. Click an existing highlight to change its color, add a note to it, or delete it.
+
+- **Highlights** are saved per-article at `~/.config/pullread/highlights.json` — each highlight can optionally carry a note
+- **Notes** are saved per-article at `~/.config/pullread/notes.json`
+- **Article-level notes** can be written in a collapsible "Notes" panel at the bottom of each article
+- **Inline annotations** attach a note to a specific text passage, shown with a marker icon
+- **Tags** can be added to any article via the Notes panel (press Enter or comma to add)
+- **Favorites** mark articles with a heart icon in the sidebar
+- Sidebar items show indicator dots for favorites (heart), highlights (yellow), notes (blue), and summaries (purple)
+
+#### Summaries
+
+PullRead can generate article summaries using your own API key. Summaries are stored directly in each article's YAML frontmatter.
+
+**Setup:**
+1. Click the gear icon in the viewer toolbar to open Summary Settings
+2. Choose a model provider (Anthropic or OpenAI)
+3. Enter your API key and optionally customize the model
+4. Click Save
+
+**Usage:**
+- Click the "Summarize" button on any article to generate a summary
+- Summaries appear at the top of the article with a purple accent
+- Articles with summaries show a purple dot in the sidebar
+- Use the CLI for batch summarization: `pullread summarize --batch`
+
+**CLI batch mode:**
+```bash
+# Summarize all articles missing summaries (over 500 chars)
+pullread summarize --batch
+
+# Customize minimum article size
+pullread summarize --batch --min-size 1000
+```
+
+**Configuration:** LLM settings are stored at `~/.config/pullread/settings.json`:
+```json
+{
+  "llm": {
+    "provider": "anthropic",
+    "apiKey": "sk-ant-...",
+    "model": "claude-sonnet-4-5-20250929"
+  }
+}
+```
+
+Supported model providers: **Anthropic** (Claude) and **OpenAI** (GPT). Default models are `claude-sonnet-4-5-20250929` and `gpt-4o-mini` respectively.
 
 #### Keyboard Shortcuts
 
@@ -390,7 +449,9 @@ The built-in article reader (`pullread view` or **View Articles** in the menu ba
 | `Up Arrow` / `Down Arrow` | Scroll content (navigates to prev/next article at top/bottom) |
 | `/` | Focus search (opens sidebar if collapsed) |
 | `[` | Toggle sidebar |
-| `Escape` | Clear search |
+| `h` | Highlight selected text (yellow) |
+| `n` | Toggle article notes panel |
+| `Escape` | Clear search / dismiss popover |
 | `Enter` | Reload current article |
 
 Arrow key scrolling is boundary-aware: when you reach the bottom of an article and press Down, or the top and press Up, it automatically advances to the next or previous article.
@@ -474,6 +535,7 @@ pullread/
 │   ├── writer.ts                  # Markdown generation with frontmatter
 │   ├── viewer.ts                  # Local article reader (HTTP server on port 7777)
 │   ├── storage.ts                 # JSON file storage operations
+│   ├── summarizer.ts              # Article summarization (Anthropic/OpenAI)
 │   └── *.test.ts                  # Unit tests
 │
 ├── PullReadTray/                  # macOS menu bar app (Swift)
@@ -493,7 +555,10 @@ pullread/
 
 ~/.config/pullread/                # User config directory (created by app)
 ├── feeds.json                     # User's feed configuration
-└── pullread.json                  # Processed URL tracking database
+├── pullread.json                  # Processed URL tracking database
+├── settings.json                  # Model provider and API key settings
+├── highlights.json                # Article highlights
+└── notes.json                     # Article notes and annotations
 ```
 
 ### Data Flow
@@ -735,7 +800,9 @@ Ideas that would extend PullRead's capabilities:
 
 ### Highlights, Notes & Read State
 
-These features would turn PullRead from a read-only archive into an active reading tool. Here's a design for how each could work within the existing architecture.
+> **Note:** Highlights and Notes are now implemented. See the [Article Reader](#article-reader) section above for usage. Read State tracking remains a future idea.
+
+These features turn PullRead from a read-only archive into an active reading tool. Here's the design for how each works within the existing architecture.
 
 #### Read State
 
@@ -830,7 +897,7 @@ Let users attach freeform notes to specific passages or to an article as a whole
 - **Webhook support** - Trigger sync via webhook for real-time updates
 - **Self-hosted option** - Run as a service with web interface
 - **Sync to Obsidian/Notion** - Direct integration with note-taking apps
-- **AI summarization** - Generate summaries for long articles
+- ~~**AI summarization**~~ - Implemented. See [Summaries](#summaries) above
 - **Recommendations** - Suggest similar articles based on reading history
 - **iOS companion app** - View synced articles with iCloud sync
 - **Alfred/Raycast extension** - Quick actions for macOS power users
