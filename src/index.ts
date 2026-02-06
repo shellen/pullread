@@ -119,6 +119,8 @@ async function syncFeed(
 
       let content: string;
       let title = entry.title;
+      let author: string | undefined;
+      let excerpt: string | undefined;
 
       if (entry.enclosure) {
         content = entry.annotation || 'No description available.';
@@ -134,6 +136,8 @@ async function syncFeed(
 
         content = article.markdown;
         title = article.title || entry.title;
+        author = article.byline;
+        excerpt = article.excerpt;
       }
 
       const filename = writeArticle(outputPath, {
@@ -144,7 +148,9 @@ async function syncFeed(
         content,
         feed: feedName,
         annotation: entry.annotation,
-        enclosure: entry.enclosure
+        enclosure: entry.enclosure,
+        author,
+        excerpt
       });
 
       storage.markProcessed({

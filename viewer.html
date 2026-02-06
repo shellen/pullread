@@ -67,12 +67,12 @@
   .toolbar {
     flex-shrink: 0;
     z-index: 10;
-    background: var(--toolbar-bg);
+    background: var(--sidebar-bg);
     border-bottom: 1px solid var(--border);
     padding: 6px 12px;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
     font-size: 13px;
   }
 
@@ -127,6 +127,78 @@
   }
   .sidebar-toggle:hover {
     color: var(--link) !important;
+  }
+
+  /* Settings dropdown (replaces many toolbar groups) */
+  .settings-dropdown {
+    position: relative;
+  }
+  .settings-dropdown-btn {
+    background: none !important;
+    border: 1px solid transparent !important;
+    font-size: 15px !important;
+    padding: 2px 6px !important;
+    color: var(--muted) !important;
+    cursor: pointer;
+  }
+  .settings-dropdown-btn:hover { color: var(--fg) !important; }
+  .settings-dropdown-panel {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    width: 260px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    padding: 12px;
+    z-index: 55;
+    animation: fadeIn 0.12s ease;
+    font-size: 12px;
+  }
+  .settings-dropdown-panel label {
+    display: block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    margin-bottom: 4px;
+    margin-top: 10px;
+  }
+  .settings-dropdown-panel label:first-child { margin-top: 0; }
+  .settings-dropdown-panel .setting-row {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+  .settings-dropdown-panel button {
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .settings-dropdown-panel button:hover { border-color: var(--muted); }
+  .settings-dropdown-panel button.active {
+    background: var(--fg);
+    color: var(--bg);
+    border-color: var(--fg);
+  }
+  .settings-dropdown-panel select {
+    flex: 1;
+    padding: 4px 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--fg);
+    font-size: 12px;
+  }
+  .settings-dropdown-panel hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 10px 0;
   }
 
   /* Main area */
@@ -222,12 +294,14 @@
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
+    background: var(--bg);
+    position: relative;
   }
 
   .content-wrap {
     max-width: 720px;
     margin: 0 auto;
-    padding: 40px 28px 96px;
+    padding: 32px 28px 96px;
   }
 
   .empty-state {
@@ -302,17 +376,95 @@
   .content-wrap th, .content-wrap td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; }
   .content-wrap th { background: var(--code-bg); }
 
-  .article-meta {
-    color: var(--muted);
-    font-size: 14px;
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 16px;
+  .article-header {
     margin-bottom: 24px;
-    line-height: 1.6;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
-  .article-meta a { color: var(--link); text-decoration: none; }
-  .article-meta strong { color: var(--fg); font-size: 15px; }
+  .article-header h1 {
+    font-size: 1.6em;
+    line-height: 1.25;
+    margin: 0 0 8px;
+    color: var(--fg);
+    font-weight: 700;
+  }
+  .article-byline {
+    font-size: 14px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .article-byline a { color: var(--link); text-decoration: none; }
+  .article-byline a:hover { text-decoration: underline; }
+  .article-byline .author { color: var(--fg); font-weight: 500; }
+  .article-byline .sep { margin: 0 6px; opacity: 0.4; }
+  .article-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+    align-items: center;
+  }
+  .article-actions button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    font-size: 12px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--muted);
+    cursor: pointer;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .article-actions button:hover { color: var(--fg); border-color: var(--muted); }
+  .article-actions button.active-fav { color: #e91e63; border-color: #e91e63; }
+  .article-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Margin notes (Google Docs-style) */
+  .margin-notes {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 240px;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .margin-note {
+    position: absolute;
+    right: 12px;
+    width: 216px;
+    padding: 8px 10px;
+    background: var(--code-bg);
+    border-left: 2px solid var(--link);
+    border-radius: 0 4px 4px 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    pointer-events: all;
+    cursor: pointer;
+    transition: box-shadow 0.15s;
+  }
+  .margin-note:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  .margin-note .mn-text {
+    color: var(--muted);
+    font-size: 11px;
+    margin-bottom: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .margin-note .mn-body {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  @media (max-width: 1100px) {
+    .margin-notes { display: none; }
+  }
 
   /* Keyboard nav hint */
   .nav-hint {
@@ -730,36 +882,8 @@
 
     <div class="toolbar-spacer"></div>
 
-    <div class="toolbar-group">
-      <label>Theme</label>
-      <button onclick="setTheme('light')" data-theme-btn="light" class="active">Light</button>
-      <button onclick="setTheme('dark')" data-theme-btn="dark">Dark</button>
-      <button onclick="setTheme('sepia')" data-theme-btn="sepia">Sepia</button>
-    </div>
-
-    <div class="toolbar-group">
-      <label>Font</label>
-      <select onchange="setFont(this.value)" id="font-select">
-        <option value="serif" selected>Serif</option>
-        <option value="sans">Sans-serif</option>
-        <option value="system">Charter</option>
-        <option value="mono">Monospace</option>
-        <option value="inter">Inter</option>
-        <option value="lora">Lora</option>
-        <option value="literata">Literata</option>
-        <option value="source-serif">Source Serif</option>
-      </select>
-    </div>
-
-    <div class="toolbar-group">
-      <label>Size</label>
-      <button onclick="setSize('small')" data-size-btn="small">A</button>
-      <button onclick="setSize('medium')" data-size-btn="medium" class="active" style="font-size:14px">A</button>
-      <button onclick="setSize('large')" data-size-btn="large" style="font-size:17px">A</button>
-    </div>
-
-    <div class="toolbar-group">
-      <button onclick="toggleLLMSettings()" title="Summary Settings" style="font-size:15px">&#9881;</button>
+    <div class="settings-dropdown">
+      <button class="settings-dropdown-btn" onclick="toggleSettingsDropdown()" title="Reader settings">&#9881;</button>
     </div>
   </div>
 
@@ -779,6 +903,7 @@
         <div class="subhint">or drop a .md file here</div>
       </div>
       <div class="content-wrap" id="content" style="display:none;"></div>
+      <div class="margin-notes" id="margin-notes"></div>
     </div>
   </div>
 
@@ -842,6 +967,65 @@ function toggleSidebar() {
   localStorage.setItem('pr-sidebar', document.getElementById('sidebar').classList.contains('collapsed') ? '0' : '1');
 }
 
+function toggleSettingsDropdown() {
+  const existing = document.querySelector('.settings-dropdown-panel');
+  if (existing) { existing.remove(); return; }
+
+  const currentTheme = document.body.getAttribute('data-theme') || 'light';
+  const currentFont = localStorage.getItem('pr-font') || 'serif';
+  const currentSize = localStorage.getItem('pr-size') || 'medium';
+
+  const panel = document.createElement('div');
+  panel.className = 'settings-dropdown-panel';
+  panel.onclick = function(e) { e.stopPropagation(); };
+  panel.innerHTML = `
+    <label>Theme</label>
+    <div class="setting-row">
+      <button onclick="setTheme('light');updateDropdownState()" ${currentTheme==='light'?'class="active"':''}>Light</button>
+      <button onclick="setTheme('dark');updateDropdownState()" ${currentTheme==='dark'?'class="active"':''}>Dark</button>
+      <button onclick="setTheme('sepia');updateDropdownState()" ${currentTheme==='sepia'?'class="active"':''}>Sepia</button>
+    </div>
+    <label>Font</label>
+    <div class="setting-row">
+      <select onchange="setFont(this.value)" id="font-select">
+        <option value="serif" ${currentFont==='serif'?'selected':''}>Serif</option>
+        <option value="sans" ${currentFont==='sans'?'selected':''}>Sans-serif</option>
+        <option value="system" ${currentFont==='system'?'selected':''}>Charter</option>
+        <option value="mono" ${currentFont==='mono'?'selected':''}>Monospace</option>
+        <option value="inter" ${currentFont==='inter'?'selected':''}>Inter</option>
+        <option value="lora" ${currentFont==='lora'?'selected':''}>Lora</option>
+        <option value="literata" ${currentFont==='literata'?'selected':''}>Literata</option>
+        <option value="source-serif" ${currentFont==='source-serif'?'selected':''}>Source Serif</option>
+      </select>
+    </div>
+    <label>Size</label>
+    <div class="setting-row">
+      <button onclick="setSize('small');updateDropdownState()" ${currentSize==='small'?'class="active"':''}>A</button>
+      <button onclick="setSize('medium');updateDropdownState()" ${currentSize==='medium'?'class="active"':''} style="font-size:14px">A</button>
+      <button onclick="setSize('large');updateDropdownState()" ${currentSize==='large'?'class="active"':''} style="font-size:17px">A</button>
+    </div>
+    <hr>
+    <button onclick="toggleLLMSettings();toggleSettingsDropdown()" style="width:100%;text-align:left;padding:6px 8px">Summary settings...</button>
+  `;
+  document.querySelector('.settings-dropdown').appendChild(panel);
+}
+
+function updateDropdownState() {
+  const panel = document.querySelector('.settings-dropdown-panel');
+  if (!panel) return;
+  // Just close and reopen to refresh active states
+  toggleSettingsDropdown();
+  toggleSettingsDropdown();
+}
+
+// Close settings dropdown when clicking outside
+document.addEventListener('click', function(e) {
+  const panel = document.querySelector('.settings-dropdown-panel');
+  if (panel && !panel.contains(e.target) && !e.target.closest('.settings-dropdown')) {
+    panel.remove();
+  }
+});
+
 // Frontmatter
 function parseFrontmatter(text) {
   const match = text.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
@@ -892,27 +1076,49 @@ function renderArticle(text, filename) {
   content.style.display = 'block';
 
   let html = '';
-  if (meta && (meta.title || meta.url || meta.domain)) {
-    html += '<div class="article-meta">';
-    if (meta.title) html += '<strong>' + escapeHtml(meta.title) + '</strong><br>';
-    if (meta.url) html += '<a href="' + escapeHtml(meta.url) + '" target="_blank">' + escapeHtml(meta.domain || meta.url) + '</a><br>';
-    if (meta.bookmarked) html += escapeHtml(meta.bookmarked.slice(0, 10));
-    if (meta.feed) html += ' &middot; ' + escapeHtml(meta.feed);
-    html += ' <button class="summarize-btn" onclick="summarizeArticle()" id="summarize-btn">Summarize</button>';
-    html += '</div>';
+
+  // Article header: title, author, date, domain, actions
+  html += '<div class="article-header">';
+  if (meta && meta.title) {
+    html += '<h1>' + escapeHtml(meta.title) + '</h1>';
   }
+  html += '<div class="article-byline">';
+  const bylineParts = [];
+  if (meta && meta.author) bylineParts.push('<span class="author">' + escapeHtml(meta.author) + '</span>');
+  if (meta && meta.domain) bylineParts.push('<a href="' + escapeHtml(meta.url || '') + '" target="_blank">' + escapeHtml(meta.domain) + '</a>');
+  if (meta && meta.bookmarked) bylineParts.push(escapeHtml(meta.bookmarked.slice(0, 10)));
+  html += bylineParts.join('<span class="sep">&middot;</span>');
+  html += '</div>';
+
+  // Action buttons row
+  html += '<div class="article-actions">';
+  const isFav = articleNotes.isFavorite;
+  html += '<button onclick="toggleFavoriteFromHeader(this)" class="' + (isFav ? 'active-fav' : '') + '" title="Favorite">' + (isFav ? '&#9829;' : '&#9825;') + ' Favorite</button>';
+  html += '<button onclick="toggleNotesFromHeader()" title="Notes">&#9998; Notes</button>';
+  html += '<button onclick="summarizeArticle()" id="summarize-btn" title="Summarize">&#10024; Summarize</button>';
+  html += '</div>';
+  html += '</div>';
 
   // Show existing summary if present in frontmatter
   if (meta && meta.summary) {
     html += '<div class="article-summary"><div class="summary-label">Summary</div>' + escapeHtml(meta.summary) + '</div>';
   }
 
-  html += marked.parse(cleanMarkdown(body));
+  // Strip the leading H1 from markdown body if it matches the title (avoid duplication)
+  let articleBody = cleanMarkdown(body);
+  if (meta && meta.title) {
+    articleBody = articleBody.replace(new RegExp('^#\\s+' + meta.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\n'), '');
+  }
+
+  html += marked.parse(articleBody);
   content.innerHTML = html;
   document.title = (meta && meta.title) || filename || 'PullRead';
 
   // Scroll to top
   document.getElementById('content-pane').scrollTop = 0;
+
+  // Clear margin notes
+  document.getElementById('margin-notes').innerHTML = '';
 }
 
 // File list
@@ -940,7 +1146,6 @@ function renderFileList() {
       + '<div class="file-item-meta">'
       + (date ? '<span>' + date + '</span>' : '')
       + (f.domain ? '<span>' + escapeHtml(f.domain) + '</span>' : '')
-      + (f.feed ? '<span>' + escapeHtml(f.feed) + '</span>' : '')
       + '</div>'
       + indicators
       + '</div>';
@@ -969,11 +1174,14 @@ async function loadFile(index) {
   removeHlToolbar();
 
   if (serverMode) {
+    // Load annotations first so favorite state is available for header render
+    await preloadAnnotations(file.filename);
     const res = await fetch('/api/file?name=' + encodeURIComponent(file.filename));
     if (res.ok) {
       const text = await res.text();
       renderArticle(text, file.filename);
-      await loadAnnotations(file.filename);
+      applyHighlights();
+      renderNotesPanel();
     }
   }
 }
@@ -995,7 +1203,7 @@ function navigateArticle(direction) {
 
 // ---- Highlights & Notes ----
 
-async function loadAnnotations(filename) {
+async function preloadAnnotations(filename) {
   if (!serverMode) return;
   try {
     const [hlRes, notesRes] = await Promise.all([
@@ -1009,6 +1217,10 @@ async function loadAnnotations(filename) {
     articleHighlights = [];
     articleNotes = { articleNote: '', annotations: [], tags: [], isFavorite: false };
   }
+}
+
+async function loadAnnotations(filename) {
+  await preloadAnnotations(filename);
   applyHighlights();
   renderNotesPanel();
 }
@@ -1134,55 +1346,128 @@ function applyHighlights() {
   for (const ann of (articleNotes.annotations || [])) {
     findAndMarkAnnotation(content, ann);
   }
+
+  // Render margin notes for highlights with notes and inline annotations
+  renderMarginNotes();
+}
+
+function renderMarginNotes() {
+  const marginContainer = document.getElementById('margin-notes');
+  if (!marginContainer) return;
+  marginContainer.innerHTML = '';
+
+  const pane = document.getElementById('content-pane');
+  if (!pane) return;
+  const paneRect = pane.getBoundingClientRect();
+
+  const notes = [];
+
+  // Collect highlight notes
+  for (const hl of articleHighlights) {
+    if (!hl.note) continue;
+    const mark = document.querySelector('mark[data-hl-id="' + hl.id + '"]');
+    if (!mark) continue;
+    const rect = mark.getBoundingClientRect();
+    notes.push({
+      top: rect.top - paneRect.top + pane.scrollTop,
+      anchorText: hl.text.slice(0, 40),
+      body: hl.note,
+      id: hl.id,
+      type: 'highlight'
+    });
+  }
+
+  // Collect inline annotation notes
+  for (const ann of (articleNotes.annotations || [])) {
+    const matchedMarker = document.querySelector('.annotation-marker[data-ann-id="' + ann.id + '"]');
+    if (!matchedMarker) continue;
+    const rect = matchedMarker.getBoundingClientRect();
+    notes.push({
+      top: rect.top - paneRect.top + pane.scrollTop,
+      anchorText: (ann.anchorText || '').slice(0, 40),
+      body: ann.note,
+      id: ann.id,
+      type: 'annotation'
+    });
+  }
+
+  // Sort by position and spread out overlapping notes
+  notes.sort((a, b) => a.top - b.top);
+  let lastBottom = 0;
+  for (const n of notes) {
+    if (n.top < lastBottom + 8) n.top = lastBottom + 8;
+    const div = document.createElement('div');
+    div.className = 'margin-note';
+    div.style.top = n.top + 'px';
+    div.innerHTML = '<div class="mn-text">' + escapeHtml(n.anchorText) + (n.anchorText.length >= 40 ? '...' : '') + '</div>'
+      + '<div class="mn-body">' + escapeHtml(n.body) + '</div>';
+    div.onclick = function() {
+      if (n.type === 'highlight') {
+        editHighlightNote(n.id, { clientX: window.innerWidth / 2, clientY: 200 });
+      } else {
+        const ann = (articleNotes.annotations || []).find(a => a.id === n.id);
+        if (ann) showAnnotationPopover({ clientX: window.innerWidth / 2, clientY: 200 }, ann);
+      }
+    };
+    marginContainer.appendChild(div);
+    lastBottom = n.top + div.offsetHeight;
+  }
 }
 
 function findAndWrap(container, hl) {
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
   const searchText = hl.text;
+  const fullText = container.textContent || '';
+
+  // Find the best match position using context
+  let targetGlobalIdx = -1;
+  if (hl.contextBefore || hl.contextAfter) {
+    // Try context-anchored search first
+    const ctxBefore = (hl.contextBefore || '').slice(-15);
+    const ctxAfter = (hl.contextAfter || '').slice(0, 15);
+    const needle = ctxBefore + searchText + ctxAfter;
+    const pos = fullText.indexOf(needle);
+    if (pos >= 0) {
+      targetGlobalIdx = pos + ctxBefore.length;
+    }
+  }
+  if (targetGlobalIdx < 0) {
+    targetGlobalIdx = fullText.indexOf(searchText);
+  }
+  if (targetGlobalIdx < 0) return;
+
+  // Walk text nodes to find the one containing our target position
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  let charCount = 0;
   let node;
 
   while (node = walker.nextNode()) {
-    const idx = node.textContent.indexOf(searchText);
-    if (idx < 0) continue;
+    const nodeLen = node.textContent.length;
+    if (charCount + nodeLen > targetGlobalIdx) {
+      const localIdx = targetGlobalIdx - charCount;
+      // Check that the text actually matches at this position
+      if (node.textContent.slice(localIdx, localIdx + searchText.length) !== searchText) break;
 
-    // Verify context if available
-    if (hl.contextBefore) {
-      const fullText = container.textContent || '';
-      const globalIdx = fullText.indexOf(searchText);
-      if (globalIdx > 0) {
-        const before = fullText.slice(Math.max(0, globalIdx - 30), globalIdx);
-        if (!before.includes(hl.contextBefore.slice(-10))) continue;
+      try {
+        const range = document.createRange();
+        range.setStart(node, localIdx);
+        range.setEnd(node, localIdx + searchText.length);
+
+        const mark = document.createElement('mark');
+        mark.className = 'pr-highlight hl-' + hl.color;
+        mark.setAttribute('data-hl-id', hl.id);
+        mark.onclick = function(e) {
+          e.stopPropagation();
+          showHighlightContextMenu(e, hl);
+        };
+
+        range.surroundContents(mark);
+      } catch {
+        // surroundContents can fail if selection spans nodes; skip gracefully
+        return;
       }
+      return;
     }
-
-    const range = document.createRange();
-    range.setStart(node, idx);
-    range.setEnd(node, idx + searchText.length);
-
-    const mark = document.createElement('mark');
-    mark.className = 'pr-highlight hl-' + hl.color;
-    mark.setAttribute('data-hl-id', hl.id);
-    mark.onclick = function(e) {
-      e.stopPropagation();
-      showHighlightContextMenu(e, hl);
-    };
-
-    range.surroundContents(mark);
-
-    // If highlight has a note, show a small marker after it
-    if (hl.note) {
-      const marker = document.createElement('span');
-      marker.className = 'hl-note-marker';
-      marker.textContent = 'n';
-      marker.title = hl.note;
-      marker.onclick = function(ev) {
-        ev.stopPropagation();
-        editHighlightNote(hl.id, ev);
-      };
-      mark.parentNode.insertBefore(marker, mark.nextSibling);
-    }
-
-    return; // Only wrap first match
+    charCount += nodeLen;
   }
 }
 
@@ -1196,6 +1481,7 @@ function findAndMarkAnnotation(container, ann) {
     // Insert a marker after the anchor text
     const marker = document.createElement('span');
     marker.className = 'annotation-marker';
+    marker.setAttribute('data-ann-id', ann.id);
     marker.textContent = 'n';
     marker.title = ann.note;
     marker.onclick = function(e) {
@@ -1510,6 +1796,35 @@ function toggleFavorite(btn) {
   saveNotes();
   renderNotesPanel();
   renderFileList();
+  updateHeaderActions();
+}
+
+function toggleFavoriteFromHeader(btn) {
+  articleNotes.isFavorite = !articleNotes.isFavorite;
+  saveNotes();
+  renderNotesPanel();
+  renderFileList();
+  updateHeaderActions();
+}
+
+function toggleNotesFromHeader() {
+  const panel = document.querySelector('.notes-panel');
+  if (panel) {
+    panel.toggleAttribute('open');
+    if (panel.hasAttribute('open')) {
+      panel.querySelector('textarea').focus();
+    }
+  }
+}
+
+function updateHeaderActions() {
+  const actions = document.querySelector('.article-actions');
+  if (!actions) return;
+  const favBtn = actions.querySelector('button');
+  if (favBtn) {
+    favBtn.className = articleNotes.isFavorite ? 'active-fav' : '';
+    favBtn.innerHTML = (articleNotes.isFavorite ? '&#9829;' : '&#9825;') + ' Favorite';
+  }
 }
 
 function handleTagKey(e) {
@@ -1562,7 +1877,7 @@ async function summarizeArticle() {
   }
 
   btn.disabled = true;
-  btn.textContent = 'Summarizing...';
+  btn.innerHTML = '&#10024; Summarizing...';
 
   try {
     const res = await fetch('/api/summarize', {
@@ -1572,8 +1887,8 @@ async function summarizeArticle() {
     });
     const data = await res.json();
     if (data.error) {
-      btn.textContent = 'Error';
-      setTimeout(() => { btn.textContent = 'Summarize'; btn.disabled = false; }, 2000);
+      btn.innerHTML = 'Error';
+      setTimeout(() => { btn.innerHTML = '&#10024; Summarize'; btn.disabled = false; }, 2000);
       return;
     }
 
@@ -1586,18 +1901,18 @@ async function summarizeArticle() {
     summaryDiv.className = 'article-summary';
     summaryDiv.innerHTML = '<div class="summary-label">Summary</div>' + escapeHtml(data.summary);
 
-    const articleMeta = content.querySelector('.article-meta');
-    if (articleMeta) {
-      articleMeta.after(summaryDiv);
+    const articleHeader = content.querySelector('.article-header');
+    if (articleHeader) {
+      articleHeader.after(summaryDiv);
     } else {
       content.prepend(summaryDiv);
     }
 
-    btn.textContent = 'Summarized';
+    btn.innerHTML = '&#10024; Summarized';
     btn.disabled = true;
   } catch (err) {
-    btn.textContent = 'Failed';
-    setTimeout(() => { btn.textContent = 'Summarize'; btn.disabled = false; }, 2000);
+    btn.innerHTML = 'Failed';
+    setTimeout(() => { btn.innerHTML = '&#10024; Summarize'; btn.disabled = false; }, 2000);
   }
 }
 
@@ -1693,15 +2008,25 @@ document.addEventListener('keydown', e => {
 
   // Escape clears search or dismisses popovers
   if (e.key === 'Escape') {
+    // Close settings dropdown
+    const dropdown = document.querySelector('.settings-dropdown-panel');
+    if (dropdown) { dropdown.remove(); return; }
+    // Close highlight toolbar / annotation popover
     if (hlToolbarEl || document.querySelector('.annotation-popover')) {
       removeHlToolbar();
       return;
     }
+    // Clear and blur search
     const search = document.getElementById('search');
     if (document.activeElement === search) {
       search.value = '';
       filterFiles();
       search.blur();
+      return;
+    }
+    // Blur any focused textarea/input
+    if (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT') {
+      document.activeElement.blur();
       return;
     }
   }
@@ -1730,21 +2055,21 @@ document.addEventListener('keydown', e => {
   }
 
   // j/k navigate file list (next/prev)
-  if ((e.key === 'j' || e.key === 'k') && document.activeElement.tagName !== 'INPUT') {
+  if ((e.key === 'j' || e.key === 'k') && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
     e.preventDefault();
     navigateArticle(e.key === 'j' ? 1 : -1);
     return;
   }
 
   // Left/Right arrow navigate prev/next article
-  if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && document.activeElement.tagName !== 'INPUT') {
+  if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
     e.preventDefault();
     navigateArticle(e.key === 'ArrowRight' ? 1 : -1);
     return;
   }
 
   // Up/Down scroll the content pane; navigate articles at boundaries
-  if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && document.activeElement.tagName !== 'INPUT') {
+  if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
     const pane = document.getElementById('content-pane');
     const scrollAmount = 80;
     const atTop = pane.scrollTop <= 0;
@@ -1765,7 +2090,7 @@ document.addEventListener('keydown', e => {
   }
 
   // Enter loads current selection (when not in search)
-  if (e.key === 'Enter' && document.activeElement.tagName !== 'INPUT') {
+  if (e.key === 'Enter' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
     const currentIdx = filteredFiles.findIndex(f => f.filename === activeFile);
     if (currentIdx >= 0) loadFile(currentIdx);
   }
@@ -1837,7 +2162,6 @@ async function init() {
   if (savedTheme) setTheme(savedTheme);
   if (savedFont) {
     setFont(savedFont);
-    document.getElementById('font-select').value = savedFont;
   }
   if (savedSize) setSize(savedSize);
   if (savedSidebar === '0') document.getElementById('sidebar').classList.add('collapsed');

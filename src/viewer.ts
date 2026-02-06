@@ -16,6 +16,7 @@ interface FileMeta {
   domain: string;
   bookmarked: string;
   feed: string;
+  author: string;
   mtime: string;
   hasSummary: boolean;
 }
@@ -62,6 +63,7 @@ function listFiles(outputPath: string): FileMeta[] {
         domain: meta.domain || '',
         bookmarked: meta.bookmarked || '',
         feed: meta.feed || '',
+        author: meta.author || '',
         mtime: stat.mtime.toISOString(),
         hasSummary: !!meta.summary,
       });
