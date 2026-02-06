@@ -222,58 +222,120 @@ function runApplePrompt(prompt: string): string {
 }
 
 const CHUNK_WORD_LIMIT = 2000;
-const CHUNK_OVERLAP = 200; // words of overlap to preserve cross-boundary context
 
-// Split text into chunks on paragraph boundaries with overlap
-function splitIntoParagraphChunks(text: string, maxWords: number, overlapWords: number): string[] {
-  const paragraphs = text.split(/\n\s*\n/);
-  const chunks: string[] = [];
-  let current: string[] = [];
-  let currentWordCount = 0;
+// RLM-inspired multi-turn summarization for long articles.
+// Instead of map-reduce (N separate processes, each losing context), this runs
+// ONE Swift process using LanguageModelSession's multi-turn conversation.
+// The model progressively reads the article section by section, maintaining
+// running notes. Sessions are recycled every few turns to avoid context overflow.
+// A final clean session synthesizes the summary from accumulated notes.
+function runAppleRLM(articleText: string): string {
+  const configDir = join(homedir(), '.config', 'pullread');
+  const tmpArticle = join(configDir, '.apple-article.txt');
+  const swiftScript = join(configDir, '.apple-rlm.swift');
 
-  for (const para of paragraphs) {
-    const paraWords = para.split(/\s+/).length;
-    if (currentWordCount + paraWords > maxWords && current.length > 0) {
-      chunks.push(current.join('\n\n'));
-      // Keep trailing paragraphs as overlap for next chunk
-      const overlapParas: string[] = [];
-      let overlapCount = 0;
-      for (let i = current.length - 1; i >= 0 && overlapCount < overlapWords; i--) {
-        overlapParas.unshift(current[i]);
-        overlapCount += current[i].split(/\s+/).length;
-      }
-      current = overlapParas;
-      currentWordCount = overlapCount;
+  writeFileSync(tmpArticle, articleText);
+
+  const scriptContent = [
+    'import Foundation',
+    'import FoundationModels',
+    '',
+    'let articlePath = CommandLine.arguments[1]',
+    'let fullText = try String(contentsOfFile: articlePath, encoding: .utf8)',
+    '',
+    '// Split into paragraphs and analyze structure',
+    'let paragraphs = fullText.components(separatedBy: "\\n\\n")',
+    '    .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }',
+    'let totalWords = fullText.split(separator: " ").count',
+    'let headings = paragraphs.filter { $0.hasPrefix("#") }',
+    '    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }',
+    '',
+    '// Build sections of ~1500 words on paragraph boundaries',
+    'var sections: [String] = []',
+    'var current: [String] = []',
+    'var wc = 0',
+    'for para in paragraphs {',
+    '    let w = para.split(separator: " ").count',
+    '    if wc + w > 1500 && !current.isEmpty {',
+    '        sections.append(current.joined(separator: "\\n\\n"))',
+    '        current = []',
+    '        wc = 0',
+    '    }',
+    '    current.append(para)',
+    '    wc += w',
+    '}',
+    'if !current.isEmpty { sections.append(current.joined(separator: "\\n\\n")) }',
+    '',
+    '// Multi-turn conversation: progressive reading with session recycling',
+    'var session = LanguageModelSession()',
+    'var turns = 0',
+    'let maxTurns = 3',
+    'var notes = ""',
+    '',
+    '// Phase 1: Structural overview — the model sees the shape of the article first',
+    'let headingList = headings.isEmpty ? "None detected" : headings.joined(separator: " | ")',
+    'let opening = String(paragraphs.first?.prefix(500) ?? "")',
+    'let closing = String(paragraphs.last?.prefix(500) ?? "")',
+    'let overview = "Summarize a \\(totalWords)-word article (\\(sections.count) sections).\\n"',
+    '    + "Headings: \\(headingList)\\n\\n"',
+    '    + "Opening: \\(opening)\\n\\n"',
+    '    + "Closing: \\(closing)\\n\\n"',
+    '    + "I will feed sections one at a time. After each, respond with concise bullet-point notes of key facts and arguments. Keep notes brief and factual."',
+    '',
+    'let r1 = try await session.respond(to: overview)',
+    'notes = r1.content',
+    'turns = 1',
+    '',
+    '// Phase 2: Feed each section, recycling sessions to prevent context overflow',
+    'for (i, section) in sections.enumerated() {',
+    '    if turns >= maxTurns {',
+    '        session = LanguageModelSession()',
+    '        let resume = "Continuing article summarization. Key points so far:\\n\\n"',
+    '            + notes',
+    '            + "\\n\\nI will feed more sections. After each, update notes with key facts and arguments."',
+    '        let rr = try await session.respond(to: resume)',
+    '        notes = rr.content',
+    '        turns = 1',
+    '    }',
+    '    let prompt = "Section \\(i + 1) of \\(sections.count):\\n\\n"',
+    '        + section',
+    '        + "\\n\\nUpdate your running notes with key points from this section."',
+    '    let r = try await session.respond(to: prompt)',
+    '    notes = r.content',
+    '    turns += 1',
+    '}',
+    '',
+    '// Phase 3: Final summary in a clean session with just the accumulated notes',
+    'let finalSession = LanguageModelSession()',
+    'let finalPrompt = "Here are notes from reading a full article:\\n\\n"',
+    '    + notes',
+    '    + "\\n\\nWrite a 2-3 sentence summary. State the main points directly."',
+    '    + " Do not use phrases like \\"This article discusses\\"."',
+    'let result = try await finalSession.respond(to: finalPrompt)',
+    'print(result.content)',
+  ].join('\n');
+
+  writeFileSync(swiftScript, scriptContent);
+
+  try {
+    const result = execFileSync('swift', [swiftScript, tmpArticle], {
+      encoding: 'utf-8',
+      timeout: 180_000, // 3 minutes for multi-turn conversation
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    return result.trim();
+  } catch (err: any) {
+    const stderr = err.stderr || '';
+    if (stderr.includes('No such module') || stderr.includes('FoundationModels')) {
+      throw new Error('Apple Intelligence requires macOS 26 (Tahoe) with Xcode command line tools installed.');
     }
-    current.push(para);
-    currentWordCount += paraWords;
-  }
-  if (current.length > 0) {
-    chunks.push(current.join('\n\n'));
-  }
-  return chunks;
-}
-
-// Hierarchical summarization: summarize pairs of summaries in a tree
-function hierarchicalReduce(summaries: string[]): string {
-  if (summaries.length <= 3) {
-    // Few enough to combine in one pass
-    const combinePrompt = `Below are summaries of different sections of the same article. Combine them into a single 2-3 sentence summary that captures the main argument or finding. Do not use phrases like "This article discusses" — just state the main points directly.\n\n${summaries.map((s, i) => `Section ${i + 1}: ${s}`).join('\n\n')}`;
-    return runApplePrompt(combinePrompt);
-  }
-
-  // Pair up summaries and reduce
-  const reduced: string[] = [];
-  for (let i = 0; i < summaries.length; i += 2) {
-    if (i + 1 < summaries.length) {
-      const pairPrompt = `Combine these two section summaries into one concise summary (2-3 sentences). State the key points directly.\n\nSection A: ${summaries[i]}\n\nSection B: ${summaries[i + 1]}`;
-      reduced.push(runApplePrompt(pairPrompt));
-    } else {
-      reduced.push(summaries[i]); // Odd one out passes through
+    if (stderr.includes('not eligible') || stderr.includes('not available')) {
+      throw new Error('Apple Intelligence is not available on this Mac. Requires Apple Silicon with macOS 26.');
     }
+    throw new Error(`Apple Intelligence error: ${stderr.slice(0, 200) || err.message}`);
+  } finally {
+    try { unlinkSync(tmpArticle); } catch {}
   }
-
-  return hierarchicalReduce(reduced);
 }
 
 async function callApple(articleText: string): Promise<SummarizeResult> {
@@ -285,20 +347,9 @@ async function callApple(articleText: string): Promise<SummarizeResult> {
     return { summary: runApplePrompt(prompt), model: 'apple-on-device' };
   }
 
-  // Long article — paragraph-aware chunking with overlap, then hierarchical reduce
-  const chunks = splitIntoParagraphChunks(articleText, CHUNK_WORD_LIMIT, CHUNK_OVERLAP);
-
-  // Map: summarize each chunk
-  const chunkSummaries: string[] = [];
-  for (let i = 0; i < chunks.length; i++) {
-    const chunkPrompt = `Summarize this section (part ${i + 1} of ${chunks.length}) in 1-2 sentences. Focus on the key points.\n\n---\n\n${chunks[i]}`;
-    chunkSummaries.push(runApplePrompt(chunkPrompt));
-  }
-
-  // Reduce: hierarchical pairwise combination instead of flat combine
-  const finalSummary = hierarchicalReduce(chunkSummaries);
-
-  return { summary: finalSummary, model: 'apple-on-device' };
+  // Long article — RLM-inspired multi-turn conversation
+  const summary = runAppleRLM(articleText);
+  return { summary, model: 'apple-on-device' };
 }
 
 export async function summarizeText(articleText: string, config?: LLMConfig): Promise<SummarizeResult> {
