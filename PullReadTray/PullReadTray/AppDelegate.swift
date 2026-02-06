@@ -165,10 +165,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         logsMenuItem.target = self
         menu.addItem(logsMenuItem)
 
-        // Check for Updates (Sparkle)
-        checkForUpdatesMenuItem = NSMenuItem(title: "Check for Updates...", action: #selector(checkForUpdates), keyEquivalent: "")
-        checkForUpdatesMenuItem.target = self
-        menu.addItem(checkForUpdatesMenuItem)
+        // Check for Updates (Sparkle) - only show when Sparkle is fully integrated
+        // Uncomment when Sparkle SPM package is added and configured:
+        // checkForUpdatesMenuItem = NSMenuItem(title: "Check for Updates...", action: #selector(checkForUpdates), keyEquivalent: "")
+        // checkForUpdatesMenuItem.target = self
+        // menu.addItem(checkForUpdatesMenuItem)
 
         menu.addItem(NSMenuItem.separator())
 

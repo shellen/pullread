@@ -1467,7 +1467,11 @@ function removeHlToolbar() {
     hlToolbarEl.remove();
     hlToolbarEl = null;
   }
-  removeAnnotationPopover();
+  // Only remove annotation popover if not actively focused (user is typing)
+  const popover = document.querySelector('.annotation-popover');
+  if (popover && !popover.contains(document.activeElement)) {
+    popover.remove();
+  }
 }
 
 function removeAnnotationPopover() {
@@ -1578,6 +1582,9 @@ function clearHighlightNote(id) {
 
 // Listen for text selection in content pane
 document.addEventListener('mouseup', e => {
+  // Don't dismiss anything if clicking inside an annotation popover or margin note
+  if (e.target.closest && e.target.closest('.annotation-popover, .margin-note')) return;
+
   const contentEl = document.getElementById('content');
   if (!contentEl || !contentEl.contains(e.target)) {
     // Don't remove toolbar if clicking on the toolbar itself
@@ -1860,6 +1867,10 @@ function removeTag(tag) {
 // ---- LLM Summarization ----
 
 let llmConfigured = false;
+let llmProvider = '';
+let llmModel = '';
+let lastSummaryProvider = '';
+let lastSummaryModel = '';
 
 async function checkLLMConfig() {
   if (!serverMode) return;
@@ -1868,8 +1879,15 @@ async function checkLLMConfig() {
     if (res.ok) {
       const data = await res.json();
       llmConfigured = !!(data.llm && data.llm.hasKey);
+      llmProvider = data.llm?.provider || '';
+      llmModel = data.llm?.model || '';
     }
   } catch {}
+}
+
+function providerLabel(provider) {
+  const labels = { anthropic: 'Anthropic', openai: 'OpenAI', gemini: 'Gemini', openrouter: 'OpenRouter', apple: 'Apple Intelligence' };
+  return labels[provider] || provider;
 }
 
 async function summarizeArticle() {
@@ -1877,13 +1895,9 @@ async function summarizeArticle() {
   const btn = document.getElementById('summarize-btn');
   if (!btn) return;
 
-  if (!llmConfigured) {
-    alert('No API key configured. Add your key in PullRead Settings (click the menu bar icon \u2192 Settings).');
-    return;
-  }
-
   btn.disabled = true;
   btn.innerHTML = '&#10024; Summarizing...';
+  btn.title = 'Summarizing with ' + providerLabel(llmProvider) + '...';
 
   try {
     const res = await fetch('/api/summarize', {
@@ -1893,19 +1907,41 @@ async function summarizeArticle() {
     });
     const data = await res.json();
     if (data.error) {
-      btn.innerHTML = 'Error';
-      setTimeout(() => { btn.innerHTML = '&#10024; Summarize'; btn.disabled = false; }, 2000);
+      btn.innerHTML = '&#10024; Retry';
+      btn.disabled = false;
+      btn.title = data.error;
+      // Show error inline under the header
+      const content = document.getElementById('content');
+      const existingError = content.querySelector('.summary-error');
+      if (existingError) existingError.remove();
+      const errDiv = document.createElement('div');
+      errDiv.className = 'summary-error';
+      errDiv.style.cssText = 'padding:8px 12px;margin:8px 0;background:var(--border);border-radius:6px;font-size:12px;color:var(--muted)';
+      errDiv.textContent = data.error;
+      const articleHeader = content.querySelector('.article-header');
+      if (articleHeader) articleHeader.after(errDiv);
       return;
     }
 
-    // Insert summary into the DOM
+    lastSummaryProvider = data.provider || llmProvider;
+    lastSummaryModel = data.model || llmModel;
+
+    // Remove any previous error
     const content = document.getElementById('content');
+    const existingError = content.querySelector('.summary-error');
+    if (existingError) existingError.remove();
+
+    // Insert summary into the DOM
     const existingSummary = content.querySelector('.article-summary');
     if (existingSummary) existingSummary.remove();
 
     const summaryDiv = document.createElement('div');
     summaryDiv.className = 'article-summary';
-    summaryDiv.innerHTML = '<div class="summary-label">Summary</div>' + escapeHtml(data.summary);
+    summaryDiv.innerHTML = '<div class="summary-label">Summary</div>'
+      + escapeHtml(data.summary)
+      + '<div style="font-size:10px;color:var(--muted);margin-top:6px">'
+      + providerLabel(lastSummaryProvider) + ' · ' + escapeHtml(lastSummaryModel)
+      + '</div>';
 
     const articleHeader = content.querySelector('.article-header');
     if (articleHeader) {
@@ -1915,10 +1951,13 @@ async function summarizeArticle() {
     }
 
     btn.innerHTML = '&#10024; Summarized';
-    btn.disabled = true;
+    btn.title = 'Summarized by ' + providerLabel(lastSummaryProvider) + ' (' + lastSummaryModel + '). Click to re-run.';
+    btn.disabled = false;
+    btn.onclick = function() { btn.onclick = null; summarizeArticle(); };
   } catch (err) {
-    btn.innerHTML = 'Failed';
-    setTimeout(() => { btn.innerHTML = '&#10024; Summarize'; btn.disabled = false; }, 2000);
+    btn.innerHTML = '&#10024; Retry';
+    btn.title = 'Summarization failed. Click to retry.';
+    btn.disabled = false;
   }
 }
 

@@ -7,7 +7,7 @@ import { join, extname, dirname } from 'path';
 import { exec } from 'child_process';
 import { homedir } from 'os';
 import { VIEWER_HTML } from './viewer-html';
-import { summarizeText, loadLLMConfig, saveLLMConfig, getDefaultModel, LLMConfig } from './summarizer';
+import { summarizeText, loadLLMConfig, saveLLMConfig, getDefaultModel, KNOWN_MODELS, LLMConfig } from './summarizer';
 
 interface FileMeta {
   filename: string;
@@ -263,7 +263,7 @@ export function startViewer(outputPath: string, port = 7777): void {
             provider: config.provider,
             model: config.model || getDefaultModel(config.provider),
             hasKey: config.provider === 'apple' || !!config.apiKey
-          } : null
+          } : { provider: 'apple', model: 'on-device', hasKey: true }
         });
         return;
       }
@@ -297,6 +297,9 @@ export function startViewer(outputPath: string, port = 7777): void {
           return;
         }
 
+        const config = loadLLMConfig();
+        const provider = config?.provider || 'apple';
+
         let articleText = text;
         if (!articleText && name) {
           const filePath = join(outputPath, name);
@@ -317,11 +320,20 @@ export function startViewer(outputPath: string, port = 7777): void {
           writeSummaryToFile(join(outputPath, name), result.summary);
         }
 
-        sendJson(res, { summary: result.summary, model: result.model });
+        sendJson(res, { summary: result.summary, model: result.model, provider });
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Summarization failed';
+        // Provide user-friendly error messages
+        let userMsg = msg;
+        if (msg.includes('Apple Intelligence requires')) {
+          userMsg = 'Apple Intelligence requires macOS 26. Configure a cloud provider in Settings.';
+        } else if (msg.includes('context window') || msg.includes('too long') || msg.includes('max_tokens') || msg.includes('exceededContextWindowSize')) {
+          userMsg = 'Article too long for this model. Try a cloud provider with a larger context window.';
+        } else if (msg.includes('No API key')) {
+          userMsg = 'No model configured. Open Settings to add a provider.';
+        }
         res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: msg }));
+        res.end(JSON.stringify({ error: userMsg }));
       }
       return;
     }

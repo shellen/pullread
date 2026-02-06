@@ -5,6 +5,7 @@ import { parseHTML } from 'linkedom';
 import { Readability } from '@mozilla/readability';
 import TurndownService from 'turndown';
 import { getCookiesForDomain, getDomainFromUrl } from './cookies';
+import { extractText, getDocumentProxy } from 'unpdf';
 
 export interface ExtractedArticle {
   title: string;
@@ -46,10 +47,10 @@ function normalizeUrl(url: string): string {
     u.searchParams.delete(param);
   }
 
-  // Medium: follow redirects by using clean URL
+  // Medium: strip tracking params but keep share key (sk bypasses paywall)
   if (u.hostname === 'medium.com' || u.hostname.endsWith('.medium.com')) {
     u.searchParams.delete('source');
-    u.searchParams.delete('sk');
+    // Keep 'sk' — it's an author-shared paywall bypass token
   }
 
   // Reddit: use old.reddit.com for better HTML extraction
@@ -161,6 +162,54 @@ function extractFallback(document: any, url: string): ExtractedArticle | null {
   };
 }
 
+/**
+ * Check if a URL points to a PDF file
+ */
+export function isPdfUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.pathname.toLowerCase().endsWith('.pdf');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Extract text content from a PDF and return as a markdown article.
+ * Uses unpdf (Mozilla PDF.js) for text extraction.
+ */
+export async function extractPdf(data: Uint8Array, url: string): Promise<ExtractedArticle | null> {
+  try {
+    const pdf = await getDocumentProxy(data);
+    const { totalPages, text } = await extractText(pdf, { mergePages: true });
+    const textStr = typeof text === 'string' ? text : (text as string[]).join('\n\n');
+
+    // If very little text extracted, likely a scanned/image PDF
+    if (textStr.trim().length < 100) {
+      return null;
+    }
+
+    // Try to extract title from first line or URL
+    const lines = textStr.trim().split('\n').filter(l => l.trim());
+    const firstLine = lines[0] || '';
+    const title = firstLine.length > 10 && firstLine.length < 200
+      ? firstLine
+      : url.split('/').pop()?.replace('.pdf', '').replace(/[-_]/g, ' ') || 'Untitled PDF';
+
+    // Format as markdown with page count info
+    const markdown = `*PDF document · ${totalPages} page${totalPages !== 1 ? 's' : ''}*\n\n${textStr}`;
+
+    return {
+      title,
+      content: `<p>${textStr}</p>`,
+      markdown,
+      excerpt: textStr.slice(0, 200).trim()
+    };
+  } catch {
+    return null;
+  }
+}
+
 export interface FetchOptions {
   useBrowserCookies?: boolean;
 }
@@ -168,6 +217,7 @@ export interface FetchOptions {
 // Modern Chrome-like headers to pass bot detection
 function getBrowserHeaders(url: string): Record<string, string> {
   const parsed = new URL(url);
+  const isMedium = parsed.hostname === 'medium.com' || parsed.hostname.endsWith('.medium.com');
   return {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
@@ -180,10 +230,11 @@ function getBrowserHeaders(url: string): Record<string, string> {
     'Sec-Ch-Ua-Platform': '"macOS"',
     'Sec-Fetch-Dest': 'document',
     'Sec-Fetch-Mode': 'navigate',
-    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-Site': isMedium ? 'cross-site' : 'none',
     'Sec-Fetch-User': '?1',
     'Upgrade-Insecure-Requests': '1',
-    'Referer': parsed.origin + '/',
+    // Medium serves full content to visitors from Google (SEO first-click-free)
+    'Referer': isMedium ? 'https://www.google.com/' : parsed.origin + '/',
   };
 }
 
@@ -220,6 +271,31 @@ export function classifyFetchError(err: any, status?: number): string {
 const FETCH_TIMEOUT_MS = 30_000;
 const MAX_RETRIES = 2;
 const RETRY_DELAYS = [2_000, 5_000];
+
+/**
+ * Try fetching an archived version of a page from the Wayback Machine.
+ * Used as a fallback when the original site blocks us (403).
+ */
+async function fetchFromWayback(url: string): Promise<ExtractedArticle | null> {
+  try {
+    const apiUrl = `https://archive.org/wayback/available?url=${encodeURIComponent(url)}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10_000);
+    const res = await fetch(apiUrl, { signal: controller.signal });
+    clearTimeout(timer);
+    const data = await res.json() as any;
+    if (!data.archived_snapshots?.closest?.available) return null;
+
+    const snapshotUrl: string = data.archived_snapshots.closest.url;
+    const snapRes = await fetchWithTimeout(snapshotUrl, getBrowserHeaders(snapshotUrl), FETCH_TIMEOUT_MS);
+    if (!snapRes.ok) return null;
+
+    const html = await snapRes.text();
+    return extractArticle(html, url);
+  } catch {
+    return null;
+  }
+}
 
 async function fetchWithTimeout(url: string, headers: Record<string, string>, timeoutMs: number): Promise<Response> {
   const controller = new AbortController();
@@ -273,14 +349,27 @@ export async function fetchAndExtract(
       const response = await fetchWithTimeout(cleanUrl, attemptHeaders, FETCH_TIMEOUT_MS);
 
       if (!response.ok) {
-        const { retryable } = classifyError(null, response.status);
+        const { cls, retryable } = classifyError(null, response.status);
         if (retryable && attempt < MAX_RETRIES) {
           lastError = new Error(`HTTP ${response.status}`);
           lastStatus = response.status;
           await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
           continue;
         }
+        // For 403s, try Wayback Machine as a last resort
+        if (cls === 'bot_blocked') {
+          const archived = await fetchFromWayback(url);
+          if (archived) return archived;
+        }
         throw new Error(`Failed to fetch ${url}: ${response.status}`);
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+
+      // Handle PDF responses
+      if (contentType.includes('application/pdf') || isPdfUrl(cleanUrl)) {
+        const buffer = await response.arrayBuffer();
+        return extractPdf(new Uint8Array(buffer), cleanUrl);
       }
 
       const html = await response.text();

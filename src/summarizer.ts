@@ -227,10 +227,7 @@ async function callApple(articleText: string): Promise<SummarizeResult> {
 }
 
 export async function summarizeText(articleText: string, config?: LLMConfig): Promise<SummarizeResult> {
-  const llmConfig = config || loadLLMConfig();
-  if (!llmConfig) {
-    throw new Error('No API key configured. Add your key in the PullRead Settings window.');
-  }
+  const llmConfig = config || loadLLMConfig() || { provider: 'apple' as Provider, apiKey: '' };
 
   const model = llmConfig.model || getDefaultModel(llmConfig.provider);
 
