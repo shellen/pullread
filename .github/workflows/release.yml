@@ -168,8 +168,10 @@ jobs:
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
-          # Download Sparkle tools
-          curl -L -o Sparkle.tar.xz "https://github.com/sparkle-project/Sparkle/releases/latest/download/Sparkle-2.7.5.tar.xz"
+          # Fetch latest Sparkle release tag dynamically to avoid hardcoded version mismatch
+          SPARKLE_TAG=$(curl -s https://api.github.com/repos/sparkle-project/Sparkle/releases/latest | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])")
+          echo "Downloading Sparkle ${SPARKLE_TAG}"
+          curl -L -o Sparkle.tar.xz "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_TAG}/Sparkle-${SPARKLE_TAG}.tar.xz"
           mkdir -p sparkle-tools
           tar -xf Sparkle.tar.xz -C sparkle-tools
 
