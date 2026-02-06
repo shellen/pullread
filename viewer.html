@@ -572,6 +572,84 @@
   .dot-highlight { background: #ffeb3b; }
   .dot-note { background: var(--link); }
   .dot-summary { background: #ab47bc; }
+  .dot-favorite { color: #e91e63; font-size: 8px; line-height: 6px; }
+
+  /* Highlight note marker (small icon after highlighted text) */
+  .hl-note-marker {
+    display: inline-block;
+    width: 13px;
+    height: 13px;
+    background: var(--muted);
+    color: var(--bg);
+    border-radius: 50%;
+    font-size: 8px;
+    text-align: center;
+    line-height: 13px;
+    cursor: pointer;
+    vertical-align: super;
+    margin-left: 1px;
+    font-family: -apple-system, sans-serif;
+    opacity: 0.7;
+  }
+  .hl-note-marker:hover { opacity: 1; }
+
+  /* Tags input */
+  .tags-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+  .tags-row .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 8px;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 11px;
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .tags-row .tag .tag-remove {
+    cursor: pointer;
+    opacity: 0.5;
+    font-size: 13px;
+    line-height: 1;
+  }
+  .tags-row .tag .tag-remove:hover { opacity: 1; }
+  .tags-row input {
+    border: none;
+    background: transparent;
+    color: var(--fg);
+    font-size: 12px;
+    outline: none;
+    width: 100px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  /* Favorite toggle */
+  .favorite-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    font-size: 13px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .favorite-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 0;
+    line-height: 1;
+    color: var(--muted);
+  }
+  .favorite-btn.active { color: #e91e63; }
+  .favorite-btn:hover { opacity: 0.8; }
 
   /* Summary display */
   .article-summary {
@@ -733,7 +811,7 @@ let serverMode = false;
 
 // Highlights & Notes state
 let articleHighlights = []; // highlights for current article
-let articleNotes = { articleNote: '', annotations: [] }; // notes for current article
+let articleNotes = { articleNote: '', annotations: [], tags: [], isFavorite: false }; // notes for current article
 let allHighlightsIndex = {}; // { filename: [...] } for sidebar indicators
 let allNotesIndex = {}; // { filename: { articleNote, annotations } } for sidebar indicators
 
@@ -846,11 +924,12 @@ function renderFileList() {
   list.innerHTML = filteredFiles.map((f, i) => {
     const date = f.bookmarked ? f.bookmarked.slice(0, 10) : '';
     const isActive = activeFile === f.filename ? ' active' : '';
-    const { hasHl, hasNote } = hasAnnotations(f.filename);
+    const { hasHl, hasNote, isFavorite } = hasAnnotations(f.filename);
     const hasSummary = f.hasSummary;
     let indicators = '';
-    if (hasHl || hasNote || hasSummary) {
+    if (hasHl || hasNote || hasSummary || isFavorite) {
       indicators = '<div class="file-item-indicators">'
+        + (isFavorite ? '<span class="dot dot-favorite" title="Favorite">&#9829;</span>' : '')
         + (hasHl ? '<span class="dot dot-highlight" title="Has highlights"></span>' : '')
         + (hasNote ? '<span class="dot dot-note" title="Has notes"></span>' : '')
         + (hasSummary ? '<span class="dot dot-summary" title="Has summary"></span>' : '')
@@ -924,10 +1003,11 @@ async function loadAnnotations(filename) {
       fetch('/api/notes?name=' + encodeURIComponent(filename))
     ]);
     articleHighlights = hlRes.ok ? await hlRes.json() : [];
-    articleNotes = notesRes.ok ? await notesRes.json() : { articleNote: '', annotations: [] };
+    const notesData = notesRes.ok ? await notesRes.json() : {};
+    articleNotes = { articleNote: '', annotations: [], tags: [], isFavorite: false, ...notesData };
   } catch {
     articleHighlights = [];
-    articleNotes = { articleNote: '', annotations: [] };
+    articleNotes = { articleNote: '', annotations: [], tags: [], isFavorite: false };
   }
   applyHighlights();
   renderNotesPanel();
@@ -949,10 +1029,14 @@ async function loadAnnotationsIndex() {
 }
 
 function hasAnnotations(filename) {
-  const hasHl = allHighlightsIndex[filename] && allHighlightsIndex[filename].length > 0;
+  const hls = allHighlightsIndex[filename] || [];
+  const hasHl = hls.length > 0;
+  const hasHlNotes = hls.some(h => h.note);
   const notes = allNotesIndex[filename];
-  const hasNote = notes && (notes.articleNote || (notes.annotations && notes.annotations.length > 0));
-  return { hasHl, hasNote };
+  const hasNote = notes && (notes.articleNote || (notes.annotations && notes.annotations.length > 0) || hasHlNotes);
+  const isFavorite = notes && notes.isFavorite;
+  const hasTags = notes && notes.tags && notes.tags.length > 0;
+  return { hasHl, hasNote, isFavorite, hasTags };
 }
 
 async function saveHighlights() {
@@ -998,13 +1082,16 @@ function createHighlight(color) {
   const text = sel.toString();
   const { contextBefore, contextAfter } = getTextContext(text);
 
+  const now = new Date().toISOString();
   const highlight = {
     id: generateId(),
     text: text,
     contextBefore,
     contextAfter,
     color: color,
-    createdAt: new Date().toISOString()
+    note: '',
+    createdAt: now,
+    updatedAt: now
   };
 
   articleHighlights.push(highlight);
@@ -1034,8 +1121,9 @@ function applyHighlights() {
     parent.normalize();
   });
 
-  // Remove annotation markers
+  // Remove annotation markers and highlight note markers
   content.querySelectorAll('.annotation-marker').forEach(m => m.remove());
+  content.querySelectorAll('.hl-note-marker').forEach(m => m.remove());
 
   // Apply each highlight
   for (const hl of articleHighlights) {
@@ -1080,6 +1168,20 @@ function findAndWrap(container, hl) {
     };
 
     range.surroundContents(mark);
+
+    // If highlight has a note, show a small marker after it
+    if (hl.note) {
+      const marker = document.createElement('span');
+      marker.className = 'hl-note-marker';
+      marker.textContent = 'n';
+      marker.title = hl.note;
+      marker.onclick = function(ev) {
+        ev.stopPropagation();
+        editHighlightNote(hl.id, ev);
+      };
+      mark.parentNode.insertBefore(marker, mark.nextSibling);
+    }
+
     return; // Only wrap first match
   }
 }
@@ -1143,12 +1245,14 @@ function showHighlightContextMenu(e, hl) {
   removeHlToolbar();
   const bar = document.createElement('div');
   bar.className = 'hl-toolbar';
+  const noteLabel = hl.note ? 'Edit Note' : 'Note';
   bar.innerHTML = `
     <button class="hl-yellow-btn" title="Yellow" onclick="changeHighlightColor('${hl.id}','yellow')"></button>
     <button class="hl-green-btn" title="Green" onclick="changeHighlightColor('${hl.id}','green')"></button>
     <button class="hl-blue-btn" title="Blue" onclick="changeHighlightColor('${hl.id}','blue')"></button>
     <button class="hl-pink-btn" title="Pink" onclick="changeHighlightColor('${hl.id}','pink')"></button>
-    <button class="hl-note-btn" style="color:red;border-color:red" title="Delete" onclick="deleteHighlight('${hl.id}')">Delete</button>
+    <button class="hl-note-btn" title="${noteLabel}" onclick="editHighlightNote('${hl.id}', event)">${noteLabel}</button>
+    <button class="hl-note-btn" style="color:red;border-color:red" title="Delete" onclick="deleteHighlight('${hl.id}')">Del</button>
   `;
   const pane = document.getElementById('content-pane');
   bar.style.left = (e.clientX - pane.getBoundingClientRect().left) + 'px';
@@ -1161,10 +1265,64 @@ function changeHighlightColor(id, color) {
   const hl = articleHighlights.find(h => h.id === id);
   if (hl) {
     hl.color = color;
+    hl.updatedAt = new Date().toISOString();
     saveHighlights();
     applyHighlights();
   }
   removeHlToolbar();
+}
+
+function editHighlightNote(id, e) {
+  removeHlToolbar();
+  const hl = articleHighlights.find(h => h.id === id);
+  if (!hl) return;
+
+  const pane = document.getElementById('content-pane');
+  const paneRect = pane.getBoundingClientRect();
+  const popover = document.createElement('div');
+  popover.className = 'annotation-popover';
+  popover.style.left = (e.clientX - paneRect.left) + 'px';
+  popover.style.top = (e.clientY - paneRect.top + pane.scrollTop + 10) + 'px';
+  popover.innerHTML = `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Note on highlight: "${escapeHtml(hl.text.slice(0, 50))}${hl.text.length > 50 ? '...' : ''}"</div>
+    <textarea placeholder="Add a note to this highlight...">${escapeHtml(hl.note || '')}</textarea>
+    <div class="btn-row">
+      ${hl.note ? '<button style="color:red;border-color:red" onclick="clearHighlightNote(\'' + id + '\')">Remove</button>' : ''}
+      <button onclick="removeAnnotationPopover()">Cancel</button>
+      <button class="primary" onclick="saveHighlightNote('${id}', this)">Save</button>
+    </div>
+  `;
+  popover.onclick = function(ev) { ev.stopPropagation(); };
+  pane.appendChild(popover);
+  popover.querySelector('textarea').focus();
+}
+
+function saveHighlightNote(id, btn) {
+  const popover = btn.closest('.annotation-popover');
+  const note = popover.querySelector('textarea').value.trim();
+  const hl = articleHighlights.find(h => h.id === id);
+  if (hl) {
+    hl.note = note;
+    hl.updatedAt = new Date().toISOString();
+    saveHighlights();
+    applyHighlights();
+    renderNotesPanel();
+    renderFileList();
+  }
+  removeAnnotationPopover();
+}
+
+function clearHighlightNote(id) {
+  const hl = articleHighlights.find(h => h.id === id);
+  if (hl) {
+    hl.note = '';
+    hl.updatedAt = new Date().toISOString();
+    saveHighlights();
+    applyHighlights();
+    renderNotesPanel();
+    renderFileList();
+  }
+  removeAnnotationPopover();
 }
 
 // Listen for text selection in content pane
@@ -1226,13 +1384,15 @@ function saveInlineNote(btn, anchorText) {
   if (!note) { removeAnnotationPopover(); return; }
 
   const { contextBefore, contextAfter } = getTextContext(anchorText);
+  const now = new Date().toISOString();
   const annotation = {
     id: generateId(),
     anchorText,
     contextBefore,
     contextAfter,
     note,
-    createdAt: new Date().toISOString()
+    createdAt: now,
+    updatedAt: now
   };
   if (!articleNotes.annotations) articleNotes.annotations = [];
   articleNotes.annotations.push(annotation);
@@ -1278,6 +1438,7 @@ function updateAnnotation(id, btn) {
   const ann = (articleNotes.annotations || []).find(a => a.id === id);
   if (ann) {
     ann.note = note;
+    ann.updatedAt = new Date().toISOString();
     saveNotes();
   }
   removeAnnotationPopover();
@@ -1297,20 +1458,33 @@ function renderNotesPanel() {
   const noteText = articleNotes.articleNote || '';
   const annCount = (articleNotes.annotations || []).length;
   const hlCount = articleHighlights.length;
+  const hlNoteCount = articleHighlights.filter(h => h.note).length;
 
   let summaryText = 'Notes';
   const badges = [];
-  if (hlCount) badges.push(hlCount + ' highlight' + (hlCount !== 1 ? 's' : ''));
+  if (hlCount) badges.push(hlCount + ' highlight' + (hlCount !== 1 ? 's' : '') + (hlNoteCount ? ' (' + hlNoteCount + ' with notes)' : ''));
   if (annCount) badges.push(annCount + ' annotation' + (annCount !== 1 ? 's' : ''));
   if (badges.length) summaryText += ' (' + badges.join(', ') + ')';
 
+  const tags = articleNotes.tags || [];
+  const isFav = articleNotes.isFavorite || false;
+  const tagsHtml = tags.map(t => '<span class="tag">' + escapeHtml(t) + '<span class="tag-remove" onclick="removeTag(\'' + escapeHtml(t.replace(/'/g, "\\'")) + '\')">&times;</span></span>').join('');
+
   panel.innerHTML = `
     <summary>${summaryText}</summary>
+    <div class="favorite-row">
+      <button class="favorite-btn${isFav ? ' active' : ''}" onclick="toggleFavorite(this)" title="Mark as favorite">${isFav ? '&#9829;' : '&#9825;'}</button>
+      <span style="color:var(--muted);font-size:12px">${isFav ? 'Favorited' : 'Mark favorite'}</span>
+    </div>
+    <div class="tags-row">
+      ${tagsHtml}
+      <input type="text" placeholder="Add tag..." onkeydown="handleTagKey(event)" />
+    </div>
     <textarea placeholder="Add notes about this article...">${escapeHtml(noteText)}</textarea>
     <div class="notes-save-hint">Notes auto-save on blur</div>
   `;
 
-  if (noteText) panel.setAttribute('open', '');
+  if (noteText || isFav || tags.length) panel.setAttribute('open', '');
 
   content.appendChild(panel);
 
@@ -1329,6 +1503,37 @@ function renderNotesPanel() {
     saveNotes();
     renderFileList();
   });
+}
+
+function toggleFavorite(btn) {
+  articleNotes.isFavorite = !articleNotes.isFavorite;
+  saveNotes();
+  renderNotesPanel();
+  renderFileList();
+}
+
+function handleTagKey(e) {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    const tag = e.target.value.trim().replace(/,/g, '');
+    if (!tag) return;
+    if (!articleNotes.tags) articleNotes.tags = [];
+    if (!articleNotes.tags.includes(tag)) {
+      articleNotes.tags.push(tag);
+      saveNotes();
+      renderNotesPanel();
+      renderFileList();
+    }
+    e.target.value = '';
+  }
+}
+
+function removeTag(tag) {
+  if (!articleNotes.tags) return;
+  articleNotes.tags = articleNotes.tags.filter(t => t !== tag);
+  saveNotes();
+  renderNotesPanel();
+  renderFileList();
 }
 
 // ---- LLM Summarization ----
@@ -1471,7 +1676,7 @@ async function saveLLMSettings() {
 // Keyboard navigation
 document.addEventListener('keydown', e => {
   // "/" focuses search
-  if (e.key === '/' && document.activeElement !== document.getElementById('search')) {
+  if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
     e.preventDefault();
     const sidebar = document.getElementById('sidebar');
     if (sidebar.classList.contains('collapsed')) toggleSidebar();
@@ -1480,7 +1685,7 @@ document.addEventListener('keydown', e => {
   }
 
   // "[" toggles sidebar
-  if (e.key === '[' && document.activeElement.tagName !== 'INPUT') {
+  if (e.key === '[' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
     e.preventDefault();
     toggleSidebar();
     return;

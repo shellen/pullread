@@ -220,7 +220,7 @@ export function startViewer(outputPath: string, port = 7777): void {
         const name = url.searchParams.get('name');
         const allNotes = loadJsonFile(NOTES_PATH) as Record<string, unknown>;
         if (name) {
-          sendJson(res, allNotes[name] || { articleNote: '', annotations: [] });
+          sendJson(res, allNotes[name] || { articleNote: '', annotations: [], tags: [], isFavorite: false });
         } else {
           sendJson(res, allNotes);
         }
@@ -229,14 +229,19 @@ export function startViewer(outputPath: string, port = 7777): void {
       if (req.method === 'POST') {
         try {
           const body = JSON.parse(await readBody(req));
-          const { name, articleNote, annotations } = body;
+          const { name, articleNote, annotations, tags, isFavorite } = body;
           if (!name) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'name is required' }));
             return;
           }
           const allNotes = loadJsonFile(NOTES_PATH) as Record<string, unknown>;
-          allNotes[name] = { articleNote: articleNote || '', annotations: annotations || [] };
+          allNotes[name] = {
+            articleNote: articleNote || '',
+            annotations: annotations || [],
+            tags: tags || [],
+            isFavorite: !!isFavorite
+          };
           saveJsonFile(NOTES_PATH, allNotes);
           sendJson(res, { ok: true });
         } catch (err) {

@@ -392,13 +392,15 @@ The built-in article reader (`pullread view` or **View Articles** in the menu ba
 
 #### Highlights & Notes
 
-Select any text in an article to see a floating toolbar with highlight color options (yellow, green, blue, pink) and an "Add note" button. Click an existing highlight to change its color or delete it.
+Select any text in an article to see a floating toolbar with highlight color options (yellow, green, blue, pink) and an "Add note" button. Click an existing highlight to change its color, add a note to it, or delete it.
 
-- **Highlights** are saved per-article at `~/.config/pullread/highlights.json`
+- **Highlights** are saved per-article at `~/.config/pullread/highlights.json` — each highlight can optionally carry a note
 - **Notes** are saved per-article at `~/.config/pullread/notes.json`
 - **Article-level notes** can be written in a collapsible "Notes" panel at the bottom of each article
 - **Inline annotations** attach a note to a specific text passage, shown with a marker icon
-- Sidebar items show indicator dots for articles with highlights (yellow) or notes (blue)
+- **Tags** can be added to any article via the Notes panel (press Enter or comma to add)
+- **Favorites** mark articles with a heart icon in the sidebar
+- Sidebar items show indicator dots for favorites (heart), highlights (yellow), notes (blue), and summaries (purple)
 
 #### Summaries
 
