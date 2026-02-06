@@ -325,10 +325,14 @@ export function startViewer(outputPath: string, port = 7777): void {
         const msg = err instanceof Error ? err.message : 'Summarization failed';
         // Provide user-friendly error messages
         let userMsg = msg;
-        if (msg.includes('Apple Intelligence requires')) {
-          userMsg = 'Apple Intelligence requires macOS 26. Configure a cloud provider in Settings.';
+        if (msg.includes('Apple Intelligence requires macOS 26')) {
+          userMsg = 'Apple Intelligence requires macOS 26 (Tahoe). Update macOS or choose a different provider in Settings.';
+        } else if (msg.includes('Apple Intelligence is not available')) {
+          userMsg = 'Apple Intelligence is not available on this Mac. Choose a cloud provider in Settings.';
+        } else if (msg.includes('Apple Intelligence error')) {
+          userMsg = 'Apple Intelligence encountered an error. Try again, or switch to a cloud provider for this article.';
         } else if (msg.includes('context window') || msg.includes('too long') || msg.includes('max_tokens') || msg.includes('exceededContextWindowSize')) {
-          userMsg = 'Article too long for this model. Try a cloud provider with a larger context window.';
+          userMsg = 'Article too long for this model. Try a model with a larger context window.';
         } else if (msg.includes('No API key')) {
           userMsg = 'No model configured. Open Settings to add a provider.';
         }

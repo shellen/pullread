@@ -119,24 +119,21 @@ struct SettingsView: View {
     private var welcomeHeader: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Image(systemName: "doc.text.fill")
-                    .font(.system(size: 32))
-                    .foregroundStyle(.linearGradient(
-                        colors: [.blue, .purple],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 40, height: 40)
+                    .cornerRadius(8)
                 VStack(alignment: .leading) {
                     Text("Welcome to PullRead")
                         .font(.title2)
                         .fontWeight(.semibold)
-                    Text("Sync RSS feeds to markdown files")
+                    Text("Your bookmark reader & markdown library")
                         .foregroundColor(.secondary)
                 }
             }
             .padding(.bottom, 4)
 
-            Text("PullRead syncs your RSS and Atom feeds into clean markdown files, saved to a folder you choose. Add your feeds below and you're ready to go.")
+            Text("PullRead syncs your bookmarks and feeds into clean markdown files you can read, search, and keep forever.")
                 .font(.callout)
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -190,12 +187,12 @@ struct SettingsView: View {
                             .font(.headline)
                             .foregroundColor(.secondary)
                     }
-                    Label("Add Your Feeds", systemImage: "antenna.radiowaves.left.and.right")
+                    Label("Your Sources", systemImage: "bookmark.fill")
                         .font(.headline)
                         .foregroundColor(.primary)
                 }
 
-                Text("Add RSS or Atom feed URLs to sync.")
+                Text("Add feed URLs for sites you follow.")
                     .font(.caption)
                     .foregroundColor(.secondary)
 
@@ -336,25 +333,28 @@ struct SettingsView: View {
                         .foregroundColor(.primary)
                 }
 
-                Text("Add your API key to generate article summaries on demand. Your key is stored locally and never shared.")
+                Text("Generate article summaries on demand. Your key is stored locally and never shared.")
                     .font(.caption)
                     .foregroundColor(.secondary)
 
+                // Provider dropdown
                 HStack(spacing: 8) {
                     Text("Provider")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .frame(width: 60, alignment: .trailing)
                     Picker("", selection: $llmProvider) {
+                        Label("Apple Intelligence", systemImage: "apple.logo")
+                            .tag("apple")
+                        Divider()
                         Text("Anthropic").tag("anthropic")
                         Text("OpenAI").tag("openai")
-                        Text("Gemini").tag("gemini")
+                        Text("Google Gemini").tag("gemini")
                         Text("OpenRouter").tag("openrouter")
-                        Text("Apple Intelligence").tag("apple")
                     }
-                    .pickerStyle(.segmented)
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .onChange(of: llmProvider) { _ in
-                        // Reset model selection when provider changes
                         useCustomModel = false
                         llmModel = Self.defaultModels[llmProvider] ?? ""
                         llmModelCustom = ""
@@ -366,10 +366,10 @@ struct SettingsView: View {
                         Image(systemName: "apple.intelligence")
                             .foregroundColor(.blue)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Uses on-device model via Foundation Models framework")
+                            Text("On-device summarization — free & private")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            Text("Requires macOS 26 (Tahoe) · No API key needed · Free & private")
+                            Text("Requires macOS 26 (Tahoe) · No API key needed · Long articles are processed in sections automatically")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
@@ -380,6 +380,7 @@ struct SettingsView: View {
                 }
 
                 if !isAppleProvider {
+                    // API Key
                     HStack(spacing: 8) {
                         Text("API Key")
                             .font(.caption)
@@ -392,6 +393,7 @@ struct SettingsView: View {
                             .cornerRadius(6)
                     }
 
+                    // Model selection
                     HStack(spacing: 8) {
                         Text("Model")
                             .font(.caption)
@@ -409,39 +411,43 @@ struct SettingsView: View {
                                 llmModelCustom = ""
                             }
                             .font(.caption)
+                            .buttonStyle(.borderless)
                         } else {
                             Picker("", selection: $llmModel) {
                                 ForEach(modelsForProvider, id: \.self) { model in
                                     Text(model).tag(model)
                                 }
                             }
-                            .frame(maxWidth: .infinity)
+                            .pickerStyle(.menu)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             Button("Custom") {
                                 useCustomModel = true
                             }
                             .font(.caption)
+                            .buttonStyle(.borderless)
+                            .foregroundColor(.accentColor)
                         }
                     }
 
                     if useCustomModel {
-                        Text("Enter any model ID. Useful for newer models not yet listed.")
+                        Text("Enter any model ID supported by this provider.")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                             .padding(.leading, 68)
                     }
-                }
 
-                if !isAppleProvider && !llmApiKey.isEmpty {
-                    HStack(spacing: 8) {
-                        Image(systemName: "checkmark.shield.fill")
-                            .foregroundColor(.green)
-                        Text("Key stored locally at ~/.config/pullread/settings.json")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                    if !llmApiKey.isEmpty {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.shield.fill")
+                                .foregroundColor(.green)
+                            Text("Key stored locally at ~/.config/pullread/settings.json")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(10)
+                        .background(Color.green.opacity(0.1))
+                        .cornerRadius(8)
                     }
-                    .padding(10)
-                    .background(Color.green.opacity(0.1))
-                    .cornerRadius(8)
                 }
             }
         }

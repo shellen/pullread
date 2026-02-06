@@ -81,26 +81,42 @@ struct OnboardingView: View {
         VStack(spacing: 24) {
             Spacer().frame(height: 20)
 
-            Image(systemName: "doc.text.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(.linearGradient(
-                    colors: [.blue, .purple],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ))
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 80, height: 80)
+                .cornerRadius(16)
 
             Text("Welcome to PullRead")
                 .font(.largeTitle)
                 .fontWeight(.bold)
 
-            Text("PullRead turns your RSS feeds into a local library of clean, readable markdown files.")
+            Text("Your bookmark reader and markdown library. PullRead syncs your bookmarks and feeds into clean, readable markdown files you own.")
                 .font(.body)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 380)
 
+            HStack(spacing: 16) {
+                featurePill(icon: "doc.text", text: "Markdown files")
+                featurePill(icon: "bookmark.fill", text: "Bookmark sync")
+                featurePill(icon: "sparkles", text: "AI summaries")
+            }
+
             Spacer()
         }
+    }
+
+    private func featurePill(icon: String, text: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.caption)
+            Text(text)
+                .font(.caption)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(Color.secondary.opacity(0.1))
+        .cornerRadius(12)
     }
 
     // MARK: - Step 2: Output Folder
@@ -142,10 +158,10 @@ struct OnboardingView: View {
     private var feedsStep: some View {
         VStack(alignment: .leading, spacing: 20) {
             stepHeader(
-                icon: "antenna.radiowaves.left.and.right",
+                icon: "bookmark.fill",
                 iconColor: .orange,
-                title: "Add Your Feeds",
-                subtitle: "Add RSS or Atom feed URLs to sync. We've included a sample feed to get you started."
+                title: "Add Your Sources",
+                subtitle: "Add feed URLs for sites you follow. PullRead converts articles into markdown files you can read, search, and keep forever."
             )
 
             GlassCard {
@@ -278,13 +294,13 @@ struct OnboardingView: View {
                 .fontWeight(.bold)
 
             if syncComplete {
-                Text("Your first sync is complete. Look for the PullRead icon in your menu bar to sync, view articles, and manage settings.")
+                Text("Your first sync is complete. Your articles are now markdown files in your output folder. Use the menu bar icon to sync, read, and manage your library.")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 380)
             } else {
-                Text("Your feeds are configured. Run your first sync to start reading.")
+                Text("Your sources are configured. Run your first sync to start building your markdown library.")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)

@@ -116,7 +116,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             } else {
                 button.title = "PR"
             }
-            button.toolTip = "PullRead - RSS to Markdown Sync"
+            button.toolTip = "PullRead - Bookmark Reader & Markdown Library"
         }
 
         let menu = NSMenu()
@@ -172,6 +172,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // menu.addItem(checkForUpdatesMenuItem)
 
         menu.addItem(NSMenuItem.separator())
+
+        // Welcome Guide
+        let welcomeMenuItem = NSMenuItem(title: "Welcome Guide...", action: #selector(showWelcomeGuide), keyEquivalent: "")
+        welcomeMenuItem.target = self
+        menu.addItem(welcomeMenuItem)
 
         // About
         let aboutMenuItem = NSMenuItem(title: "About PullRead", action: #selector(showAbout), keyEquivalent: "")
@@ -363,12 +368,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         controller.showWhatsNew(version: version)
     }
 
+    @objc private func showWelcomeGuide() {
+        // Allow re-showing onboarding by temporarily clearing the flag
+        let wasCompleted = UserDefaults.standard.bool(forKey: "onboardingCompleted")
+        UserDefaults.standard.set(false, forKey: "onboardingCompleted")
+        showSettings(isFirstRun: true)
+        // Restore the flag after showing (onboarding Done button will re-set it)
+        if wasCompleted {
+            UserDefaults.standard.set(true, forKey: "onboardingCompleted")
+        }
+    }
+
     @objc private func showAbout() {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
         let alert = NSAlert()
         alert.messageText = "PullRead"
-        alert.informativeText = "RSS to Markdown Sync\n\nVersion \(version) (\(build))\n\nSyncs RSS and Atom feeds to markdown files for offline reading.\n\nBy A Little Drive\nhttps://alittledrive.com"
+        alert.informativeText = "Bookmark Reader & Markdown Library\n\nVersion \(version) (\(build))\n\nSyncs your bookmarks and feeds into clean markdown files you can read, search, and keep.\n\nBy A Little Drive\nhttps://alittledrive.com"
         alert.alertStyle = .informational
         alert.addButton(withTitle: "OK")
         alert.runModal()

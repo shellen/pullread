@@ -180,19 +180,14 @@ async function callOpenRouter(apiKey: string, model: string, articleText: string
   return { summary: text.trim(), model: data.model || model };
 }
 
-async function callApple(articleText: string): Promise<SummarizeResult> {
-  // Apple Intelligence has a 4,096 token context window — use a smaller input
-  const trimmed = articleText.split(/\s+/).slice(0, 2500).join(' ');
-  const prompt = `${SUMMARIZE_PROMPT}\n\n---\n\n${trimmed}`;
-
+// Low-level helper: run a prompt through Apple Intelligence via Foundation Models
+function runApplePrompt(prompt: string): string {
   const configDir = join(homedir(), '.config', 'pullread');
   const tmpPrompt = join(configDir, '.apple-prompt.txt');
   const swiftScript = join(configDir, '.apple-summarize.swift');
 
-  // Write the prompt to a temp file
   writeFileSync(tmpPrompt, prompt);
 
-  // Write the Swift helper script (uses Foundation Models framework, macOS 26+)
   const scriptContent = [
     'import Foundation',
     'import FoundationModels',
@@ -208,10 +203,10 @@ async function callApple(articleText: string): Promise<SummarizeResult> {
   try {
     const result = execFileSync('swift', [swiftScript, tmpPrompt], {
       encoding: 'utf-8',
-      timeout: 60_000,
+      timeout: 90_000,
       stdio: ['pipe', 'pipe', 'pipe']
     });
-    return { summary: result.trim(), model: 'apple-on-device' };
+    return result.trim();
   } catch (err: any) {
     const stderr = err.stderr || '';
     if (stderr.includes('No such module') || stderr.includes('FoundationModels')) {
@@ -220,10 +215,40 @@ async function callApple(articleText: string): Promise<SummarizeResult> {
     if (stderr.includes('not eligible') || stderr.includes('not available')) {
       throw new Error('Apple Intelligence is not available on this Mac. Requires Apple Silicon with macOS 26.');
     }
-    throw new Error(`Apple Intelligence failed: ${stderr.slice(0, 200) || err.message}`);
+    throw new Error(`Apple Intelligence error: ${stderr.slice(0, 200) || err.message}`);
   } finally {
     try { unlinkSync(tmpPrompt); } catch {}
   }
+}
+
+const CHUNK_WORD_LIMIT = 2000;
+
+async function callApple(articleText: string): Promise<SummarizeResult> {
+  const words = articleText.split(/\s+/);
+
+  if (words.length <= CHUNK_WORD_LIMIT) {
+    // Short article — single pass
+    const prompt = `${SUMMARIZE_PROMPT}\n\n---\n\n${words.join(' ')}`;
+    return { summary: runApplePrompt(prompt), model: 'apple-on-device' };
+  }
+
+  // Long article — map-reduce: summarize chunks, then combine
+  const chunks: string[] = [];
+  for (let i = 0; i < words.length; i += CHUNK_WORD_LIMIT) {
+    chunks.push(words.slice(i, i + CHUNK_WORD_LIMIT).join(' '));
+  }
+
+  const chunkSummaries: string[] = [];
+  for (let i = 0; i < chunks.length; i++) {
+    const chunkPrompt = `Summarize this section (part ${i + 1} of ${chunks.length}) in 1-2 sentences. Focus on the key points.\n\n---\n\n${chunks[i]}`;
+    chunkSummaries.push(runApplePrompt(chunkPrompt));
+  }
+
+  // Final combine pass
+  const combinePrompt = `Below are summaries of different sections of the same article. Combine them into a single 2-3 sentence summary that captures the main argument or finding. Do not use phrases like "This article discusses" — just state the main points directly.\n\n${chunkSummaries.map((s, i) => `Section ${i + 1}: ${s}`).join('\n\n')}`;
+  const finalSummary = runApplePrompt(combinePrompt);
+
+  return { summary: finalSummary, model: 'apple-on-device' };
 }
 
 export async function summarizeText(articleText: string, config?: LLMConfig): Promise<SummarizeResult> {
