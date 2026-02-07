@@ -8,11 +8,9 @@ struct OnboardingView: View {
     @Binding var isPresented: Bool
     @State private var currentStep = 0
     @State private var outputPath: String = "~/Documents/PullRead"
-    @State private var feeds: [FeedItem] = [
-        FeedItem(name: "Hacker News (100+)", url: "https://hnrss.org/newest?points=100")
-    ]
-    @State private var newFeedName: String = ""
+    @State private var feeds: [FeedItem] = []
     @State private var newFeedURL: String = ""
+    @State private var isFetchingTitle: Bool = false
     @State private var useBrowserCookies: Bool = false
     @State private var isSyncing: Bool = false
     @State private var syncComplete: Bool = false
@@ -90,15 +88,15 @@ struct OnboardingView: View {
                 .font(.largeTitle)
                 .fontWeight(.bold)
 
-            Text("Your bookmark reader and markdown library. PullRead syncs your bookmarks and feeds into clean, readable markdown files you own.")
+            Text("Save articles from your bookmark services as clean markdown files you own. Connect Instapaper, Pinboard, Raindrop, or any service with an RSS feed.")
                 .font(.body)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 380)
 
             HStack(spacing: 16) {
-                featurePill(icon: "doc.text", text: "Markdown files")
                 featurePill(icon: "bookmark.fill", text: "Bookmark sync")
+                featurePill(icon: "doc.text", text: "Markdown files")
                 featurePill(icon: "sparkles", text: "AI summaries")
             }
 
@@ -153,15 +151,15 @@ struct OnboardingView: View {
         }
     }
 
-    // MARK: - Step 3: Add Feeds
+    // MARK: - Step 3: Connect Bookmarks
 
     private var feedsStep: some View {
         VStack(alignment: .leading, spacing: 20) {
             stepHeader(
                 icon: "bookmark.fill",
                 iconColor: .orange,
-                title: "Add Your Sources",
-                subtitle: "Add feed URLs for sites you follow. PullRead converts articles into markdown files you can read, search, and keep forever."
+                title: "Connect Your Bookmarks",
+                subtitle: "Paste the RSS feed URL from your bookmark service. PullRead will fetch and save your bookmarked articles as markdown files."
             )
 
             GlassCard {
@@ -193,45 +191,73 @@ struct OnboardingView: View {
                         }
                     }
 
-                    Divider()
+                    if !feeds.isEmpty {
+                        Divider()
+                    }
 
-                    // Add new feed
+                    // Add new feed — URL only with auto-discovery
                     HStack(spacing: 8) {
-                        TextField("Name", text: $newFeedName)
-                            .textFieldStyle(.plain)
-                            .padding(8)
-                            .frame(width: 100)
-                            .background(Color(NSColor.textBackgroundColor).opacity(0.5))
-                            .cornerRadius(6)
-
-                        TextField("Feed URL", text: $newFeedURL)
+                        TextField("Paste bookmark feed URL or blog URL...", text: $newFeedURL)
                             .textFieldStyle(.plain)
                             .padding(8)
                             .background(Color(NSColor.textBackgroundColor).opacity(0.5))
                             .cornerRadius(6)
+                            .onSubmit { addFeed() }
 
-                        Button(action: addFeed) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.title2)
+                        if isFetchingTitle {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                                .frame(width: 24)
+                        } else {
+                            Button(action: addFeed) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.title2)
+                            }
+                            .buttonStyle(.borderless)
+                            .disabled(newFeedURL.isEmpty)
+                        }
+                    }
+
+                    // Import bookmarks.html option
+                    HStack(spacing: 6) {
+                        Button(action: importBookmarks) {
+                            Label("Import bookmarks.html", systemImage: "square.and.arrow.down")
+                                .font(.caption)
                         }
                         .buttonStyle(.borderless)
-                        .disabled(newFeedName.isEmpty || newFeedURL.isEmpty)
+
+                        Text("from Chrome, Safari, Firefox, or Pocket export")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
                     }
                 }
             }
 
-            // Feed suggestions
+            // Bookmark service examples
             VStack(alignment: .leading, spacing: 8) {
-                Text("Popular feeds:")
+                Text("Where to find your feed URL:")
                     .font(.caption)
                     .foregroundColor(.secondary)
 
-                HStack(spacing: 8) {
-                    suggestionChip(name: "TechCrunch", url: "https://techcrunch.com/feed/")
-                    suggestionChip(name: "Daring Fireball", url: "https://daringfireball.net/feeds/main")
-                    suggestionChip(name: "The Verge", url: "https://www.theverge.com/rss/index.xml")
+                VStack(alignment: .leading, spacing: 4) {
+                    serviceHint(name: "Instapaper", hint: "Settings \u{2192} Export \u{2192} RSS Feed URL")
+                    serviceHint(name: "Pinboard", hint: "pinboard.in/feeds/u:USERNAME/")
+                    serviceHint(name: "Raindrop", hint: "Collection \u{2192} Share \u{2192} RSS Feed")
+                    serviceHint(name: "Omnivore", hint: "Settings \u{2192} Feeds \u{2192} RSS URL")
                 }
             }
+        }
+    }
+
+    private func serviceHint(name: String, hint: String) -> some View {
+        HStack(spacing: 6) {
+            Text(name)
+                .font(.caption)
+                .fontWeight(.medium)
+                .frame(width: 80, alignment: .leading)
+            Text(hint)
+                .font(.caption2)
+                .foregroundColor(.secondary)
         }
     }
 
@@ -294,13 +320,13 @@ struct OnboardingView: View {
                 .fontWeight(.bold)
 
             if syncComplete {
-                Text("Your first sync is complete. Your articles are now markdown files in your output folder. Use the menu bar icon to sync, read, and manage your library.")
+                Text("Your first sync is complete. Your bookmarked articles are now markdown files in your output folder. Use the menu bar icon to sync, read, and manage your library.")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 380)
             } else {
-                Text("Your sources are configured. Run your first sync to start building your markdown library.")
+                Text("PullRead will now fetch your bookmarked articles and save them as markdown. You can sync anytime from the menu bar.")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -340,11 +366,7 @@ struct OnboardingView: View {
 
             if currentStep < totalSteps - 1 {
                 Button("Next") {
-                    if currentStep == 2 && feeds.isEmpty {
-                        errorMessage = "Please add at least one feed."
-                        showingError = true
-                        return
-                    }
+                    // Feeds step: allow skipping — user may have imported bookmarks.html instead
                     if currentStep == 1 && outputPath.isEmpty {
                         errorMessage = "Please choose an output folder."
                         showingError = true
@@ -391,24 +413,6 @@ struct OnboardingView: View {
         }
     }
 
-    private func suggestionChip(name: String, url: String) -> some View {
-        Button(action: {
-            let alreadyAdded = feeds.contains { $0.url == url }
-            if !alreadyAdded {
-                feeds.append(FeedItem(name: name, url: url))
-            }
-        }) {
-            Text("+ \(name)")
-                .font(.caption)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(Color.accentColor.opacity(0.1))
-                .cornerRadius(12)
-        }
-        .buttonStyle(.borderless)
-        .disabled(feeds.contains { $0.url == url })
-    }
-
     private func selectOutputFolder() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
@@ -430,16 +434,168 @@ struct OnboardingView: View {
     }
 
     private func addFeed() {
-        guard !newFeedName.isEmpty, !newFeedURL.isEmpty else { return }
+        guard !newFeedURL.isEmpty else { return }
 
         var urlString = newFeedURL.trimmingCharacters(in: .whitespacesAndNewlines)
         if !urlString.hasPrefix("http://") && !urlString.hasPrefix("https://") {
             urlString = "https://" + urlString
         }
 
-        feeds.append(FeedItem(name: newFeedName.trimmingCharacters(in: .whitespaces), url: urlString))
-        newFeedName = ""
-        newFeedURL = ""
+        let finalUrl = urlString
+        isFetchingTitle = true
+
+        discoverFeed(from: finalUrl) { result in
+            let feedUrl = result?.feedUrl ?? finalUrl
+            let name = result?.title ?? domainFromUrl(feedUrl)
+            feeds.append(FeedItem(name: name, url: feedUrl))
+            newFeedURL = ""
+            isFetchingTitle = false
+        }
+    }
+
+    private func domainFromUrl(_ urlString: String) -> String {
+        guard let url = URL(string: urlString), let host = url.host else { return urlString }
+        return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+    }
+
+    private struct FeedDiscoveryResult {
+        let feedUrl: String
+        let title: String?
+    }
+
+    private func discoverFeed(from urlString: String, completion: @escaping (FeedDiscoveryResult?) -> Void) {
+        guard let url = URL(string: urlString) else {
+            completion(nil)
+            return
+        }
+
+        URLSession.shared.dataTask(with: url) { data, _, _ in
+            guard let data = data, let text = String(data: data, encoding: .utf8) else {
+                DispatchQueue.main.async { completion(nil) }
+                return
+            }
+
+            let isFeed = text.contains("<rss") || text.contains("<feed") || text.contains("<rdf:RDF") || text.contains("<?xml")
+
+            if isFeed {
+                let title = self.extractXmlTitle(from: text)
+                DispatchQueue.main.async { completion(FeedDiscoveryResult(feedUrl: urlString, title: title)) }
+                return
+            }
+
+            // Try HTML RSS auto-discovery
+            let pattern = #"<link[^>]*rel\s*=\s*["']alternate["'][^>]*type\s*=\s*["']application/(rss|atom)\+xml["'][^>]*href\s*=\s*["']([^"']+)["'][^>]*>"#
+            let altPattern = #"<link[^>]*href\s*=\s*["']([^"']+)["'][^>]*type\s*=\s*["']application/(rss|atom)\+xml["'][^>]*>"#
+
+            var feedHref: String?
+            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+               let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) {
+                if let range = Range(match.range(at: 2), in: text) {
+                    feedHref = String(text[range])
+                }
+            } else if let regex = try? NSRegularExpression(pattern: altPattern, options: .caseInsensitive),
+                      let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) {
+                if let range = Range(match.range(at: 1), in: text) {
+                    feedHref = String(text[range])
+                }
+            }
+
+            guard let href = feedHref else {
+                let title = self.extractXmlTitle(from: text)
+                DispatchQueue.main.async { completion(FeedDiscoveryResult(feedUrl: urlString, title: title)) }
+                return
+            }
+
+            let resolvedUrl: String
+            if href.hasPrefix("http://") || href.hasPrefix("https://") {
+                resolvedUrl = href
+            } else if let base = URL(string: urlString), let resolved = URL(string: href, relativeTo: base) {
+                resolvedUrl = resolved.absoluteString
+            } else {
+                resolvedUrl = href
+            }
+
+            guard let feedUrl = URL(string: resolvedUrl) else {
+                DispatchQueue.main.async { completion(FeedDiscoveryResult(feedUrl: resolvedUrl, title: nil)) }
+                return
+            }
+
+            URLSession.shared.dataTask(with: feedUrl) { feedData, _, _ in
+                var feedTitle: String?
+                if let feedData = feedData, let feedText = String(data: feedData, encoding: .utf8) {
+                    feedTitle = self.extractXmlTitle(from: feedText)
+                }
+                DispatchQueue.main.async { completion(FeedDiscoveryResult(feedUrl: resolvedUrl, title: feedTitle)) }
+            }.resume()
+        }.resume()
+    }
+
+    private func extractXmlTitle(from text: String) -> String? {
+        guard let startRange = text.range(of: "<title>"),
+              let endRange = text.range(of: "</title>", range: startRange.upperBound..<text.endIndex) else {
+            return nil
+        }
+        let raw = String(text[startRange.upperBound..<endRange.lowerBound])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "<![CDATA[", with: "")
+            .replacingOccurrences(of: "]]>", with: "")
+        return raw.isEmpty ? nil : raw
+    }
+
+    private func importBookmarks() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.html]
+        panel.prompt = "Import"
+        panel.message = "Select a bookmarks.html file to import"
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        guard let resourcePath = Bundle.main.resourcePath else {
+            errorMessage = "Could not find PullRead binary in app bundle."
+            showingError = true
+            return
+        }
+
+        let binaryPath = "\(resourcePath)/pullread"
+        guard FileManager.default.fileExists(atPath: binaryPath) else {
+            errorMessage = "PullRead binary not found. Please reinstall the app."
+            showingError = true
+            return
+        }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: binaryPath)
+        process.arguments = ["import", url.path, "--config-path", configPath, "--data-path", (configPath as NSString).deletingLastPathComponent + "/pullread.db"]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                try process.run()
+                process.waitUntilExit()
+                let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+                DispatchQueue.main.async {
+                    if process.terminationStatus == 0 {
+                        let summary = output.components(separatedBy: "\n").last(where: { $0.contains("Done:") }) ?? "Import completed"
+                        errorMessage = summary
+                        showingError = true
+                    } else {
+                        errorMessage = "Import failed: \(output)"
+                        showingError = true
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    errorMessage = "Failed to run import: \(error.localizedDescription)"
+                    showingError = true
+                }
+            }
+        }
     }
 
     private func saveConfig() {

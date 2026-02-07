@@ -826,9 +826,6 @@ struct SettingsView: View {
             // Pre-fill defaults for first run
             if isFirstRun {
                 outputPath = "~/Documents/PullRead"
-                feeds = [
-                    FeedItem(name: "Hacker News (100+)", url: "https://hnrss.org/newest?points=100")
-                ]
             }
             return
         }
