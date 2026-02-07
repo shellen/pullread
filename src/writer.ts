@@ -74,8 +74,6 @@ domain: ${data.domain}`;
 
   return `${frontmatter}
 
-# ${data.title}
-
 ${data.content}
 `;
 }

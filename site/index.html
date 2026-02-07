@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pull Read - Own Your Reading List</title>
+<meta name="description" content="Save articles from your bookmark services as clean markdown files you own. Connect Instapaper, Pinboard, Raindrop, and more.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --teal: #2a9d8f;
+    --teal-dark: #21867a;
+    --teal-light: #e8f5f3;
+    --orange: #e76f51;
+    --fg: #1a1a1a;
+    --muted: #5a5a5a;
+    --light-muted: #888;
+    --bg: #fafaf9;
+    --white: #ffffff;
+    --border: #e8e8e6;
+    --code-bg: #f3f3f1;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Nav */
+  nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: rgba(250, 250, 249, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 18px;
+    color: var(--fg);
+    text-decoration: none;
+  }
+
+  .nav-brand svg { flex-shrink: 0; }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    list-style: none;
+  }
+
+  .nav-links a {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: color 0.15s;
+  }
+
+  .nav-links a:hover { color: var(--fg); }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 15px;
+    text-decoration: none;
+    transition: all 0.15s;
+    border: none;
+    cursor: pointer;
+  }
+
+  .btn-primary {
+    background: var(--teal);
+    color: var(--white);
+  }
+
+  .btn-primary:hover {
+    background: var(--teal-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(42, 157, 143, 0.3);
+  }
+
+  .btn-secondary {
+    background: var(--white);
+    color: var(--fg);
+    border: 1px solid var(--border);
+  }
+
+  .btn-secondary:hover {
+    border-color: #ccc;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+
+  .btn-sm {
+    padding: 8px 16px;
+    font-size: 13px;
+    border-radius: 6px;
+  }
+
+  /* Hero */
+  .hero {
+    padding: 140px 24px 80px;
+    text-align: center;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .hero-icon {
+    margin-bottom: 32px;
+  }
+
+  .hero h1 {
+    font-size: clamp(36px, 6vw, 56px);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    margin-bottom: 20px;
+  }
+
+  .hero h1 .accent { color: var(--teal); }
+
+  .hero p {
+    font-size: 19px;
+    color: var(--muted);
+    max-width: 560px;
+    margin: 0 auto 36px;
+    line-height: 1.6;
+  }
+
+  .hero-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .hero-note {
+    margin-top: 16px;
+    font-size: 13px;
+    color: var(--light-muted);
+  }
+
+  /* Section layout */
+  section {
+    padding: 80px 24px;
+  }
+
+  .container {
+    max-width: 1080px;
+    margin: 0 auto;
+  }
+
+  .section-label {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--teal);
+    margin-bottom: 12px;
+  }
+
+  .section-title {
+    font-size: clamp(28px, 4vw, 40px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    margin-bottom: 16px;
+  }
+
+  .section-subtitle {
+    font-size: 17px;
+    color: var(--muted);
+    max-width: 560px;
+    line-height: 1.6;
+  }
+
+  /* How it works */
+  .how-it-works {
+    background: var(--white);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 40px;
+    margin-top: 48px;
+  }
+
+  .step {
+    text-align: center;
+  }
+
+  .step-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--teal-light);
+    color: var(--teal);
+    font-weight: 700;
+    font-size: 16px;
+    margin-bottom: 16px;
+  }
+
+  .step h3 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .step p {
+    font-size: 15px;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+
+  .flow-arrow {
+    display: none;
+  }
+
+  /* Features grid */
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-top: 48px;
+  }
+
+  .feature-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    transition: box-shadow 0.2s, transform 0.2s;
+  }
+
+  .feature-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    transform: translateY(-2px);
+  }
+
+  .feature-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: var(--teal-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+    color: var(--teal);
+  }
+
+  .feature-card h3 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .feature-card p {
+    font-size: 14px;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+
+  /* Services strip */
+  .services {
+    background: var(--white);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .service-logos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 36px;
+    justify-content: center;
+  }
+
+  .service-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--muted);
+  }
+
+  /* Reader preview */
+  .reader-section { text-align: center; }
+
+  .reader-preview {
+    margin-top: 48px;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+    max-width: 900px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .reader-chrome {
+    background: #f5f5f5;
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .reader-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #e0e0e0;
+  }
+
+  .reader-body {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    min-height: 360px;
+  }
+
+  .reader-sidebar {
+    background: #f7f7f7;
+    border-right: 1px solid var(--border);
+    padding: 16px 0;
+  }
+
+  .reader-sidebar-item {
+    padding: 10px 16px;
+    font-size: 12px;
+    color: var(--muted);
+    border-left: 3px solid transparent;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .reader-sidebar-item.active {
+    background: #e8e8e8;
+    border-left-color: var(--teal);
+    color: var(--fg);
+    font-weight: 600;
+  }
+
+  .reader-sidebar-item .date {
+    font-size: 10px;
+    color: var(--light-muted);
+    display: block;
+    margin-top: 2px;
+  }
+
+  .reader-content {
+    padding: 32px 40px;
+    text-align: left;
+  }
+
+  .reader-content h2 {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--fg);
+  }
+
+  .reader-content .byline {
+    font-size: 12px;
+    color: var(--light-muted);
+    margin-bottom: 16px;
+  }
+
+  .reader-content .mock-text {
+    height: 10px;
+    background: #eee;
+    border-radius: 4px;
+    margin-bottom: 10px;
+  }
+
+  .reader-content .mock-text:nth-child(odd) { width: 100%; }
+  .reader-content .mock-text:nth-child(even) { width: 85%; }
+  .reader-content .mock-text:last-child { width: 60%; }
+
+  .reader-content .highlight {
+    background: rgba(255, 235, 59, 0.35);
+    border-radius: 2px;
+    display: inline;
+    padding: 1px 0;
+  }
+
+  .reader-content .mock-paragraph {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+
+  /* Markdown preview */
+  .markdown-section {
+    background: var(--white);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .markdown-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    margin-top: 48px;
+    align-items: start;
+  }
+
+  .markdown-block {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .markdown-block-header {
+    background: var(--code-bg);
+    padding: 10px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--light-muted);
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .markdown-block pre {
+    padding: 20px;
+    font-size: 13px;
+    line-height: 1.6;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    overflow-x: auto;
+    color: var(--muted);
+  }
+
+  .markdown-block pre .key { color: var(--teal); }
+  .markdown-block pre .val { color: var(--orange); }
+  .markdown-block pre .heading { color: var(--fg); font-weight: 600; }
+
+  /* CTA */
+  .cta {
+    text-align: center;
+    padding: 100px 24px;
+  }
+
+  .cta h2 {
+    font-size: clamp(28px, 4vw, 40px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 16px;
+  }
+
+  .cta p {
+    font-size: 17px;
+    color: var(--muted);
+    margin-bottom: 32px;
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .cta-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  /* Footer */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 32px 24px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--light-muted);
+  }
+
+  footer a {
+    color: var(--muted);
+    text-decoration: none;
+  }
+
+  footer a:hover { color: var(--fg); }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .steps {
+      grid-template-columns: 1fr;
+      gap: 32px;
+    }
+
+    .features-grid {
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+
+    .reader-body {
+      grid-template-columns: 1fr;
+    }
+
+    .reader-sidebar {
+      display: none;
+    }
+
+    .markdown-split {
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+
+    .nav-links { display: none; }
+
+    .hero { padding: 100px 24px 60px; }
+
+    section { padding: 60px 24px; }
+  }
+
+  @media (max-width: 480px) {
+    .hero-buttons {
+      flex-direction: column;
+      align-items: center;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav>
+  <a href="#" class="nav-brand">
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+      <rect x="1" y="1" width="26" height="26" rx="6" fill="#2a9d8f"/>
+      <rect x="5" y="5" width="18" height="20" rx="2" fill="#fff"/>
+      <rect x="8" y="10" width="12" height="2" rx="1" fill="#444"/>
+      <rect x="8" y="14" width="12" height="2" rx="1" fill="#444"/>
+      <rect x="8" y="18" width="8" height="2" rx="1" fill="#444"/>
+      <path d="M17 3v6l2-1.5L21 9V3z" fill="#e76f51"/>
+    </svg>
+    Pull Read
+  </a>
+  <ul class="nav-links">
+    <li><a href="#features">Features</a></li>
+    <li><a href="#reader">Reader</a></li>
+    <li><a href="#format">Format</a></li>
+    <li><a href="https://github.com/shellen/pullread" class="btn btn-sm btn-secondary">GitHub</a></li>
+    <li><a href="https://github.com/shellen/pullread/releases/latest" class="btn btn-sm btn-primary">Download</a></li>
+  </ul>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-icon">
+    <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+      <rect x="2" y="2" width="76" height="76" rx="18" fill="#2a9d8f"/>
+      <rect x="14" y="12" width="52" height="58" rx="4" fill="#fff"/>
+      <rect x="22" y="28" width="36" height="5" rx="2.5" fill="#444"/>
+      <rect x="22" y="38" width="36" height="5" rx="2.5" fill="#444"/>
+      <rect x="22" y="48" width="24" height="5" rx="2.5" fill="#444"/>
+      <path d="M49 6v18l6-4.5L61 24V6z" fill="#e76f51"/>
+    </svg>
+  </div>
+  <h1>Own your <span class="accent">reading list</span></h1>
+  <p>Pull Read saves articles from your bookmark services as clean markdown files. Your reading archive, in a folder you control.</p>
+  <div class="hero-buttons">
+    <a href="https://github.com/shellen/pullread/releases/latest" class="btn btn-primary">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12V2M4 8l4 4 4-4M2 14h12"/></svg>
+      Download for macOS
+    </a>
+    <a href="https://github.com/shellen/pullread" class="btn btn-secondary">View on GitHub</a>
+  </div>
+  <p class="hero-note">Self-contained menu bar app. No Node.js required.</p>
+</section>
+
+<!-- How it works -->
+<section class="how-it-works" id="how">
+  <div class="container">
+    <div style="text-align: center;">
+      <div class="section-label">How it works</div>
+      <h2 class="section-title">Three steps to owning your articles</h2>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h3>Connect your feeds</h3>
+        <p>Add RSS feeds from Instapaper, Pinboard, Raindrop, or any bookmark service. Paste a blog URL and Pull Read auto-discovers the feed.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h3>Pull Read syncs</h3>
+        <p>Articles are fetched, cleaned with Mozilla's Readability algorithm, and converted to markdown with rich metadata.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h3>Read and annotate</h3>
+        <p>Browse in the built-in reader with highlights, notes, and AI summaries. Or open files in Obsidian, VS Code, or any editor.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section id="features">
+  <div class="container">
+    <div class="section-label">Features</div>
+    <h2 class="section-title">Everything you need to<br>archive what you read</h2>
+    <p class="section-subtitle">Pull Read handles articles, podcasts, YouTube videos, PDFs, and tweets with specialized extractors for each.</p>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h12M4 8h12M4 12h8"/></svg>
+        </div>
+        <h3>Clean extraction</h3>
+        <p>Mozilla's Readability strips ads, nav, and clutter. What's left is the article, converted to beautiful markdown.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="10 2 12.5 7 18 7.5 14 11.5 15 17 10 14 5 17 6 11.5 2 7.5 7.5 7"/></svg>
+        </div>
+        <h3>Highlights and notes</h3>
+        <p>Select text to highlight in four colors. Add inline annotations, article-level notes, and tags to organize your thinking.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8"/><path d="M10 6v4l3 3"/></svg>
+        </div>
+        <h3>AI summaries</h3>
+        <p>Summarize articles on demand or in batch with Claude, GPT, Gemini, or Apple Intelligence. Summaries live in the file.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="16" height="12" rx="2"/><polygon points="8 8 8 12 12 10"/></svg>
+        </div>
+        <h3>YouTube transcripts</h3>
+        <p>Save videos with full transcripts when available. Search your video notes alongside articles.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10a7 7 0 0114 0"/><path d="M6 10a4 4 0 018 0"/><circle cx="10" cy="10" r="1"/><path d="M10 11v5"/><path d="M8 16h4"/></svg>
+        </div>
+        <h3>Podcast archival</h3>
+        <p>Episode metadata, show notes, and audio links are preserved. Perfect for referencing past episodes.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V4a2 2 0 00-2-2z"/><path d="M8 1v2M12 1v2M4 7h12"/></svg>
+        </div>
+        <h3>Weekly reviews</h3>
+        <p>AI-generated digests of your recent reading. See themes and connections across what you've saved.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 13l10 5 10-5"/></svg>
+        </div>
+        <h3>Smart deduplication</h3>
+        <p>Pull Read remembers what it's already processed. Failed extractions are tracked for easy retry.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M8 17a2 2 0 004 0"/></svg>
+        </div>
+        <h3>Menu bar app</h3>
+        <p>Native macOS menu bar app with sync, notifications, and scheduled reviews. Self-contained binary, no dependencies.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2 2 0 012 2v10a2 2 0 01-2 2H7l-4 3V5a2 2 0 012-2h12z"/></svg>
+        </div>
+        <h3>Cloud sync friendly</h3>
+        <p>Output to Dropbox, iCloud, Google Drive, or any folder. Your archive goes wherever your files go.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Services -->
+<section class="services">
+  <div class="container" style="text-align: center;">
+    <div class="section-label">Integrations</div>
+    <h2 class="section-title">Connect your favorite services</h2>
+    <p class="section-subtitle" style="margin: 0 auto;">Pull Read works with any service that offers an RSS feed, plus direct bookmark import from browsers and services.</p>
+    <div class="service-logos">
+      <span class="service-tag">Instapaper</span>
+      <span class="service-tag">Pinboard</span>
+      <span class="service-tag">Raindrop.io</span>
+      <span class="service-tag">Omnivore</span>
+      <span class="service-tag">Feedbin</span>
+      <span class="service-tag">Hacker News</span>
+      <span class="service-tag">YouTube</span>
+      <span class="service-tag">Any RSS Feed</span>
+      <span class="service-tag">Browser Bookmarks</span>
+    </div>
+  </div>
+</section>
+
+<!-- Reader -->
+<section class="reader-section" id="reader">
+  <div class="container">
+    <div class="section-label">Built-in reader</div>
+    <h2 class="section-title">A reading experience you'll enjoy</h2>
+    <p class="section-subtitle" style="margin: 0 auto;">Light, dark, and sepia themes. Multiple fonts. Keyboard shortcuts. Highlights in four colors. Notes and tags.</p>
+
+    <div class="reader-preview">
+      <div class="reader-chrome">
+        <div class="reader-dot"></div>
+        <div class="reader-dot"></div>
+        <div class="reader-dot"></div>
+      </div>
+      <div class="reader-body">
+        <div class="reader-sidebar">
+          <div class="reader-sidebar-item">
+            How to Write Better Code
+            <span class="date">2026-02-06</span>
+          </div>
+          <div class="reader-sidebar-item active">
+            The Case for Local-First
+            <span class="date">2026-02-05</span>
+          </div>
+          <div class="reader-sidebar-item">
+            Understanding WebAssembly
+            <span class="date">2026-02-04</span>
+          </div>
+          <div class="reader-sidebar-item">
+            Why RSS Still Matters
+            <span class="date">2026-02-03</span>
+          </div>
+          <div class="reader-sidebar-item">
+            Building CLI Tools in Bun
+            <span class="date">2026-02-02</span>
+          </div>
+        </div>
+        <div class="reader-content">
+          <h2>The Case for Local-First</h2>
+          <div class="byline">Martin Kleppmann &middot; inkandswitch.com &middot; 2026-02-05</div>
+          <div class="mock-paragraph">
+            Cloud apps have become the default, but they come with trade-offs that most people accept without question: latency, lock-in, and the assumption that your data lives on someone else's server.
+          </div>
+          <div class="mock-paragraph">
+            <span class="highlight">Local-first software keeps your data on your device while still enabling collaboration.</span> The idea is simple: you shouldn't need a server to use your own files.
+          </div>
+          <div class="mock-text"></div>
+          <div class="mock-text"></div>
+          <div class="mock-text"></div>
+          <div class="mock-text"></div>
+          <div class="mock-text"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Markdown format -->
+<section class="markdown-section" id="format">
+  <div class="container">
+    <div class="section-label">Your data, your format</div>
+    <h2 class="section-title">Plain markdown with rich metadata</h2>
+    <p class="section-subtitle">Every article is a <code>.md</code> file with YAML frontmatter. Open them in Obsidian, Logseq, VS Code, or any text editor. No database, no vendor lock-in.</p>
+
+    <div class="markdown-split">
+      <div class="markdown-block">
+        <div class="markdown-block-header">Article file</div>
+        <pre><span class="key">---</span>
+<span class="key">title:</span> <span class="val">"The Case for Local-First"</span>
+<span class="key">url:</span> https://inkandswitch.com/local-first
+<span class="key">bookmarked:</span> 2026-02-05T14:30:00Z
+<span class="key">domain:</span> inkandswitch.com
+<span class="key">author:</span> <span class="val">"Martin Kleppmann"</span>
+<span class="key">feed:</span> instapaper
+<span class="key">summary:</span> <span class="val">"Explores the benefits of..."</span>
+<span class="key">---</span>
+
+Cloud apps have become the default,
+but they come with trade-offs...
+</pre>
+      </div>
+      <div class="markdown-block">
+        <div class="markdown-block-header">File structure</div>
+        <pre>~/Dropbox/Articles/
+<span class="val">  2026-02-06-how-to-write-better-code.md</span>
+<span class="val">  2026-02-05-the-case-for-local-first.md</span>
+<span class="val">  2026-02-04-understanding-webassembly.md</span>
+<span class="val">  2026-02-03-why-rss-still-matters.md</span>
+<span class="val">  2026-02-02-building-cli-tools-in-bun.md</span>
+<span class="val">  2026-02-01-episode-42-the-answer.md</span>
+<span class="val">  2026-01-31-react-server-components.md</span>
+<span class="val">  ...</span>
+
+Date-prefixed, slugified filenames.
+Sorted chronologically by default.
+Compatible with any tool.</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+  <h2>Start owning your reading list</h2>
+  <p>Free and open source. Download the macOS app or clone the repo to get started in minutes.</p>
+  <div class="cta-buttons">
+    <a href="https://github.com/shellen/pullread/releases/latest" class="btn btn-primary">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12V2M4 8l4 4 4-4M2 14h12"/></svg>
+      Download for macOS
+    </a>
+    <a href="https://github.com/shellen/pullread" class="btn btn-secondary">View on GitHub</a>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <p>Pull Read is open source under the MIT License. <a href="https://github.com/shellen/pullread">GitHub</a></p>
+</footer>
+
+</body>
+</html>
