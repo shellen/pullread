@@ -102,16 +102,31 @@ jobs:
           APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         run: |
+          set -euo pipefail
+
           # Create temporary keychain
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
           KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
 
+          echo "Creating keychain..."
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-          # Import certificate
+          # Decode and validate certificate
+          echo "Decoding certificate..."
           echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          echo "Certificate file size: $(wc -c < $RUNNER_TEMP/certificate.p12) bytes"
+
+          # Verify the p12 is valid before importing
+          echo "Verifying p12 file..."
+          openssl pkcs12 -in $RUNNER_TEMP/certificate.p12 -passin pass:"$APPLE_CERTIFICATE_PASSWORD" -noout 2>&1 || {
+            echo "::error::Failed to verify .p12 file. Check APPLE_CERTIFICATE_PASSWORD matches the export password."
+            exit 1
+          }
+
+          # Import certificate
+          echo "Importing certificate into keychain..."
           security import $RUNNER_TEMP/certificate.p12 \
             -P "$APPLE_CERTIFICATE_PASSWORD" \
             -A \
@@ -122,6 +137,10 @@ jobs:
           # Allow codesign to access keychain
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security list-keychain -d user -s "$KEYCHAIN_PATH"
+
+          # Verify the identity is available
+          echo "Available signing identities:"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
 
           # Clean up certificate file
           rm $RUNNER_TEMP/certificate.p12
