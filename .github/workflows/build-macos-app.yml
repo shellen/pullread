@@ -228,7 +228,15 @@ jobs:
           # Bundle CLI binary into app resources
           cp ../dist/pullread "artifacts/Pull Read.app/Contents/Resources/"
 
+          # Strip test artifacts from the release bundle — build-for-testing embeds
+          # XCTest frameworks and test plugins which Apple notarization rejects
+          # (they lack secure timestamps since they're Apple-signed system binaries)
+          rm -rf "artifacts/Pull Read.app/Contents/PlugIns"
+          rm -rf "artifacts/Pull Read.app/Contents/Frameworks"
+
           # Verify
+          echo "App bundle contents:"
+          ls -la "artifacts/Pull Read.app/Contents/"
           ls -la "artifacts/Pull Read.app/Contents/Resources/"
 
           # Free disk space: remove everything we no longer need
