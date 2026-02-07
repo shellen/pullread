@@ -241,15 +241,27 @@ jobs:
         working-directory: PullReadTray
         run: |
           APP_PATH="artifacts/Pull Read.app"
+          IDENTITY="Developer ID Application"
 
-          # Sign the CLI binary
-          codesign --force --sign "Developer ID Application" "$APP_PATH/Contents/Resources/pullread"
+          # Sign the bundled CLI binary (hardened runtime required for notarization)
+          codesign --force --options runtime --timestamp \
+            --sign "$IDENTITY" \
+            "$APP_PATH/Contents/Resources/pullread"
 
-          # Deep sign the entire app bundle
-          codesign --force --deep --sign "Developer ID Application" "$APP_PATH"
+          # Sign the main app binary
+          codesign --force --options runtime --timestamp \
+            --sign "$IDENTITY" \
+            "$APP_PATH/Contents/MacOS/PullReadTray"
+
+          # Sign the overall app bundle
+          codesign --force --options runtime --timestamp \
+            --sign "$IDENTITY" \
+            "$APP_PATH"
 
           # Verify
           codesign -dv --verbose=2 "$APP_PATH"
+          echo "Verifying hardened runtime flag..."
+          codesign -d --verbose=2 "$APP_PATH" 2>&1 | grep -i runtime
 
       - name: Create DMG
         working-directory: PullReadTray
@@ -274,7 +286,7 @@ jobs:
         if: env.HAS_SIGNING_CERT == 'true'
         working-directory: PullReadTray
         run: |
-          codesign --sign "Developer ID Application" --timestamp artifacts/PullRead.dmg
+          codesign --force --sign "Developer ID Application" --timestamp artifacts/PullRead.dmg
 
       - name: Notarize app
         if: env.HAS_SIGNING_CERT == 'true' && env.HAS_NOTARIZE_CREDS == 'true'
@@ -288,12 +300,28 @@ jobs:
           # Create ZIP for notarization
           ditto -c -k --keepParent "$APP_PATH" PullRead-app.zip
 
-          # Submit for notarization
-          xcrun notarytool submit PullRead-app.zip \
+          # Submit for notarization and capture output
+          SUBMIT_OUTPUT=$(xcrun notarytool submit PullRead-app.zip \
             --apple-id "$APPLE_ID" \
             --team-id "$APPLE_TEAM_ID" \
             --password "$APPLE_ID_PASSWORD" \
-            --wait
+            --wait 2>&1) || true
+
+          echo "$SUBMIT_OUTPUT"
+
+          # Extract submission ID and check status
+          SUBMISSION_ID=$(echo "$SUBMIT_OUTPUT" | grep "id:" | head -1 | awk '{print $2}')
+
+          if echo "$SUBMIT_OUTPUT" | grep -q "status: Invalid"; then
+            echo "::error::Notarization failed. Fetching log..."
+            xcrun notarytool log "$SUBMISSION_ID" \
+              --apple-id "$APPLE_ID" \
+              --team-id "$APPLE_TEAM_ID" \
+              --password "$APPLE_ID_PASSWORD" \
+              notarization-log.json
+            cat notarization-log.json
+            exit 1
+          fi
 
           # Staple the ticket
           xcrun stapler staple "$APP_PATH"
