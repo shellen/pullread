@@ -254,6 +254,72 @@ export function startViewer(outputPath: string, port = 7777): void {
       }
     }
 
+    // Weekly review
+    if (url.pathname === '/api/review' && req.method === 'POST') {
+      try {
+        const body = JSON.parse(await readBody(req));
+        const days = body.days || 7;
+        const { generateAndSaveReview } = await import('./review');
+        const result = await generateAndSaveReview(outputPath, days);
+        if (!result) {
+          sendJson(res, { error: 'No articles found in the past ' + days + ' days' });
+        } else {
+          sendJson(res, { filename: result.filename, review: result.review });
+        }
+      } catch (err: any) {
+        sendJson(res, { error: err.message || 'Failed to generate review' });
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/review' && req.method === 'GET') {
+      try {
+        const days = parseInt(url.searchParams.get('days') || '7', 10);
+        const { getRecentArticles } = await import('./review');
+        const articles = getRecentArticles(outputPath, days);
+        sendJson(res, { count: articles.length, articles: articles.map(a => ({ title: a.title, domain: a.domain, bookmarked: a.bookmarked })) });
+      } catch {
+        sendJson(res, { count: 0, articles: [] });
+      }
+      return;
+    }
+
+    // Feed title discovery
+    if (url.pathname === '/api/feed-title' && req.method === 'GET') {
+      const feedUrl = url.searchParams.get('url');
+      if (!feedUrl) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'url parameter required' }));
+        return;
+      }
+      try {
+        const { fetchFeedTitle } = await import('./feed');
+        const title = await fetchFeedTitle(feedUrl);
+        sendJson(res, { title: title || null });
+      } catch {
+        sendJson(res, { title: null });
+      }
+      return;
+    }
+
+    // Feed auto-discovery (for blog URLs that aren't feeds themselves)
+    if (url.pathname === '/api/feed-discover' && req.method === 'GET') {
+      const pageUrl = url.searchParams.get('url');
+      if (!pageUrl) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'url parameter required' }));
+        return;
+      }
+      try {
+        const { discoverFeed } = await import('./feed');
+        const result = await discoverFeed(pageUrl);
+        sendJson(res, result || { feedUrl: null, title: null });
+      } catch {
+        sendJson(res, { feedUrl: null, title: null });
+      }
+      return;
+    }
+
     // Settings API (LLM config)
     if (url.pathname === '/api/settings') {
       if (req.method === 'GET') {
@@ -325,10 +391,14 @@ export function startViewer(outputPath: string, port = 7777): void {
         const msg = err instanceof Error ? err.message : 'Summarization failed';
         // Provide user-friendly error messages
         let userMsg = msg;
-        if (msg.includes('Apple Intelligence requires')) {
-          userMsg = 'Apple Intelligence requires macOS 26. Configure a cloud provider in Settings.';
+        if (msg.includes('Apple Intelligence requires macOS 26')) {
+          userMsg = 'Apple Intelligence requires macOS 26 (Tahoe). Update macOS or choose a different provider in Settings.';
+        } else if (msg.includes('Apple Intelligence is not available')) {
+          userMsg = 'Apple Intelligence is not available on this Mac. Choose a cloud provider in Settings.';
+        } else if (msg.includes('Apple Intelligence error')) {
+          userMsg = 'Apple Intelligence encountered an error. Try again, or switch to a cloud provider for this article.';
         } else if (msg.includes('context window') || msg.includes('too long') || msg.includes('max_tokens') || msg.includes('exceededContextWindowSize')) {
-          userMsg = 'Article too long for this model. Try a cloud provider with a larger context window.';
+          userMsg = 'Article too long for this model. Try a model with a larger context window.';
         } else if (msg.includes('No API key')) {
           userMsg = 'No model configured. Open Settings to add a provider.';
         }

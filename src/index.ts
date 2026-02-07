@@ -439,6 +439,36 @@ if (command === 'sync') {
     console.error('Fatal error:', err.message);
     process.exit(1);
   });
+} else if (command === 'review') {
+  const config = loadConfig();
+  const daysIndex = args.indexOf('--days');
+  const days = daysIndex !== -1 && args[daysIndex + 1]
+    ? parseInt(args[daysIndex + 1], 10)
+    : 7;
+
+  (async () => {
+    const { generateAndSaveReview, getRecentArticles } = await import('./review');
+    const articles = getRecentArticles(config.outputPath, days);
+
+    if (articles.length === 0) {
+      console.log(`No articles found in the past ${days} days.`);
+      process.exit(0);
+    }
+
+    console.log(`Found ${articles.length} articles from the past ${days} days`);
+    console.log('Generating weekly review...');
+
+    const result = await generateAndSaveReview(config.outputPath, days);
+    if (result) {
+      console.log(`\nReview saved: ${result.filename}`);
+      console.log(`\n${result.review}`);
+    } else {
+      console.log('Failed to generate review.');
+    }
+  })().catch(err => {
+    console.error('Fatal error:', err.message);
+    process.exit(1);
+  });
 } else {
   console.log(`Usage: pullread <command>
 
@@ -451,5 +481,7 @@ Commands:
   summarize --batch       Summarize articles missing summaries
   summarize --min-size N  Skip articles under N chars (default: 500)
   import <file.html>      Import bookmarks from HTML file (Netscape format)
+  review                  Generate a weekly review of recent articles
+  review --days N         Review the past N days (default: 7)
 `);
 }

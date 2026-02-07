@@ -1,8 +1,8 @@
 # PullRead
 
-**Sync RSS and Atom feeds to clean markdown files for offline reading and archival.**
+**Save articles from your bookmark services as clean markdown files you own.**
 
-PullRead fetches entries from your RSS/Atom feeds, extracts article content using Mozilla's Readability algorithm, and saves them as beautifully formatted markdown files with YAML frontmatter. Perfect for syncing bookmarks, blogs, and podcasts to your local markdown library.
+PullRead connects to bookmark services like Instapaper, Pinboard, Raindrop, and Omnivore (via their RSS feeds), extracts article content using Mozilla's Readability algorithm, and saves them as beautifully formatted markdown files with YAML frontmatter. It also handles RSS/Atom feeds, podcasts, YouTube videos (with transcripts), and more. Perfect for building a local, searchable reading archive synced to Dropbox, iCloud, or any folder you choose.
 
 ---
 
@@ -34,6 +34,7 @@ PullRead fetches entries from your RSS/Atom feeds, extracts article content usin
 - [Architecture](#architecture)
 - [Development](#development)
 - [Testing](#testing)
+- [Code Signing](#code-signing)
 - [Troubleshooting](#troubleshooting)
 - [Room for Improvement](#room-for-improvement)
 - [Future Ideas](#future-ideas)
@@ -44,15 +45,19 @@ PullRead fetches entries from your RSS/Atom feeds, extracts article content usin
 
 ## Features
 
-- **Multi-format feed support** - Atom, RSS, and podcast feeds with automatic detection
+- **Bookmark service integration** - Connect Instapaper, Pinboard, Raindrop, Omnivore, and more via RSS feeds
+- **Import bookmarks** - Import a `bookmarks.html` export from any browser or service
+- **RSS auto-discovery** - Paste a blog URL and PullRead finds the RSS/Atom feed automatically
 - **Clean article extraction** - Uses Mozilla's Readability algorithm (same as Firefox Reader View)
+- **YouTube support** - Embeds video thumbnail with full transcript when available
+- **X.com/Twitter support** - Generates meaningful titles from tweet content
 - **Markdown output** - Converts HTML to clean, readable markdown with YAML frontmatter
 - **Intelligent deduplication** - Tracks processed URLs to avoid re-fetching
 - **Retry mechanism** - Failed extractions are tracked and can be retried later
 - **Podcast support** - Saves episode metadata with audio links (perfect for show notes)
-- **Built-in article reader** - Two-pane local web UI with full keyboard navigation (j/k, arrow keys, boundary-aware scrolling)
+- **Built-in article reader** - Two-pane local web UI with full keyboard navigation, highlights, notes, and tags
+- **Weekly reviews** - AI-generated summaries of your recent reading (daily/weekly schedule or on-demand)
 - **Self-contained macOS app** - Native Swift menu bar app with bundled CLI binary (no Node.js required)
-- **Flexible scheduling** - Run on-demand, via launchd, or with AppleScript
 - **Article summaries** - On-demand summarization with your own API key (Anthropic or OpenAI)
 - **Cloud-sync friendly** - Output folder can be Dropbox, iCloud, Google Drive, etc.
 
@@ -153,9 +158,9 @@ Edit `feeds.json`:
 {
   "outputPath": "~/Dropbox/Articles",
   "feeds": {
-    "bookmarks": "https://example.com/user/bookmarks/feed.xml",
-    "instapaper": "https://www.instapaper.com/rss/YOUR_ID/...",
-    "hn-favorites": "https://hnrss.org/favorites?id=YOUR_USERNAME",
+    "instapaper": "https://www.instapaper.com/rss/YOUR_FOLDER_ID/YOUR_USER_ID",
+    "pinboard": "https://feeds.pinboard.in/rss/u:YOUR_USERNAME/",
+    "raindrop": "https://raindrop.io/collection/COLLECTION_ID/feed",
     "podcasts": "https://anchor.fm/s/YOUR_SHOW/podcast/rss"
   }
 }
@@ -181,10 +186,12 @@ The keys in the `feeds` object (e.g., `bookmarks`, `instapaper`) are used for:
 |---------|-----------------|
 | Instapaper | `https://www.instapaper.com/rss/YOUR_FOLDER_ID/YOUR_USER_ID` |
 | Pinboard | `https://feeds.pinboard.in/rss/u:USERNAME/` |
-| Pocket | Requires IFTTT or Zapier integration |
-| Hacker News | `https://hnrss.org/favorites?id=USERNAME` |
 | Raindrop.io | `https://raindrop.io/collection/COLLECTION_ID/feed` |
+| Omnivore | `https://api.omnivore.app/feed/YOUR_ID` |
+| Hacker News | `https://hnrss.org/favorites?id=USERNAME` |
 | Feedbin | Available in settings |
+
+> **Tip:** You don't need to find the exact RSS URL. Paste a blog or site URL and PullRead will auto-discover the feed.
 
 ---
 
@@ -222,6 +229,25 @@ npm run summarize -- --batch --min-size 1000
 4. **For articles**: Fetch the page, extract content with Readability, convert to markdown
 5. **For podcasts**: Save episode metadata (title, description, audio link)
 6. **Record results** in SQLite (success or failure with error message)
+
+### Special URL Handling
+
+PullRead handles certain URLs with specialized extractors:
+
+- **YouTube** - Instead of extracting the page HTML, PullRead embeds the video thumbnail at the top of the article and includes the full video transcript (when captions are available). In the article reader, YouTube thumbnails are automatically converted to embedded video players.
+- **X.com / Twitter** - Tweets often lack useful `<title>` tags. PullRead generates a meaningful title from the tweet content (via `og:description`), e.g., "Thread on AI safety by @username" instead of "Untitled".
+- **Blog URLs** - If you add a blog URL that isn't a feed, PullRead auto-discovers the RSS/Atom feed via `<link rel="alternate">` tags in the HTML.
+
+### Weekly Reviews
+
+PullRead can generate AI-powered summaries of your recent reading. In the macOS app, go to Settings and set the review schedule to **Daily** or **Weekly**. You can also generate a review on-demand from the menu bar.
+
+Reviews use the same LLM settings as article summaries (configure your API key in the viewer's gear icon). From the CLI:
+
+```bash
+# Generate a review of the last 7 days
+pullread review --days 7
+```
 
 ### Verbosity
 
@@ -357,21 +383,22 @@ Pull Read is a self-contained native Swift menu bar application. It bundles the 
 ### Menu Structure
 
 ```
-┌────────────────────────┐
-│ Status: Idle           │  ← Current sync state
-│ Last sync: 2:34 PM     │  ← Time of last sync
-├────────────────────────┤
-│ Sync Now          ⌘S   │  → Runs the bundled CLI
-│ Retry Failed      ⌘R   │  → Retries failed URLs
-├────────────────────────┤
-│ Open Output Folder ⌘O  │  → Opens your Articles folder
-│ View Articles...  ⌘D   │  → Opens the markdown reader
-│ Settings          ⌘,   │  → Configure feeds and output path
-│ View Logs...      ⌘L   │  → Opens sync log
-├────────────────────────┤
-│ About PullRead         │
-│ Quit PullRead     ⌘Q   │
-└────────────────────────┘
+┌──────────────────────────┐
+│ Status: Idle             │  ← Current sync state
+│ Last sync: 2:34 PM       │  ← Time of last sync
+├──────────────────────────┤
+│ Sync Now            ⌘S   │  → Runs the bundled CLI
+│ Retry Failed        ⌘R   │  → Retries failed URLs
+│ Generate Review Now       │  → AI summary of recent reading
+├──────────────────────────┤
+│ Open Output Folder  ⌘O   │  → Opens your Articles folder
+│ View Articles...    ⌘D   │  → Opens the markdown reader
+│ Settings            ⌘,   │  → Configure feeds, services, reviews
+│ View Logs...        ⌘L   │  → Opens sync log
+├──────────────────────────┤
+│ About PullRead           │
+│ Quit PullRead       ⌘Q   │
+└──────────────────────────┘
 ```
 
 ### Features
@@ -379,8 +406,11 @@ Pull Read is a self-contained native Swift menu bar application. It bundles the 
 - **Self-contained** - Bundled CLI binary, no Node.js required
 - **Article reader** - Built-in two-pane markdown viewer via "View Articles..." menu
 - **Highlights & notes** - Select text to highlight, add inline annotations, and write article-level notes
+- **Weekly reviews** - Scheduled AI summaries of your recent reading (daily, weekly, or on-demand)
+- **Bookmark import** - Import a `bookmarks.html` file from any browser or service
+- **RSS auto-discovery** - Paste a blog URL and the app finds the feed automatically
 - **Resync recovery** - Deleted output files are detected and re-synced automatically
-- **Status indicator** showing idle/syncing state
+- **Status indicator** showing idle/syncing state with badge for unread reviews
 - **Icon animation** during sync operations
 - **Native notifications** on sync completion or failure
 - **Keyboard shortcuts** for common actions
@@ -472,7 +502,11 @@ osascript -e 'tell application "System Events" to make login item at end with pr
 
 ## Scheduling
 
-### Option 1: launchd (Recommended)
+### Option 1: macOS Menu Bar App (Recommended)
+
+The macOS app handles scheduling automatically. Just add it to your Login Items (see [Auto-Start on Login](#auto-start-on-login)) and it stays in your menu bar. Click **Sync Now** or let it sync on launch. You can also schedule **Weekly Reviews** under Settings → Options.
+
+### Option 2: launchd
 
 Create a plist at `~/Library/LaunchAgents/com.pullread.sync.plist`:
 
@@ -506,7 +540,7 @@ Load it:
 launchctl load ~/Library/LaunchAgents/com.pullread.sync.plist
 ```
 
-### Option 2: cron
+### Option 3: cron
 
 ```bash
 # Edit crontab
@@ -516,7 +550,7 @@ crontab -e
 */30 * * * * cd /path/to/pullread && /usr/local/bin/npm run sync >> /tmp/pullread.log 2>&1
 ```
 
-### Option 3: AppleScript (for idle-based sync)
+### Option 4: AppleScript (for idle-based sync)
 
 See `scripts/PullReadScheduler.applescript` for an idle-based scheduler that runs when your Mac has been idle for a set period.
 
@@ -530,26 +564,31 @@ See `scripts/PullReadScheduler.applescript` for an idle-based scheduler that run
 pullread/
 ├── src/                           # TypeScript CLI source
 │   ├── index.ts                   # CLI entry point, orchestration
-│   ├── feed.ts                    # RSS/Atom parsing (auto-detects format)
-│   ├── extractor.ts               # Article extraction with Readability
+│   ├── feed.ts                    # RSS/Atom parsing, auto-discovery
+│   ├── extractor.ts               # Article extraction (Readability, YouTube, X.com)
 │   ├── writer.ts                  # Markdown generation with frontmatter
 │   ├── viewer.ts                  # Local article reader (HTTP server on port 7777)
 │   ├── storage.ts                 # JSON file storage operations
 │   ├── summarizer.ts              # Article summarization (Anthropic/OpenAI)
-│   └── *.test.ts                  # Unit tests
+│   ├── review.ts                  # Weekly review generation
+│   └── *.test.ts                  # Unit tests (86 tests across 5 suites)
 │
 ├── PullReadTray/                  # macOS menu bar app (Swift)
 │   ├── PullReadTray/
 │   │   ├── PullReadTrayApp.swift  # SwiftUI entry point
-│   │   ├── AppDelegate.swift      # Menu bar setup, notifications
-│   │   └── SyncService.swift      # Bundled CLI binary execution
+│   │   ├── AppDelegate.swift      # Menu bar, notifications, review scheduling
+│   │   ├── SyncService.swift      # Bundled CLI binary execution
+│   │   ├── SettingsView.swift     # Feed management, bookmark services, options
+│   │   └── OnboardingView.swift   # First-run setup wizard
 │   ├── PullReadTrayTests/         # XCTest unit tests
 │   └── PullReadTrayUITests/       # XCTest UI tests
 │
 ├── scripts/                       # Build and scheduler scripts
-│   └── build-release.sh           # Builds universal CLI binary
+│   ├── build-release.sh           # Builds universal CLI binary
+│   └── embed-viewer.ts            # Generates viewer-html.ts from viewer.html
+├── viewer.html                    # Article reader source (single-file HTML/JS/CSS)
+├── .github/workflows/             # CI: build, test, sign, notarize
 ├── dist/                          # Compiled CLI binaries (gitignored)
-├── docs/plans/                    # Design documentation
 ├── feeds.json                     # Dev configuration (gitignored)
 └── feeds.json.example             # Configuration template
 
@@ -677,28 +716,34 @@ npm test
 
 ### Test Coverage
 
-The test suite covers:
+86 tests across 5 suites:
 
-- **Feed parsing** (`feed.test.ts`)
-  - Atom feed detection and parsing
-  - RSS feed detection and parsing
-  - Podcast feeds with enclosures
-  - CDATA sections and HTML entities
-
-- **Content extraction** (`extractor.test.ts`)
+- **Content extraction** (`extractor.test.ts` — 28 tests)
   - Readability algorithm
   - HTML to Markdown conversion
+  - YouTube URL detection and video ID extraction
+  - X.com/Twitter title generation
   - Edge cases (empty content, timeouts)
 
-- **Markdown generation** (`writer.test.ts`)
-  - Frontmatter generation
-  - Filename slugification
-  - Special character handling
+- **Feed parsing** (`feed.test.ts` — 26 tests)
+  - Atom, RSS, and RDF feed detection and parsing
+  - Podcast feeds with enclosures
+  - CDATA sections and HTML entities
+  - RSS auto-discovery from HTML pages
 
-- **Database operations** (`storage.test.ts`)
+- **Bookmark import** (`bookmarks.test.ts` — 19 tests)
+  - Browser bookmark HTML parsing
+  - Folder and tag extraction
+
+- **Database operations** (`storage.test.ts` — 7 tests)
   - URL tracking
   - Status updates
   - Failure recording
+
+- **Markdown generation** (`writer.test.ts` — 6 tests)
+  - Frontmatter generation
+  - Filename slugification
+  - Special character handling
 
 ### macOS App Tests
 
@@ -709,6 +754,75 @@ xcodebuild test \
   -scheme PullReadTray \
   -destination 'platform=macOS'
 ```
+
+---
+
+## Code Signing
+
+The CI workflow automatically signs, notarizes, and staples the macOS app when the required secrets are configured. Without them, the workflow still builds and tests the app — it just produces an unsigned build.
+
+### Prerequisites
+
+- An [Apple Developer Program](https://developer.apple.com/programs/) membership ($99/year)
+- A **Developer ID Application** certificate (for distributing outside the App Store)
+
+### Step 1: Create a Developer ID Certificate
+
+1. Go to [developer.apple.com/account/resources/certificates](https://developer.apple.com/account/resources/certificates)
+2. Click **+** to create a new certificate
+3. Select **Developer ID Application** and follow the prompts
+4. Download and install the certificate into Keychain Access
+
+### Step 2: Export as .p12
+
+1. Open **Keychain Access**
+2. Find your "Developer ID Application: ..." certificate under **My Certificates**
+3. Right-click → **Export** → choose `.p12` format
+4. Set a strong password (you'll need this for the GitHub secret)
+
+### Step 3: Base64-encode the .p12
+
+```bash
+base64 -i Certificates.p12 | pbcopy
+```
+
+This copies the encoded certificate to your clipboard.
+
+### Step 4: Create an App-Specific Password
+
+1. Go to [appleid.apple.com](https://appleid.apple.com) → **Sign-In and Security** → **App-Specific Passwords**
+2. Generate a new password and label it "PullRead Notarization"
+3. Save the generated password
+
+### Step 5: Find Your Team ID
+
+1. Go to [developer.apple.com/account](https://developer.apple.com/account) → **Membership Details**
+2. Copy the **Team ID** (a 10-character alphanumeric string)
+
+### Step 6: Add GitHub Secrets
+
+Go to your repository's **Settings → Secrets and variables → Actions** and add these five secrets:
+
+| Secret | Value |
+|--------|-------|
+| `APPLE_CERTIFICATE_BASE64` | The base64-encoded `.p12` from Step 3 |
+| `APPLE_CERTIFICATE_PASSWORD` | The password you set when exporting the `.p12` |
+| `APPLE_ID` | Your Apple ID email address |
+| `APPLE_ID_PASSWORD` | The app-specific password from Step 4 |
+| `APPLE_TEAM_ID` | Your 10-character Team ID from Step 5 |
+
+### Step 7: Test
+
+Push a commit that touches `PullReadTray/` or `src/` and watch the [Actions tab](../../actions). The workflow will:
+
+1. Build the CLI binary
+2. Import the certificate into a temporary keychain
+3. Build the Xcode project with `CODE_SIGN_IDENTITY="Developer ID Application"`
+4. Sign the app bundle and DMG
+5. Submit for notarization via `xcrun notarytool` and staple the ticket
+6. Upload the signed DMG as a build artifact
+
+If the signing secrets aren't configured, the workflow gracefully falls back to an unsigned build.
 
 ---
 
@@ -798,106 +912,19 @@ This project works well for its intended purpose, but there are several areas th
 
 Ideas that would extend PullRead's capabilities:
 
-### Highlights, Notes & Read State
+### Read State
 
-> **Note:** Highlights and Notes are now implemented. See the [Article Reader](#article-reader) section above for usage. Read State tracking remains a future idea.
-
-These features turn PullRead from a read-only archive into an active reading tool. Here's the design for how each works within the existing architecture.
-
-#### Read State
-
-Track which articles have been opened and how far the user scrolled.
-
-**Storage:** A JSON file at `~/.config/pullread/reading-state.json`:
-```json
-{
-  "2024-01-29-article-title.md": {
-    "read": true,
-    "openedAt": "2024-01-30T10:00:00Z",
-    "scrollPercent": 100,
-    "lastReadAt": "2024-01-30T10:05:00Z"
-  }
-}
-```
-
-**Implementation:**
-- **Server:** Add `GET /api/read-state` and `POST /api/read-state` endpoints to `viewer.ts` for loading/saving per-article state
-- **Client:** On article load, mark it as opened and send a `POST`. Track `scrollTop / scrollHeight` on scroll (debounced) and persist the percentage. Show unread articles with a visual indicator (bold title or dot) in the sidebar. Add a filter toggle ("Unread only") next to the search bar
-- **Frontmatter option:** Alternatively, append `read: true` directly to each markdown file's YAML frontmatter, making state portable across devices via cloud sync — no separate JSON needed
-
-#### Highlights
-
-Let users select text in an article and save highlights.
-
-**Storage:** A JSON file at `~/.config/pullread/highlights.json`:
-```json
-{
-  "2024-01-29-article-title.md": [
-    {
-      "id": "h1a2b3",
-      "text": "the exact selected text",
-      "contextBefore": "preceding words for anchoring",
-      "contextAfter": "following words for anchoring",
-      "color": "yellow",
-      "createdAt": "2024-01-30T10:02:00Z"
-    }
-  ]
-}
-```
-
-**Implementation:**
-- **Server:** Add `GET /api/highlights?name=<file>` and `POST /api/highlights` endpoints
-- **Client:** Listen for `mouseup` / `selectionchange` events. When the user selects text, show a small floating toolbar with color options. On highlight creation, save the selected text plus surrounding context (for fuzzy re-anchoring if content changes). After rendering markdown to HTML, walk the DOM text nodes and wrap matched ranges in `<mark>` elements with a `data-highlight-id` attribute. Clicking an existing highlight could show a popover to change color or delete
-- **CSS:** Add `.highlight-yellow`, `.highlight-green`, `.highlight-blue`, `.highlight-pink` classes with appropriate background colors per theme
-- **Export:** Add `pullread export-highlights` CLI command that outputs all highlights as a markdown file grouped by article
-
-#### Notes / Annotations
-
-Let users attach freeform notes to specific passages or to an article as a whole.
-
-**Storage:** Extend `highlights.json` or use a separate `~/.config/pullread/notes.json`:
-```json
-{
-  "2024-01-29-article-title.md": {
-    "articleNote": "Overall thoughts about this piece...",
-    "annotations": [
-      {
-        "id": "n4d5e6",
-        "anchorText": "text the note is attached to",
-        "contextBefore": "...",
-        "contextAfter": "...",
-        "note": "My comment on this passage",
-        "createdAt": "2024-01-30T10:03:00Z"
-      }
-    ]
-  }
-}
-```
-
-**Implementation:**
-- **Inline annotations:** After selecting text and clicking an "Add note" button, show a small textarea popover anchored to the selection. Save the note with the same context-anchoring approach as highlights. Render a margin icon or underline in the article to indicate annotated passages; hover/click to reveal the note
-- **Article-level notes:** Add a collapsible "Notes" panel below the article metadata header. This is a simple textarea that persists via the API. Could also be written back into the markdown frontmatter as an `notes:` field for portability
-- **Server:** `GET /api/notes?name=<file>` and `POST /api/notes` endpoints in `viewer.ts`
-- **Keyboard shortcut:** `n` to open the article-level notes panel, `h` to highlight current selection
-
-#### Shared Design Principles
-
-- **File-based storage** — JSON files in `~/.config/pullread/` keeps everything portable and inspectable. No database needed
-- **Frontmatter as source of truth (optional)** — For maximum portability (Dropbox/iCloud sync), read state and article-level notes could be written directly into each markdown file's YAML frontmatter. Highlights and inline annotations are better suited to a sidecar JSON since they reference DOM positions
-- **Offline-first** — All state is local. The viewer reads/writes through the local HTTP API. No external services
-- **Graceful degradation** — If state files are missing, the viewer works exactly as it does today. Features appear only when state exists
+Track which articles have been opened and how far the user scrolled, with unread indicators in the sidebar and a filter toggle.
 
 ### Other Ideas
 
 - **Browser extension** - "Send to PullRead" button that adds URLs directly to a local feed
-- **Tags/categories** - Support for preserving tags from bookmark services
 - **Full-text search** - Index markdown content for quick searching
 - **Multi-platform tray app** - Electron or Tauri version for Windows/Linux
 - **Kindle/epub export** - Convert markdown collection to ebook format
 - **Webhook support** - Trigger sync via webhook for real-time updates
 - **Self-hosted option** - Run as a service with web interface
 - **Sync to Obsidian/Notion** - Direct integration with note-taking apps
-- ~~**AI summarization**~~ - Implemented. See [Summaries](#summaries) above
 - **Recommendations** - Suggest similar articles based on reading history
 - **iOS companion app** - View synced articles with iCloud sync
 - **Alfred/Raycast extension** - Quick actions for macOS power users
@@ -935,7 +962,7 @@ Contributions are welcome! Here's how to get started:
 
 ## License
 
-ISC License
+[MIT License](LICENSE)
 
 ---
 

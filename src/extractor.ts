@@ -73,8 +73,7 @@ export function shouldSkipUrl(url: string): string | null {
 export function resolveRelativeUrls(markdown: string, baseUrl: string): string {
   let origin: string;
   try {
-    const parsed = new URL(baseUrl);
-    origin = parsed.origin;
+    origin = new URL(baseUrl).origin;
   } catch {
     return markdown;
   }
@@ -91,7 +90,108 @@ export function resolveRelativeUrls(markdown: string, baseUrl: string): string {
     (_, text, path) => `[${text}](${origin}${path})`
   );
 
+  // Resolve relative URLs in images: ![alt](x1.png) -> ![alt](https://domain.com/path/x1.png)
+  // Skips absolute URLs, root-relative, data URIs, fragments, and mailto
+  markdown = markdown.replace(
+    /!\[([^\]]*)\]\((?!\/|https?:|data:|#|mailto:)([^)\s]+)\)/g,
+    (_, alt, relPath) => {
+      try {
+        return `![${alt}](${new URL(relPath, baseUrl).href})`;
+      } catch {
+        return `![${alt}](${relPath})`;
+      }
+    }
+  );
+
+  // Resolve relative URLs in links
+  markdown = markdown.replace(
+    /(?<!!)\[([^\]]*)\]\((?!\/|https?:|data:|#|mailto:)([^)\s]+)\)/g,
+    (_, text, relPath) => {
+      try {
+        return `[${text}](${new URL(relPath, baseUrl).href})`;
+      } catch {
+        return `[${text}](${relPath})`;
+      }
+    }
+  );
+
   return markdown;
+}
+
+/**
+ * Detect if a URL is from X.com/Twitter
+ */
+function isTwitterUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return host === 'x.com' || host === 'www.x.com' ||
+           host === 'twitter.com' || host === 'www.twitter.com' ||
+           host === 'mobile.twitter.com' || host === 'mobile.x.com';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Detect if a URL is a YouTube video
+ */
+export function isYouTubeUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return host === 'www.youtube.com' || host === 'youtube.com' ||
+           host === 'm.youtube.com' || host === 'youtu.be';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Extract YouTube video ID from various URL formats
+ */
+export function extractYouTubeId(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === 'youtu.be') {
+      return parsed.pathname.slice(1).split('/')[0] || null;
+    }
+    if (parsed.pathname === '/watch') {
+      return parsed.searchParams.get('v');
+    }
+    const embedMatch = parsed.pathname.match(/\/(embed|v)\/([^/?]+)/);
+    if (embedMatch) return embedMatch[2];
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Generate a friendly title for X.com/Twitter posts
+ */
+function generateTwitterTitle(html: string, url: string): string {
+  const { document } = parseHTML(html);
+  // Try og:description for tweet text
+  const desc = document.querySelector('meta[property="og:description"]')?.getAttribute('content')
+    || document.querySelector('meta[name="description"]')?.getAttribute('content')
+    || '';
+
+  if (desc) {
+    // Truncate to first sentence or 80 chars
+    const clean = desc.replace(/\n/g, ' ').trim();
+    const short = clean.length > 80 ? clean.slice(0, 77) + '...' : clean;
+    return short;
+  }
+
+  // Extract username from URL like x.com/username/status/123
+  try {
+    const path = new URL(url).pathname;
+    const parts = path.split('/').filter(Boolean);
+    if (parts.length >= 1) {
+      return `A post by @${parts[0]} on X`;
+    }
+  } catch {}
+
+  return 'A post on X';
 }
 
 /**
@@ -110,8 +210,15 @@ export function extractArticle(html: string, url: string): ExtractedArticle | nu
       turndown.turndown(article.content),
       url
     );
+    let title = article.title || 'Untitled';
+
+    // For X.com/Twitter, "Untitled" is common — generate a better title
+    if ((title === 'Untitled' || !title.trim()) && isTwitterUrl(url)) {
+      title = generateTwitterTitle(html, url);
+    }
+
     return {
-      title: article.title || 'Untitled',
+      title,
       content: article.content,
       markdown,
       byline: article.byline || undefined,
@@ -152,9 +259,16 @@ function extractFallback(document: any, url: string): ExtractedArticle | null {
   const body = jsonLdContent || description;
   if (!title || !body) return null;
 
+  // For X.com/Twitter, replace generic titles
+  let finalTitle = title;
+  if ((finalTitle === 'Untitled' || !finalTitle.trim()) && isTwitterUrl(url)) {
+    const clean = description.replace(/\n/g, ' ').trim();
+    finalTitle = clean.length > 80 ? clean.slice(0, 77) + '...' : (clean || 'A post on X');
+  }
+
   const markdown = body;
   return {
-    title,
+    title: finalTitle,
     content: `<p>${body}</p>`,
     markdown,
     byline: author || undefined,
@@ -312,6 +426,112 @@ async function fetchWithTimeout(url: string, headers: Record<string, string>, ti
   }
 }
 
+/**
+ * Fetch YouTube transcript via the timedtext/captions API.
+ * Extracts caption track list from the video page, then fetches the transcript.
+ */
+async function fetchYouTubeTranscript(videoId: string): Promise<string | null> {
+  try {
+    const pageUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const res = await fetchWithTimeout(pageUrl, getBrowserHeaders(pageUrl), FETCH_TIMEOUT_MS);
+    if (!res.ok) return null;
+    const html = await res.text();
+
+    // Extract captionTracks from ytInitialPlayerResponse
+    const match = html.match(/"captionTracks":\s*(\[.*?\])/);
+    if (!match) return null;
+
+    const tracks = JSON.parse(match[1]) as Array<{ baseUrl: string; languageCode: string; kind?: string }>;
+    if (!tracks || tracks.length === 0) return null;
+
+    // Prefer English manual captions, then auto-generated English, then first available
+    const english = tracks.find(t => t.languageCode === 'en' && t.kind !== 'asr');
+    const autoEn = tracks.find(t => t.languageCode === 'en');
+    const track = english || autoEn || tracks[0];
+
+    const captionRes = await fetchWithTimeout(track.baseUrl, {}, FETCH_TIMEOUT_MS);
+    if (!captionRes.ok) return null;
+    const xml = await captionRes.text();
+
+    // Parse XML: extract <text> elements
+    const lines: string[] = [];
+    const textRegex = /<text[^>]*>([\s\S]*?)<\/text>/g;
+    let m;
+    while ((m = textRegex.exec(xml)) !== null) {
+      const text = m[1]
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/\n/g, ' ')
+        .trim();
+      if (text) lines.push(text);
+    }
+
+    return lines.length > 0 ? lines.join('\n') : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Handle YouTube URLs: extract title/description from page, embed video, and include transcript
+ */
+async function extractYouTube(url: string, videoId: string, options: FetchOptions): Promise<ExtractedArticle | null> {
+  const cleanUrl = normalizeUrl(url);
+  const headers = getBrowserHeaders(cleanUrl);
+
+  if (options.useBrowserCookies) {
+    const domain = getDomainFromUrl(cleanUrl);
+    const cookies = getCookiesForDomain(domain);
+    if (cookies) headers['Cookie'] = cookies;
+  }
+
+  const response = await fetchWithTimeout(cleanUrl, headers, FETCH_TIMEOUT_MS);
+  if (!response.ok) throw new Error(`Failed to fetch ${url}: ${response.status}`);
+
+  const html = await response.text();
+  const { document } = parseHTML(html);
+
+  const getMeta = (prop: string): string => {
+    const el = document.querySelector(`meta[property="${prop}"], meta[name="${prop}"]`);
+    return el?.getAttribute('content') || '';
+  };
+
+  const title = getMeta('og:title') || getMeta('twitter:title')
+    || document.querySelector('title')?.textContent || `YouTube Video ${videoId}`;
+  const description = getMeta('og:description') || getMeta('description') || '';
+  const channelMatch = html.match(/"ownerChannelName"\s*:\s*"([^"]+)"/);
+  const channel = channelMatch ? channelMatch[1] : undefined;
+
+  // Build markdown with video thumbnail link and channel info
+  const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+
+  let markdown = `[![Watch on YouTube](${thumbnailUrl})](${url})\n\n`;
+  markdown += `**[Watch on YouTube](${url})**`;
+  if (channel) markdown += ` · ${channel}`;
+  markdown += '\n\n';
+
+  if (description) {
+    markdown += `${description}\n\n`;
+  }
+
+  // Try to fetch transcript
+  const transcript = await fetchYouTubeTranscript(videoId);
+  if (transcript) {
+    markdown += `---\n\n## Transcript\n\n${transcript}\n`;
+  }
+
+  return {
+    title,
+    content: `<p>${description}</p>`,
+    markdown,
+    byline: channel || undefined,
+    excerpt: description.slice(0, 200) || undefined
+  };
+}
+
 export async function fetchAndExtract(
   url: string,
   options: FetchOptions = {}
@@ -320,6 +540,14 @@ export async function fetchAndExtract(
   const skipReason = shouldSkipUrl(url);
   if (skipReason) {
     throw new Error(skipReason);
+  }
+
+  // YouTube videos get special handling — embed + transcript
+  if (isYouTubeUrl(url)) {
+    const videoId = extractYouTubeId(url);
+    if (videoId) {
+      return extractYouTube(url, videoId, options);
+    }
   }
 
   // Normalize URL (strip tracking, site-specific transforms)
@@ -373,7 +601,8 @@ export async function fetchAndExtract(
       }
 
       const html = await response.text();
-      return extractArticle(html, cleanUrl);
+      // Use final URL after redirects for better relative URL resolution
+      return extractArticle(html, response.url || cleanUrl);
 
     } catch (err: any) {
       lastError = err;

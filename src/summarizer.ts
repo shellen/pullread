@@ -180,19 +180,14 @@ async function callOpenRouter(apiKey: string, model: string, articleText: string
   return { summary: text.trim(), model: data.model || model };
 }
 
-async function callApple(articleText: string): Promise<SummarizeResult> {
-  // Apple Intelligence has a 4,096 token context window — use a smaller input
-  const trimmed = articleText.split(/\s+/).slice(0, 2500).join(' ');
-  const prompt = `${SUMMARIZE_PROMPT}\n\n---\n\n${trimmed}`;
-
+// Low-level helper: run a prompt through Apple Intelligence via Foundation Models
+function runApplePrompt(prompt: string): string {
   const configDir = join(homedir(), '.config', 'pullread');
   const tmpPrompt = join(configDir, '.apple-prompt.txt');
   const swiftScript = join(configDir, '.apple-summarize.swift');
 
-  // Write the prompt to a temp file
   writeFileSync(tmpPrompt, prompt);
 
-  // Write the Swift helper script (uses Foundation Models framework, macOS 26+)
   const scriptContent = [
     'import Foundation',
     'import FoundationModels',
@@ -208,10 +203,10 @@ async function callApple(articleText: string): Promise<SummarizeResult> {
   try {
     const result = execFileSync('swift', [swiftScript, tmpPrompt], {
       encoding: 'utf-8',
-      timeout: 60_000,
+      timeout: 90_000,
       stdio: ['pipe', 'pipe', 'pipe']
     });
-    return { summary: result.trim(), model: 'apple-on-device' };
+    return result.trim();
   } catch (err: any) {
     const stderr = err.stderr || '';
     if (stderr.includes('No such module') || stderr.includes('FoundationModels')) {
@@ -220,10 +215,141 @@ async function callApple(articleText: string): Promise<SummarizeResult> {
     if (stderr.includes('not eligible') || stderr.includes('not available')) {
       throw new Error('Apple Intelligence is not available on this Mac. Requires Apple Silicon with macOS 26.');
     }
-    throw new Error(`Apple Intelligence failed: ${stderr.slice(0, 200) || err.message}`);
+    throw new Error(`Apple Intelligence error: ${stderr.slice(0, 200) || err.message}`);
   } finally {
     try { unlinkSync(tmpPrompt); } catch {}
   }
+}
+
+const CHUNK_WORD_LIMIT = 2000;
+
+// RLM-inspired multi-turn summarization for long articles.
+// Instead of map-reduce (N separate processes, each losing context), this runs
+// ONE Swift process using LanguageModelSession's multi-turn conversation.
+// The model progressively reads the article section by section, maintaining
+// running notes. Sessions are recycled every few turns to avoid context overflow.
+// A final clean session synthesizes the summary from accumulated notes.
+function runAppleRLM(articleText: string): string {
+  const configDir = join(homedir(), '.config', 'pullread');
+  const tmpArticle = join(configDir, '.apple-article.txt');
+  const swiftScript = join(configDir, '.apple-rlm.swift');
+
+  writeFileSync(tmpArticle, articleText);
+
+  const scriptContent = [
+    'import Foundation',
+    'import FoundationModels',
+    '',
+    'let articlePath = CommandLine.arguments[1]',
+    'let fullText = try String(contentsOfFile: articlePath, encoding: .utf8)',
+    '',
+    '// Split into paragraphs and analyze structure',
+    'let paragraphs = fullText.components(separatedBy: "\\n\\n")',
+    '    .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }',
+    'let totalWords = fullText.split(separator: " ").count',
+    'let headings = paragraphs.filter { $0.hasPrefix("#") }',
+    '    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }',
+    '',
+    '// Build sections of ~1500 words on paragraph boundaries',
+    'var sections: [String] = []',
+    'var current: [String] = []',
+    'var wc = 0',
+    'for para in paragraphs {',
+    '    let w = para.split(separator: " ").count',
+    '    if wc + w > 1500 && !current.isEmpty {',
+    '        sections.append(current.joined(separator: "\\n\\n"))',
+    '        current = []',
+    '        wc = 0',
+    '    }',
+    '    current.append(para)',
+    '    wc += w',
+    '}',
+    'if !current.isEmpty { sections.append(current.joined(separator: "\\n\\n")) }',
+    '',
+    '// Multi-turn conversation: progressive reading with session recycling',
+    'var session = LanguageModelSession()',
+    'var turns = 0',
+    'let maxTurns = 3',
+    'var notes = ""',
+    '',
+    '// Phase 1: Structural overview — the model sees the shape of the article first',
+    'let headingList = headings.isEmpty ? "None detected" : headings.joined(separator: " | ")',
+    'let opening = String(paragraphs.first?.prefix(500) ?? "")',
+    'let closing = String(paragraphs.last?.prefix(500) ?? "")',
+    'let overview = "Summarize a \\(totalWords)-word article (\\(sections.count) sections).\\n"',
+    '    + "Headings: \\(headingList)\\n\\n"',
+    '    + "Opening: \\(opening)\\n\\n"',
+    '    + "Closing: \\(closing)\\n\\n"',
+    '    + "I will feed sections one at a time. After each, respond with concise bullet-point notes of key facts and arguments. Keep notes brief and factual."',
+    '',
+    'let r1 = try await session.respond(to: overview)',
+    'notes = r1.content',
+    'turns = 1',
+    '',
+    '// Phase 2: Feed each section, recycling sessions to prevent context overflow',
+    'for (i, section) in sections.enumerated() {',
+    '    if turns >= maxTurns {',
+    '        session = LanguageModelSession()',
+    '        let resume = "Continuing article summarization. Key points so far:\\n\\n"',
+    '            + notes',
+    '            + "\\n\\nI will feed more sections. After each, update notes with key facts and arguments."',
+    '        let rr = try await session.respond(to: resume)',
+    '        notes = rr.content',
+    '        turns = 1',
+    '    }',
+    '    let prompt = "Section \\(i + 1) of \\(sections.count):\\n\\n"',
+    '        + section',
+    '        + "\\n\\nUpdate your running notes with key points from this section."',
+    '    let r = try await session.respond(to: prompt)',
+    '    notes = r.content',
+    '    turns += 1',
+    '}',
+    '',
+    '// Phase 3: Final summary in a clean session with just the accumulated notes',
+    'let finalSession = LanguageModelSession()',
+    'let finalPrompt = "Here are notes from reading a full article:\\n\\n"',
+    '    + notes',
+    '    + "\\n\\nWrite a 2-3 sentence summary. State the main points directly."',
+    '    + " Do not use phrases like \\"This article discusses\\"."',
+    'let result = try await finalSession.respond(to: finalPrompt)',
+    'print(result.content)',
+  ].join('\n');
+
+  writeFileSync(swiftScript, scriptContent);
+
+  try {
+    const result = execFileSync('swift', [swiftScript, tmpArticle], {
+      encoding: 'utf-8',
+      timeout: 180_000, // 3 minutes for multi-turn conversation
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    return result.trim();
+  } catch (err: any) {
+    const stderr = err.stderr || '';
+    if (stderr.includes('No such module') || stderr.includes('FoundationModels')) {
+      throw new Error('Apple Intelligence requires macOS 26 (Tahoe) with Xcode command line tools installed.');
+    }
+    if (stderr.includes('not eligible') || stderr.includes('not available')) {
+      throw new Error('Apple Intelligence is not available on this Mac. Requires Apple Silicon with macOS 26.');
+    }
+    throw new Error(`Apple Intelligence error: ${stderr.slice(0, 200) || err.message}`);
+  } finally {
+    try { unlinkSync(tmpArticle); } catch {}
+  }
+}
+
+async function callApple(articleText: string): Promise<SummarizeResult> {
+  const words = articleText.split(/\s+/);
+
+  if (words.length <= CHUNK_WORD_LIMIT) {
+    // Short article — single pass
+    const prompt = `${SUMMARIZE_PROMPT}\n\n---\n\n${words.join(' ')}`;
+    return { summary: runApplePrompt(prompt), model: 'apple-on-device' };
+  }
+
+  // Long article — RLM-inspired multi-turn conversation
+  const summary = runAppleRLM(articleText);
+  return { summary, model: 'apple-on-device' };
 }
 
 export async function summarizeText(articleText: string, config?: LLMConfig): Promise<SummarizeResult> {

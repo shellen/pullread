@@ -167,6 +167,105 @@ export function parseFeed(xml: string): FeedEntry[] {
   }
 }
 
+export function parseFeedTitle(xml: string): string | null {
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: '@_',
+    cdataPropName: '__cdata'
+  });
+
+  try {
+    const parsed = parser.parse(xml);
+    const feedType = detectFeedType(parsed);
+
+    let title: any;
+    if (feedType === 'atom') {
+      title = parsed.feed?.title;
+    } else if (feedType === 'rss') {
+      title = parsed.rss?.channel?.title;
+    } else if (feedType === 'rdf') {
+      title = parsed['rdf:RDF']?.channel?.title;
+    }
+
+    if (!title) return null;
+
+    const raw = typeof title === 'object' ? (title.__cdata || title['#text'] || '') : String(title);
+    return raw.replace(/<[^>]+>/g, '').trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchFeedTitle(url: string): Promise<string | null> {
+  const response = await fetch(url);
+  if (!response.ok) return null;
+  const xml = await response.text();
+  return parseFeedTitle(xml);
+}
+
+/**
+ * Discover RSS/Atom feed URL from an HTML page.
+ * Looks for <link rel="alternate" type="application/rss+xml|application/atom+xml"> tags.
+ * Returns the feed URL if found, null otherwise.
+ */
+export function discoverFeedUrl(html: string, baseUrl: string): string | null {
+  // Match <link> tags with rel="alternate" and RSS/Atom types
+  const linkRegex = /<link\b[^>]*>/gi;
+  let match;
+  while ((match = linkRegex.exec(html)) !== null) {
+    const tag = match[0];
+    const relMatch = tag.match(/rel\s*=\s*["']?\s*alternate\s*["']?/i);
+    if (!relMatch) continue;
+
+    const typeMatch = tag.match(/type\s*=\s*["'](application\/(rss|atom)\+xml)["']/i);
+    if (!typeMatch) continue;
+
+    const hrefMatch = tag.match(/href\s*=\s*["']([^"']+)["']/i);
+    if (!hrefMatch) continue;
+
+    const href = hrefMatch[1].trim();
+    // Resolve relative URLs
+    try {
+      return new URL(href, baseUrl).href;
+    } catch {
+      return href;
+    }
+  }
+  return null;
+}
+
+/**
+ * Try to discover and return the feed URL from a given URL.
+ * If the URL is already an RSS/Atom feed, returns the original URL.
+ * If it's an HTML page, tries to discover the feed via <link> tags.
+ */
+export async function discoverFeed(url: string): Promise<{ feedUrl: string; title: string | null } | null> {
+  const response = await fetch(url);
+  if (!response.ok) return null;
+  const text = await response.text();
+
+  // First, try parsing as a feed directly
+  const title = parseFeedTitle(text);
+  if (title !== null) {
+    return { feedUrl: url, title };
+  }
+
+  // Not a feed — try HTML auto-discovery
+  const feedUrl = discoverFeedUrl(text, url);
+  if (!feedUrl) return null;
+
+  // Fetch the discovered feed to get its title
+  try {
+    const feedResponse = await fetch(feedUrl);
+    if (!feedResponse.ok) return { feedUrl, title: null };
+    const feedXml = await feedResponse.text();
+    const feedTitle = parseFeedTitle(feedXml);
+    return { feedUrl, title: feedTitle };
+  } catch {
+    return { feedUrl, title: null };
+  }
+}
+
 export async function fetchFeed(url: string): Promise<FeedEntry[]> {
   const response = await fetch(url);
   if (!response.ok) {

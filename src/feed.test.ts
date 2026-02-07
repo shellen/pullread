@@ -1,7 +1,7 @@
 // ABOUTME: Tests for RSS and Atom feed parsing
 // ABOUTME: Verifies extraction of entries from various feed formats
 
-import { parseFeed } from './feed';
+import { parseFeed, parseFeedTitle, discoverFeedUrl } from './feed';
 
 const ATOM_FEED = `<?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
@@ -197,9 +197,76 @@ describe('parseFeed - RDF/RSS 1.0 (Pinboard)', () => {
   });
 });
 
+describe('parseFeedTitle', () => {
+  test('extracts title from Atom feed', () => {
+    expect(parseFeedTitle(ATOM_FEED)).toBe('Bookmarks');
+  });
+
+  test('extracts title from RSS feed', () => {
+    expect(parseFeedTitle(RSS_FEED)).toBe('My RSS Feed');
+  });
+
+  test('extracts title from RDF feed', () => {
+    expect(parseFeedTitle(RDF_FEED)).toBe('Pinboard (testuser)');
+  });
+
+  test('extracts title from podcast feed with CDATA', () => {
+    expect(parseFeedTitle(PODCAST_FEED)).toBe('My Podcast');
+  });
+
+  test('returns null for invalid XML', () => {
+    expect(parseFeedTitle('not xml at all')).toBeNull();
+  });
+
+  test('returns null for unknown format', () => {
+    expect(parseFeedTitle('<?xml version="1.0"?><unknown/>')).toBeNull();
+  });
+});
+
 describe('parseFeed - Error handling', () => {
   test('throws on unknown feed format', () => {
     const invalidXml = '<?xml version="1.0"?><unknown><item/></unknown>';
     expect(() => parseFeed(invalidXml)).toThrow('Unknown feed format');
+  });
+});
+
+describe('discoverFeedUrl', () => {
+  test('discovers RSS feed from link tag', () => {
+    const html = `<html><head>
+      <link rel="alternate" type="application/rss+xml" href="/feed.xml" title="Blog RSS">
+    </head><body>Blog content</body></html>`;
+    expect(discoverFeedUrl(html, 'https://blog.example.com')).toBe('https://blog.example.com/feed.xml');
+  });
+
+  test('discovers Atom feed from link tag', () => {
+    const html = `<html><head>
+      <link rel="alternate" type="application/atom+xml" href="https://blog.example.com/atom.xml">
+    </head><body></body></html>`;
+    expect(discoverFeedUrl(html, 'https://blog.example.com')).toBe('https://blog.example.com/atom.xml');
+  });
+
+  test('discovers feed with href before type attribute', () => {
+    const html = `<html><head>
+      <link href="/rss" rel="alternate" type="application/rss+xml">
+    </head><body></body></html>`;
+    expect(discoverFeedUrl(html, 'https://example.com')).toBe('https://example.com/rss');
+  });
+
+  test('resolves relative feed URLs', () => {
+    const html = `<html><head>
+      <link rel="alternate" type="application/rss+xml" href="feed.xml">
+    </head><body></body></html>`;
+    expect(discoverFeedUrl(html, 'https://example.com/blog/')).toBe('https://example.com/blog/feed.xml');
+  });
+
+  test('returns null when no feed link found', () => {
+    const html = `<html><head>
+      <link rel="stylesheet" href="/style.css">
+    </head><body></body></html>`;
+    expect(discoverFeedUrl(html, 'https://example.com')).toBeNull();
+  });
+
+  test('returns null for empty HTML', () => {
+    expect(discoverFeedUrl('', 'https://example.com')).toBeNull();
   });
 });

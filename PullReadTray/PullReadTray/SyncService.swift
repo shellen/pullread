@@ -162,6 +162,67 @@ class SyncService {
         }
     }
 
+    /// Run a review command to generate a summary of recent articles
+    func runReview(days: Int = 7, completion: @escaping (Result<String, Error>) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+
+            guard self.isBinaryAvailable() else {
+                completion(.failure(NSError(domain: "PullRead", code: 1, userInfo: [NSLocalizedDescriptionKey: "PullRead binary not found"])))
+                return
+            }
+
+            let process = Process()
+            let pipe = Pipe()
+            let errorPipe = Pipe()
+
+            process.executableURL = URL(fileURLWithPath: self.binaryPath)
+            process.arguments = ["review", "--days", "\(days)", "--config-path", self.getConfigPath(), "--data-path", "\(self.configDir)/pullread.db"]
+            process.standardOutput = pipe
+            process.standardError = errorPipe
+
+            var outputData = Data()
+            var errorData = Data()
+
+            let outputHandle = pipe.fileHandleForReading
+            let errorHandle = errorPipe.fileHandleForReading
+            let outputGroup = DispatchGroup()
+            let errorGroup = DispatchGroup()
+
+            outputGroup.enter()
+            DispatchQueue(label: "pullread.review.stdout").async {
+                outputData = outputHandle.readDataToEndOfFile()
+                outputGroup.leave()
+            }
+
+            errorGroup.enter()
+            DispatchQueue(label: "pullread.review.stderr").async {
+                errorData = errorHandle.readDataToEndOfFile()
+                errorGroup.leave()
+            }
+
+            do {
+                try process.run()
+                process.waitUntilExit()
+                outputGroup.wait()
+                errorGroup.wait()
+
+                let output = String(data: outputData, encoding: .utf8) ?? ""
+                let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
+                self.logOutput(output + errorOutput)
+
+                if process.terminationStatus == 0 {
+                    completion(.success(output))
+                } else {
+                    let msg = errorOutput.isEmpty ? "Review failed with exit code \(process.terminationStatus)" : errorOutput
+                    completion(.failure(NSError(domain: "PullRead", code: Int(process.terminationStatus), userInfo: [NSLocalizedDescriptionKey: msg])))
+                }
+            } catch {
+                completion(.failure(error))
+            }
+        }
+    }
+
     /// Returns true if the article viewer server is currently running
     func isViewerRunning() -> Bool {
         guard let process = viewerProcess else { return false }

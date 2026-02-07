@@ -1,7 +1,7 @@
 // ABOUTME: Tests for article content extraction
 // ABOUTME: Verifies Readability extracts clean content from HTML pages
 
-import { extractArticle, resolveRelativeUrls } from './extractor';
+import { extractArticle, resolveRelativeUrls, isYouTubeUrl, extractYouTubeId } from './extractor';
 
 const SAMPLE_HTML = `
 <!DOCTYPE html>
@@ -49,6 +49,62 @@ describe('extractArticle', () => {
   });
 });
 
+describe('extractArticle — X.com/Twitter handling', () => {
+  test('generates title from og:description for X.com posts', () => {
+    const html = `<html><head>
+      <meta property="og:description" content="Just shipped the new feature! Really excited about this one." />
+    </head><body>
+      <article><p>Just shipped the new feature! Really excited about this one.</p>
+      <p>More content here for readability to pick up properly in extraction.</p>
+      <p>Even more content to make sure readability considers this an article.</p></article>
+    </body></html>`;
+    const result = extractArticle(html, 'https://x.com/johndoe/status/123456789');
+    expect(result).not.toBeNull();
+    // Should NOT be "Untitled"
+    expect(result!.title).not.toBe('Untitled');
+    expect(result!.title).toContain('shipped');
+  });
+
+  test('generates username-based title when no description available', () => {
+    const html = `<html><head><title></title></head><body>
+      <article><p>Some tweet content that readability will extract from the page.</p>
+      <p>Additional content to make readability happy with extraction length.</p>
+      <p>Third paragraph for good measure to ensure extraction works properly.</p></article>
+    </body></html>`;
+    const result = extractArticle(html, 'https://x.com/janedoe/status/987654321');
+    expect(result).not.toBeNull();
+    expect(result!.title).not.toBe('Untitled');
+  });
+
+  test('does not alter titles for non-Twitter URLs', () => {
+    const html = `<html><head><title></title></head><body>
+      <article><p>Content of the page without a proper title set in head.</p>
+      <p>More content here for the readability algorithm to extract properly.</p>
+      <p>And even more substantial content for good extraction results.</p></article>
+    </body></html>`;
+    const result = extractArticle(html, 'https://example.com/article');
+    // For non-Twitter, "Untitled" is still the default
+    if (result) {
+      // Either has a title or is Untitled — but NOT Twitter-specific
+      expect(result.title).not.toContain('post on X');
+    }
+  });
+
+  test('handles long tweet descriptions by truncating', () => {
+    const longDesc = 'A'.repeat(100);
+    const html = `<html><head>
+      <meta property="og:description" content="${longDesc}" />
+    </head><body>
+      <article><p>${longDesc}</p>
+      <p>Second paragraph of tweet content for readability extraction to work.</p>
+      <p>Third paragraph to ensure there is enough content for extraction.</p></article>
+    </body></html>`;
+    const result = extractArticle(html, 'https://x.com/user/status/111');
+    expect(result).not.toBeNull();
+    expect(result!.title.length).toBeLessThanOrEqual(80);
+  });
+});
+
 describe('resolveRelativeUrls', () => {
   const baseUrl = 'https://example.com/articles/my-post';
 
@@ -82,6 +138,37 @@ describe('resolveRelativeUrls', () => {
     expect(result).toBe('![Screenshot 2026-02-02 at 10.49.54\u202FAM](https://blog.example.com/art/afterword/1770047479321-Screenshot_2026-02-02_at_10.49.54___AM.png)');
   });
 
+  test('resolves relative image paths (no leading slash)', () => {
+    const md = '![figure](x1.png)';
+    const result = resolveRelativeUrls(md, 'https://arxiv.org/html/2512.24601v1/');
+    expect(result).toBe('![figure](https://arxiv.org/html/2512.24601v1/x1.png)');
+  });
+
+  test('resolves relative link paths (no leading slash)', () => {
+    const md = '[see appendix](appendix.html)';
+    const result = resolveRelativeUrls(md, 'https://example.com/docs/guide/');
+    expect(result).toBe('[see appendix](https://example.com/docs/guide/appendix.html)');
+  });
+
+  test('resolves relative paths with subdirectories', () => {
+    const md = '![chart](images/chart.png)';
+    const result = resolveRelativeUrls(md, 'https://example.com/post/my-article/');
+    expect(result).toBe('![chart](https://example.com/post/my-article/images/chart.png)');
+  });
+
+  test('does not touch data: URIs or fragments', () => {
+    const md = '![img](data:image/png;base64,abc) and [link](#section)';
+    const result = resolveRelativeUrls(md, baseUrl);
+    expect(result).toBe(md);
+  });
+
+  test('resolves relative URLs with base URL lacking trailing slash', () => {
+    const md = '![fig](x1.png)';
+    // Without trailing slash, x1.png resolves relative to the parent directory
+    const result = resolveRelativeUrls(md, 'https://arxiv.org/html/2512.24601v1');
+    expect(result).toBe('![fig](https://arxiv.org/html/x1.png)');
+  });
+
   test('returns markdown unchanged for invalid base URL', () => {
     const md = '![img](/photo.jpg)';
     const result = resolveRelativeUrls(md, 'not-a-url');
@@ -95,5 +182,49 @@ describe('resolveRelativeUrls', () => {
     expect(result).toContain('https://example.com/page1');
     expect(result).toContain('https://example.com/img/2.png');
     expect(result).toContain('https://example.com/page2');
+  });
+});
+
+describe('isYouTubeUrl', () => {
+  test('detects youtube.com URLs', () => {
+    expect(isYouTubeUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ')).toBe(true);
+    expect(isYouTubeUrl('https://youtube.com/watch?v=abc123')).toBe(true);
+    expect(isYouTubeUrl('https://m.youtube.com/watch?v=abc123')).toBe(true);
+  });
+
+  test('detects youtu.be URLs', () => {
+    expect(isYouTubeUrl('https://youtu.be/dQw4w9WgXcQ')).toBe(true);
+  });
+
+  test('rejects non-YouTube URLs', () => {
+    expect(isYouTubeUrl('https://example.com/video')).toBe(false);
+    expect(isYouTubeUrl('https://vimeo.com/123')).toBe(false);
+  });
+});
+
+describe('extractYouTubeId', () => {
+  test('extracts ID from standard watch URL', () => {
+    expect(extractYouTubeId('https://www.youtube.com/watch?v=dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');
+  });
+
+  test('extracts ID from youtu.be short URL', () => {
+    expect(extractYouTubeId('https://youtu.be/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');
+  });
+
+  test('extracts ID from embed URL', () => {
+    expect(extractYouTubeId('https://www.youtube.com/embed/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');
+  });
+
+  test('extracts ID with extra parameters', () => {
+    expect(extractYouTubeId('https://www.youtube.com/watch?v=abc123&t=30s')).toBe('abc123');
+  });
+
+  test('returns null for non-video YouTube pages', () => {
+    expect(extractYouTubeId('https://www.youtube.com/channel/UC12345')).toBeNull();
+    expect(extractYouTubeId('https://www.youtube.com/results?search_query=test')).toBeNull();
+  });
+
+  test('returns null for invalid URLs', () => {
+    expect(extractYouTubeId('not-a-url')).toBeNull();
   });
 });

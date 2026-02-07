@@ -3,6 +3,7 @@
 
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 struct FeedItem: Identifiable, Equatable {
     let id = UUID()
@@ -16,6 +17,7 @@ struct SettingsView: View {
     @State private var feeds: [FeedItem] = []
     @State private var newFeedName: String = ""
     @State private var newFeedURL: String = ""
+    @State private var isFetchingTitle: Bool = false
     @State private var showingError: Bool = false
     @State private var errorMessage: String = ""
     @State private var selectedFeed: FeedItem.ID?
@@ -26,6 +28,7 @@ struct SettingsView: View {
     @State private var llmModel: String = ""
     @State private var llmModelCustom: String = ""
     @State private var useCustomModel: Bool = false
+    @State private var reviewSchedule: String = "off"
 
     private static let knownModels: [String: [String]] = [
         "anthropic": ["claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001", "claude-opus-4-6"],
@@ -119,24 +122,21 @@ struct SettingsView: View {
     private var welcomeHeader: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Image(systemName: "doc.text.fill")
-                    .font(.system(size: 32))
-                    .foregroundStyle(.linearGradient(
-                        colors: [.blue, .purple],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 40, height: 40)
+                    .cornerRadius(8)
                 VStack(alignment: .leading) {
                     Text("Welcome to PullRead")
                         .font(.title2)
                         .fontWeight(.semibold)
-                    Text("Sync RSS feeds to markdown files")
+                    Text("Your bookmark reader & markdown library")
                         .foregroundColor(.secondary)
                 }
             }
             .padding(.bottom, 4)
 
-            Text("PullRead syncs your RSS and Atom feeds into clean markdown files, saved to a folder you choose. Add your feeds below and you're ready to go.")
+            Text("PullRead syncs your bookmarks and feeds into clean markdown files you can read, search, and keep forever.")
                 .font(.callout)
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -190,14 +190,32 @@ struct SettingsView: View {
                             .font(.headline)
                             .foregroundColor(.secondary)
                     }
-                    Label("Add Your Feeds", systemImage: "antenna.radiowaves.left.and.right")
+                    Label("Your Sources", systemImage: "bookmark.fill")
                         .font(.headline)
                         .foregroundColor(.primary)
                 }
 
-                Text("Add RSS or Atom feed URLs to sync.")
+                Text("Add feed URLs from your favorite sites and bookmark services.")
                     .font(.caption)
                     .foregroundColor(.secondary)
+
+                DisclosureGroup {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ServiceRow(name: "Instapaper", detail: "Settings \u{2192} Export \u{2192} RSS Feed URL")
+                        ServiceRow(name: "Pinboard", detail: "Use your RSS feed: pinboard.in/feeds/u:USERNAME/")
+                        ServiceRow(name: "Raindrop", detail: "Collection \u{2192} Share \u{2192} RSS Feed")
+                        ServiceRow(name: "Omnivore", detail: "Settings \u{2192} Feeds \u{2192} RSS URL")
+                        Divider()
+                        Text("**Import bookmarks.html** — You can import bookmarks exported from Chrome, Safari, Firefox, Pocket, or other services. Use the Import button below or run `pullread import <file.html>` from the terminal.")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.top, 4)
+                } label: {
+                    Label("Which services work?", systemImage: "questionmark.circle")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
 
                 // Feed list
                 List(selection: $selectedFeed) {
@@ -223,41 +241,66 @@ struct SettingsView: View {
                 .background(Color(NSColor.textBackgroundColor).opacity(0.3))
                 .cornerRadius(8)
 
-                // Add new feed
+                // Add new feed — just paste a URL, title is auto-fetched
                 HStack(spacing: 8) {
-                    TextField("Name", text: $newFeedName)
-                        .textFieldStyle(.plain)
-                        .padding(8)
-                        .frame(width: 100)
-                        .background(Color(NSColor.textBackgroundColor).opacity(0.5))
-                        .cornerRadius(6)
-
-                    TextField("Feed URL", text: $newFeedURL)
+                    TextField("Paste feed URL...", text: $newFeedURL)
                         .textFieldStyle(.plain)
                         .padding(8)
                         .background(Color(NSColor.textBackgroundColor).opacity(0.5))
                         .cornerRadius(6)
+                        .onSubmit { addFeed() }
 
-                    Button(action: addFeed) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title2)
+                    if isFetchingTitle {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                            .frame(width: 28)
+                    } else {
+                        Button(action: addFeed) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.title2)
+                        }
+                        .buttonStyle(.borderless)
+                        .disabled(newFeedURL.isEmpty)
                     }
-                    .buttonStyle(.borderless)
-                    .disabled(newFeedName.isEmpty || newFeedURL.isEmpty)
                 }
 
-                // Remove selected button
-                if selectedFeed != nil {
-                    Button(action: {
-                        if let id = selectedFeed {
-                            feeds.removeAll { $0.id == id }
-                            selectedFeed = nil
-                        }
-                    }) {
-                        Label("Remove Selected", systemImage: "trash")
+                if !newFeedName.isEmpty {
+                    HStack(spacing: 8) {
+                        Text("Name:")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        TextField("Feed name", text: $newFeedName)
+                            .textFieldStyle(.plain)
+                            .padding(4)
+                            .background(Color(NSColor.textBackgroundColor).opacity(0.3))
+                            .cornerRadius(4)
+                            .font(.caption)
                     }
-                    .foregroundColor(.red)
+                }
+
+                HStack {
+                    // Remove selected button
+                    if selectedFeed != nil {
+                        Button(action: {
+                            if let id = selectedFeed {
+                                feeds.removeAll { $0.id == id }
+                                selectedFeed = nil
+                            }
+                        }) {
+                            Label("Remove Selected", systemImage: "trash")
+                        }
+                        .foregroundColor(.red)
+                        .buttonStyle(.borderless)
+                    }
+
+                    Spacer()
+
+                    // Import bookmarks.html button
+                    Button(action: importBookmarks) {
+                        Label("Import Bookmarks...", systemImage: "square.and.arrow.down")
+                    }
                     .buttonStyle(.borderless)
+                    .help("Import bookmarks from an HTML file (Chrome, Safari, Firefox, Pocket, etc.)")
                 }
             }
         }
@@ -316,6 +359,26 @@ struct SettingsView: View {
                     .background(Color.green.opacity(0.1))
                     .cornerRadius(8)
                 }
+
+                Divider()
+
+                // Scheduled Reviews
+                HStack(spacing: 8) {
+                    Text("Scheduled Reviews")
+                        .fontWeight(.medium)
+                    Spacer()
+                    Picker("", selection: $reviewSchedule) {
+                        Text("Off").tag("off")
+                        Text("Daily").tag("daily")
+                        Text("Weekly").tag("weekly")
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 120)
+                }
+
+                Text("Automatically generate a thematic summary of your recent articles. Requires a configured LLM provider above.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
         }
     }
@@ -336,25 +399,28 @@ struct SettingsView: View {
                         .foregroundColor(.primary)
                 }
 
-                Text("Add your API key to generate article summaries on demand. Your key is stored locally and never shared.")
+                Text("Generate article summaries on demand. Your key is stored locally and never shared.")
                     .font(.caption)
                     .foregroundColor(.secondary)
 
+                // Provider dropdown
                 HStack(spacing: 8) {
                     Text("Provider")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .frame(width: 60, alignment: .trailing)
                     Picker("", selection: $llmProvider) {
+                        Label("Apple Intelligence", systemImage: "apple.logo")
+                            .tag("apple")
+                        Divider()
                         Text("Anthropic").tag("anthropic")
                         Text("OpenAI").tag("openai")
-                        Text("Gemini").tag("gemini")
+                        Text("Google Gemini").tag("gemini")
                         Text("OpenRouter").tag("openrouter")
-                        Text("Apple Intelligence").tag("apple")
                     }
-                    .pickerStyle(.segmented)
-                    .onChange(of: llmProvider) { _ in
-                        // Reset model selection when provider changes
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .onChange(of: llmProvider) {
                         useCustomModel = false
                         llmModel = Self.defaultModels[llmProvider] ?? ""
                         llmModelCustom = ""
@@ -366,10 +432,10 @@ struct SettingsView: View {
                         Image(systemName: "apple.intelligence")
                             .foregroundColor(.blue)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Uses on-device model via Foundation Models framework")
+                            Text("On-device summarization — free & private")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            Text("Requires macOS 26 (Tahoe) · No API key needed · Free & private")
+                            Text("Requires macOS 26 (Tahoe) · No API key needed · Long articles are processed in sections automatically")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
@@ -380,6 +446,7 @@ struct SettingsView: View {
                 }
 
                 if !isAppleProvider {
+                    // API Key
                     HStack(spacing: 8) {
                         Text("API Key")
                             .font(.caption)
@@ -392,6 +459,7 @@ struct SettingsView: View {
                             .cornerRadius(6)
                     }
 
+                    // Model selection
                     HStack(spacing: 8) {
                         Text("Model")
                             .font(.caption)
@@ -409,39 +477,43 @@ struct SettingsView: View {
                                 llmModelCustom = ""
                             }
                             .font(.caption)
+                            .buttonStyle(.borderless)
                         } else {
                             Picker("", selection: $llmModel) {
                                 ForEach(modelsForProvider, id: \.self) { model in
                                     Text(model).tag(model)
                                 }
                             }
-                            .frame(maxWidth: .infinity)
+                            .pickerStyle(.menu)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             Button("Custom") {
                                 useCustomModel = true
                             }
                             .font(.caption)
+                            .buttonStyle(.borderless)
+                            .foregroundColor(.accentColor)
                         }
                     }
 
                     if useCustomModel {
-                        Text("Enter any model ID. Useful for newer models not yet listed.")
+                        Text("Enter any model ID supported by this provider.")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                             .padding(.leading, 68)
                     }
-                }
 
-                if !isAppleProvider && !llmApiKey.isEmpty {
-                    HStack(spacing: 8) {
-                        Image(systemName: "checkmark.shield.fill")
-                            .foregroundColor(.green)
-                        Text("Key stored locally at ~/.config/pullread/settings.json")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                    if !llmApiKey.isEmpty {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.shield.fill")
+                                .foregroundColor(.green)
+                            Text("Key stored locally at ~/.config/pullread/settings.json")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(10)
+                        .background(Color.green.opacity(0.1))
+                        .cornerRadius(8)
                     }
-                    .padding(10)
-                    .background(Color.green.opacity(0.1))
-                    .cornerRadius(8)
                 }
             }
         }
@@ -554,17 +626,194 @@ struct SettingsView: View {
         }
     }
 
+    private func importBookmarks() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.html]
+        panel.prompt = "Import"
+        panel.message = "Select a bookmarks.html file to import"
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        // Find the pullread binary in app resources
+        guard let resourcePath = Bundle.main.resourcePath else {
+            errorMessage = "Could not find PullRead binary in app bundle."
+            showingError = true
+            return
+        }
+
+        let binaryPath = "\(resourcePath)/pullread"
+        guard FileManager.default.fileExists(atPath: binaryPath) else {
+            errorMessage = "PullRead binary not found. Please reinstall the app."
+            showingError = true
+            return
+        }
+
+        // Run: pullread import <file> --config-path <config>
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: binaryPath)
+        process.arguments = ["import", url.path, "--config-path", configPath, "--data-path", (configPath as NSString).deletingLastPathComponent + "/pullread.db"]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                try process.run()
+                process.waitUntilExit()
+                let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+                DispatchQueue.main.async {
+                    if process.terminationStatus == 0 {
+                        // Extract summary from output
+                        let summary = output.components(separatedBy: "\n").last(where: { $0.contains("Done:") }) ?? "Import completed"
+                        errorMessage = summary
+                        showingError = true
+                    } else {
+                        errorMessage = "Import failed: \(output)"
+                        showingError = true
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    errorMessage = "Failed to run import: \(error.localizedDescription)"
+                    showingError = true
+                }
+            }
+        }
+    }
+
     private func addFeed() {
-        guard !newFeedName.isEmpty, !newFeedURL.isEmpty else { return }
+        guard !newFeedURL.isEmpty else { return }
 
         var urlString = newFeedURL.trimmingCharacters(in: .whitespacesAndNewlines)
         if !urlString.hasPrefix("http://") && !urlString.hasPrefix("https://") {
             urlString = "https://" + urlString
         }
 
-        feeds.append(FeedItem(name: newFeedName.trimmingCharacters(in: .whitespaces), url: urlString))
-        newFeedName = ""
-        newFeedURL = ""
+        let finalUrl = urlString
+
+        if !newFeedName.isEmpty {
+            // User already provided or edited a name
+            feeds.append(FeedItem(name: newFeedName.trimmingCharacters(in: .whitespaces), url: finalUrl))
+            newFeedName = ""
+            newFeedURL = ""
+        } else {
+            // Auto-discover feed URL (handles blog URLs too) and fetch title
+            isFetchingTitle = true
+            discoverFeed(from: finalUrl) { result in
+                let feedUrl = result?.feedUrl ?? finalUrl
+                let name = result?.title ?? domainFromUrl(feedUrl)
+                feeds.append(FeedItem(name: name, url: feedUrl))
+                newFeedName = ""
+                newFeedURL = ""
+                isFetchingTitle = false
+            }
+        }
+    }
+
+    private func domainFromUrl(_ urlString: String) -> String {
+        guard let url = URL(string: urlString),
+              let host = url.host else {
+            return urlString
+        }
+        return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+    }
+
+    /// Result of feed discovery: the actual feed URL (may differ from input) and an optional title
+    private struct FeedDiscoveryResult {
+        let feedUrl: String
+        let title: String?
+    }
+
+    /// Fetches a URL and tries to parse it as an RSS/Atom feed.
+    /// If it's an HTML page instead, looks for <link rel="alternate" type="application/rss+xml"> to auto-discover the feed.
+    private func discoverFeed(from urlString: String, completion: @escaping (FeedDiscoveryResult?) -> Void) {
+        guard let url = URL(string: urlString) else {
+            completion(nil)
+            return
+        }
+
+        URLSession.shared.dataTask(with: url) { data, response, _ in
+            guard let data = data, let text = String(data: data, encoding: .utf8) else {
+                DispatchQueue.main.async { completion(nil) }
+                return
+            }
+
+            // Check if this is already a valid feed (look for RSS/Atom markers)
+            let isFeed = text.contains("<rss") || text.contains("<feed") || text.contains("<rdf:RDF") || text.contains("<?xml")
+
+            if isFeed {
+                // Try to extract <title>
+                let title = self.extractXmlTitle(from: text)
+                DispatchQueue.main.async { completion(FeedDiscoveryResult(feedUrl: urlString, title: title)) }
+                return
+            }
+
+            // Not a feed — try HTML RSS auto-discovery
+            // Look for: <link rel="alternate" type="application/rss+xml" href="...">
+            // or:       <link rel="alternate" type="application/atom+xml" href="...">
+            let pattern = #"<link[^>]*rel\s*=\s*["']alternate["'][^>]*type\s*=\s*["']application/(rss|atom)\+xml["'][^>]*href\s*=\s*["']([^"']+)["'][^>]*>"#
+            let altPattern = #"<link[^>]*href\s*=\s*["']([^"']+)["'][^>]*type\s*=\s*["']application/(rss|atom)\+xml["'][^>]*>"#
+
+            var feedHref: String?
+            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+               let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) {
+                if let range = Range(match.range(at: 2), in: text) {
+                    feedHref = String(text[range])
+                }
+            } else if let regex = try? NSRegularExpression(pattern: altPattern, options: .caseInsensitive),
+                      let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) {
+                if let range = Range(match.range(at: 1), in: text) {
+                    feedHref = String(text[range])
+                }
+            }
+
+            guard let href = feedHref else {
+                // No feed found — fall back to treating as-is (maybe a direct feed with unusual format)
+                let title = self.extractXmlTitle(from: text)
+                DispatchQueue.main.async { completion(FeedDiscoveryResult(feedUrl: urlString, title: title)) }
+                return
+            }
+
+            // Resolve the discovered feed URL relative to the page URL
+            let resolvedUrl: String
+            if href.hasPrefix("http://") || href.hasPrefix("https://") {
+                resolvedUrl = href
+            } else if let base = URL(string: urlString), let resolved = URL(string: href, relativeTo: base) {
+                resolvedUrl = resolved.absoluteString
+            } else {
+                resolvedUrl = href
+            }
+
+            // Fetch the discovered feed to get its title
+            guard let feedUrl = URL(string: resolvedUrl) else {
+                DispatchQueue.main.async { completion(FeedDiscoveryResult(feedUrl: resolvedUrl, title: nil)) }
+                return
+            }
+
+            URLSession.shared.dataTask(with: feedUrl) { feedData, _, _ in
+                var feedTitle: String?
+                if let feedData = feedData, let feedText = String(data: feedData, encoding: .utf8) {
+                    feedTitle = self.extractXmlTitle(from: feedText)
+                }
+                DispatchQueue.main.async { completion(FeedDiscoveryResult(feedUrl: resolvedUrl, title: feedTitle)) }
+            }.resume()
+        }.resume()
+    }
+
+    private func extractXmlTitle(from text: String) -> String? {
+        guard let startRange = text.range(of: "<title>"),
+              let endRange = text.range(of: "</title>", range: startRange.upperBound..<text.endIndex) else {
+            return nil
+        }
+        let raw = String(text[startRange.upperBound..<endRange.lowerBound])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "<![CDATA[", with: "")
+            .replacingOccurrences(of: "]]>", with: "")
+        return raw.isEmpty ? nil : raw
     }
 
     private func deleteFeed(at offsets: IndexSet) {
@@ -578,9 +827,6 @@ struct SettingsView: View {
             // Pre-fill defaults for first run
             if isFirstRun {
                 outputPath = "~/Documents/PullRead"
-                feeds = [
-                    FeedItem(name: "Hacker News (100+)", url: "https://hnrss.org/newest?points=100")
-                ]
             }
             return
         }
@@ -616,6 +862,9 @@ struct SettingsView: View {
                 useCustomModel = true
             }
         }
+
+        // Load review schedule from UserDefaults
+        reviewSchedule = UserDefaults.standard.string(forKey: "reviewSchedule") ?? "off"
     }
 
     private func saveConfig() {
@@ -690,6 +939,9 @@ struct SettingsView: View {
                 try settingsData.write(to: URL(fileURLWithPath: settingsPath))
             }
 
+            // Save review schedule
+            UserDefaults.standard.set(reviewSchedule, forKey: "reviewSchedule")
+
             isPresented = false
             if isFirstRun {
                 onFirstRunComplete?()
@@ -717,6 +969,23 @@ struct GlassCard<Content: View>: View {
             .background(.ultraThinMaterial)
             .cornerRadius(12)
             .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+    }
+}
+
+struct ServiceRow: View {
+    let name: String
+    let detail: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(name)
+                .font(.caption)
+                .fontWeight(.medium)
+                .frame(width: 80, alignment: .leading)
+            Text(detail)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
     }
 }
 
