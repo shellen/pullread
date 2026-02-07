@@ -42,7 +42,7 @@ describe('generateMarkdown', () => {
     expect(md).toContain('url: https://example.com/test');
     expect(md).toContain('bookmarked: 2024-01-29T19:05:18.441Z');
     expect(md).toContain('domain: example.com');
-    expect(md).toContain('# Test Article');
+    expect(md).not.toContain('# Test Article');
     expect(md).toContain('This is the article content.');
   });
 

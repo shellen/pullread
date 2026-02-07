@@ -1110,7 +1110,13 @@ function renderArticle(text, filename) {
   // Strip the leading H1 from markdown body if it matches the title (avoid duplication)
   let articleBody = cleanMarkdown(body);
   if (meta && meta.title) {
-    articleBody = articleBody.replace(new RegExp('^#\\s+' + meta.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\n'), '');
+    var h1Match = articleBody.match(/^#\s+(.+)\s*\n/);
+    if (h1Match) {
+      var normalize = function(s) { return s.toLowerCase().replace(/[\u2018\u2019\u201C\u201D]/g, "'").replace(/[^a-z0-9]/g, ''); };
+      if (normalize(h1Match[1]) === normalize(meta.title)) {
+        articleBody = articleBody.slice(h1Match[0].length);
+      }
+    }
   }
 
   html += marked.parse(articleBody);
