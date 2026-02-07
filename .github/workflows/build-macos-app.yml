@@ -248,10 +248,10 @@ jobs:
             --sign "$IDENTITY" \
             "$APP_PATH/Contents/Resources/pullread"
 
-          # Sign the main app binary
+          # Sign the main app binary (PRODUCT_NAME is "Pull Read", not "PullReadTray")
           codesign --force --options runtime --timestamp \
             --sign "$IDENTITY" \
-            "$APP_PATH/Contents/MacOS/PullReadTray"
+            "$APP_PATH/Contents/MacOS/Pull Read"
 
           # Sign the overall app bundle
           codesign --force --options runtime --timestamp \
