@@ -3,6 +3,7 @@
 
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 struct OnboardingView: View {
     @Binding var isPresented: Bool

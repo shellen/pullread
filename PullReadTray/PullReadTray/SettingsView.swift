@@ -3,6 +3,7 @@
 
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 struct FeedItem: Identifiable, Equatable {
     let id = UUID()
