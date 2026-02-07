@@ -27,6 +27,7 @@ struct SettingsView: View {
     @State private var llmModel: String = ""
     @State private var llmModelCustom: String = ""
     @State private var useCustomModel: Bool = false
+    @State private var reviewSchedule: String = "off"
 
     private static let knownModels: [String: [String]] = [
         "anthropic": ["claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001", "claude-opus-4-6"],
@@ -201,11 +202,10 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         ServiceRow(name: "Instapaper", detail: "Settings \u{2192} Export \u{2192} RSS Feed URL")
                         ServiceRow(name: "Pinboard", detail: "Use your RSS feed: pinboard.in/feeds/u:USERNAME/")
-                        ServiceRow(name: "Pocket", detail: "Not available as RSS \u{2014} export bookmarks.html instead")
                         ServiceRow(name: "Raindrop", detail: "Collection \u{2192} Share \u{2192} RSS Feed")
                         ServiceRow(name: "Omnivore", detail: "Settings \u{2192} Feeds \u{2192} RSS URL")
                         Divider()
-                        Text("You can also import bookmarks.html files exported from Chrome, Safari, Firefox, or any service above via **pullread import**.")
+                        Text("**Import bookmarks.html** — You can import bookmarks exported from Chrome, Safari, Firefox, Pocket, or other services. Use the Import button below or run `pullread import <file.html>` from the terminal.")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
@@ -277,18 +277,29 @@ struct SettingsView: View {
                     }
                 }
 
-                // Remove selected button
-                if selectedFeed != nil {
-                    Button(action: {
-                        if let id = selectedFeed {
-                            feeds.removeAll { $0.id == id }
-                            selectedFeed = nil
+                HStack {
+                    // Remove selected button
+                    if selectedFeed != nil {
+                        Button(action: {
+                            if let id = selectedFeed {
+                                feeds.removeAll { $0.id == id }
+                                selectedFeed = nil
+                            }
+                        }) {
+                            Label("Remove Selected", systemImage: "trash")
                         }
-                    }) {
-                        Label("Remove Selected", systemImage: "trash")
+                        .foregroundColor(.red)
+                        .buttonStyle(.borderless)
                     }
-                    .foregroundColor(.red)
+
+                    Spacer()
+
+                    // Import bookmarks.html button
+                    Button(action: importBookmarks) {
+                        Label("Import Bookmarks...", systemImage: "square.and.arrow.down")
+                    }
                     .buttonStyle(.borderless)
+                    .help("Import bookmarks from an HTML file (Chrome, Safari, Firefox, Pocket, etc.)")
                 }
             }
         }
@@ -347,6 +358,26 @@ struct SettingsView: View {
                     .background(Color.green.opacity(0.1))
                     .cornerRadius(8)
                 }
+
+                Divider()
+
+                // Scheduled Reviews
+                HStack(spacing: 8) {
+                    Text("Scheduled Reviews")
+                        .fontWeight(.medium)
+                    Spacer()
+                    Picker("", selection: $reviewSchedule) {
+                        Text("Off").tag("off")
+                        Text("Daily").tag("daily")
+                        Text("Weekly").tag("weekly")
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 120)
+                }
+
+                Text("Automatically generate a thematic summary of your recent articles. Requires a configured LLM provider above.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
         }
     }
@@ -594,6 +625,65 @@ struct SettingsView: View {
         }
     }
 
+    private func importBookmarks() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.html]
+        panel.prompt = "Import"
+        panel.message = "Select a bookmarks.html file to import"
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        // Find the pullread binary in app resources
+        guard let resourcePath = Bundle.main.resourcePath else {
+            errorMessage = "Could not find PullRead binary in app bundle."
+            showingError = true
+            return
+        }
+
+        let binaryPath = "\(resourcePath)/pullread"
+        guard FileManager.default.fileExists(atPath: binaryPath) else {
+            errorMessage = "PullRead binary not found. Please reinstall the app."
+            showingError = true
+            return
+        }
+
+        // Run: pullread import <file> --config-path <config>
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: binaryPath)
+        process.arguments = ["import", url.path, "--config-path", configPath, "--data-path", (configPath as NSString).deletingLastPathComponent + "/pullread.db"]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                try process.run()
+                process.waitUntilExit()
+                let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+                DispatchQueue.main.async {
+                    if process.terminationStatus == 0 {
+                        // Extract summary from output
+                        let summary = output.components(separatedBy: "\n").last(where: { $0.contains("Done:") }) ?? "Import completed"
+                        errorMessage = summary
+                        showingError = true
+                    } else {
+                        errorMessage = "Import failed: \(output)"
+                        showingError = true
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    errorMessage = "Failed to run import: \(error.localizedDescription)"
+                    showingError = true
+                }
+            }
+        }
+    }
+
     private func addFeed() {
         guard !newFeedURL.isEmpty else { return }
 
@@ -610,11 +700,12 @@ struct SettingsView: View {
             newFeedName = ""
             newFeedURL = ""
         } else {
-            // Auto-fetch the feed title
+            // Auto-discover feed URL (handles blog URLs too) and fetch title
             isFetchingTitle = true
-            fetchFeedTitle(from: finalUrl) { title in
-                let name = title ?? domainFromUrl(finalUrl)
-                feeds.append(FeedItem(name: name, url: finalUrl))
+            discoverFeed(from: finalUrl) { result in
+                let feedUrl = result?.feedUrl ?? finalUrl
+                let name = result?.title ?? domainFromUrl(feedUrl)
+                feeds.append(FeedItem(name: name, url: feedUrl))
                 newFeedName = ""
                 newFeedURL = ""
                 isFetchingTitle = false
@@ -630,33 +721,98 @@ struct SettingsView: View {
         return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
     }
 
-    private func fetchFeedTitle(from urlString: String, completion: @escaping (String?) -> Void) {
+    /// Result of feed discovery: the actual feed URL (may differ from input) and an optional title
+    private struct FeedDiscoveryResult {
+        let feedUrl: String
+        let title: String?
+    }
+
+    /// Fetches a URL and tries to parse it as an RSS/Atom feed.
+    /// If it's an HTML page instead, looks for <link rel="alternate" type="application/rss+xml"> to auto-discover the feed.
+    private func discoverFeed(from urlString: String, completion: @escaping (FeedDiscoveryResult?) -> Void) {
         guard let url = URL(string: urlString) else {
             completion(nil)
             return
         }
 
-        URLSession.shared.dataTask(with: url) { data, _, _ in
-            guard let data = data, let xml = String(data: data, encoding: .utf8) else {
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, _ in
+            guard let data = data, let text = String(data: data, encoding: .utf8) else {
                 DispatchQueue.main.async { completion(nil) }
                 return
             }
 
-            // Try <title>...</title> (works for RSS, Atom, and RDF)
-            var title: String?
-            if let startRange = xml.range(of: "<title>"),
-               let endRange = xml.range(of: "</title>", range: startRange.upperBound..<xml.endIndex) {
-                let raw = String(xml[startRange.upperBound..<endRange.lowerBound])
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                    .replacingOccurrences(of: "<![CDATA[", with: "")
-                    .replacingOccurrences(of: "]]>", with: "")
-                if !raw.isEmpty {
-                    title = raw
+            // Check if this is already a valid feed (look for RSS/Atom markers)
+            let isFeed = text.contains("<rss") || text.contains("<feed") || text.contains("<rdf:RDF") || text.contains("<?xml")
+
+            if isFeed {
+                // Try to extract <title>
+                let title = self?.extractXmlTitle(from: text)
+                DispatchQueue.main.async { completion(FeedDiscoveryResult(feedUrl: urlString, title: title)) }
+                return
+            }
+
+            // Not a feed — try HTML RSS auto-discovery
+            // Look for: <link rel="alternate" type="application/rss+xml" href="...">
+            // or:       <link rel="alternate" type="application/atom+xml" href="...">
+            let pattern = #"<link[^>]*rel\s*=\s*["']alternate["'][^>]*type\s*=\s*["']application/(rss|atom)\+xml["'][^>]*href\s*=\s*["']([^"']+)["'][^>]*>"#
+            let altPattern = #"<link[^>]*href\s*=\s*["']([^"']+)["'][^>]*type\s*=\s*["']application/(rss|atom)\+xml["'][^>]*>"#
+
+            var feedHref: String?
+            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+               let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) {
+                if let range = Range(match.range(at: 2), in: text) {
+                    feedHref = String(text[range])
+                }
+            } else if let regex = try? NSRegularExpression(pattern: altPattern, options: .caseInsensitive),
+                      let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) {
+                if let range = Range(match.range(at: 1), in: text) {
+                    feedHref = String(text[range])
                 }
             }
 
-            DispatchQueue.main.async { completion(title) }
+            guard let href = feedHref else {
+                // No feed found — fall back to treating as-is (maybe a direct feed with unusual format)
+                let title = self?.extractXmlTitle(from: text)
+                DispatchQueue.main.async { completion(FeedDiscoveryResult(feedUrl: urlString, title: title)) }
+                return
+            }
+
+            // Resolve the discovered feed URL relative to the page URL
+            let resolvedUrl: String
+            if href.hasPrefix("http://") || href.hasPrefix("https://") {
+                resolvedUrl = href
+            } else if let base = URL(string: urlString), let resolved = URL(string: href, relativeTo: base) {
+                resolvedUrl = resolved.absoluteString
+            } else {
+                resolvedUrl = href
+            }
+
+            // Fetch the discovered feed to get its title
+            guard let feedUrl = URL(string: resolvedUrl) else {
+                DispatchQueue.main.async { completion(FeedDiscoveryResult(feedUrl: resolvedUrl, title: nil)) }
+                return
+            }
+
+            URLSession.shared.dataTask(with: feedUrl) { feedData, _, _ in
+                var feedTitle: String?
+                if let feedData = feedData, let feedText = String(data: feedData, encoding: .utf8) {
+                    feedTitle = self?.extractXmlTitle(from: feedText)
+                }
+                DispatchQueue.main.async { completion(FeedDiscoveryResult(feedUrl: resolvedUrl, title: feedTitle)) }
+            }.resume()
         }.resume()
+    }
+
+    private func extractXmlTitle(from text: String) -> String? {
+        guard let startRange = text.range(of: "<title>"),
+              let endRange = text.range(of: "</title>", range: startRange.upperBound..<text.endIndex) else {
+            return nil
+        }
+        let raw = String(text[startRange.upperBound..<endRange.lowerBound])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "<![CDATA[", with: "")
+            .replacingOccurrences(of: "]]>", with: "")
+        return raw.isEmpty ? nil : raw
     }
 
     private func deleteFeed(at offsets: IndexSet) {
@@ -708,6 +864,9 @@ struct SettingsView: View {
                 useCustomModel = true
             }
         }
+
+        // Load review schedule from UserDefaults
+        reviewSchedule = UserDefaults.standard.string(forKey: "reviewSchedule") ?? "off"
     }
 
     private func saveConfig() {
@@ -781,6 +940,9 @@ struct SettingsView: View {
                 let settingsData = try JSONSerialization.data(withJSONObject: existingSettings, options: [.prettyPrinted, .sortedKeys])
                 try settingsData.write(to: URL(fileURLWithPath: settingsPath))
             }
+
+            // Save review schedule
+            UserDefaults.standard.set(reviewSchedule, forKey: "reviewSchedule")
 
             isPresented = false
             if isFirstRun {

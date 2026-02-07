@@ -1,7 +1,7 @@
 // ABOUTME: Tests for RSS and Atom feed parsing
 // ABOUTME: Verifies extraction of entries from various feed formats
 
-import { parseFeed, parseFeedTitle } from './feed';
+import { parseFeed, parseFeedTitle, discoverFeedUrl } from './feed';
 
 const ATOM_FEED = `<?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
@@ -227,5 +227,46 @@ describe('parseFeed - Error handling', () => {
   test('throws on unknown feed format', () => {
     const invalidXml = '<?xml version="1.0"?><unknown><item/></unknown>';
     expect(() => parseFeed(invalidXml)).toThrow('Unknown feed format');
+  });
+});
+
+describe('discoverFeedUrl', () => {
+  test('discovers RSS feed from link tag', () => {
+    const html = `<html><head>
+      <link rel="alternate" type="application/rss+xml" href="/feed.xml" title="Blog RSS">
+    </head><body>Blog content</body></html>`;
+    expect(discoverFeedUrl(html, 'https://blog.example.com')).toBe('https://blog.example.com/feed.xml');
+  });
+
+  test('discovers Atom feed from link tag', () => {
+    const html = `<html><head>
+      <link rel="alternate" type="application/atom+xml" href="https://blog.example.com/atom.xml">
+    </head><body></body></html>`;
+    expect(discoverFeedUrl(html, 'https://blog.example.com')).toBe('https://blog.example.com/atom.xml');
+  });
+
+  test('discovers feed with href before type attribute', () => {
+    const html = `<html><head>
+      <link href="/rss" rel="alternate" type="application/rss+xml">
+    </head><body></body></html>`;
+    expect(discoverFeedUrl(html, 'https://example.com')).toBe('https://example.com/rss');
+  });
+
+  test('resolves relative feed URLs', () => {
+    const html = `<html><head>
+      <link rel="alternate" type="application/rss+xml" href="feed.xml">
+    </head><body></body></html>`;
+    expect(discoverFeedUrl(html, 'https://example.com/blog/')).toBe('https://example.com/blog/feed.xml');
+  });
+
+  test('returns null when no feed link found', () => {
+    const html = `<html><head>
+      <link rel="stylesheet" href="/style.css">
+    </head><body></body></html>`;
+    expect(discoverFeedUrl(html, 'https://example.com')).toBeNull();
+  });
+
+  test('returns null for empty HTML', () => {
+    expect(discoverFeedUrl('', 'https://example.com')).toBeNull();
   });
 });

@@ -861,6 +861,10 @@
   .icon-sm { width: 0.85em; height: 0.85em; }
   .icon-lg { width: 1.15em; height: 1.15em; }
 
+  /* YouTube video embed */
+  .yt-embed { position: relative; width: 100%; padding-bottom: 56.25%; height: 0; overflow: hidden; margin: 1em 0; border-radius: 8px; }
+  .yt-embed iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; border-radius: 8px; }
+
 </style>
 </head>
 <body data-theme="light" class="font-serif size-medium">
@@ -1110,6 +1114,17 @@ function renderArticle(text, filename) {
   }
 
   html += marked.parse(articleBody);
+
+  // Convert YouTube thumbnail links into embedded video iframes
+  html = html.replace(
+    /<a[^>]*href="(https?:\/\/(www\.)?youtube\.com\/watch\?v=([^"&]+)[^"]*|https?:\/\/youtu\.be\/([^"/?]+)[^"]*)"[^>]*>\s*<img[^>]*src="https:\/\/img\.youtube\.com\/vi\/[^"]*"[^>]*>\s*<\/a>/gi,
+    function(match, url, _yt, id1, id2) {
+      var videoId = id1 || id2;
+      if (!videoId) return match;
+      return '<div class="yt-embed"><iframe src="https://www.youtube.com/embed/' + videoId + '" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>';
+    }
+  );
+
   content.innerHTML = html;
   document.title = (meta && meta.title) || filename || 'PullRead';
 

@@ -302,6 +302,24 @@ export function startViewer(outputPath: string, port = 7777): void {
       return;
     }
 
+    // Feed auto-discovery (for blog URLs that aren't feeds themselves)
+    if (url.pathname === '/api/feed-discover' && req.method === 'GET') {
+      const pageUrl = url.searchParams.get('url');
+      if (!pageUrl) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'url parameter required' }));
+        return;
+      }
+      try {
+        const { discoverFeed } = await import('./feed');
+        const result = await discoverFeed(pageUrl);
+        sendJson(res, result || { feedUrl: null, title: null });
+      } catch {
+        sendJson(res, { feedUrl: null, title: null });
+      }
+      return;
+    }
+
     // Settings API (LLM config)
     if (url.pathname === '/api/settings') {
       if (req.method === 'GET') {

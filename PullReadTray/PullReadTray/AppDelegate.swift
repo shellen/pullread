@@ -16,6 +16,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var checkForUpdatesMenuItem: NSMenuItem!
     private var settingsWindowController: SettingsWindowController!
     private var whatsNewWindowController: SettingsWindowController?
+    private var reviewTimer: Timer?
+    private var hasUnreadReview: Bool = false
 
     // Sparkle updater - uncomment when Sparkle SPM package is added:
     // private let updaterController = SPUStandardUpdaterController(
@@ -76,6 +78,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Check if we should show "What's New" after an update
         checkForVersionUpdate()
+
+        // Set up scheduled review timer
+        scheduleReviewTimerIfNeeded()
     }
 
     private func checkFirstRunOrInvalidConfig() {
@@ -143,6 +148,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         retryMenuItem.target = self
         menu.addItem(retryMenuItem)
 
+        // Generate Review Now
+        let reviewMenuItem = NSMenuItem(title: "Generate Review Now", action: #selector(generateReviewNow), keyEquivalent: "")
+        reviewMenuItem.target = self
+        menu.addItem(reviewMenuItem)
+
         menu.addItem(NSMenuItem.separator())
 
         // Open Output Folder
@@ -197,6 +207,98 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func retryFailed() {
         runSync(retryFailed: true)
+    }
+
+    @objc private func generateReviewNow() {
+        statusMenuItem.title = "Status: Generating review..."
+        syncService.runReview(days: 7) { [weak self] result in
+            DispatchQueue.main.async {
+                self?.statusMenuItem.title = "Status: Idle"
+                switch result {
+                case .success(let output):
+                    self?.hasUnreadReview = true
+                    self?.updateBadge()
+                    self?.showNotification(title: "Review Ready", body: "Your weekly review has been generated.")
+                case .failure(let error):
+                    self?.showNotification(title: "Review Failed", body: error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    // MARK: - Scheduled Reviews
+
+    /// Review schedule options stored in UserDefaults
+    /// "off" = disabled, "daily" = once per day, "weekly" = once per week
+    func scheduleReviewTimerIfNeeded() {
+        reviewTimer?.invalidate()
+        reviewTimer = nil
+
+        let schedule = UserDefaults.standard.string(forKey: "reviewSchedule") ?? "off"
+        guard schedule != "off" else { return }
+
+        let interval: TimeInterval
+        switch schedule {
+        case "daily":
+            interval = 24 * 60 * 60 // 24 hours
+        case "weekly":
+            interval = 7 * 24 * 60 * 60 // 7 days
+        default:
+            return
+        }
+
+        // Check if enough time has passed since last review
+        let lastReview = UserDefaults.standard.double(forKey: "lastReviewTimestamp")
+        let elapsed = Date().timeIntervalSince1970 - lastReview
+        let firstFire: TimeInterval
+        if lastReview == 0 || elapsed >= interval {
+            // Run soon (5 seconds after launch to let everything initialize)
+            firstFire = 5
+        } else {
+            firstFire = interval - elapsed
+        }
+
+        reviewTimer = Timer.scheduledTimer(withTimeInterval: firstFire, repeats: false) { [weak self] _ in
+            self?.runScheduledReview()
+            // After the first fire, schedule recurring timer
+            self?.reviewTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+                self?.runScheduledReview()
+            }
+        }
+    }
+
+    private func runScheduledReview() {
+        let days = UserDefaults.standard.string(forKey: "reviewSchedule") == "daily" ? 1 : 7
+        syncService.runReview(days: days) { [weak self] result in
+            DispatchQueue.main.async {
+                if case .success = result {
+                    UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastReviewTimestamp")
+                    self?.hasUnreadReview = true
+                    self?.updateBadge()
+                    self?.showNotification(title: "Review Ready", body: "Your \(days == 1 ? "daily" : "weekly") review has been generated.")
+                }
+            }
+        }
+    }
+
+    private func updateBadge() {
+        guard let button = statusItem?.button else { return }
+        if hasUnreadReview {
+            // Show badge indicator — use a different SF Symbol
+            if let image = NSImage(systemSymbolName: "doc.text.fill.viewfinder", accessibilityDescription: "PullRead — New Review") {
+                image.isTemplate = true
+                button.image = image
+            } else {
+                // Fallback: add a text badge
+                button.title = "PR*"
+            }
+        } else {
+            if let image = NSImage(systemSymbolName: "doc.text.fill", accessibilityDescription: "PullRead") {
+                image.isTemplate = true
+                button.image = image
+            }
+            button.title = ""
+        }
     }
 
     private func runSync(retryFailed: Bool) {
@@ -288,6 +390,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func viewArticles() {
+        // Clear the badge when user opens the viewer
+        hasUnreadReview = false
+        updateBadge()
+
         syncService.openViewer { [weak self] result in
             DispatchQueue.main.async {
                 if case .failure(let error) = result {
@@ -314,7 +420,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.runSync(retryFailed: false)
             } : nil
         ) { [weak self] in
-            // Callback after save - could trigger a sync or update UI
+            // Callback after save — update review timer and notify
+            self?.scheduleReviewTimerIfNeeded()
             self?.showNotification(title: "Settings Saved", body: "Your configuration has been updated.")
         }
     }
@@ -391,6 +498,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func quit() {
+        reviewTimer?.invalidate()
         syncService.stopViewer()
         NSApplication.shared.terminate(nil)
     }
