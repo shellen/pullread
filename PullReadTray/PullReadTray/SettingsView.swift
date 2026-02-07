@@ -420,7 +420,7 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.menu)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .onChange(of: llmProvider) { _ in
+                    .onChange(of: llmProvider) {
                         useCustomModel = false
                         llmModel = Self.defaultModels[llmProvider] ?? ""
                         llmModelCustom = ""
@@ -736,7 +736,7 @@ struct SettingsView: View {
             return
         }
 
-        URLSession.shared.dataTask(with: url) { [weak self] data, response, _ in
+        URLSession.shared.dataTask(with: url) { data, response, _ in
             guard let data = data, let text = String(data: data, encoding: .utf8) else {
                 DispatchQueue.main.async { completion(nil) }
                 return
@@ -747,7 +747,7 @@ struct SettingsView: View {
 
             if isFeed {
                 // Try to extract <title>
-                let title = self?.extractXmlTitle(from: text)
+                let title = self.extractXmlTitle(from: text)
                 DispatchQueue.main.async { completion(FeedDiscoveryResult(feedUrl: urlString, title: title)) }
                 return
             }
@@ -773,7 +773,7 @@ struct SettingsView: View {
 
             guard let href = feedHref else {
                 // No feed found — fall back to treating as-is (maybe a direct feed with unusual format)
-                let title = self?.extractXmlTitle(from: text)
+                let title = self.extractXmlTitle(from: text)
                 DispatchQueue.main.async { completion(FeedDiscoveryResult(feedUrl: urlString, title: title)) }
                 return
             }
@@ -797,7 +797,7 @@ struct SettingsView: View {
             URLSession.shared.dataTask(with: feedUrl) { feedData, _, _ in
                 var feedTitle: String?
                 if let feedData = feedData, let feedText = String(data: feedData, encoding: .utf8) {
-                    feedTitle = self?.extractXmlTitle(from: feedText)
+                    feedTitle = self.extractXmlTitle(from: feedText)
                 }
                 DispatchQueue.main.async { completion(FeedDiscoveryResult(feedUrl: resolvedUrl, title: feedTitle)) }
             }.resume()

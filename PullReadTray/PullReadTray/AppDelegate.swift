@@ -215,7 +215,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.async {
                 self?.statusMenuItem.title = "Status: Idle"
                 switch result {
-                case .success(let output):
+                case .success:
                     self?.hasUnreadReview = true
                     self?.updateBadge()
                     self?.showNotification(title: "Review Ready", body: "Your weekly review has been generated.")
