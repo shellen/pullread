@@ -9,7 +9,8 @@ struct WhatsNewView: View {
 
     var body: some View {
         ZStack {
-            VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
+            // Opaque background — avoids liquid glass transparency issues
+            VisualEffectView(material: .sidebar, blendingMode: .behindWindow)
                 .ignoresSafeArea()
 
             VStack(alignment: .leading, spacing: 20) {

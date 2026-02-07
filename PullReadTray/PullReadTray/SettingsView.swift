@@ -13,7 +13,7 @@ struct FeedItem: Identifiable, Equatable {
 
 struct SettingsView: View {
     @Binding var isPresented: Bool
-    @State private var outputPath: String = "~/Articles"
+    @State private var outputPath: String = "~/Documents/PullRead"
     @State private var feeds: [FeedItem] = []
     @State private var newFeedName: String = ""
     @State private var newFeedURL: String = ""
@@ -80,8 +80,8 @@ struct SettingsView: View {
 
     var body: some View {
         ZStack {
-            // Glass background
-            VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
+            // Opaque background — avoids liquid glass transparency issues
+            VisualEffectView(material: .sidebar, blendingMode: .behindWindow)
                 .ignoresSafeArea()
 
             ScrollView {
@@ -164,7 +164,7 @@ struct SettingsView: View {
                     .foregroundColor(.secondary)
 
                 HStack {
-                    TextField("~/Articles", text: $outputPath)
+                    TextField("~/Documents/PullRead", text: $outputPath)
                         .textFieldStyle(.plain)
                         .padding(8)
                         .background(Color(NSColor.textBackgroundColor).opacity(0.5))
@@ -190,12 +190,12 @@ struct SettingsView: View {
                             .font(.headline)
                             .foregroundColor(.secondary)
                     }
-                    Label("Your Sources", systemImage: "bookmark.fill")
+                    Label("Connect Your Bookmarks", systemImage: "bookmark.fill")
                         .font(.headline)
                         .foregroundColor(.primary)
                 }
 
-                Text("Add feed URLs from your favorite sites and bookmark services.")
+                Text("Paste the RSS feed URL from your bookmark service. PullRead will fetch and save your bookmarked articles.")
                     .font(.caption)
                     .foregroundColor(.secondary)
 
@@ -966,9 +966,9 @@ struct GlassCard<Content: View>: View {
     var body: some View {
         content
             .padding(16)
-            .background(.ultraThinMaterial)
+            .background(.thickMaterial)
             .cornerRadius(12)
-            .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+            .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
     }
 }
 

@@ -25,7 +25,8 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
+            // Opaque background — avoids liquid glass transparency issues
+            VisualEffectView(material: .sidebar, blendingMode: .behindWindow)
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -55,6 +56,9 @@ struct OnboardingView: View {
             }
         }
         .frame(width: 520, height: 540)
+        .onAppear {
+            loadExistingConfig()
+        }
         .alert("Error", isPresented: $showingError) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -126,7 +130,7 @@ struct OnboardingView: View {
                 icon: "folder.fill",
                 iconColor: .blue,
                 title: "Choose Output Folder",
-                subtitle: "This is where your synced articles will be saved as markdown files. Pick any folder — a cloud-synced folder like Dropbox or iCloud works great."
+                subtitle: "Synced articles will be saved as markdown files here. Pick any folder — a cloud-synced folder like Dropbox or iCloud works great."
             )
 
             GlassCard {
@@ -160,7 +164,7 @@ struct OnboardingView: View {
                 icon: "bookmark.fill",
                 iconColor: .orange,
                 title: "Connect Your Bookmarks",
-                subtitle: "Paste the RSS feed URL from your bookmark service. PullRead will fetch and save your bookmarked articles as markdown files."
+                subtitle: "Paste the RSS feed URL from your bookmark service. PullRead will fetch and save your bookmarked articles."
             )
 
             GlassCard {
@@ -596,6 +600,28 @@ struct OnboardingView: View {
                     showingError = true
                 }
             }
+        }
+    }
+
+    /// Load existing config so the Welcome Guide reflects current settings
+    private func loadExistingConfig() {
+        guard FileManager.default.fileExists(atPath: configPath),
+              let data = FileManager.default.contents(atPath: configPath),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return
+        }
+
+        if let path = json["outputPath"] as? String {
+            outputPath = path
+        }
+
+        if let feedsDict = json["feeds"] as? [String: String] {
+            feeds = feedsDict.map { FeedItem(name: $0.key, url: $0.value) }
+                .sorted { $0.name.lowercased() < $1.name.lowercased() }
+        }
+
+        if let cookies = json["useBrowserCookies"] as? Bool {
+            useBrowserCookies = cookies
         }
     }
 

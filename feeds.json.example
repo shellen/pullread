@@ -1,5 +1,5 @@
 {
-  "outputPath": "~/Articles",
+  "outputPath": "~/Documents/PullRead",
   "feeds": {
     "bookmarks": "https://example.com/user/bookmarks/feed.xml",
     "instapaper": "https://www.instapaper.com/rss/...",
