@@ -17,6 +17,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindowController: SettingsWindowController!
     private var whatsNewWindowController: SettingsWindowController?
     private var reviewTimer: Timer?
+    private var syncTimer: Timer?
     private var hasUnreadReview: Bool = false
 
     // Sparkle updater - uncomment when Sparkle SPM package is added:
@@ -79,8 +80,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Check if we should show "What's New" after an update
         checkForVersionUpdate()
 
-        // Set up scheduled review timer
+        // Set up scheduled review timer and auto-sync timer
         scheduleReviewTimerIfNeeded()
+        scheduleSyncTimerIfNeeded()
     }
 
     private func checkFirstRunOrInvalidConfig() {
@@ -267,6 +269,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // MARK: - Auto-Sync
+
+    func scheduleSyncTimerIfNeeded() {
+        syncTimer?.invalidate()
+        syncTimer = nil
+
+        let interval = UserDefaults.standard.string(forKey: "syncInterval") ?? "manual"
+        guard interval != "manual" else { return }
+
+        let seconds: TimeInterval
+        switch interval {
+        case "30m": seconds = 30 * 60
+        case "1h":  seconds = 60 * 60
+        case "4h":  seconds = 4 * 60 * 60
+        case "12h": seconds = 12 * 60 * 60
+        default: return
+        }
+
+        syncTimer = Timer.scheduledTimer(withTimeInterval: seconds, repeats: true) { [weak self] _ in
+            self?.runSync(retryFailed: false)
+        }
+    }
+
     private func runScheduledReview() {
         let days = UserDefaults.standard.string(forKey: "reviewSchedule") == "daily" ? 1 : 7
         syncService.runReview(days: days) { [weak self] result in
@@ -420,8 +445,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.runSync(retryFailed: false)
             } : nil
         ) { [weak self] in
-            // Callback after save — update review timer and notify
+            // Callback after save — update timers and notify
             self?.scheduleReviewTimerIfNeeded()
+            self?.scheduleSyncTimerIfNeeded()
             self?.showNotification(title: "Settings Saved", body: "Your configuration has been updated.")
         }
     }
@@ -499,6 +525,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func quit() {
         reviewTimer?.invalidate()
+        syncTimer?.invalidate()
         syncService.stopViewer()
         NSApplication.shared.terminate(nil)
     }

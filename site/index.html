@@ -522,6 +522,19 @@
 
   footer a:hover { color: var(--fg); }
 
+  .footer-brand {
+    margin-bottom: 10px;
+  }
+  .footer-logo {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--muted) !important;
+    letter-spacing: -0.01em;
+  }
+  .footer-logo:hover {
+    color: var(--fg) !important;
+  }
+
   /* Responsive */
   @media (max-width: 768px) {
     .steps {
@@ -855,7 +868,10 @@ Compatible with any tool.</pre>
 
 <!-- Footer -->
 <footer>
-  <p>Pull Read is open source under the MIT License. <a href="https://github.com/shellen/pullread">GitHub</a></p>
+  <div class="footer-brand">
+    <a href="https://alittledrive.com" class="footer-logo">A Little Drive</a>
+  </div>
+  <p>Pull Read is open source under the <a href="https://github.com/shellen/pullread/blob/main/LICENSE">MIT License</a>. <a href="https://github.com/shellen/pullread">GitHub</a></p>
 </footer>
 
 </body>

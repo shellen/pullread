@@ -466,21 +466,105 @@
     .margin-notes { display: none; }
   }
 
-  /* Keyboard nav hint */
-  .nav-hint {
-    font-size: 11px;
-    color: var(--muted);
+  /* Sidebar footer buttons */
+  .sidebar-footer {
+    display: flex;
+    gap: 4px;
     padding: 8px 12px;
     border-top: 1px solid var(--border);
   }
-  .nav-hint kbd {
+  .sidebar-footer-btn {
+    flex: 1;
+    padding: 4px 0;
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .sidebar-footer-btn:hover {
+    color: var(--fg);
+    border-color: var(--muted);
+  }
+
+  /* Generic modal overlay */
+  .modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.15s ease;
+  }
+  .modal-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 32px;
+    max-width: 480px;
+    width: 90%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.2);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .modal-card h2 {
+    font-size: 18px;
+    margin: 0 0 14px;
+    color: var(--fg);
+  }
+  .modal-card h3 {
+    font-size: 14px;
+    margin: 18px 0 6px;
+    color: var(--fg);
+    font-weight: 600;
+  }
+  .modal-card h3:first-of-type { margin-top: 8px; }
+  .modal-card p {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--muted);
+    margin: 0 0 8px;
+  }
+  .modal-close {
+    display: block;
+    margin: 18px auto 0;
+    padding: 7px 24px;
+    background: var(--fg);
+    color: var(--bg);
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .modal-close:hover { opacity: 0.85; }
+  .modal-updated {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .shortcuts-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 6px 14px;
+    margin: 12px 0;
+    font-size: 13px;
+  }
+  .shortcuts-grid kbd {
     background: var(--code-bg);
     border: 1px solid var(--border);
     border-radius: 3px;
-    padding: 1px 5px;
-    font-size: 11px;
+    padding: 2px 7px;
+    font-size: 12px;
     font-family: inherit;
+    text-align: center;
   }
+  .shortcuts-grid span { color: var(--fg); }
 
   /* Drop file highlight */
   .drop-highlight .content-pane {
@@ -899,7 +983,10 @@
       </div>
       <div class="file-count" id="file-count"></div>
       <div class="file-list" id="file-list"></div>
-      <div class="nav-hint"><kbd>j</kbd><kbd>k</kbd> <kbd>&larr;</kbd><kbd>&rarr;</kbd> next/prev &middot; <kbd>&uarr;</kbd><kbd>&darr;</kbd> scroll &middot; <kbd>/</kbd> search &middot; <kbd>[</kbd> sidebar &middot; <kbd>h</kbd> highlight &middot; <kbd>n</kbd> notes</div>
+      <div class="sidebar-footer">
+        <button class="sidebar-footer-btn" onclick="showShortcutsModal()" title="Keyboard shortcuts">Shortcuts</button>
+        <button class="sidebar-footer-btn" onclick="showGuideModal()" title="Features guide">Guide</button>
+      </div>
     </div>
 
     <div class="content-pane" id="content-pane">
@@ -1120,6 +1207,33 @@ function renderArticle(text, filename) {
   }
 
   html += marked.parse(articleBody);
+
+  // Deduplicate images: remove consecutive/nearby img tags with the same src
+  html = (function dedupeImages(h) {
+    const div = document.createElement('div');
+    div.innerHTML = h;
+    const imgs = Array.from(div.querySelectorAll('img'));
+    const seen = new Set();
+    for (const img of imgs) {
+      const src = img.getAttribute('src');
+      if (!src) continue;
+      // Normalize: strip query params for dedup comparison
+      let key;
+      try { key = new URL(src).origin + new URL(src).pathname; } catch { key = src; }
+      if (seen.has(key)) {
+        // Remove the duplicate image (and its wrapping <p> or <a> if it's the only child)
+        const parent = img.parentElement;
+        if (parent && (parent.tagName === 'P' || parent.tagName === 'A') && parent.children.length === 1 && parent.textContent.trim() === '') {
+          parent.remove();
+        } else {
+          img.remove();
+        }
+      } else {
+        seen.add(key);
+      }
+    }
+    return div.innerHTML;
+  })(html);
 
   // Convert YouTube thumbnail links into embedded video iframes
   html = html.replace(
@@ -2030,6 +2144,77 @@ function hideSummary() {
   }
 }
 
+// Shortcuts modal
+function showShortcutsModal() {
+  closeModal();
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.onclick = function(e) { if (e.target === overlay) closeModal(); };
+  overlay.innerHTML = `
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <h2>Keyboard Shortcuts</h2>
+      <div class="shortcuts-grid">
+        <kbd>j</kbd> / <kbd>&rarr;</kbd> <span>Next article</span>
+        <kbd>k</kbd> / <kbd>&larr;</kbd> <span>Previous article</span>
+        <kbd>&uarr;</kbd> <kbd>&darr;</kbd> <span>Scroll (jumps articles at edges)</span>
+        <kbd>/</kbd> <span>Search articles</span>
+        <kbd>[</kbd> <span>Toggle sidebar</span>
+        <kbd>h</kbd> <span>Highlight selected text</span>
+        <kbd>n</kbd> <span>Toggle article notes</span>
+        <kbd>Esc</kbd> <span>Clear search / close popover</span>
+      </div>
+      <button class="modal-close" onclick="closeModal()">Done</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+// Guide modal
+function showGuideModal() {
+  closeModal();
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.onclick = function(e) { if (e.target === overlay) closeModal(); };
+  overlay.innerHTML = `
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <div class="modal-updated">Last updated: Feb 2026</div>
+      <h2>PullRead Guide</h2>
+
+      <h3>What is PullRead?</h3>
+      <p>PullRead syncs your bookmarks and RSS feeds into clean markdown files you can read, search, highlight, and keep forever. Articles are stored locally on your Mac.</p>
+
+      <h3>How does syncing work?</h3>
+      <p>PullRead fetches new items from your configured feeds (Instapaper, Pinboard, Raindrop, RSS, etc.) and extracts the article content into markdown. You can sync manually from the menu bar, or set an automatic interval in Settings (every 30 min, 1 hour, 4 hours, or 12 hours).</p>
+
+      <h3>What are reviews?</h3>
+      <p>Reviews are AI-generated thematic summaries of your recent reading. You can schedule them daily or weekly in Settings. Daily reviews cover the past 24 hours; weekly reviews cover the past 7 days. They require a configured LLM provider (Anthropic, OpenAI, Gemini, OpenRouter, or Apple Intelligence).</p>
+
+      <h3>Highlights &amp; Notes</h3>
+      <p>Select any text and press <strong>h</strong> to highlight it, or use the floating toolbar to choose a color. Click a highlight to add a note. Press <strong>n</strong> to open the notes panel for article-level notes, tags, and favorites.</p>
+
+      <h3>Summaries</h3>
+      <p>Click the Summarize button on any article to generate an AI summary. Summaries are saved in the article frontmatter so they persist across sessions.</p>
+
+      <h3>Themes &amp; Fonts</h3>
+      <p>Click the gear icon in the toolbar to switch between Light, Dark, and Sepia themes. Choose from 8 fonts and 3 text sizes. Your preferences are saved automatically.</p>
+
+      <h3>Browser Cookies</h3>
+      <p>Enable Chrome Cookies in Settings to access paywalled content from sites like NYTimes or WSJ using your existing login sessions. Cookies stay on your Mac and are never uploaded.</p>
+
+      <h3>Importing Bookmarks</h3>
+      <p>You can import bookmarks.html files exported from Chrome, Safari, Firefox, or Pocket directly from Settings or via the CLI with <code>pullread import &lt;file&gt;</code>.</p>
+
+      <button class="modal-close" onclick="closeModal()">Done</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+function closeModal() {
+  const overlay = document.querySelector('.modal-overlay');
+  if (overlay) overlay.remove();
+}
+
 // Keyboard navigation
 document.addEventListener('keydown', e => {
   // "/" focuses search
@@ -2050,6 +2235,9 @@ document.addEventListener('keydown', e => {
 
   // Escape clears search or dismisses popovers
   if (e.key === 'Escape') {
+    // Close modal overlays (shortcuts, guide)
+    const modal = document.querySelector('.modal-overlay');
+    if (modal) { modal.remove(); return; }
     // Close settings dropdown
     const dropdown = document.querySelector('.settings-dropdown-panel');
     if (dropdown) { dropdown.remove(); return; }
