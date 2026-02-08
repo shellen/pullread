@@ -874,21 +874,22 @@ The `deploy-site.yml` workflow publishes `site/appcast.xml` (and any other site 
 
 ### Releasing an Update
 
-Once Sparkle is configured, the release process is:
+Once Sparkle is configured, cut a new release entirely from the GitHub UI — no CLI or git tags required:
 
-```bash
-# Tag and push a new version
-git tag v1.1.0
-git push origin v1.1.0
-```
+1. Go to **Actions** → **Build and Release** → **Run workflow**
+2. Enter the version number (e.g., `1.1.0`)
+3. Click **Run workflow**
 
-The `release.yml` workflow will:
-1. Build the universal CLI binary (arm64 + x64)
-2. Build, sign, and notarize the app and DMG
-3. Sign the DMG with the Sparkle private key
-4. Create a GitHub Release with the DMG attached
-5. Generate a new `appcast.xml` and push it to the site
-6. GitHub Pages deploys the updated appcast
+The workflow automatically:
+1. Creates and pushes a `v1.1.0` git tag
+2. Builds the universal CLI binary (arm64 + x64)
+3. Builds, signs, and notarizes the app and DMG
+4. Signs the DMG with the Sparkle private key
+5. Creates a GitHub Release with the DMG attached
+6. Generates a new `appcast.xml` and pushes it to the site
+7. GitHub Pages deploys the updated appcast
+
+Alternatively, pushing a tag (`git tag v1.1.0 && git push origin v1.1.0`) triggers the same workflow.
 
 Existing users with Sparkle enabled will see the update prompt within 24 hours (or immediately via **Check for Updates...**).
 
