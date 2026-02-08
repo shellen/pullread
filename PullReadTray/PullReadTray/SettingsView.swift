@@ -29,6 +29,7 @@ struct SettingsView: View {
     @State private var llmModelCustom: String = ""
     @State private var useCustomModel: Bool = false
     @State private var reviewSchedule: String = "off"
+    @State private var syncInterval: String = "manual"
 
     private static let knownModels: [String: [String]] = [
         "anthropic": ["claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001", "claude-opus-4-6"],
@@ -362,6 +363,28 @@ struct SettingsView: View {
 
                 Divider()
 
+                // Sync Frequency
+                HStack(spacing: 8) {
+                    Text("Sync Frequency")
+                        .fontWeight(.medium)
+                    Spacer()
+                    Picker("", selection: $syncInterval) {
+                        Text("Manual Only").tag("manual")
+                        Text("Every 30 min").tag("30m")
+                        Text("Every 1 hour").tag("1h")
+                        Text("Every 4 hours").tag("4h")
+                        Text("Every 12 hours").tag("12h")
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 140)
+                }
+
+                Text("How often PullRead checks your feeds for new bookmarks. Manual means you sync from the menu bar yourself.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                Divider()
+
                 // Scheduled Reviews
                 HStack(spacing: 8) {
                     Text("Scheduled Reviews")
@@ -376,9 +399,19 @@ struct SettingsView: View {
                     .frame(width: 120)
                 }
 
-                Text("Automatically generate a thematic summary of your recent articles. Requires a configured LLM provider above.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                if reviewSchedule == "daily" {
+                    Text("Generates a thematic summary of articles from the past day. Runs every 24 hours from your last review. Requires a configured LLM provider.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else if reviewSchedule == "weekly" {
+                    Text("Generates a thematic summary of articles from the past 7 days. Runs once a week from your last review. Requires a configured LLM provider.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("Automatically generate a thematic summary of your recent articles. Requires a configured LLM provider.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
         }
     }
@@ -863,8 +896,9 @@ struct SettingsView: View {
             }
         }
 
-        // Load review schedule from UserDefaults
+        // Load review schedule and sync interval from UserDefaults
         reviewSchedule = UserDefaults.standard.string(forKey: "reviewSchedule") ?? "off"
+        syncInterval = UserDefaults.standard.string(forKey: "syncInterval") ?? "manual"
     }
 
     private func saveConfig() {
@@ -939,8 +973,9 @@ struct SettingsView: View {
                 try settingsData.write(to: URL(fileURLWithPath: settingsPath))
             }
 
-            // Save review schedule
+            // Save review schedule and sync interval
             UserDefaults.standard.set(reviewSchedule, forKey: "reviewSchedule")
+            UserDefaults.standard.set(syncInterval, forKey: "syncInterval")
 
             isPresented = false
             if isFirstRun {
