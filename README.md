@@ -845,32 +845,68 @@ PullRead uses [Sparkle 2](https://sparkle-project.org/) for automatic updates. W
 
 Sparkle requires an Ed25519 keypair. The **public key** is shipped in the app bundle so it can verify update signatures. The **private key** stays in GitHub Secrets and is only used during releases to sign the DMG.
 
+> **One-time setup only.** These steps need to be done once when first configuring Sparkle for a fork or fresh repo. After setup, releases are fully automated from the GitHub Actions UI.
+
 #### Step 1: Generate Ed25519 Signing Keys
 
-Run the **Sparkle Key Generation** workflow manually:
+1. Go to your repo on GitHub
+2. Click **Actions** → **Sparkle Key Generation (one-time)** → **Run workflow** → **Run workflow**
+3. Wait for the job to complete, then click into the completed job
+4. Expand the **Generate Ed25519 keys** step to see the output
 
-1. Go to **Actions** → **Sparkle Key Generation (one-time)** → **Run workflow**
-2. The workflow output will print both keys:
-   - The **public key** is already configured in `PullReadTray/PullReadTray/Info.plist` under `SUPublicEDKey`. If you regenerate keys, update this value to match.
-   - The **private key** is printed by `generate_keys -p`. Copy the entire key string.
+The output will contain two things you need to copy:
 
-#### Step 2: Store the Private Key
+**The public key** looks like this in the output:
+```
+<key>SUPublicEDKey</key>
+<string>kp53pifY8xCdPlB+Z+laUwknXBgRMJLTxFIAk+7/0rc=</string>
+```
 
-1. Go to **Settings → Secrets and variables → Actions**
-2. Create a new secret named `SPARKLE_PRIVATE_KEY`
-3. Paste the private key from the workflow output as the value
+**The private key** is printed between the separator lines by `generate_keys -p`. It will be a long base64 string.
+
+> **Important:** The CI runner is ephemeral — once the job finishes, the keys are gone forever. Copy both keys from the log output before navigating away. If you lose them, re-run the workflow to generate a new pair.
+
+#### Step 2: Store the Private Key as a GitHub Secret (manual copy-paste required)
+
+This is a one-time manual step. GitHub Secrets cannot be set by workflows — you must paste the value yourself.
+
+1. Copy the **private key** string from the workflow output (Step 1)
+2. Go to your repo → **Settings** → **Secrets and variables** → **Actions**
+3. Click **New repository secret**
+4. Name: `SPARKLE_PRIVATE_KEY`
+5. Value: paste the private key you copied
+6. Click **Add secret**
 
 The private key is only accessed by the `release.yml` workflow during the "Sign DMG for Sparkle" and "Update Sparkle appcast" steps. It never appears in source code.
 
-#### Step 3: Enable GitHub Pages
+#### Step 3: Update the Public Key in Info.plist (if regenerating keys)
 
-The appcast is served from GitHub Pages:
+The public key is already set in `PullReadTray/PullReadTray/Info.plist` under `SUPublicEDKey`. If you ran the keygen workflow and got a **different** public key than what's currently in Info.plist, you need to update it:
 
-1. Go to **Settings → Pages**
-2. Set **Source** to **Deploy from a branch**
+1. Open `PullReadTray/PullReadTray/Info.plist`
+2. Find the `SUPublicEDKey` entry
+3. Replace the `<string>...</string>` value with your new public key from the workflow output
+4. Commit and push the change
+
+If the public key matches what's already in Info.plist, skip this step.
+
+#### Step 4: Enable GitHub Pages (one-time repo setting)
+
+The Sparkle appcast is served from GitHub Pages. This is a one-time repo configuration:
+
+1. Go to your repo → **Settings** → **Pages**
+2. Under **Source**, select **Deploy from a branch**
 3. Set **Branch** to `gh-pages` / `root`
+4. Click **Save**
 
 The `deploy-site.yml` workflow publishes `site/appcast.xml` (and any other site content) to the `gh-pages` branch automatically.
+
+#### Setup Checklist
+
+- [ ] Ran **Sparkle Key Generation** workflow and copied both keys from the log output
+- [ ] Created `SPARKLE_PRIVATE_KEY` secret in repo Settings with the private key
+- [ ] Verified `SUPublicEDKey` in Info.plist matches the public key from the workflow
+- [ ] Enabled GitHub Pages (Settings → Pages → gh-pages / root)
 
 ### Releasing an Update
 
