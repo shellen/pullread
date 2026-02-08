@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Literata:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.cdnfonts.com/css/opendyslexic" rel="stylesheet">
 <style>
   :root {
     --bg: #ffffff;
@@ -39,14 +40,55 @@
     --muted: #7a6a52;
     --border: #d4c9b0;
     --code-bg: #ebe3cf;
-    --link: #8b5e3c;
+    --link: #6b4226;
     --toolbar-bg: #efe6d0;
     --sidebar-bg: #ede4cd;
     --sidebar-hover: #e5dbc2;
     --sidebar-active: #ddd1b6;
   }
+  [data-theme="high-contrast"] {
+    --bg: #000000;
+    --fg: #ffffff;
+    --muted: #cccccc;
+    --border: #666666;
+    --code-bg: #1a1a1a;
+    --link: #6ec6ff;
+    --toolbar-bg: #111111;
+    --sidebar-bg: #0a0a0a;
+    --sidebar-hover: #1a1a1a;
+    --sidebar-active: #2a2a2a;
+  }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  .skip-link {
+    position: absolute;
+    top: -100%;
+    left: 8px;
+    padding: 8px 16px;
+    background: var(--fg);
+    color: var(--bg);
+    border-radius: 0 0 6px 6px;
+    z-index: 200;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .skip-link:focus {
+    top: 0;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
 
   body {
     background: var(--bg);
@@ -553,6 +595,48 @@
     }
   }
 
+  /* Focus indicators (a11y) */
+  :focus-visible {
+    outline: 2px solid var(--link);
+    outline-offset: 2px;
+  }
+  .toolbar button:focus-visible,
+  .sidebar-footer-btn:focus-visible {
+    outline: 2px solid var(--link);
+    outline-offset: 1px;
+    border-radius: 4px;
+  }
+
+  /* Reduced motion (a11y) */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Line height options */
+  .leading-compact .content-wrap { line-height: 1.5; }
+  .leading-relaxed .content-wrap { line-height: 2.0; }
+  .leading-loose .content-wrap { line-height: 2.4; }
+
+  /* Letter spacing options */
+  .spacing-wide .content-wrap { letter-spacing: 0.03em; }
+  .spacing-wider .content-wrap { letter-spacing: 0.06em; }
+
+  /* Content width options */
+  .width-narrow .content-wrap { max-width: 560px; }
+  .width-wide .content-wrap { max-width: 900px; }
+
+  /* Dyslexia-friendly font */
+  .font-opendyslexic .content-wrap {
+    font-family: 'OpenDyslexic', 'Comic Sans MS', cursive, sans-serif;
+    letter-spacing: 0.04em;
+    word-spacing: 0.1em;
+  }
+
   /* Sidebar footer buttons */
   .sidebar-footer {
     display: flex;
@@ -1039,8 +1123,9 @@
 </style>
 </head>
 <body data-theme="light" class="font-serif size-medium">
+<a href="#content-pane" class="skip-link">Skip to content</a>
 <!-- SVG icon sprite (FontAwesome Free solid/regular, inlined for fully offline use) -->
-<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
   <symbol id="i-bars" viewBox="0 0 448 512"><path d="M0 96C0 78.3 14.3 64 32 64h384c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zm0 160c0-17.7 14.3-32 32-32h384c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zm448 160c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32h384c17.7 0 32 14.3 32 32z"/></symbol>
   <symbol id="i-gear" viewBox="0 0 512 512"><path d="M495.9 166.6c3.2 8.7.5 18.4-6.4 24.6l-43.3 39.4c1.1 8.3 1.7 16.8 1.7 25.4s-.6 17.1-1.7 25.4l43.3 39.4c6.9 6.2 9.6 15.9 6.4 24.6-4.4 11.9-9.7 23.3-15.8 34.3l-4.7 8.1c-6.6 11-14 21.4-22.1 31.2-5.9 7.2-15.7 9.6-24.5 6.8l-55.7-17.7c-13.4 10.1-28.2 18.3-44 24.4l-12.5 57.1c-2 9.1-9.3 15.5-18.4 17.4-12.2 2.5-24.8 3.8-37.6 3.8s-25.5-1.3-37.6-3.8c-9.2-1.9-16.5-8.3-18.4-17.4l-12.5-57.1c-15.8-6.1-30.6-14.3-44-24.4l-55.7 17.7c-8.8 2.8-18.6.3-24.5-6.8-8.1-9.8-15.5-20.2-22.1-31.2l-4.7-8.1c-6.1-11-11.4-22.4-15.8-34.3-3.2-8.7-.5-18.4 6.4-24.6l43.3-39.4C64.6 273.1 64 264.6 64 256s.6-17.1 1.7-25.4L22.4 191.2c-6.9-6.2-9.6-15.9-6.4-24.6 4.4-11.9 9.7-23.3 15.8-34.3l4.7-8.1c6.6-11 14-21.4 22.1-31.2 5.9-7.2 15.7-9.6 24.5-6.8l55.7 17.7c13.4-10.1 28.2-18.3 44-24.4l12.5-57.1c2-9.1 9.3-15.5 18.4-17.4C226.5 1.3 239.2 0 252 0s25.5 1.3 37.6 3.8c9.2 1.9 16.5 8.3 18.4 17.4l12.5 57.1c15.8 6.1 30.6 14.3 44 24.4l55.7-17.7c8.8-2.8 18.6-.3 24.5 6.8 8.1 9.8 15.5 20.2 22.1 31.2l4.7 8.1c6.1 11 11.4 22.4 15.8 34.3zM256 336a80 80 0 1 0 0-160 80 80 0 1 0 0 160z"/></symbol>
   <symbol id="i-heart" viewBox="0 0 512 512"><path d="M47.6 300.4L228.3 469.1c7.5 7 17.4 10.9 27.7 10.9s20.2-3.9 27.7-10.9L464.4 300.4c30.4-28.3 47.6-68 47.6-109.5v-5.8c0-69.9-50.5-129.5-119.4-141C347 36.5 300.6 51.4 268 84L256 96 244 84c-32.6-32.6-79-47.5-124.6-39.9C50.5 55.6 0 115.2 0 185.1v5.8c0 41.5 17.2 81.2 47.6 109.5z"/></symbol>
@@ -1050,45 +1135,46 @@
   <symbol id="i-globe" viewBox="0 0 512 512"><path d="M352 256c0 22.2-1.2 43.6-3.3 64H163.3c-2.2-20.4-3.3-41.8-3.3-64s1.2-43.6 3.3-64h185.4c2.2 20.4 3.3 41.8 3.3 64zm28.8-64h123.1c5.3 20.5 8.1 41.9 8.1 64s-2.8 43.5-8.1 64H380.8c2.1-20.6 3.2-42 3.2-64s-1.1-43.4-3.2-64zm112.6-32H376.7c-10-63.9-29.8-117.4-55.3-151.6C399.6 29 467.7 90.2 493.4 160zM256 16c30.6 0 66.7 56.5 82.3 144H173.7C189.3 72.5 225.4 16 256 16zM135.3 160H18.6c25.7-69.8 93.8-131 172-151.6-25.5 34.2-45.3 87.7-55.3 151.6zM8.1 192H131.2c-2.1 20.6-3.2 42-3.2 64s1.1 43.4 3.2 64H8.1C2.8 299.5 0 278.1 0 256s2.8-43.5 8.1-64zm10.5 160h116.7c10 63.9 29.8 117.4 55.3 151.6C112.4 483 44.3 421.8 18.6 352zM256 496c-30.6 0-66.7-56.5-82.3-144h164.7C322.7 439.5 286.6 496 256 496zm120.7 7.6c25.5-34.2 45.3-87.7 55.3-151.6h116.7c-25.7 69.8-93.8 131-172 151.6z"/></symbol>
   <symbol id="i-xmark" viewBox="0 0 384 512"><path d="M342.6 150.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L192 210.7 86.6 105.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L146.7 256 41.4 361.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192 301.3l105.4 105.3c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L237.3 256l105.3-105.4z"/></symbol>
 </svg>
-<div class="app">
+<div class="app" role="application" aria-label="PullRead article reader">
 
-  <div class="toolbar">
-    <button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar"><svg class="icon"><use href="#i-bars"/></svg></button>
-    <span class="brand" onclick="toggleSidebar()">PullRead</span>
+  <nav class="toolbar" aria-label="Reader toolbar">
+    <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle sidebar" aria-expanded="true" id="sidebar-toggle-btn"><svg class="icon" aria-hidden="true"><use href="#i-bars"/></svg></button>
+    <span class="brand" onclick="toggleSidebar()" role="heading" aria-level="1">PullRead</span>
 
     <div class="toolbar-spacer"></div>
 
     <div class="settings-dropdown">
-      <button class="settings-dropdown-btn" onclick="toggleSettingsDropdown()" title="Reader settings"><svg class="icon"><use href="#i-gear"/></svg></button>
+      <button class="settings-dropdown-btn" onclick="toggleSettingsDropdown()" aria-label="Reader settings" aria-expanded="false" id="settings-toggle-btn"><svg class="icon" aria-hidden="true"><use href="#i-gear"/></svg></button>
     </div>
-  </div>
+  </nav>
 
   <div class="main">
-    <div class="sidebar" id="sidebar">
-      <div class="sidebar-search">
+    <aside class="sidebar" id="sidebar" aria-label="Article list">
+      <div class="sidebar-search" role="search">
+        <label for="search" class="sr-only">Search articles</label>
         <input type="text" id="search" placeholder="Search articles..." oninput="filterFiles()" />
       </div>
-      <div class="file-count" id="file-count"></div>
-      <div class="file-list" id="file-list"></div>
+      <div class="file-count" id="file-count" aria-live="polite" aria-atomic="true"></div>
+      <div class="file-list" id="file-list" role="listbox" aria-label="Articles"></div>
       <div class="sidebar-footer">
-        <button class="sidebar-footer-btn" onclick="showShortcutsModal()" title="Keyboard shortcuts">Shortcuts</button>
-        <button class="sidebar-footer-btn" onclick="showGuideModal()" title="Features guide">Guide</button>
+        <button class="sidebar-footer-btn" onclick="showShortcutsModal()" aria-label="Keyboard shortcuts">Shortcuts</button>
+        <button class="sidebar-footer-btn" onclick="showGuideModal()" aria-label="Features guide">Guide</button>
       </div>
-    </div>
+    </aside>
 
-    <div class="content-pane" id="content-pane">
+    <main class="content-pane" id="content-pane" aria-label="Article content">
       <div class="empty-state" id="empty-state">
-        <div class="hint">Select an article</div>
-        <div class="subhint">or drop a .md file here</div>
+        <p class="hint">Select an article</p>
+        <p class="subhint">or drop a .md file here</p>
       </div>
-      <div class="content-wrap" id="content" style="display:none;"></div>
-      <div class="margin-notes" id="margin-notes"></div>
-    </div>
+      <article class="content-wrap" id="content" style="display:none;" aria-live="polite"></article>
+      <div class="margin-notes" id="margin-notes" aria-hidden="true"></div>
+    </main>
   </div>
 
 </div>
 
-<div class="onboarding-overlay" id="onboarding" style="display:none" onclick="dismissOnboarding(event)">
+<div class="onboarding-overlay" id="onboarding" style="display:none" onclick="dismissOnboarding(event)" role="dialog" aria-modal="true" aria-label="Welcome to PullRead">
   <div class="onboarding-card" onclick="event.stopPropagation()">
     <h2>Welcome to PullRead</h2>
     <p>Browse your synced articles in a clean, distraction-free reader. Select text to highlight passages, or add notes to articles. Use the sidebar to search and select articles, or customize the theme and font above.</p>
@@ -1142,20 +1228,47 @@ function setSize(size) {
 }
 
 function toggleSidebar() {
-  document.getElementById('sidebar').classList.toggle('collapsed');
-  localStorage.setItem('pr-sidebar', document.getElementById('sidebar').classList.contains('collapsed') ? '0' : '1');
+  const sidebar = document.getElementById('sidebar');
+  sidebar.classList.toggle('collapsed');
+  const isCollapsed = sidebar.classList.contains('collapsed');
+  localStorage.setItem('pr-sidebar', isCollapsed ? '0' : '1');
+  document.getElementById('sidebar-toggle-btn').setAttribute('aria-expanded', !isCollapsed);
+}
+
+function setLineHeight(val) {
+  document.body.className = document.body.className.replace(/leading-\w+/g, '');
+  if (val !== 'default') document.body.classList.add('leading-' + val);
+  localStorage.setItem('pr-leading', val);
+}
+
+function setSpacing(val) {
+  document.body.className = document.body.className.replace(/spacing-\w+/g, '');
+  if (val !== 'default') document.body.classList.add('spacing-' + val);
+  localStorage.setItem('pr-spacing', val);
+}
+
+function setWidth(val) {
+  document.body.className = document.body.className.replace(/width-\w+/g, '');
+  if (val !== 'default') document.body.classList.add('width-' + val);
+  localStorage.setItem('pr-width', val);
 }
 
 function toggleSettingsDropdown() {
   const existing = document.querySelector('.settings-dropdown-panel');
-  if (existing) { existing.remove(); return; }
+  const btn = document.getElementById('settings-toggle-btn');
+  if (existing) { existing.remove(); btn.setAttribute('aria-expanded', 'false'); return; }
 
   const currentTheme = document.body.getAttribute('data-theme') || 'light';
   const currentFont = localStorage.getItem('pr-font') || 'serif';
   const currentSize = localStorage.getItem('pr-size') || 'medium';
+  const currentLeading = localStorage.getItem('pr-leading') || 'default';
+  const currentSpacing = localStorage.getItem('pr-spacing') || 'default';
+  const currentWidth = localStorage.getItem('pr-width') || 'default';
 
   const panel = document.createElement('div');
   panel.className = 'settings-dropdown-panel';
+  panel.setAttribute('role', 'region');
+  panel.setAttribute('aria-label', 'Reader settings');
   panel.onclick = function(e) { e.stopPropagation(); };
   panel.innerHTML = `
     <label>Theme</label>
@@ -1163,10 +1276,11 @@ function toggleSettingsDropdown() {
       <button onclick="setTheme('light');updateDropdownState()" ${currentTheme==='light'?'class="active"':''}>Light</button>
       <button onclick="setTheme('dark');updateDropdownState()" ${currentTheme==='dark'?'class="active"':''}>Dark</button>
       <button onclick="setTheme('sepia');updateDropdownState()" ${currentTheme==='sepia'?'class="active"':''}>Sepia</button>
+      <button onclick="setTheme('high-contrast');updateDropdownState()" ${currentTheme==='high-contrast'?'class="active"':''} title="High contrast">Hi-Con</button>
     </div>
     <label>Font</label>
     <div class="setting-row">
-      <select onchange="setFont(this.value)" id="font-select">
+      <select onchange="setFont(this.value)" id="font-select" aria-label="Font family">
         <option value="serif" ${currentFont==='serif'?'selected':''}>Serif</option>
         <option value="sans" ${currentFont==='sans'?'selected':''}>Sans-serif</option>
         <option value="system" ${currentFont==='system'?'selected':''}>Charter</option>
@@ -1175,16 +1289,43 @@ function toggleSettingsDropdown() {
         <option value="lora" ${currentFont==='lora'?'selected':''}>Lora</option>
         <option value="literata" ${currentFont==='literata'?'selected':''}>Literata</option>
         <option value="source-serif" ${currentFont==='source-serif'?'selected':''}>Source Serif</option>
+        <option value="opendyslexic" ${currentFont==='opendyslexic'?'selected':''}>OpenDyslexic</option>
       </select>
     </div>
     <label>Size</label>
     <div class="setting-row">
-      <button onclick="setSize('small');updateDropdownState()" ${currentSize==='small'?'class="active"':''}>A</button>
-      <button onclick="setSize('medium');updateDropdownState()" ${currentSize==='medium'?'class="active"':''} style="font-size:14px">A</button>
-      <button onclick="setSize('large');updateDropdownState()" ${currentSize==='large'?'class="active"':''} style="font-size:17px">A</button>
+      <button onclick="setSize('small');updateDropdownState()" ${currentSize==='small'?'class="active"':''} aria-label="Small text">A</button>
+      <button onclick="setSize('medium');updateDropdownState()" ${currentSize==='medium'?'class="active"':''} style="font-size:14px" aria-label="Medium text">A</button>
+      <button onclick="setSize('large');updateDropdownState()" ${currentSize==='large'?'class="active"':''} style="font-size:17px" aria-label="Large text">A</button>
+    </div>
+    <label>Line height</label>
+    <div class="setting-row">
+      <select onchange="setLineHeight(this.value)" aria-label="Line height">
+        <option value="default" ${currentLeading==='default'?'selected':''}>Default</option>
+        <option value="compact" ${currentLeading==='compact'?'selected':''}>Compact</option>
+        <option value="relaxed" ${currentLeading==='relaxed'?'selected':''}>Relaxed</option>
+        <option value="loose" ${currentLeading==='loose'?'selected':''}>Loose</option>
+      </select>
+    </div>
+    <label>Letter spacing</label>
+    <div class="setting-row">
+      <select onchange="setSpacing(this.value)" aria-label="Letter spacing">
+        <option value="default" ${currentSpacing==='default'?'selected':''}>Default</option>
+        <option value="wide" ${currentSpacing==='wide'?'selected':''}>Wide</option>
+        <option value="wider" ${currentSpacing==='wider'?'selected':''}>Wider</option>
+      </select>
+    </div>
+    <label>Content width</label>
+    <div class="setting-row">
+      <select onchange="setWidth(this.value)" aria-label="Content width">
+        <option value="narrow" ${currentWidth==='narrow'?'selected':''}>Narrow</option>
+        <option value="default" ${currentWidth==='default'?'selected':''}>Default</option>
+        <option value="wide" ${currentWidth==='wide'?'selected':''}>Wide</option>
+      </select>
     </div>
   `;
   document.querySelector('.settings-dropdown').appendChild(panel);
+  btn.setAttribute('aria-expanded', 'true');
 }
 
 function updateDropdownState() {
@@ -1270,9 +1411,9 @@ function renderArticle(text, filename) {
   // Action buttons row
   html += '<div class="article-actions">';
   const isFav = articleNotes.isFavorite;
-  html += '<button onclick="toggleFavoriteFromHeader(this)" class="' + (isFav ? 'active-fav' : '') + '" title="Favorite"><svg class="icon icon-sm"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg> Favorite</button>';
-  html += '<button onclick="toggleNotesFromHeader()" title="Notes"><svg class="icon icon-sm"><use href="#i-pen"/></svg> Notes</button>';
-  html += '<button onclick="summarizeArticle()" id="summarize-btn" title="Summarize"><svg class="icon icon-sm"><use href="#i-wand"/></svg> Summarize</button>';
+  html += '<button onclick="toggleFavoriteFromHeader(this)" class="' + (isFav ? 'active-fav' : '') + '" aria-label="' + (isFav ? 'Remove from favorites' : 'Add to favorites') + '" aria-pressed="' + isFav + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg> Favorite</button>';
+  html += '<button onclick="toggleNotesFromHeader()" aria-label="Toggle notes panel"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-pen"/></svg> Notes</button>';
+  html += '<button onclick="summarizeArticle()" id="summarize-btn" aria-label="Summarize article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Summarize</button>';
   html += '</div>';
   html += '</div>';
 
@@ -1328,12 +1469,25 @@ function renderArticle(text, filename) {
     function(match, url, _yt, id1, id2) {
       var videoId = id1 || id2;
       if (!videoId) return match;
-      return '<div class="yt-embed"><iframe src="https://www.youtube.com/embed/' + videoId + '" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>';
+      return '<div class="yt-embed"><iframe src="https://www.youtube.com/embed/' + videoId + '" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen title="Embedded video"></iframe></div>';
     }
   );
 
   content.innerHTML = html;
   document.title = (meta && meta.title) || filename || 'PullRead';
+
+  // Post-process for accessibility
+  content.querySelectorAll('img:not([alt])').forEach(function(img) { img.setAttribute('alt', ''); });
+  content.querySelectorAll('img[alt=""]').forEach(function(img) { img.setAttribute('role', 'presentation'); });
+  content.querySelectorAll('table').forEach(function(table) {
+    if (!table.querySelector('thead')) {
+      var firstRow = table.querySelector('tr');
+      if (firstRow && firstRow.querySelectorAll('th').length > 0) {
+        firstRow.querySelectorAll('th').forEach(function(th) { th.setAttribute('scope', 'col'); });
+      }
+    }
+    table.setAttribute('role', 'table');
+  });
 
   // Scroll to top
   document.getElementById('content-pane').scrollTop = 0;
@@ -1356,17 +1510,17 @@ function renderFileList() {
     let indicators = '';
     if (hasHl || hasNote || hasSummary || isFavorite) {
       indicators = '<div class="file-item-indicators">'
-        + (isFavorite ? '<span class="dot dot-favorite" title="Favorite"><svg class="icon icon-sm"><use href="#i-heart"/></svg></span>' : '')
-        + (hasHl ? '<span class="dot dot-highlight" title="Has highlights"></span>' : '')
-        + (hasNote ? '<span class="dot dot-note" title="Has notes"></span>' : '')
-        + (hasSummary ? '<span class="dot dot-summary" title="Has summary"></span>' : '')
+        + (isFavorite ? '<span class="dot dot-favorite" aria-label="Favorite"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-heart"/></svg></span>' : '')
+        + (hasHl ? '<span class="dot dot-highlight" aria-label="Has highlights"></span>' : '')
+        + (hasNote ? '<span class="dot dot-note" aria-label="Has notes"></span>' : '')
+        + (hasSummary ? '<span class="dot dot-summary" aria-label="Has summary"></span>' : '')
         + '</div>';
     }
-    return '<div class="file-item' + isActive + '" data-index="' + i + '" onclick="loadFile(' + i + ')">'
+    return '<div class="file-item' + isActive + '" data-index="' + i + '" onclick="loadFile(' + i + ')" role="option" aria-selected="' + (activeFile === f.filename) + '" tabindex="0" onkeydown="if(event.key===\'Enter\')loadFile(' + i + ')">'
       + '<div class="file-item-title">' + escapeHtml(f.title) + '</div>'
       + '<div class="file-item-meta">'
-      + (date ? '<span><svg class="icon icon-sm" style="opacity:0.5"><use href="#i-calendar"/></svg> ' + date + '</span>' : '')
-      + (f.domain ? '<span><svg class="icon icon-sm" style="opacity:0.5"><use href="#i-globe"/></svg> ' + escapeHtml(f.domain) + '</span>' : '')
+      + (date ? '<span><svg class="icon icon-sm" style="opacity:0.5" aria-hidden="true"><use href="#i-calendar"/></svg> ' + date + '</span>' : '')
+      + (f.domain ? '<span><svg class="icon icon-sm" style="opacity:0.5" aria-hidden="true"><use href="#i-globe"/></svg> ' + escapeHtml(f.domain) + '</span>' : '')
       + '</div>'
       + indicators
       + '</div>';
@@ -1746,11 +1900,11 @@ function showHlToolbar(x, y) {
   const bar = document.createElement('div');
   bar.className = 'hl-toolbar';
   bar.innerHTML = `
-    <button class="hl-yellow-btn" title="Yellow" onclick="createHighlight('yellow')"></button>
-    <button class="hl-green-btn" title="Green" onclick="createHighlight('green')"></button>
-    <button class="hl-blue-btn" title="Blue" onclick="createHighlight('blue')"></button>
-    <button class="hl-pink-btn" title="Pink" onclick="createHighlight('pink')"></button>
-    <button class="hl-note-btn" title="Add note" onclick="addInlineNote()">+ Note</button>
+    <button class="hl-yellow-btn" aria-label="Highlight yellow" onclick="createHighlight('yellow')"></button>
+    <button class="hl-green-btn" aria-label="Highlight green" onclick="createHighlight('green')"></button>
+    <button class="hl-blue-btn" aria-label="Highlight blue" onclick="createHighlight('blue')"></button>
+    <button class="hl-pink-btn" aria-label="Highlight pink" onclick="createHighlight('pink')"></button>
+    <button class="hl-note-btn" aria-label="Add note" onclick="addInlineNote()">+ Note</button>
   `;
   bar.style.left = x + 'px';
   bar.style.top = y + 'px';
@@ -1764,12 +1918,12 @@ function showHighlightContextMenu(e, hl) {
   bar.className = 'hl-toolbar';
   const noteLabel = hl.note ? 'Edit Note' : 'Note';
   bar.innerHTML = `
-    <button class="hl-yellow-btn" title="Yellow" onclick="changeHighlightColor('${hl.id}','yellow')"></button>
-    <button class="hl-green-btn" title="Green" onclick="changeHighlightColor('${hl.id}','green')"></button>
-    <button class="hl-blue-btn" title="Blue" onclick="changeHighlightColor('${hl.id}','blue')"></button>
-    <button class="hl-pink-btn" title="Pink" onclick="changeHighlightColor('${hl.id}','pink')"></button>
-    <button class="hl-note-btn" title="${noteLabel}" onclick="editHighlightNote('${hl.id}', event)">${noteLabel}</button>
-    <button class="hl-note-btn" style="color:red;border-color:red" title="Delete" onclick="deleteHighlight('${hl.id}')">Del</button>
+    <button class="hl-yellow-btn" aria-label="Yellow" onclick="changeHighlightColor('${hl.id}','yellow')"></button>
+    <button class="hl-green-btn" aria-label="Green" onclick="changeHighlightColor('${hl.id}','green')"></button>
+    <button class="hl-blue-btn" aria-label="Blue" onclick="changeHighlightColor('${hl.id}','blue')"></button>
+    <button class="hl-pink-btn" aria-label="Pink" onclick="changeHighlightColor('${hl.id}','pink')"></button>
+    <button class="hl-note-btn" aria-label="${noteLabel}" onclick="editHighlightNote('${hl.id}', event)">${noteLabel}</button>
+    <button class="hl-note-btn" style="color:red;border-color:red" aria-label="Delete highlight" onclick="deleteHighlight('${hl.id}')">Del</button>
   `;
   const pane = document.getElementById('content-pane');
   bar.style.left = (e.clientX - pane.getBoundingClientRect().left) + 'px';
@@ -2237,11 +2391,30 @@ function hideSummary() {
   }
 }
 
+// Modal focus management
+let _modalReturnFocus = null;
+
+function trapFocus(overlay) {
+  overlay.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') { closeModal(); return; }
+    if (e.key !== 'Tab') return;
+    const focusable = overlay.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    if (!focusable.length) return;
+    const first = focusable[0], last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+}
+
 // Shortcuts modal
 function showShortcutsModal() {
   closeModal();
+  _modalReturnFocus = document.activeElement;
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Keyboard shortcuts');
   overlay.onclick = function(e) { if (e.target === overlay) closeModal(); };
   overlay.innerHTML = `
     <div class="modal-card" onclick="event.stopPropagation()">
@@ -2260,13 +2433,19 @@ function showShortcutsModal() {
     </div>
   `;
   document.body.appendChild(overlay);
+  trapFocus(overlay);
+  overlay.querySelector('.modal-close').focus();
 }
 
 // Guide modal
 function showGuideModal() {
   closeModal();
+  _modalReturnFocus = document.activeElement;
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'PullRead guide');
   overlay.onclick = function(e) { if (e.target === overlay) closeModal(); };
   overlay.innerHTML = `
     <div class="modal-card" onclick="event.stopPropagation()">
@@ -2289,7 +2468,7 @@ function showGuideModal() {
       <p>Click the Summarize button on any article to generate an AI summary. Summaries are saved in the article frontmatter so they persist across sessions.</p>
 
       <h3>Themes &amp; Fonts</h3>
-      <p>Click the gear icon in the toolbar to switch between Light, Dark, and Sepia themes. Choose from 8 fonts and 3 text sizes. Your preferences are saved automatically.</p>
+      <p>Click the gear icon to switch between Light, Dark, Sepia, and High Contrast themes. Choose from 9 fonts including OpenDyslexic. Adjust text size, line height, letter spacing, and content width. Preferences are saved automatically.</p>
 
       <h3>Browser Cookies</h3>
       <p>Enable Chrome Cookies in Settings to access paywalled content from sites like NYTimes or WSJ using your existing login sessions. Cookies stay on your Mac and are never uploaded.</p>
@@ -2301,11 +2480,14 @@ function showGuideModal() {
     </div>
   `;
   document.body.appendChild(overlay);
+  trapFocus(overlay);
+  overlay.querySelector('.modal-close').focus();
 }
 
 function closeModal() {
   const overlay = document.querySelector('.modal-overlay');
   if (overlay) overlay.remove();
+  if (_modalReturnFocus) { _modalReturnFocus.focus(); _modalReturnFocus = null; }
 }
 
 // Keyboard navigation
@@ -2482,12 +2664,27 @@ async function init() {
   const savedFont = localStorage.getItem('pr-font');
   const savedSize = localStorage.getItem('pr-size');
   const savedSidebar = localStorage.getItem('pr-sidebar');
-  if (savedTheme) setTheme(savedTheme);
+  const savedLeading = localStorage.getItem('pr-leading');
+  const savedSpacing = localStorage.getItem('pr-spacing');
+  const savedWidth = localStorage.getItem('pr-width');
+
+  // Auto-detect OS dark mode on first visit
+  if (savedTheme) {
+    setTheme(savedTheme);
+  } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    setTheme('dark');
+  }
   if (savedFont) {
     setFont(savedFont);
   }
   if (savedSize) setSize(savedSize);
-  if (savedSidebar === '0' || window.innerWidth <= 768) document.getElementById('sidebar').classList.add('collapsed');
+  if (savedLeading && savedLeading !== 'default') setLineHeight(savedLeading);
+  if (savedSpacing && savedSpacing !== 'default') setSpacing(savedSpacing);
+  if (savedWidth && savedWidth !== 'default') setWidth(savedWidth);
+  if (savedSidebar === '0' || window.innerWidth <= 768) {
+    document.getElementById('sidebar').classList.add('collapsed');
+    document.getElementById('sidebar-toggle-btn').setAttribute('aria-expanded', 'false');
+  }
 
   try {
     const res = await fetch('/api/files');
