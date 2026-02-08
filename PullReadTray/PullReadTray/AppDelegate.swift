@@ -4,8 +4,7 @@
 import Cocoa
 import SwiftUI
 import UserNotifications
-// Sparkle import - uncomment when Sparkle SPM package is added:
-// import Sparkle
+import Sparkle
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
@@ -20,12 +19,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var syncTimer: Timer?
     private var hasUnreadReview: Bool = false
 
-    // Sparkle updater - uncomment when Sparkle SPM package is added:
-    // private let updaterController = SPUStandardUpdaterController(
-    //     startingUpdater: true,
-    //     updaterDelegate: nil,
-    //     userDriverDelegate: nil
-    // )
+    private let updaterController = SPUStandardUpdaterController(
+        startingUpdater: true,
+        updaterDelegate: nil,
+        userDriverDelegate: nil
+    )
 
     /// Returns true if running in a unit test environment
     /// Uses multiple detection methods for reliability across different test runners
@@ -177,11 +175,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         logsMenuItem.target = self
         menu.addItem(logsMenuItem)
 
-        // Check for Updates (Sparkle) - only show when Sparkle is fully integrated
-        // Uncomment when Sparkle SPM package is added and configured:
-        // checkForUpdatesMenuItem = NSMenuItem(title: "Check for Updates...", action: #selector(checkForUpdates), keyEquivalent: "")
-        // checkForUpdatesMenuItem.target = self
-        // menu.addItem(checkForUpdatesMenuItem)
+        // Check for Updates (Sparkle)
+        checkForUpdatesMenuItem = NSMenuItem(title: "Check for Updates...", action: #selector(checkForUpdates), keyEquivalent: "")
+        checkForUpdatesMenuItem.target = self
+        menu.addItem(checkForUpdatesMenuItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -464,19 +461,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func checkForUpdates() {
-        // When Sparkle SPM package is added, uncomment:
-        // updaterController.checkForUpdates(nil)
-        // And remove the placeholder below.
-
-        // Placeholder until Sparkle is fully integrated:
-        // 1. Add Sparkle 2.x via SPM: https://github.com/sparkle-project/Sparkle
-        // 2. Run generate_keys to create Ed25519 keypair
-        // 3. Add SUPublicEDKey to Info.plist
-        // 4. Uncomment `import Sparkle` and `updaterController` above
-        showAlert(
-            title: "Check for Updates",
-            message: "Automatic updates via Sparkle are configured but not yet active.\n\nTo complete setup:\n1. Add Sparkle 2.x as an SPM dependency\n2. Generate Ed25519 signing keys\n3. Uncomment the Sparkle code in AppDelegate\n\nVisit the project README for details."
-        )
+        updaterController.checkForUpdates(nil)
     }
 
     private func checkForVersionUpdate() {
