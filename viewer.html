@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PullRead</title>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/styles/github.min.css" media="(prefers-color-scheme: light)" id="hljs-light">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/styles/github-dark.min.css" media="(prefers-color-scheme: dark)" id="hljs-dark">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Literata:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
@@ -1120,6 +1123,248 @@
   .yt-embed { position: relative; width: 100%; padding-bottom: 56.25%; height: 0; overflow: hidden; margin: 1em 0; border-radius: 8px; }
   .yt-embed iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; border-radius: 8px; }
 
+  /* Reading progress bar */
+  .reading-progress {
+    position: sticky;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: transparent;
+    z-index: 8;
+    pointer-events: none;
+  }
+  .reading-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--link);
+    transition: width 0.1s linear;
+    border-radius: 0 2px 2px 0;
+    opacity: 0.8;
+  }
+
+  /* Read time & word count badge */
+  .read-stats {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--muted);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .read-stats .stat-divider {
+    opacity: 0.4;
+  }
+
+  /* Focus mode: dim all paragraphs except the one closest to center */
+  .focus-mode .content-wrap > p,
+  .focus-mode .content-wrap > blockquote,
+  .focus-mode .content-wrap > ul,
+  .focus-mode .content-wrap > ol,
+  .focus-mode .content-wrap > pre,
+  .focus-mode .content-wrap > h2,
+  .focus-mode .content-wrap > h3,
+  .focus-mode .content-wrap > h4,
+  .focus-mode .content-wrap > table {
+    opacity: 0.2;
+    transition: opacity 0.3s ease;
+  }
+  .focus-mode .content-wrap > .focus-active,
+  .focus-mode .content-wrap > .focus-active + p,
+  .focus-mode .content-wrap > .focus-adjacent {
+    opacity: 1;
+  }
+  .focus-mode .content-wrap > .article-header,
+  .focus-mode .content-wrap > .article-summary,
+  .focus-mode .content-wrap > .notes-panel {
+    opacity: 1;
+  }
+
+  /* Table of Contents */
+  .toc-panel {
+    position: sticky;
+    top: 16px;
+    max-height: calc(100vh - 80px);
+    overflow-y: auto;
+    padding: 12px 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .toc-container {
+    position: absolute;
+    left: 12px;
+    top: 0;
+    width: 200px;
+    pointer-events: none;
+    z-index: 4;
+  }
+  .toc-container .toc-panel {
+    pointer-events: all;
+  }
+  .toc-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+  .toc-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .toc-list li {
+    margin: 0;
+  }
+  .toc-list a {
+    display: block;
+    padding: 3px 0;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--muted);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    padding-left: 8px;
+    transition: color 0.15s, border-color 0.15s;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .toc-list a:hover {
+    color: var(--fg);
+  }
+  .toc-list a.toc-active {
+    color: var(--link);
+    border-left-color: var(--link);
+    font-weight: 500;
+  }
+  .toc-list .toc-h3 {
+    padding-left: 20px;
+    font-size: 11px;
+  }
+  @media (max-width: 1400px) {
+    .toc-container { display: none; }
+  }
+
+  /* Resume position indicator */
+  .resume-indicator {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--fg);
+    color: var(--bg);
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    cursor: pointer;
+    z-index: 50;
+    animation: fadeIn 0.3s ease;
+    opacity: 0.95;
+  }
+  .resume-indicator:hover {
+    opacity: 1;
+  }
+
+  /* Syntax highlighting theme sync */
+  .content-wrap pre code.hljs {
+    background: var(--code-bg);
+    padding: 14px;
+    border-radius: 6px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  [data-theme="dark"] .content-wrap pre code.hljs,
+  [data-theme="high-contrast"] .content-wrap pre code.hljs {
+    background: var(--code-bg);
+  }
+  [data-theme="sepia"] .content-wrap pre code.hljs {
+    background: var(--code-bg);
+  }
+
+  /* Code block language label */
+  .content-wrap pre {
+    position: relative;
+  }
+  .code-lang-label {
+    position: absolute;
+    top: 0;
+    right: 0;
+    padding: 2px 8px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    background: var(--code-bg);
+    border-radius: 0 6px 0 4px;
+    border-bottom: 1px solid var(--border);
+    border-left: 1px solid var(--border);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    opacity: 0.7;
+  }
+
+  /* Focus mode toggle button in toolbar */
+  .focus-btn {
+    background: none !important;
+    border: 1px solid transparent !important;
+    font-size: 14px !important;
+    padding: 2px 6px !important;
+    color: var(--muted) !important;
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+  .focus-btn:hover { color: var(--fg) !important; }
+  .focus-btn.active { color: var(--link) !important; }
+
+  /* Print styles */
+  @media print {
+    .toolbar, .sidebar, .skip-link, .margin-notes, .toc-container,
+    .reading-progress, .hl-toolbar, .annotation-popover, .resume-indicator,
+    .article-actions, .notes-panel summary, .notes-panel .favorite-row,
+    .notes-panel .tags-row, .notes-panel textarea, .notes-save-hint,
+    .onboarding-overlay, .modal-overlay, .settings-dropdown-panel { display: none !important; }
+
+    body, .app, .main, .content-pane {
+      height: auto !important;
+      overflow: visible !important;
+      background: white !important;
+      color: black !important;
+    }
+    .content-pane {
+      position: static !important;
+    }
+    .content-wrap {
+      max-width: 100% !important;
+      padding: 0 !important;
+      font-size: 12pt !important;
+      line-height: 1.6 !important;
+      color: black !important;
+    }
+    .content-wrap a { color: #333 !important; text-decoration: underline !important; }
+    .content-wrap a::after { content: " (" attr(href) ")"; font-size: 9pt; color: #666; }
+    .content-wrap a[href^="#"]::after, .content-wrap a[href^="javascript"]::after { content: none; }
+    .content-wrap img { max-width: 100% !important; break-inside: avoid; }
+    .content-wrap pre { break-inside: avoid; border: 1px solid #ddd !important; background: #f9f9f9 !important; }
+    .content-wrap blockquote { border-left-color: #999 !important; color: #333 !important; }
+    .article-header { border-bottom: 1px solid #ccc !important; }
+    .article-summary { border-left-color: #999 !important; background: #f5f5f5 !important; break-inside: avoid; }
+    mark.pr-highlight { background: #ff0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+    /* Print notes section at end */
+    .notes-panel {
+      display: block !important;
+      border-top: 1px solid #ccc !important;
+      page-break-before: auto;
+    }
+    .notes-panel > div[style] { display: block !important; }
+
+    @page {
+      margin: 2cm;
+      @bottom-center { content: counter(page); }
+    }
+  }
+
 </style>
 </head>
 <body data-theme="light" class="font-serif size-medium">
@@ -1143,6 +1388,7 @@
 
     <div class="toolbar-spacer"></div>
 
+    <button class="focus-btn" onclick="toggleFocusMode()" aria-label="Toggle focus mode" title="Focus mode (f)" id="focus-btn">&#9681;</button>
     <div class="settings-dropdown">
       <button class="settings-dropdown-btn" onclick="toggleSettingsDropdown()" aria-label="Reader settings" aria-expanded="false" id="settings-toggle-btn"><svg class="icon" aria-hidden="true"><use href="#i-gear"/></svg></button>
     </div>
@@ -1163,12 +1409,14 @@
     </aside>
 
     <main class="content-pane" id="content-pane" aria-label="Article content">
+      <div class="reading-progress" aria-hidden="true"><div class="reading-progress-bar" id="reading-progress-bar"></div></div>
       <div class="empty-state" id="empty-state">
         <p class="hint">Select an article</p>
         <p class="subhint">or drop a .md file here</p>
       </div>
       <article class="content-wrap" id="content" style="display:none;" aria-live="polite"></article>
       <div class="margin-notes" id="margin-notes" aria-hidden="true"></div>
+      <div class="toc-container" id="toc-container" aria-label="Table of contents"></div>
     </main>
   </div>
 
@@ -1186,6 +1434,8 @@
       <kbd>[</kbd> <span>Toggle sidebar</span>
       <kbd>h</kbd> <span>Highlight selected text</span>
       <kbd>n</kbd> <span>Toggle article notes</span>
+      <kbd>f</kbd> <span>Toggle focus mode</span>
+      <kbd>p</kbd> <span>Print article</span>
       <kbd>Esc</kbd> <span>Clear search</span>
     </div>
     <button class="onboarding-dismiss" onclick="dismissOnboarding()">Got it</button>
@@ -1212,6 +1462,7 @@ function setTheme(theme) {
     b.classList.toggle('active', b.getAttribute('data-theme-btn') === theme)
   );
   localStorage.setItem('pr-theme', theme);
+  updateHljsTheme();
 }
 
 function setFont(font) {
@@ -1406,6 +1657,7 @@ function renderArticle(text, filename) {
   if (meta && meta.domain) bylineParts.push('<a href="' + escapeHtml(meta.url || '') + '" target="_blank">' + escapeHtml(meta.domain) + '</a>');
   if (meta && meta.bookmarked) bylineParts.push(escapeHtml(meta.bookmarked.slice(0, 10)));
   html += bylineParts.join('<span class="sep">&middot;</span>');
+  // Read time will be inserted after rendering
   html += '</div>';
 
   // Action buttons row
@@ -1489,11 +1741,45 @@ function renderArticle(text, filename) {
     table.setAttribute('role', 'table');
   });
 
+  // Add read time & word count to byline
+  const articleBodyText = content.textContent || '';
+  const { words, minutes } = calculateReadStats(articleBodyText);
+  const bylineEl = content.querySelector('.article-byline');
+  if (bylineEl && words > 50) {
+    const statsSpan = document.createElement('span');
+    statsSpan.className = 'read-stats';
+    if (bylineEl.children.length > 0) {
+      const sep = document.createElement('span');
+      sep.className = 'sep';
+      sep.innerHTML = '&middot;';
+      bylineEl.appendChild(sep);
+    }
+    statsSpan.innerHTML = minutes + ' min read<span class="stat-divider">&middot;</span>' + (words >= 1000 ? (words / 1000).toFixed(1) + 'k' : words) + ' words';
+    bylineEl.appendChild(statsSpan);
+  }
+
+  // Apply syntax highlighting to code blocks
+  applySyntaxHighlighting();
+
+  // Generate table of contents
+  generateToc();
+
   // Scroll to top
   document.getElementById('content-pane').scrollTop = 0;
 
+  // Reset reading progress
+  updateReadingProgress();
+
   // Clear margin notes
   document.getElementById('margin-notes').innerHTML = '';
+
+  // Restore scroll position (after a tick so DOM is settled)
+  setTimeout(() => restoreScrollPosition(filename), 100);
+
+  // Update focus mode if active
+  if (focusModeActive) {
+    setTimeout(updateFocusMode, 200);
+  }
 }
 
 // File list
@@ -2427,6 +2713,8 @@ function showShortcutsModal() {
         <kbd>[</kbd> <span>Toggle sidebar</span>
         <kbd>h</kbd> <span>Highlight selected text</span>
         <kbd>n</kbd> <span>Toggle article notes</span>
+        <kbd>f</kbd> <span>Toggle focus mode</span>
+        <kbd>p</kbd> <span>Print article</span>
         <kbd>Esc</kbd> <span>Clear search / close popover</span>
       </div>
       <button class="modal-close" onclick="closeModal()">Done</button>
@@ -2467,8 +2755,23 @@ function showGuideModal() {
       <h3>Summaries</h3>
       <p>Click the Summarize button on any article to generate an AI summary. Summaries are saved in the article frontmatter so they persist across sessions.</p>
 
+      <h3>Focus Mode</h3>
+      <p>Press <strong>f</strong> or click the half-circle icon in the toolbar to enter Focus Mode. This dims all content except the paragraph you're currently reading, helping you concentrate on one section at a time. Inspired by IA Writer's focus feature.</p>
+
+      <h3>Reading Progress</h3>
+      <p>A thin progress bar at the top tracks how far you've read. Each article also shows estimated read time and word count in the header. Your reading position is automatically saved so you can pick up where you left off.</p>
+
+      <h3>Table of Contents</h3>
+      <p>On wide screens, articles with 3 or more headings show an auto-generated table of contents on the left. Click any heading to jump to that section. The active section is highlighted as you scroll.</p>
+
       <h3>Themes &amp; Fonts</h3>
       <p>Click the gear icon to switch between Light, Dark, Sepia, and High Contrast themes. Choose from 9 fonts including OpenDyslexic. Adjust text size, line height, letter spacing, and content width. Preferences are saved automatically.</p>
+
+      <h3>Code Highlighting</h3>
+      <p>Technical articles with code blocks are automatically syntax highlighted with language detection. The highlighting theme adapts to your chosen reading theme.</p>
+
+      <h3>Printing</h3>
+      <p>Press <strong>p</strong> or use your browser's print function to get a clean, optimized print layout of any article. Links are expanded with their URLs for reference.</p>
 
       <h3>Browser Cookies</h3>
       <p>Enable Chrome Cookies in Settings to access paywalled content from sites like NYTimes or WSJ using your existing login sessions. Cookies stay on your Mac and are never uploaded.</p>
@@ -2542,6 +2845,22 @@ document.addEventListener('keydown', e => {
     if (sel && !sel.isCollapsed && sel.toString().trim()) {
       e.preventDefault();
       createHighlight('yellow');
+      return;
+    }
+  }
+
+  // f to toggle focus mode
+  if (e.key === 'f' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+    e.preventDefault();
+    toggleFocusMode();
+    return;
+  }
+
+  // p to print article
+  if (e.key === 'p' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+    if (activeFile) {
+      e.preventDefault();
+      window.print();
       return;
     }
   }
@@ -2657,6 +2976,259 @@ function showOnboardingIfNeeded() {
   }
 }
 
+// ---- Reading Progress Bar ----
+function updateReadingProgress() {
+  const pane = document.getElementById('content-pane');
+  const bar = document.getElementById('reading-progress-bar');
+  if (!pane || !bar) return;
+  const scrollTop = pane.scrollTop;
+  const scrollHeight = pane.scrollHeight - pane.clientHeight;
+  const progress = scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0;
+  bar.style.width = Math.min(100, Math.max(0, progress)) + '%';
+}
+
+document.getElementById('content-pane').addEventListener('scroll', function() {
+  updateReadingProgress();
+  updateFocusMode();
+  updateTocActive();
+  saveScrollPosition();
+});
+
+// ---- Read Time & Word Count ----
+function calculateReadStats(text) {
+  const words = text.trim().split(/\s+/).filter(w => w.length > 0).length;
+  const wpm = 238; // average adult reading speed
+  const minutes = Math.ceil(words / wpm);
+  return { words, minutes };
+}
+
+function formatReadStats(words, minutes) {
+  const wordStr = words >= 1000 ? (words / 1000).toFixed(1) + 'k' : words.toString();
+  return '<span class="read-stats">' + minutes + ' min read<span class="stat-divider">&middot;</span>' + wordStr + ' words</span>';
+}
+
+// ---- Focus Mode ----
+let focusModeActive = false;
+let focusObserver = null;
+
+function toggleFocusMode() {
+  focusModeActive = !focusModeActive;
+  document.body.classList.toggle('focus-mode', focusModeActive);
+  document.getElementById('focus-btn').classList.toggle('active', focusModeActive);
+  localStorage.setItem('pr-focus', focusModeActive ? '1' : '0');
+  if (focusModeActive) {
+    updateFocusMode();
+  } else {
+    clearFocusClasses();
+  }
+}
+
+function clearFocusClasses() {
+  document.querySelectorAll('.focus-active, .focus-adjacent').forEach(el => {
+    el.classList.remove('focus-active', 'focus-adjacent');
+  });
+}
+
+function updateFocusMode() {
+  if (!focusModeActive) return;
+  const content = document.getElementById('content');
+  if (!content || content.style.display === 'none') return;
+
+  const pane = document.getElementById('content-pane');
+  const paneRect = pane.getBoundingClientRect();
+  const centerY = paneRect.top + paneRect.height * 0.4;
+
+  const blocks = content.querySelectorAll(':scope > p, :scope > blockquote, :scope > ul, :scope > ol, :scope > pre, :scope > h2, :scope > h3, :scope > h4, :scope > table');
+
+  clearFocusClasses();
+
+  let closest = null;
+  let closestDist = Infinity;
+
+  blocks.forEach(block => {
+    const rect = block.getBoundingClientRect();
+    const blockCenter = rect.top + rect.height / 2;
+    const dist = Math.abs(blockCenter - centerY);
+    if (dist < closestDist) {
+      closestDist = dist;
+      closest = block;
+    }
+  });
+
+  if (closest) {
+    closest.classList.add('focus-active');
+    // Also highlight immediate siblings for context
+    if (closest.previousElementSibling && !closest.previousElementSibling.classList.contains('article-header')) {
+      closest.previousElementSibling.classList.add('focus-adjacent');
+    }
+    if (closest.nextElementSibling && !closest.nextElementSibling.classList.contains('notes-panel')) {
+      closest.nextElementSibling.classList.add('focus-adjacent');
+    }
+  }
+}
+
+// ---- Code Syntax Highlighting ----
+function applySyntaxHighlighting() {
+  if (typeof hljs === 'undefined') return;
+  const content = document.getElementById('content');
+  if (!content) return;
+
+  // Update highlight.js theme based on current app theme
+  updateHljsTheme();
+
+  content.querySelectorAll('pre code').forEach(block => {
+    // Skip if already highlighted
+    if (block.classList.contains('hljs')) return;
+    hljs.highlightElement(block);
+
+    // Add language label if detected
+    const lang = block.className.match(/language-(\w+)/);
+    const detected = block.result && block.result.language;
+    const langName = (lang && lang[1]) || detected;
+    if (langName && langName !== 'undefined') {
+      const label = document.createElement('span');
+      label.className = 'code-lang-label';
+      label.textContent = langName;
+      block.closest('pre').appendChild(label);
+    }
+  });
+}
+
+function updateHljsTheme() {
+  const theme = document.body.getAttribute('data-theme');
+  const lightSheet = document.getElementById('hljs-light');
+  const darkSheet = document.getElementById('hljs-dark');
+  if (!lightSheet || !darkSheet) return;
+
+  if (theme === 'dark' || theme === 'high-contrast') {
+    lightSheet.media = 'not all';
+    darkSheet.media = 'all';
+  } else {
+    lightSheet.media = 'all';
+    darkSheet.media = 'not all';
+  }
+}
+
+// ---- Reading Position Memory ----
+let scrollSaveTimeout = null;
+
+function saveScrollPosition() {
+  if (!activeFile) return;
+  clearTimeout(scrollSaveTimeout);
+  scrollSaveTimeout = setTimeout(() => {
+    const pane = document.getElementById('content-pane');
+    if (!pane) return;
+    const scrollHeight = pane.scrollHeight - pane.clientHeight;
+    if (scrollHeight <= 0) return;
+    const pct = pane.scrollTop / scrollHeight;
+    const positions = JSON.parse(localStorage.getItem('pr-scroll-positions') || '{}');
+    positions[activeFile] = { pct, ts: Date.now() };
+    // Keep only last 100 positions
+    const keys = Object.keys(positions);
+    if (keys.length > 100) {
+      const sorted = keys.sort((a, b) => positions[a].ts - positions[b].ts);
+      sorted.slice(0, keys.length - 100).forEach(k => delete positions[k]);
+    }
+    localStorage.setItem('pr-scroll-positions', JSON.stringify(positions));
+  }, 500);
+}
+
+function restoreScrollPosition(filename) {
+  const positions = JSON.parse(localStorage.getItem('pr-scroll-positions') || '{}');
+  const saved = positions[filename];
+  if (!saved || saved.pct < 0.02) return; // Don't restore if near the top
+
+  const pane = document.getElementById('content-pane');
+  if (!pane) return;
+
+  // Show a "resume" indicator
+  const indicator = document.createElement('div');
+  indicator.className = 'resume-indicator';
+  indicator.textContent = 'Resume reading \u2193';
+  indicator.setAttribute('role', 'button');
+  indicator.setAttribute('aria-label', 'Resume reading from where you left off');
+  indicator.onclick = function() {
+    const scrollHeight = pane.scrollHeight - pane.clientHeight;
+    pane.scrollTo({ top: saved.pct * scrollHeight, behavior: 'smooth' });
+    indicator.remove();
+  };
+  document.body.appendChild(indicator);
+
+  // Auto-dismiss after 5 seconds
+  setTimeout(() => { if (indicator.parentNode) indicator.remove(); }, 5000);
+}
+
+// ---- Table of Contents ----
+function generateToc() {
+  const content = document.getElementById('content');
+  const tocContainer = document.getElementById('toc-container');
+  if (!content || !tocContainer) return;
+
+  const headings = content.querySelectorAll('h2, h3');
+  tocContainer.innerHTML = '';
+
+  if (headings.length < 3) return; // Only show TOC for articles with 3+ headings
+
+  const panel = document.createElement('div');
+  panel.className = 'toc-panel';
+
+  const label = document.createElement('div');
+  label.className = 'toc-label';
+  label.textContent = 'Contents';
+  panel.appendChild(label);
+
+  const list = document.createElement('ul');
+  list.className = 'toc-list';
+
+  headings.forEach((heading, i) => {
+    // Skip headings inside article-header
+    if (heading.closest('.article-header')) return;
+
+    const id = 'toc-heading-' + i;
+    heading.id = id;
+
+    const li = document.createElement('li');
+    const a = document.createElement('a');
+    a.href = '#' + id;
+    a.textContent = heading.textContent;
+    a.setAttribute('data-toc-target', id);
+    if (heading.tagName === 'H3') a.classList.add('toc-h3');
+
+    a.onclick = function(e) {
+      e.preventDefault();
+      heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    li.appendChild(a);
+    list.appendChild(li);
+  });
+
+  panel.appendChild(list);
+  tocContainer.appendChild(panel);
+}
+
+function updateTocActive() {
+  const tocLinks = document.querySelectorAll('.toc-list a');
+  if (!tocLinks.length) return;
+
+  const pane = document.getElementById('content-pane');
+  const paneRect = pane.getBoundingClientRect();
+  const threshold = paneRect.top + 80;
+
+  let activeId = null;
+  const headings = document.querySelectorAll('#content h2[id], #content h3[id]');
+
+  headings.forEach(heading => {
+    if (heading.getBoundingClientRect().top <= threshold) {
+      activeId = heading.id;
+    }
+  });
+
+  tocLinks.forEach(link => {
+    link.classList.toggle('toc-active', link.getAttribute('data-toc-target') === activeId);
+  });
+}
+
 // Init: try to load from server, fall back to standalone mode
 async function init() {
   // Restore preferences
@@ -2684,6 +3256,13 @@ async function init() {
   if (savedSidebar === '0' || window.innerWidth <= 768) {
     document.getElementById('sidebar').classList.add('collapsed');
     document.getElementById('sidebar-toggle-btn').setAttribute('aria-expanded', 'false');
+  }
+
+  // Restore focus mode
+  if (localStorage.getItem('pr-focus') === '1') {
+    focusModeActive = true;
+    document.body.classList.add('focus-mode');
+    document.getElementById('focus-btn').classList.add('active');
   }
 
   try {
