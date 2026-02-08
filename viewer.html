@@ -466,6 +466,93 @@
     .margin-notes { display: none; }
   }
 
+  /* Tablet */
+  @media (max-width: 768px) {
+    .sidebar {
+      position: absolute;
+      z-index: 20;
+      height: calc(100vh - 42px);
+      box-shadow: 4px 0 16px rgba(0,0,0,0.1);
+    }
+    .sidebar.collapsed {
+      margin-left: -300px;
+    }
+    .content-wrap {
+      padding: 24px 20px 80px;
+    }
+    .article-header h1 {
+      font-size: 1.35em;
+    }
+    .settings-dropdown-panel {
+      position: fixed;
+      top: 42px;
+      right: 8px;
+      left: 8px;
+      width: auto;
+    }
+    .annotation-popover {
+      width: 240px;
+    }
+    .modal-card {
+      padding: 20px 20px;
+      width: 94%;
+    }
+  }
+
+  /* Mobile */
+  @media (max-width: 480px) {
+    .toolbar {
+      padding: 4px 8px;
+    }
+    .brand {
+      font-size: 13px;
+    }
+    .sidebar {
+      width: 260px;
+      min-width: 260px;
+    }
+    .sidebar.collapsed {
+      margin-left: -260px;
+    }
+    .content-wrap {
+      padding: 16px 14px 72px;
+    }
+    .article-header h1 {
+      font-size: 1.2em;
+    }
+    .article-byline {
+      font-size: 12px;
+    }
+    .article-actions {
+      flex-wrap: wrap;
+    }
+    .content-wrap table {
+      font-size: 13px;
+    }
+    .content-wrap th, .content-wrap td {
+      padding: 6px 8px;
+    }
+    .annotation-popover {
+      position: fixed;
+      left: 8px;
+      right: 8px;
+      bottom: 8px;
+      top: auto;
+      width: auto;
+    }
+    .hl-toolbar {
+      padding: 4px 6px;
+    }
+    .hl-toolbar button {
+      width: 28px;
+      height: 28px;
+    }
+    .notes-panel textarea {
+      min-height: 60px;
+      font-size: 16px;
+    }
+  }
+
   /* Sidebar footer buttons */
   .sidebar-footer {
     display: flex;
@@ -1306,6 +1393,12 @@ async function loadFile(index) {
   activeFile = file.filename;
   renderFileList();
   removeHlToolbar();
+
+  // Auto-close sidebar on mobile after selecting an article
+  if (window.innerWidth <= 768) {
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar.classList.contains('collapsed')) sidebar.classList.add('collapsed');
+  }
 
   if (serverMode) {
     // Load annotations first so favorite state is available for header render
@@ -2394,7 +2487,7 @@ async function init() {
     setFont(savedFont);
   }
   if (savedSize) setSize(savedSize);
-  if (savedSidebar === '0') document.getElementById('sidebar').classList.add('collapsed');
+  if (savedSidebar === '0' || window.innerWidth <= 768) document.getElementById('sidebar').classList.add('collapsed');
 
   try {
     const res = await fetch('/api/files');
