@@ -415,7 +415,7 @@ jobs:
           body: |
             This is the latest build of Pull Read from the main branch.
 
-            The app is self-contained with the CLI binary bundled—no Node.js required.
+            The app is self-contained with the CLI binary bundled—nothing else to install.
 
             **Download:** [PullRead.dmg](https://github.com/${{ github.repository }}/releases/download/latest/PullRead.dmg)
 

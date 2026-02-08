@@ -93,7 +93,7 @@ struct OnboardingView: View {
                 .font(.largeTitle)
                 .fontWeight(.bold)
 
-            Text("Save articles from your bookmark services as clean markdown files you own. Connect Instapaper, Pinboard, Raindrop, or any service with an RSS feed.")
+            Text("Save articles from your bookmark services as clean, local markdown files. Connect Instapaper, Pinboard, Raindrop, or any service with an RSS feed.")
                 .font(.body)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
