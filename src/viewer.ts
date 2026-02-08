@@ -352,6 +352,33 @@ export function startViewer(outputPath: string, port = 7777): void {
       }
     }
 
+    // Sync status API
+    if (url.pathname === '/api/sync-status' && req.method === 'GET') {
+      const config = loadJsonFile(join(homedir(), '.config', 'pullread', 'feeds.json')) as Record<string, unknown>;
+      const syncInterval = (config as any).syncInterval || '1h';
+      const intervals: Record<string, number> = { '30m': 30, '1h': 60, '4h': 240, '12h': 720 };
+      const minutes = intervals[syncInterval as string] || null;
+
+      // Check last sync from file mtime
+      const outputFiles = existsSync(outputPath) ? readdirSync(outputPath).filter(f => f.endsWith('.md')) : [];
+      let lastSyncFile = null;
+      let latestMtime = 0;
+      for (const f of outputFiles.slice(-20)) {
+        try {
+          const mt = statSync(join(outputPath, f)).mtimeMs;
+          if (mt > latestMtime) { latestMtime = mt; lastSyncFile = f; }
+        } catch {}
+      }
+
+      sendJson(res, {
+        syncInterval,
+        intervalMinutes: minutes,
+        lastActivity: latestMtime > 0 ? new Date(latestMtime).toISOString() : null,
+        articleCount: outputFiles.length
+      });
+      return;
+    }
+
     // Summarize API
     if (url.pathname === '/api/summarize' && req.method === 'POST') {
       try {

@@ -309,6 +309,9 @@
   .file-item.active {
     background: var(--sidebar-active);
   }
+  .file-item.read .file-item-title {
+    opacity: 0.6;
+  }
   .file-item-title {
     font-size: 13px;
     font-weight: 500;
@@ -332,6 +335,33 @@
     font-size: 11px;
     color: var(--muted);
     border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .hide-read-toggle {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .hide-read-toggle input {
+    width: 12px;
+    height: 12px;
+    margin: 0;
+    cursor: pointer;
+  }
+
+  /* Favicon in sidebar */
+  .file-item-favicon {
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+    margin-right: 2px;
+    vertical-align: -2px;
+    opacity: 0.7;
   }
 
   /* Content pane */
@@ -1061,9 +1091,9 @@
   .favorite-btn.active { color: #e91e63; }
   .favorite-btn:hover { opacity: 0.8; }
 
-  /* Summary display */
+  /* Summary display — theme-aware complementary colors */
   .article-summary {
-    background: var(--code-bg);
+    background: rgba(171, 71, 188, 0.06);
     border-left: 3px solid #ab47bc;
     padding: 12px 16px;
     margin: 12px 0 20px;
@@ -1072,6 +1102,17 @@
     color: var(--fg);
     border-radius: 0 6px 6px 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  [data-theme="dark"] .article-summary {
+    background: rgba(171, 71, 188, 0.1);
+  }
+  [data-theme="sepia"] .article-summary {
+    background: rgba(171, 71, 188, 0.06);
+    border-left-color: #9c5ba0;
+  }
+  [data-theme="high-contrast"] .article-summary {
+    background: rgba(171, 71, 188, 0.15);
+    border-left-color: #ce93d8;
   }
   .article-summary .summary-label {
     font-size: 11px;
@@ -1304,6 +1345,66 @@
     opacity: 0.7;
   }
 
+  /* Tag cloud modal */
+  .tag-cloud {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 12px 0;
+    justify-content: center;
+  }
+  .tag-cloud-item {
+    display: inline-block;
+    padding: 4px 12px;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    color: var(--fg);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .tag-cloud-item:hover {
+    background: var(--sidebar-hover);
+    border-color: var(--link);
+  }
+  .domain-group {
+    margin: 16px 0 8px;
+    padding: 0;
+  }
+  .domain-group-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fg);
+    margin-bottom: 6px;
+    cursor: pointer;
+  }
+  .domain-group-header:hover { color: var(--link); }
+  .domain-group-count {
+    font-weight: 400;
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .domain-group-articles {
+    padding-left: 8px;
+    font-size: 12px;
+  }
+  .domain-group-articles a {
+    display: block;
+    padding: 2px 0;
+    color: var(--muted);
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .domain-group-articles a:hover { color: var(--link); }
+
   /* Focus mode toggle button in toolbar */
   .focus-btn {
     background: none !important;
@@ -1379,6 +1480,10 @@
   <symbol id="i-wand" viewBox="0 0 576 512"><path d="M234.7 42.7L197 56.8c-3 1.1-5 4-5 7.2s2 6.1 5 7.2l37.7 14.1L248.8 123c1.1 3 4 5 7.2 5s6.1-2 7.2-5l14.1-37.7L315 71.2c3-1.1 5-4 5-7.2s-2-6.1-5-7.2L277.3 42.7 263.2 5c-1.1-3-4-5-7.2-5s-6.1 2-7.2 5L234.7 42.7zM46.1 395.4c-18.7 18.7-18.7 49.1 0 67.9l34.6 34.6c18.7 18.7 49.1 18.7 67.9 0L529.9 116.5c18.7-18.7 18.7-49.1 0-67.9L495.3 14c-18.7-18.7-49.1-18.7-67.9 0L46.1 395.4zM484.6 82.6l-105 105-23.3-23.3 105-105 23.3 23.3zM7.5 117.2C3 118.9 0 123.2 0 128s3 9.1 7.5 10.8L64 160l21.2 56.5c1.7 4.5 6 7.5 10.8 7.5s9.1-3 10.8-7.5L128 160l56.5-21.2c4.5-1.7 7.5-6 7.5-10.8s-3-9.1-7.5-10.8L128 96 106.8 39.5C105.1 35 100.8 32 96 32s-9.1 3-10.8 7.5L64 96 7.5 117.2zm352 256c-4.5 1.7-7.5 6-7.5 10.8s3 9.1 7.5 10.8L416 416l21.2 56.5c1.7 4.5 6 7.5 10.8 7.5s9.1-3 10.8-7.5L480 416l56.5-21.2c4.5-1.7 7.5-6 7.5-10.8s-3-9.1-7.5-10.8L480 352l-21.2-56.5c-1.7-4.5-6-7.5-10.8-7.5s-9.1 3-10.8 7.5L416 352l-56.5 21.2z"/></symbol>
   <symbol id="i-globe" viewBox="0 0 512 512"><path d="M352 256c0 22.2-1.2 43.6-3.3 64H163.3c-2.2-20.4-3.3-41.8-3.3-64s1.2-43.6 3.3-64h185.4c2.2 20.4 3.3 41.8 3.3 64zm28.8-64h123.1c5.3 20.5 8.1 41.9 8.1 64s-2.8 43.5-8.1 64H380.8c2.1-20.6 3.2-42 3.2-64s-1.1-43.4-3.2-64zm112.6-32H376.7c-10-63.9-29.8-117.4-55.3-151.6C399.6 29 467.7 90.2 493.4 160zM256 16c30.6 0 66.7 56.5 82.3 144H173.7C189.3 72.5 225.4 16 256 16zM135.3 160H18.6c25.7-69.8 93.8-131 172-151.6-25.5 34.2-45.3 87.7-55.3 151.6zM8.1 192H131.2c-2.1 20.6-3.2 42-3.2 64s1.1 43.4 3.2 64H8.1C2.8 299.5 0 278.1 0 256s2.8-43.5 8.1-64zm10.5 160h116.7c10 63.9 29.8 117.4 55.3 151.6C112.4 483 44.3 421.8 18.6 352zM256 496c-30.6 0-66.7-56.5-82.3-144h164.7C322.7 439.5 286.6 496 256 496zm120.7 7.6c25.5-34.2 45.3-87.7 55.3-151.6h116.7c-25.7 69.8-93.8 131-172 151.6z"/></symbol>
   <symbol id="i-xmark" viewBox="0 0 384 512"><path d="M342.6 150.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L192 210.7 86.6 105.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L146.7 256 41.4 361.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192 301.3l105.4 105.3c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L237.3 256l105.3-105.4z"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 576 512"><path d="M64 64C28.7 64 0 92.7 0 128v256c0 35.3 28.7 64 64 64h448c35.3 0 64-28.7 64-64V128c0-35.3-28.7-64-64-64H64zm16 64h32c8.8 0 16 7.2 16 16v32c0 8.8-7.2 16-16 16H80c-8.8 0-16-7.2-16-16v-32c0-8.8 7.2-16 16-16zm112 0h32c8.8 0 16 7.2 16 16v32c0 8.8-7.2 16-16 16h-32c-8.8 0-16-7.2-16-16v-32c0-8.8 7.2-16 16-16zm112 0h32c8.8 0 16 7.2 16 16v32c0 8.8-7.2 16-16 16h-32c-8.8 0-16-7.2-16-16v-32c0-8.8 7.2-16 16-16zm112 0h32c8.8 0 16 7.2 16 16v32c0 8.8-7.2 16-16 16h-32c-8.8 0-16-7.2-16-16v-32c0-8.8 7.2-16 16-16zM80 192h32c8.8 0 16 7.2 16 16v32c0 8.8-7.2 16-16 16H80c-8.8 0-16-7.2-16-16v-32c0-8.8 7.2-16 16-16zm384 0h32c8.8 0 16 7.2 16 16v32c0 8.8-7.2 16-16 16h-32c-8.8 0-16-7.2-16-16v-32c0-8.8 7.2-16 16-16zM80 320h32c8.8 0 16 7.2 16 16v32c0 8.8-7.2 16-16 16H80c-8.8 0-16-7.2-16-16v-32c0-8.8 7.2-16 16-16zm384 0h32c8.8 0 16 7.2 16 16v32c0 8.8-7.2 16-16 16h-32c-8.8 0-16-7.2-16-16v-32c0-8.8 7.2-16 16-16zm-288 0h224c8.8 0 16 7.2 16 16v32c0 8.8-7.2 16-16 16H176c-8.8 0-16-7.2-16-16v-32c0-8.8 7.2-16 16-16z"/></symbol>
+  <symbol id="i-tags" viewBox="0 0 512 512"><path d="M345 39.1L472.8 168.4c52.4 53 52.4 138.2 0 191.2L360.8 472.9c-9.3 9.4-24.5 9.5-33.9.2s-9.5-24.5-.2-33.9L438.6 325.9c33.9-34.3 33.9-89.4 0-123.7L310.9 72.9c-9.3-9.4-9.2-24.6.2-33.9s24.6-9.2 33.9.2zM0 229.5V80C0 53.5 21.5 32 48 32H197.5c17 0 33.3 6.7 45.3 18.7l168 168c25 25 25 65.5 0 90.5L277.3 442.7c-25 25-65.5 25-90.5 0l-168-168C6.7 262.7 0 246.5 0 229.5zM144 144a32 32 0 1 0-64 0 32 32 0 1 0 64 0z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 448 512"><path d="M96 0C43 0 0 43 0 96v320c0 53 43 96 96 96h320c17.7 0 32-14.3 32-32s-14.3-32-32-32v-64c17.7 0 32-14.3 32-32V32c0-17.7-14.3-32-32-32H96zm0 384h256v64H96c-17.7 0-32-14.3-32-32s14.3-32 32-32zm32-240c0-8.8 7.2-16 16-16h192c8.8 0 16 7.2 16 16s-7.2 16-16 16H144c-8.8 0-16-7.2-16-16zm16 48h192c8.8 0 16 7.2 16 16s-7.2 16-16 16H144c-8.8 0-16-7.2-16-16s7.2-16 16-16z"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 448 512"><path d="M152 24c0-13.3-10.7-24-24-24s-24 10.7-24 24v40H64C28.7 64 0 92.7 0 128v16 48V448c0 35.3 28.7 64 64 64h320c35.3 0 64-28.7 64-64V192 144 128c0-35.3-28.7-64-64-64h-40V24c0-13.3-10.7-24-24-24s-24 10.7-24 24v40H152V24zM48 192h352V448c0 8.8-7.2 16-16 16H64c-8.8 0-16-7.2-16-16V192z"/></symbol>
 </svg>
 <div class="app" role="application" aria-label="PullRead article reader">
 
@@ -1400,11 +1505,18 @@
         <label for="search" class="sr-only">Search articles</label>
         <input type="text" id="search" placeholder="Search articles..." oninput="filterFiles()" />
       </div>
-      <div class="file-count" id="file-count" aria-live="polite" aria-atomic="true"></div>
+      <div class="file-count" id="file-count" aria-live="polite" aria-atomic="true">
+        <span id="file-count-text"></span>
+        <label class="hide-read-toggle" title="Hide viewed articles">
+          <input type="checkbox" id="hide-read-toggle" onchange="toggleHideRead()" />
+          <span class="hide-read-label">Hide read</span>
+        </label>
+      </div>
       <div class="file-list" id="file-list" role="listbox" aria-label="Articles"></div>
       <div class="sidebar-footer">
-        <button class="sidebar-footer-btn" onclick="showShortcutsModal()" aria-label="Keyboard shortcuts">Shortcuts</button>
-        <button class="sidebar-footer-btn" onclick="showGuideModal()" aria-label="Features guide">Guide</button>
+        <button class="sidebar-footer-btn" onclick="showShortcutsModal()" aria-label="Keyboard shortcuts"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-keyboard"/></svg> Shortcuts</button>
+        <button class="sidebar-footer-btn" onclick="showTagCloud()" aria-label="Explore tags"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-tags"/></svg> Explore</button>
+        <button class="sidebar-footer-btn" onclick="showGuideModal()" aria-label="Features guide"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-book"/></svg> Guide</button>
       </div>
     </aside>
 
@@ -1446,8 +1558,13 @@
 // State
 let allFiles = [];
 let filteredFiles = [];
+let displayFiles = []; // after hide-read filter
 let activeFile = null;
 let serverMode = false;
+let hideRead = false;
+let readArticles = new Set(JSON.parse(localStorage.getItem('pr-read-articles') || '[]'));
+const PAGE_SIZE = 200; // pagination chunk
+let displayedCount = 0;
 
 // Highlights & Notes state
 let articleHighlights = []; // highlights for current article
@@ -1660,12 +1777,17 @@ function renderArticle(text, filename) {
   // Read time will be inserted after rendering
   html += '</div>';
 
+  // Detect review/summary articles where Summarize doesn't make sense
+  const isReviewArticle = meta && (meta.feed === 'weekly-review' || meta.feed === 'daily-review' || meta.domain === 'pullread');
+
   // Action buttons row
   html += '<div class="article-actions">';
   const isFav = articleNotes.isFavorite;
   html += '<button onclick="toggleFavoriteFromHeader(this)" class="' + (isFav ? 'active-fav' : '') + '" aria-label="' + (isFav ? 'Remove from favorites' : 'Add to favorites') + '" aria-pressed="' + isFav + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg> Favorite</button>';
   html += '<button onclick="toggleNotesFromHeader()" aria-label="Toggle notes panel"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-pen"/></svg> Notes</button>';
-  html += '<button onclick="summarizeArticle()" id="summarize-btn" aria-label="Summarize article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Summarize</button>';
+  if (!isReviewArticle) {
+    html += '<button onclick="summarizeArticle()" id="summarize-btn" aria-label="Summarize article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Summarize</button>';
+  }
   html += '</div>';
   html += '</div>';
 
@@ -1680,7 +1802,8 @@ function renderArticle(text, filename) {
     var h1Match = articleBody.match(/^#\s+(.+)\s*\n/);
     if (h1Match) {
       var normalize = function(s) { return s.toLowerCase().replace(/[\u2018\u2019\u201C\u201D]/g, "'").replace(/[^a-z0-9]/g, ''); };
-      if (normalize(h1Match[1]) === normalize(meta.title)) {
+      // Strip if title matches, or if it's a review (title always duplicated in body)
+      if (normalize(h1Match[1]) === normalize(meta.title) || isReviewArticle) {
         articleBody = articleBody.slice(h1Match[0].length);
       }
     }
@@ -1785,32 +1908,70 @@ function renderArticle(text, filename) {
 // File list
 function renderFileList() {
   const list = document.getElementById('file-list');
-  const count = document.getElementById('file-count');
-  count.textContent = filteredFiles.length + ' article' + (filteredFiles.length !== 1 ? 's' : '');
+  const countText = document.getElementById('file-count-text');
 
-  list.innerHTML = filteredFiles.map((f, i) => {
-    const date = f.bookmarked ? f.bookmarked.slice(0, 10) : '';
-    const isActive = activeFile === f.filename ? ' active' : '';
-    const { hasHl, hasNote, isFavorite } = hasAnnotations(f.filename);
-    const hasSummary = f.hasSummary;
-    let indicators = '';
-    if (hasHl || hasNote || hasSummary || isFavorite) {
-      indicators = '<div class="file-item-indicators">'
-        + (isFavorite ? '<span class="dot dot-favorite" aria-label="Favorite"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-heart"/></svg></span>' : '')
-        + (hasHl ? '<span class="dot dot-highlight" aria-label="Has highlights"></span>' : '')
-        + (hasNote ? '<span class="dot dot-note" aria-label="Has notes"></span>' : '')
-        + (hasSummary ? '<span class="dot dot-summary" aria-label="Has summary"></span>' : '')
-        + '</div>';
-    }
-    return '<div class="file-item' + isActive + '" data-index="' + i + '" onclick="loadFile(' + i + ')" role="option" aria-selected="' + (activeFile === f.filename) + '" tabindex="0" onkeydown="if(event.key===\'Enter\')loadFile(' + i + ')">'
-      + '<div class="file-item-title">' + escapeHtml(f.title) + '</div>'
-      + '<div class="file-item-meta">'
-      + (date ? '<span><svg class="icon icon-sm" style="opacity:0.5" aria-hidden="true"><use href="#i-calendar"/></svg> ' + date + '</span>' : '')
-      + (f.domain ? '<span><svg class="icon icon-sm" style="opacity:0.5" aria-hidden="true"><use href="#i-globe"/></svg> ' + escapeHtml(f.domain) + '</span>' : '')
-      + '</div>'
-      + indicators
+  // Apply hide-read filter
+  if (hideRead) {
+    displayFiles = filteredFiles.filter(f => !readArticles.has(f.filename) || f.filename === activeFile);
+  } else {
+    displayFiles = filteredFiles;
+  }
+
+  const total = filteredFiles.length;
+  const shown = displayFiles.length;
+  countText.textContent = shown + ' article' + (shown !== 1 ? 's' : '') + (hideRead && shown < total ? ' (' + (total - shown) + ' hidden)' : '');
+
+  // Paginate: render in chunks for performance with large lists
+  displayedCount = Math.min(displayFiles.length, PAGE_SIZE);
+
+  list.innerHTML = displayFiles.slice(0, displayedCount).map((f, i) => renderFileItem(f, i)).join('');
+}
+
+function renderFileItem(f, i) {
+  const date = f.bookmarked ? f.bookmarked.slice(0, 10) : '';
+  const isActive = activeFile === f.filename ? ' active' : '';
+  const isRead = readArticles.has(f.filename);
+  const { hasHl, hasNote, isFavorite } = hasAnnotations(f.filename);
+  const hasSummary = f.hasSummary;
+  let indicators = '';
+  if (hasHl || hasNote || hasSummary || isFavorite) {
+    indicators = '<div class="file-item-indicators">'
+      + (isFavorite ? '<span class="dot dot-favorite" aria-label="Favorite"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-heart"/></svg></span>' : '')
+      + (hasHl ? '<span class="dot dot-highlight" aria-label="Has highlights"></span>' : '')
+      + (hasNote ? '<span class="dot dot-note" aria-label="Has notes"></span>' : '')
+      + (hasSummary ? '<span class="dot dot-summary" aria-label="Has summary"></span>' : '')
       + '</div>';
-  }).join('');
+  }
+
+  // Favicon from Google service
+  const favicon = f.domain && f.domain !== 'pullread'
+    ? '<img class="file-item-favicon" src="https://www.google.com/s2/favicons?domain=' + encodeURIComponent(f.domain) + '&sz=32" alt="" loading="lazy" onerror="this.style.display=\'none\'" aria-hidden="true">'
+    : '';
+
+  return '<div class="file-item' + isActive + (isRead && !isActive ? ' read' : '') + '" data-index="' + i + '" onclick="loadFile(' + i + ')" role="option" aria-selected="' + (activeFile === f.filename) + '" tabindex="0" onkeydown="if(event.key===\'Enter\')loadFile(' + i + ')">'
+    + '<div class="file-item-title">' + favicon + escapeHtml(f.title) + '</div>'
+    + '<div class="file-item-meta">'
+    + (date ? '<span><svg class="icon icon-sm" style="opacity:0.5" aria-hidden="true"><use href="#i-calendar"/></svg> ' + date + '</span>' : '')
+    + (f.domain ? '<span>' + escapeHtml(f.domain) + '</span>' : '')
+    + '</div>'
+    + indicators
+    + '</div>';
+}
+
+function toggleHideRead() {
+  hideRead = document.getElementById('hide-read-toggle').checked;
+  localStorage.setItem('pr-hide-read', hideRead ? '1' : '0');
+  renderFileList();
+}
+
+function markAsRead(filename) {
+  readArticles.add(filename);
+  // Keep only last 5000 entries
+  if (readArticles.size > 5000) {
+    const arr = Array.from(readArticles);
+    readArticles = new Set(arr.slice(arr.length - 5000));
+  }
+  localStorage.setItem('pr-read-articles', JSON.stringify(Array.from(readArticles)));
 }
 
 function filterFiles() {
@@ -1821,16 +1982,18 @@ function filterFiles() {
     filteredFiles = allFiles.filter(f =>
       f.title.toLowerCase().includes(q) ||
       f.domain.toLowerCase().includes(q) ||
-      f.feed.toLowerCase().includes(q)
+      f.feed.toLowerCase().includes(q) ||
+      (allNotesIndex[f.filename]?.tags || []).some(t => t.toLowerCase().includes(q))
     );
   }
   renderFileList();
 }
 
 async function loadFile(index) {
-  const file = filteredFiles[index];
+  const file = displayFiles[index];
   if (!file) return;
   activeFile = file.filename;
+  markAsRead(file.filename);
   renderFileList();
   removeHlToolbar();
 
@@ -1855,13 +2018,13 @@ async function loadFile(index) {
 
 // Navigate to next (+1) or previous (-1) article with wrapping
 function navigateArticle(direction) {
-  if (!filteredFiles.length) return;
-  const currentIdx = filteredFiles.findIndex(f => f.filename === activeFile);
+  if (!displayFiles.length) return;
+  const currentIdx = displayFiles.findIndex(f => f.filename === activeFile);
   let next;
   if (direction > 0) {
-    next = currentIdx < filteredFiles.length - 1 ? currentIdx + 1 : 0;
+    next = currentIdx < displayFiles.length - 1 ? currentIdx + 1 : 0;
   } else {
-    next = currentIdx > 0 ? currentIdx - 1 : filteredFiles.length - 1;
+    next = currentIdx > 0 ? currentIdx - 1 : displayFiles.length - 1;
   }
   loadFile(next);
   const el = document.querySelector('.file-item[data-index="' + next + '"]');
@@ -2915,7 +3078,7 @@ document.addEventListener('keydown', e => {
 
   // Enter loads current selection (when not in search)
   if (e.key === 'Enter' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-    const currentIdx = filteredFiles.findIndex(f => f.filename === activeFile);
+    const currentIdx = displayFiles.findIndex(f => f.filename === activeFile);
     if (currentIdx >= 0) loadFile(currentIdx);
   }
 });
@@ -2963,6 +3126,18 @@ document.addEventListener('drop', e => {
   }
 });
 
+// Infinite scroll for file list pagination
+document.getElementById('file-list').addEventListener('scroll', function() {
+  const list = this;
+  if (list.scrollTop + list.clientHeight >= list.scrollHeight - 100) {
+    if (displayedCount < displayFiles.length) {
+      const nextBatch = displayFiles.slice(displayedCount, displayedCount + PAGE_SIZE);
+      displayedCount += nextBatch.length;
+      list.insertAdjacentHTML('beforeend', nextBatch.map((f, i) => renderFileItem(f, displayedCount - nextBatch.length + i)).join(''));
+    }
+  }
+});
+
 // Onboarding overlay
 function dismissOnboarding(e) {
   if (e && e.target && e.target.id !== 'onboarding' && e.target.className !== 'onboarding-dismiss') return;
@@ -2973,6 +3148,118 @@ function dismissOnboarding(e) {
 function showOnboardingIfNeeded() {
   if (!localStorage.getItem('pr-onboarded')) {
     document.getElementById('onboarding').style.display = 'flex';
+  }
+}
+
+// ---- Tag Cloud / Explore ----
+function showTagCloud() {
+  closeModal();
+  _modalReturnFocus = document.activeElement;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Explore articles');
+  overlay.onclick = function(e) { if (e.target === overlay) closeModal(); };
+
+  // Collect all tags and domain groupings
+  const tagCounts = {};
+  const domainArticles = {};
+  const feedCounts = {};
+
+  for (const f of allFiles) {
+    // Domain grouping
+    if (f.domain && f.domain !== 'pullread') {
+      if (!domainArticles[f.domain]) domainArticles[f.domain] = [];
+      domainArticles[f.domain].push(f);
+    }
+    // Feed grouping
+    if (f.feed) {
+      feedCounts[f.feed] = (feedCounts[f.feed] || 0) + 1;
+    }
+    // User tags
+    const notes = allNotesIndex[f.filename];
+    if (notes && notes.tags) {
+      for (const tag of notes.tags) {
+        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+      }
+    }
+  }
+
+  // Sort domains by count
+  const sortedDomains = Object.entries(domainArticles)
+    .sort((a, b) => b[1].length - a[1].length)
+    .slice(0, 30);
+
+  // Sort tags by count
+  const sortedTags = Object.entries(tagCounts)
+    .sort((a, b) => b[1] - a[1]);
+
+  let tagsHtml = '';
+  if (sortedTags.length > 0) {
+    tagsHtml = '<h3>Tags</h3><div class="tag-cloud">';
+    const maxCount = sortedTags[0][1];
+    for (const [tag, count] of sortedTags) {
+      const size = Math.max(11, Math.min(20, 11 + (count / maxCount) * 9));
+      tagsHtml += '<span class="tag-cloud-item" style="font-size:' + size + 'px" onclick="closeModal();document.getElementById(\'search\').value=\'' + escapeHtml(tag) + '\';filterFiles()">' + escapeHtml(tag) + ' <span style="opacity:0.5;font-size:10px">' + count + '</span></span>';
+    }
+    tagsHtml += '</div>';
+  }
+
+  let domainsHtml = '<h3>Sources <span style="font-weight:400;color:var(--muted);font-size:12px">(' + Object.keys(domainArticles).length + ' sites)</span></h3>';
+  for (const [domain, articles] of sortedDomains) {
+    domainsHtml += '<div class="domain-group">';
+    domainsHtml += '<div class="domain-group-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">';
+    domainsHtml += '<img class="file-item-favicon" src="https://www.google.com/s2/favicons?domain=' + encodeURIComponent(domain) + '&sz=32" alt="" loading="lazy" onerror="this.style.display=\'none\'">';
+    domainsHtml += escapeHtml(domain) + ' <span class="domain-group-count">' + articles.length + ' article' + (articles.length !== 1 ? 's' : '') + '</span></div>';
+    domainsHtml += '<div class="domain-group-articles" style="display:none">';
+    for (const a of articles.slice(0, 10)) {
+      domainsHtml += '<a href="#" onclick="event.preventDefault();closeModal();jumpToArticle(\'' + escapeHtml(a.filename.replace(/'/g, "\\'")) + '\')">' + escapeHtml(a.title) + '</a>';
+    }
+    if (articles.length > 10) {
+      domainsHtml += '<span style="font-size:11px;color:var(--muted)">+ ' + (articles.length - 10) + ' more</span>';
+    }
+    domainsHtml += '</div></div>';
+  }
+
+  // Stats
+  const totalArticles = allFiles.length;
+  const totalHighlights = Object.values(allHighlightsIndex).reduce((s, h) => s + (h ? h.length : 0), 0);
+  const totalFavorites = Object.values(allNotesIndex).filter(n => n && n.isFavorite).length;
+
+  let statsHtml = '<div style="display:flex;gap:20px;margin:12px 0;font-size:13px;color:var(--muted)">';
+  statsHtml += '<span><strong style="color:var(--fg)">' + totalArticles + '</strong> articles</span>';
+  statsHtml += '<span><strong style="color:var(--fg)">' + totalHighlights + '</strong> highlights</span>';
+  statsHtml += '<span><strong style="color:var(--fg)">' + totalFavorites + '</strong> favorites</span>';
+  statsHtml += '<span><strong style="color:var(--fg)">' + Object.keys(domainArticles).length + '</strong> sources</span>';
+  statsHtml += '</div>';
+
+  overlay.innerHTML = `
+    <div class="modal-card" style="max-width:560px;max-height:80vh;overflow-y:auto" onclick="event.stopPropagation()">
+      <h2>Explore Your Library</h2>
+      ${statsHtml}
+      ${tagsHtml}
+      ${domainsHtml}
+      <button class="modal-close" onclick="closeModal()">Done</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  trapFocus(overlay);
+  overlay.querySelector('.modal-close').focus();
+}
+
+function jumpToArticle(filename) {
+  const idx = displayFiles.findIndex(f => f.filename === filename);
+  if (idx >= 0) {
+    loadFile(idx);
+  } else {
+    // File might be hidden - clear filters
+    document.getElementById('search').value = '';
+    hideRead = false;
+    document.getElementById('hide-read-toggle').checked = false;
+    filterFiles();
+    const newIdx = displayFiles.findIndex(f => f.filename === filename);
+    if (newIdx >= 0) loadFile(newIdx);
   }
 }
 
@@ -3229,6 +3516,67 @@ function updateTocActive() {
   });
 }
 
+// ---- Sync Status ----
+async function loadSyncStatus() {
+  if (!serverMode) return;
+  try {
+    const res = await fetch('/api/sync-status');
+    if (!res.ok) return;
+    const data = await res.json();
+    const countEl = document.getElementById('file-count-text');
+    if (countEl && data.intervalMinutes) {
+      const nextSync = data.intervalMinutes + ' min';
+      countEl.title = 'Sync every ' + nextSync;
+    }
+  } catch {}
+}
+
+// ---- One-Time Migration: frontmatter annotations to JSON ----
+async function migrateAnnotationsIfNeeded() {
+  if (!serverMode) return;
+  if (localStorage.getItem('pr-migration-v1-done')) return;
+
+  // Check each article's frontmatter for old-style annotation field
+  let migrated = 0;
+  for (const file of allFiles) {
+    try {
+      const res = await fetch('/api/file?name=' + encodeURIComponent(file.filename));
+      if (!res.ok) continue;
+      const text = await res.text();
+      const match = text.match(/^---\n([\s\S]*?)\n---/);
+      if (!match) continue;
+
+      const frontmatter = match[1];
+      const annotationMatch = frontmatter.match(/^annotation:\s*"?(.*?)"?\s*$/m);
+      if (!annotationMatch || !annotationMatch[1]) continue;
+
+      // Found old-style annotation - migrate to JSON notes
+      const existingNotes = allNotesIndex[file.filename] || {};
+      if (existingNotes.articleNote) continue; // Already has notes, skip
+
+      await fetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: file.filename,
+          articleNote: annotationMatch[1],
+          annotations: existingNotes.annotations || [],
+          tags: existingNotes.tags || [],
+          isFavorite: existingNotes.isFavorite || false
+        })
+      });
+      migrated++;
+    } catch { continue; }
+  }
+
+  localStorage.setItem('pr-migration-v1-done', '1');
+  if (migrated > 0) {
+    console.log('Migrated ' + migrated + ' article annotations from frontmatter to JSON');
+    await loadAnnotationsIndex(); // Refresh
+    renderFileList();
+  }
+}
+
 // Init: try to load from server, fall back to standalone mode
 async function init() {
   // Restore preferences
@@ -3265,6 +3613,10 @@ async function init() {
     document.getElementById('focus-btn').classList.add('active');
   }
 
+  // Restore hide-read
+  hideRead = localStorage.getItem('pr-hide-read') === '1';
+  document.getElementById('hide-read-toggle').checked = hideRead;
+
   try {
     const res = await fetch('/api/files');
     if (res.ok) {
@@ -3276,6 +3628,10 @@ async function init() {
       await Promise.all([loadAnnotationsIndex(), checkLLMConfig()]);
 
       renderFileList();
+
+      // Run one-time migration and load sync status in background
+      migrateAnnotationsIfNeeded();
+      loadSyncStatus();
 
       // Auto-load first article
       if (allFiles.length > 0) {

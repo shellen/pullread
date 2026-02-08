@@ -10,6 +10,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var syncService: SyncService!
     private var lastSyncMenuItem: NSMenuItem!
+    private var nextSyncMenuItem: NSMenuItem!
     private var syncMenuItem: NSMenuItem!
     private var statusMenuItem: NSMenuItem!
     private var checkForUpdatesMenuItem: NSMenuItem!
@@ -81,6 +82,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Set up scheduled review timer and auto-sync timer
         scheduleReviewTimerIfNeeded()
         scheduleSyncTimerIfNeeded()
+
+        // Sync on launch if config is valid and auto-sync is enabled (or first reopen)
+        if !syncService.isFirstRun() && syncService.isConfigValid() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                self?.runSync(retryFailed: false)
+            }
+        }
     }
 
     private func checkFirstRunOrInvalidConfig() {
@@ -135,6 +143,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         lastSyncMenuItem = NSMenuItem(title: "Last sync: Never", action: nil, keyEquivalent: "")
         lastSyncMenuItem.isEnabled = false
         menu.addItem(lastSyncMenuItem)
+
+        // Next sync time
+        nextSyncMenuItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        nextSyncMenuItem.isEnabled = false
+        nextSyncMenuItem.isHidden = true
+        menu.addItem(nextSyncMenuItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -272,8 +286,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         syncTimer?.invalidate()
         syncTimer = nil
 
-        let interval = UserDefaults.standard.string(forKey: "syncInterval") ?? "manual"
-        guard interval != "manual" else { return }
+        let interval = UserDefaults.standard.string(forKey: "syncInterval") ?? "1h"
+        guard interval != "manual" else {
+            nextSyncMenuItem?.isHidden = true
+            return
+        }
 
         let seconds: TimeInterval
         switch interval {
@@ -286,7 +303,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         syncTimer = Timer.scheduledTimer(withTimeInterval: seconds, repeats: true) { [weak self] _ in
             self?.runSync(retryFailed: false)
+            self?.updateNextSyncTime(interval: seconds)
         }
+
+        updateNextSyncTime(interval: seconds)
+    }
+
+    private func updateNextSyncTime(interval: TimeInterval) {
+        let nextFire = Date().addingTimeInterval(interval)
+        let formatter = DateFormatter()
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        nextSyncMenuItem?.title = "Next sync: \(formatter.string(from: nextFire))"
+        nextSyncMenuItem?.isHidden = false
     }
 
     private func runScheduledReview() {
