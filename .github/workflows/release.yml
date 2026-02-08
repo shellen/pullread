@@ -200,13 +200,13 @@ jobs:
           DMG_SIZE=$(stat -f%z PullRead.dmg)
           DMG_URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}/PullRead.dmg"
 
-          # Generate appcast.xml
-          cat > appcast.xml << APPCAST_EOF
+          # Generate appcast.xml into site/ so it's served alongside the marketing page
+          cat > site/appcast.xml << APPCAST_EOF
           <?xml version="1.0" encoding="utf-8"?>
           <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
             <channel>
               <title>Pull Read</title>
-              <link>https://shellen.github.io/pullread/appcast.xml</link>
+              <link>https://pullread.com/appcast.xml</link>
               <description>Pull Read updates</description>
               <language>en</language>
               <item>
@@ -224,20 +224,12 @@ jobs:
           </rss>
           APPCAST_EOF
 
-          # Deploy to GitHub Pages
+          # Commit appcast.xml into site/ on main and trigger Pages deploy
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Create/update gh-pages branch
-          git fetch origin gh-pages || true
-          git checkout gh-pages 2>/dev/null || git checkout --orphan gh-pages
-
-          # Keep only appcast.xml on this branch
-          git rm -rf . 2>/dev/null || true
-          mv appcast.xml .
-          git add appcast.xml
-          git commit -m "Update appcast for v${VERSION}"
-          git push origin gh-pages
+          git add site/appcast.xml
+          git commit -m "Update appcast for v${VERSION}" || echo "No changes to commit"
+          git push origin HEAD:main
 
       - name: Clean up keychain
         if: always()
