@@ -29,9 +29,8 @@
     <!-- Sparkle auto-update configuration -->
     <key>SUFeedURL</key>
     <string>https://shellen.github.io/pullread/appcast.xml</string>
-    <!-- SUPublicEDKey: replace with actual key from sparkle-keygen workflow -->
     <key>SUPublicEDKey</key>
-    <string>YOUR_ED25519_PUBLIC_KEY_HERE</string>
+    <string>kp53hiddenforprivacy</string>
     <key>SUEnableAutomaticChecks</key>
     <true/>
     <key>SUScheduledCheckInterval</key>
