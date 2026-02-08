@@ -890,23 +890,25 @@ The public key is already set in `PullReadTray/PullReadTray/Info.plist` under `S
 
 If the public key matches what's already in Info.plist, skip this step.
 
-#### Step 4: Enable GitHub Pages (one-time repo setting)
+#### Step 4: Enable GitHub Pages (if not already configured)
 
-The Sparkle appcast is served from GitHub Pages. This is a one-time repo configuration:
+The Sparkle appcast is served from GitHub Pages. If your repo already has GitHub Pages enabled (e.g., serving `pullread.com`), this step is already done.
+
+Otherwise:
 
 1. Go to your repo → **Settings** → **Pages**
 2. Under **Source**, select **Deploy from a branch**
 3. Set **Branch** to `gh-pages` / `root`
 4. Click **Save**
 
-The `deploy-site.yml` workflow publishes `site/appcast.xml` (and any other site content) to the `gh-pages` branch automatically.
+The `deploy-site.yml` workflow publishes `site/appcast.xml` (and any other site content) automatically.
 
 #### Setup Checklist
 
 - [ ] Ran **Sparkle Key Generation** workflow and copied both keys from the log output
 - [ ] Created `SPARKLE_PRIVATE_KEY` secret in repo Settings with the private key
 - [ ] Verified `SUPublicEDKey` in Info.plist matches the public key from the workflow
-- [ ] Enabled GitHub Pages (Settings → Pages → gh-pages / root)
+- [ ] Enabled GitHub Pages (Settings → Pages → gh-pages / root) — already done if pullread.com is live
 
 ### Releasing an Update
 
