@@ -35,6 +35,7 @@ PullRead connects to bookmark services like Instapaper, Pinboard, Raindrop, and 
 - [Development](#development)
 - [Testing](#testing)
 - [Code Signing](#code-signing)
+- [Auto-Updates (Sparkle)](#auto-updates-sparkle)
 - [Troubleshooting](#troubleshooting)
 - [Room for Improvement](#room-for-improvement)
 - [Future Ideas](#future-ideas)
@@ -395,7 +396,9 @@ Pull Read is a self-contained native Swift menu bar application. It bundles the 
 │ View Articles...    ⌘D   │  → Opens the markdown reader
 │ Settings            ⌘,   │  → Configure feeds, services, reviews
 │ View Logs...        ⌘L   │  → Opens sync log
+│ Check for Updates...      │  → Sparkle auto-update check
 ├──────────────────────────┤
+│ Welcome Guide...          │
 │ About PullRead           │
 │ Quit PullRead       ⌘Q   │
 └──────────────────────────┘
@@ -823,6 +826,99 @@ Push a commit that touches `PullReadTray/` or `src/` and watch the [Actions tab]
 6. Upload the signed DMG as a build artifact
 
 If the signing secrets aren't configured, the workflow gracefully falls back to an unsigned build.
+
+---
+
+## Auto-Updates (Sparkle)
+
+PullRead uses [Sparkle 2](https://sparkle-project.org/) for automatic updates. When configured, the app checks for updates daily and shows a native macOS update prompt when a new version is available. Users can also check manually via the **Check for Updates...** menu item.
+
+### How It Works
+
+1. The release workflow (`release.yml`) builds a signed, notarized DMG
+2. The DMG is signed with an EdDSA (Ed25519) key for Sparkle verification
+3. An `appcast.xml` feed is generated and published to GitHub Pages
+4. Installed apps check the appcast on a schedule (daily by default)
+5. When a new version is found, Sparkle prompts the user to download and install it
+
+### Setup
+
+Sparkle requires an Ed25519 keypair. The **public key** is shipped in the app bundle so it can verify update signatures. The **private key** stays in GitHub Secrets and is only used during releases to sign the DMG.
+
+#### Step 1: Generate Ed25519 Signing Keys
+
+Run the **Sparkle Key Generation** workflow manually:
+
+1. Go to **Actions** → **Sparkle Key Generation (one-time)** → **Run workflow**
+2. The workflow output will print both keys:
+   - The **public key** is already configured in `PullReadTray/PullReadTray/Info.plist` under `SUPublicEDKey`. If you regenerate keys, update this value to match.
+   - The **private key** is printed by `generate_keys -p`. Copy the entire key string.
+
+#### Step 2: Store the Private Key
+
+1. Go to **Settings → Secrets and variables → Actions**
+2. Create a new secret named `SPARKLE_PRIVATE_KEY`
+3. Paste the private key from the workflow output as the value
+
+The private key is only accessed by the `release.yml` workflow during the "Sign DMG for Sparkle" and "Update Sparkle appcast" steps. It never appears in source code.
+
+#### Step 3: Enable GitHub Pages
+
+The appcast is served from GitHub Pages:
+
+1. Go to **Settings → Pages**
+2. Set **Source** to **Deploy from a branch**
+3. Set **Branch** to `gh-pages` / `root`
+
+The `deploy-site.yml` workflow publishes `site/appcast.xml` (and any other site content) to the `gh-pages` branch automatically.
+
+### Releasing an Update
+
+Once Sparkle is configured, the release process is:
+
+```bash
+# Tag and push a new version
+git tag v1.1.0
+git push origin v1.1.0
+```
+
+The `release.yml` workflow will:
+1. Build the universal CLI binary (arm64 + x64)
+2. Build, sign, and notarize the app and DMG
+3. Sign the DMG with the Sparkle private key
+4. Create a GitHub Release with the DMG attached
+5. Generate a new `appcast.xml` and push it to the site
+6. GitHub Pages deploys the updated appcast
+
+Existing users with Sparkle enabled will see the update prompt within 24 hours (or immediately via **Check for Updates...**).
+
+### Configuration Reference
+
+These values are set in `PullReadTray/PullReadTray/Info.plist`:
+
+| Key | Value | Purpose |
+|-----|-------|---------|
+| `SUFeedURL` | `https://shellen.github.io/pullread/appcast.xml` | URL of the Sparkle appcast feed |
+| `SUPublicEDKey` | *(base64 Ed25519 public key)* | Verifies update signatures |
+| `SUEnableAutomaticChecks` | `true` | Check for updates on launch |
+| `SUScheduledCheckInterval` | `86400` | Check interval in seconds (24 hours) |
+
+### Important Notes
+
+- **Existing users without Sparkle** cannot be auto-updated. If a user installed a version before Sparkle was enabled, they need to manually download the new version once. After that, all future updates are automatic.
+- **The public key is safe to commit.** It can only verify signatures, not create them. This is by design — Sparkle needs it in the app bundle.
+- **If you regenerate keys**, you must update `SUPublicEDKey` in Info.plist to match the new public key, and update the `SPARKLE_PRIVATE_KEY` secret with the new private key. The old and new keys are not interchangeable.
+
+### GitHub Secrets Summary
+
+| Secret | Purpose | Required For |
+|--------|---------|--------------|
+| `SPARKLE_PRIVATE_KEY` | Signs DMGs for Sparkle update verification | `release.yml` |
+| `APPLE_CERTIFICATE_BASE64` | Code signing certificate | `release.yml` |
+| `APPLE_CERTIFICATE_PASSWORD` | Certificate password | `release.yml` |
+| `APPLE_ID` | Apple ID for notarization | `release.yml` |
+| `APPLE_ID_PASSWORD` | App-specific password for notarization | `release.yml` |
+| `APPLE_TEAM_ID` | Developer team ID | `release.yml` |
 
 ---
 
