@@ -94,13 +94,18 @@ jobs:
           rm $RUNNER_TEMP/certificate.p12
 
       - name: Build app
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           cd PullReadTray
           xcodebuild -project PullReadTray.xcodeproj \
             -scheme PullReadTray \
             -configuration Release \
             -derivedDataPath build \
+            -destination 'platform=macOS' \
+            CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Developer ID Application" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             clean build
 
       - name: Bundle CLI binary into app
