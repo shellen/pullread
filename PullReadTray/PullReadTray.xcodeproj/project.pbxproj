@@ -15,6 +15,7 @@
 		A1000006200000010000000A /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000006100000010000000B /* SettingsWindowController.swift */; };
 		A1000007200000010000000B /* WhatsNewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000007100000010000000B /* WhatsNewView.swift */; };
 		A1000008200000010000000B /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000008100000010000000B /* OnboardingView.swift */; };
+		A1000009200000010000000B /* ArticleViewerWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000009100000010000000B /* ArticleViewerWindowController.swift */; };
 		B1000001200000010000000A /* SyncServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000001100000010000000A /* SyncServiceTests.swift */; };
 		B1000002200000010000000A /* AppDelegateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002100000010000000A /* AppDelegateTests.swift */; };
 		C1000001200000010000000A /* PullReadTrayUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000001100000010000000A /* PullReadTrayUITests.swift */; };
@@ -50,6 +51,7 @@
 		A1000006100000010000000B /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 		A1000007100000010000000B /* WhatsNewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhatsNewView.swift; sourceTree = "<group>"; };
 		A1000008100000010000000B /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		A1000009100000010000000B /* ArticleViewerWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArticleViewerWindowController.swift; sourceTree = "<group>"; };
 		A1000007100000010000000A /* Pull Read.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Pull Read.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B1000001100000010000000A /* SyncServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncServiceTests.swift; sourceTree = "<group>"; };
 		B1000002100000010000000A /* AppDelegateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegateTests.swift; sourceTree = "<group>"; };
@@ -105,6 +107,7 @@
 				A1000006100000010000000B /* SettingsWindowController.swift */,
 				A1000007100000010000000B /* WhatsNewView.swift */,
 				A1000008100000010000000B /* OnboardingView.swift */,
+				A1000009100000010000000B /* ArticleViewerWindowController.swift */,
 				A1000004100000010000000A /* Assets.xcassets */,
 				A1000005100000010000000A /* Info.plist */,
 				A1000006100000010000000A /* PullReadTray.entitlements */,
@@ -282,6 +285,7 @@
 				A1000006200000010000000A /* SettingsWindowController.swift in Sources */,
 				A1000007200000010000000B /* WhatsNewView.swift in Sources */,
 				A1000008200000010000000B /* OnboardingView.swift in Sources */,
+				A1000009200000010000000B /* ArticleViewerWindowController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

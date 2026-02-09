@@ -26,6 +26,12 @@
     <string>Copyright 2026 A Little Drive. All rights reserved.</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
+    <!-- Allow WKWebView to load the local viewer server over HTTP -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+    </dict>
     <!-- Sparkle auto-update configuration -->
     <key>SUFeedURL</key>
     <string>https://shellen.github.io/pullread/appcast.xml</string>

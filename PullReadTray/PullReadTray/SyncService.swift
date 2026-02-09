@@ -2,7 +2,6 @@
 // ABOUTME: Executes bundled pullread binary for article syncing
 
 import Foundation
-import AppKit
 
 class SyncService {
     private let configDir: String
@@ -229,13 +228,16 @@ class SyncService {
         return process.isRunning
     }
 
-    /// Starts the article viewer server, or opens the browser if already running
-    func openViewer(completion: @escaping (Result<Void, Error>) -> Void) {
-        // If viewer is already running, just open the browser
+    /// The URL for the running viewer server
+    var viewerURL: URL {
+        URL(string: "http://localhost:\(viewerPort)")!
+    }
+
+    /// Ensures the article viewer server is running, starting it if necessary.
+    /// Calls completion with the viewer URL on success.
+    func ensureViewerRunning(completion: @escaping (Result<URL, Error>) -> Void) {
         if isViewerRunning() {
-            let url = URL(string: "http://localhost:\(viewerPort)")!
-            openInSafari(url)
-            completion(.success(()))
+            completion(.success(viewerURL))
             return
         }
 
@@ -264,30 +266,12 @@ class SyncService {
                 try process.run()
                 self.viewerProcess = process
 
-                // Wait briefly for the server to start listening, then open in Safari
+                // Wait briefly for the server to start listening
                 Thread.sleep(forTimeInterval: 0.5)
-                DispatchQueue.main.async {
-                    let url = URL(string: "http://localhost:\(self.viewerPort)")!
-                    self.openInSafari(url)
-                }
 
-                completion(.success(()))
+                completion(.success(self.viewerURL))
             } catch {
                 completion(.failure(error))
-            }
-        }
-    }
-
-    /// Opens a URL in Safari for best web app experience (Add to Dock support).
-    /// Falls back to the default browser if Safari is not available.
-    private func openInSafari(_ url: URL) {
-        let safariURL = URL(fileURLWithPath: "/Applications/Safari.app")
-        let config = NSWorkspace.OpenConfiguration()
-        config.activates = true
-        NSWorkspace.shared.open([url], withApplicationAt: safariURL, configuration: config) { _, error in
-            if error != nil {
-                // Fallback to default browser
-                NSWorkspace.shared.open(url)
             }
         }
     }
