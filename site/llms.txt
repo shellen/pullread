@@ -1,0 +1,43 @@
+# Pull Read
+
+> Save articles from your bookmark services as clean, local markdown files.
+
+Pull Read is an open-source macOS menu bar app and CLI tool that connects to bookmark services (Instapaper, Pinboard, Raindrop, Omnivore, Feedbin, and any RSS feed), extracts article content using Mozilla's Readability algorithm, and saves them as markdown files with YAML frontmatter.
+
+## Key Features
+
+- Bookmark service integration via RSS feeds
+- Browser bookmark import (bookmarks.html)
+- RSS/Atom auto-discovery from blog URLs
+- Clean article extraction (Mozilla Readability)
+- YouTube video support with full transcripts
+- Podcast episode archival with audio links
+- Markdown output with YAML frontmatter
+- Built-in two-pane article reader (localhost:7777)
+- Text highlighting in four colors (yellow, green, blue, pink)
+- Inline annotations and article-level notes
+- Article tagging and favorites
+- AI-powered article summaries (Anthropic Claude, OpenAI GPT)
+- AI-generated weekly reading reviews
+- Smart deduplication and retry for failed extractions
+- Self-contained native macOS menu bar app (no dependencies)
+- Cloud-sync friendly (Dropbox, iCloud, Google Drive, or any folder)
+- Automatic updates via Sparkle
+
+## Technical Details
+
+- macOS app: Native Swift with SwiftUI
+- CLI: TypeScript compiled to standalone binary via Bun
+- Viewer: Single-file HTML/CSS/JavaScript served locally
+- Distribution: Signed and notarized DMG via GitHub Releases
+- Auto-updates: Sparkle 2 with EdDSA signature verification
+- Configuration stored at ~/.config/pullread/
+- Articles saved as date-prefixed markdown files (e.g., 2026-02-08-article-title.md)
+
+## Links
+
+- Website: https://pullread.com
+- GitHub: https://github.com/shellen/pullread
+- Download: https://github.com/shellen/pullread/releases/latest
+- License: MIT
+- By: A Little Drive (https://alittledrive.com)

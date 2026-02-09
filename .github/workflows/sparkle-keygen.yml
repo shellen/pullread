@@ -25,36 +25,25 @@ jobs:
 
       - name: Generate Ed25519 keys
         run: |
-          # Generate new Ed25519 keypair
-          OUTPUT=$(sparkle-tools/bin/generate_keys 2>&1)
-          echo "$OUTPUT"
+          # Generate new Ed25519 keypair (stores in Keychain)
+          sparkle-tools/bin/generate_keys 2>&1
 
+          # Export the private key from the Keychain so it can be saved
+          # as a GitHub secret before the ephemeral runner is destroyed
           echo ""
           echo "============================================"
-          echo "  SETUP INSTRUCTIONS"
+          echo "  PRIVATE KEY (save as SPARKLE_PRIVATE_KEY secret)"
+          echo "============================================"
+          sparkle-tools/bin/generate_keys -p 2>&1
           echo "============================================"
           echo ""
-          echo "1. Copy the PRIVATE key from the output above"
-          echo "   Go to: Settings > Secrets and variables > Actions"
-          echo "   Create secret: SPARKLE_PRIVATE_KEY"
-          echo "   Paste the private key as the value"
+          echo "Copy EVERYTHING between the lines above and save it as:"
+          echo "  GitHub repo > Settings > Secrets and variables > Actions"
+          echo "  Secret name: SPARKLE_PRIVATE_KEY"
           echo ""
-          echo "2. Copy the PUBLIC key from the output above"
-          echo "   Replace YOUR_ED25519_PUBLIC_KEY_HERE in:"
-          echo "   PullReadTray/PullReadTray/Info.plist"
-          echo "   Uncomment the SUPublicEDKey lines"
+          echo "The public key (SUPublicEDKey) is already set in Info.plist."
+          echo "Steps 2-4 from the original instructions are already done."
           echo ""
-          echo "3. Add Sparkle 2.x SPM dependency to PullReadTray.xcodeproj"
-          echo "   URL: https://github.com/sparkle-project/Sparkle"
-          echo "   Version: Up to Next Major (2.0.0)"
-          echo ""
-          echo "4. Uncomment Sparkle code in AppDelegate.swift:"
-          echo "   - import Sparkle"
-          echo "   - updaterController property"
-          echo "   - checkForUpdates menu item"
-          echo "   - checkForUpdates() method body"
-          echo ""
-          echo "5. Enable GitHub Pages for this repo:"
-          echo "   Settings > Pages > Source: Deploy from a branch"
-          echo "   Branch: gh-pages / root"
+          echo "Remaining manual step:"
+          echo "  5. Enable GitHub Pages: Settings > Pages > Deploy from branch (gh-pages / root)"
           echo "============================================"

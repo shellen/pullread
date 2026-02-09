@@ -28,8 +28,10 @@ struct SettingsView: View {
     @State private var llmModel: String = ""
     @State private var llmModelCustom: String = ""
     @State private var useCustomModel: Bool = false
+    @State private var savedApiKeys: [String: String] = [:] // provider -> key
     @State private var reviewSchedule: String = "off"
-    @State private var syncInterval: String = "manual"
+    @State private var syncInterval: String = "1h"
+    @State private var selectedTab: Int = 0
 
     private static let knownModels: [String: [String]] = [
         "anthropic": ["claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001", "claude-opus-4-6"],
@@ -85,26 +87,50 @@ struct SettingsView: View {
             VisualEffectView(material: .sidebar, blendingMode: .behindWindow)
                 .ignoresSafeArea()
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    if isFirstRun {
-                        welcomeHeader
-                    }
-
-                    outputFolderSection
-
-                    feedsSection
-
-                    browserCookiesSection
-
-                    llmSection
-
-                    buttonRow
+            VStack(spacing: 0) {
+                if isFirstRun {
+                    welcomeHeader
+                        .padding(.horizontal, 24)
+                        .padding(.top, 20)
+                        .padding(.bottom, 8)
                 }
-                .padding(24)
+
+                TabView(selection: $selectedTab) {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 20) {
+                            outputFolderSection
+                            feedsSection
+                        }
+                        .padding(20)
+                    }
+                    .tabItem { Label("Feeds", systemImage: "bookmark.fill") }
+                    .tag(0)
+
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 20) {
+                            browserCookiesSection
+                        }
+                        .padding(20)
+                    }
+                    .tabItem { Label("Sync", systemImage: "arrow.triangle.2.circlepath") }
+                    .tag(1)
+
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 20) {
+                            llmSection
+                        }
+                        .padding(20)
+                    }
+                    .tabItem { Label("AI", systemImage: "text.quote") }
+                    .tag(2)
+                }
+
+                buttonRow
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 16)
             }
         }
-        .frame(width: 520, height: isFirstRun ? 620 : 580)
+        .frame(width: 520, height: isFirstRun ? 640 : 600)
         .onAppear {
             loadConfig()
         }
@@ -149,16 +175,9 @@ struct SettingsView: View {
     private var outputFolderSection: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    if isFirstRun {
-                        Text("1.")
-                            .font(.headline)
-                            .foregroundColor(.secondary)
-                    }
-                    Label("Choose Output Folder", systemImage: "folder.fill")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                }
+                Label("Output Folder", systemImage: "folder.fill")
+                    .font(.headline)
+                    .foregroundColor(.primary)
 
                 Text("Synced articles will be saved as markdown files here.")
                     .font(.caption)
@@ -185,16 +204,9 @@ struct SettingsView: View {
     private var feedsSection: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    if isFirstRun {
-                        Text("2.")
-                            .font(.headline)
-                            .foregroundColor(.secondary)
-                    }
-                    Label("Connect Your Bookmarks", systemImage: "bookmark.fill")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                }
+                Label("Connect Your Bookmarks", systemImage: "bookmark.fill")
+                    .font(.headline)
+                    .foregroundColor(.primary)
 
                 Text("Paste the RSS feed URL from your bookmark service. PullRead will fetch and save your bookmarked articles.")
                     .font(.caption)
@@ -207,7 +219,7 @@ struct SettingsView: View {
                         ServiceRow(name: "Raindrop", detail: "Collection \u{2192} Share \u{2192} RSS Feed")
                         ServiceRow(name: "Omnivore", detail: "Settings \u{2192} Feeds \u{2192} RSS URL")
                         Divider()
-                        Text("**Import bookmarks.html** — You can import bookmarks exported from Chrome, Safari, Firefox, Pocket, or other services. Use the Import button below or run `pullread import <file.html>` from the terminal.")
+                        Text("**Import bookmarks.html** — You can import bookmarks exported from Chrome, Safari, Firefox, Pocket, or other services. Use the Import button or run `pullread import <file.html>` from the terminal.")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
@@ -313,12 +325,7 @@ struct SettingsView: View {
         GlassCard {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    if isFirstRun {
-                        Text("3.")
-                            .font(.headline)
-                            .foregroundColor(.secondary)
-                    }
-                    Label("Options", systemImage: "key.fill")
+                    Label("Browser & Sync", systemImage: "key.fill")
                         .font(.headline)
                         .foregroundColor(.primary)
 
@@ -421,16 +428,9 @@ struct SettingsView: View {
     private var llmSection: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    if isFirstRun {
-                        Text("4.")
-                            .font(.headline)
-                            .foregroundColor(.secondary)
-                    }
-                    Label("Summaries (Optional)", systemImage: "text.quote")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                }
+                Label("AI Summaries", systemImage: "text.quote")
+                    .font(.headline)
+                    .foregroundColor(.primary)
 
                 Text("Generate article summaries on demand. Your key is stored locally and never shared.")
                     .font(.caption)
@@ -453,9 +453,15 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.menu)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .onChange(of: llmProvider) {
+                    .onChange(of: llmProvider) { _, newProvider in
+                        // Save current key before switching
+                        if !llmApiKey.isEmpty {
+                            savedApiKeys[llmProvider] = llmApiKey
+                        }
+                        // Restore saved key for new provider
+                        llmApiKey = savedApiKeys[newProvider] ?? ""
                         useCustomModel = false
-                        llmModel = Self.defaultModels[llmProvider] ?? ""
+                        llmModel = Self.defaultModels[newProvider] ?? ""
                         llmModelCustom = ""
                     }
                 }
@@ -894,11 +900,19 @@ struct SettingsView: View {
                 llmModel = Self.defaultModels[llmProvider] ?? ""
                 useCustomModel = true
             }
+            // Load all saved provider keys
+            if let keys = llm["savedKeys"] as? [String: String] {
+                savedApiKeys = keys
+            }
+            // Also store current key
+            if !llmApiKey.isEmpty {
+                savedApiKeys[llmProvider] = llmApiKey
+            }
         }
 
         // Load review schedule and sync interval from UserDefaults
         reviewSchedule = UserDefaults.standard.string(forKey: "reviewSchedule") ?? "off"
-        syncInterval = UserDefaults.standard.string(forKey: "syncInterval") ?? "manual"
+        syncInterval = UserDefaults.standard.string(forKey: "syncInterval") ?? "1h"
     }
 
     private func saveConfig() {
@@ -948,7 +962,12 @@ struct SettingsView: View {
             }
 
             // Save LLM settings to settings.json (separate from feeds config)
-            if isAppleProvider || !llmApiKey.isEmpty {
+            do {
+                // Save current key to savedApiKeys before persisting
+                if !isAppleProvider && !llmApiKey.isEmpty {
+                    savedApiKeys[llmProvider] = llmApiKey
+                }
+
                 let settingsPath = (configPath as NSString).deletingLastPathComponent + "/settings.json"
                 var existingSettings: [String: Any] = [:]
                 if let settingsData = FileManager.default.contents(atPath: settingsPath),
@@ -956,11 +975,11 @@ struct SettingsView: View {
                     existingSettings = parsed
                 }
                 var llm: [String: Any] = [
-                    "provider": llmProvider
+                    "provider": llmProvider,
+                    "savedKeys": savedApiKeys
                 ]
                 if isAppleProvider {
                     llm["model"] = "on-device"
-                    // Apple Intelligence doesn't need an API key
                 } else {
                     llm["apiKey"] = llmApiKey
                     let effectiveModel = useCustomModel ? llmModelCustom : llmModel

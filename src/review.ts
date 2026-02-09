@@ -70,6 +70,10 @@ export async function generateWeeklyReview(outputPath: string, days: number = 7)
   const articles = getRecentArticles(outputPath, days);
   if (articles.length === 0) return null;
 
+  const isDaily = days <= 1;
+  const reviewType = isDaily ? 'daily' : 'weekly';
+  const periodLabel = isDaily ? 'day' : `${days} days`;
+
   // Build a digest of article titles, domains, and summaries/excerpts
   const articleList = articles.map((a, i) => {
     let entry = `${i + 1}. "${a.title}" (${a.domain})`;
@@ -78,12 +82,12 @@ export async function generateWeeklyReview(outputPath: string, days: number = 7)
     return entry;
   }).join('\n');
 
-  const prompt = `You are a reading digest assistant. Below is a list of ${articles.length} articles bookmarked in the past ${days} days. Write a thematic weekly review (3-5 paragraphs) that identifies the main themes, notable findings, and interesting connections between articles. Group related articles together. Use a conversational but informative tone. Do not list every article — synthesize the key ideas.
+  const prompt = `You are a reading digest assistant. Below is a list of ${articles.length} articles bookmarked in the past ${periodLabel}. Write a thematic ${reviewType} review (3-5 paragraphs) that identifies the main themes, notable findings, and interesting connections between articles. Group related articles together. Use a conversational but informative tone. Do not list every article — synthesize the key ideas.
 
 Articles:
 ${articleList}
 
-Weekly Review:`;
+${isDaily ? 'Daily' : 'Weekly'} Review:`;
 
   // Use the configured LLM to generate the review
   const result = await summarizeText(prompt);
@@ -94,27 +98,33 @@ export async function generateAndSaveReview(outputPath: string, days: number = 7
   const review = await generateWeeklyReview(outputPath, days);
   if (!review) return null;
 
+  const isDaily = days <= 1;
+  const reviewLabel = isDaily ? 'Daily Review' : 'Weekly Review';
+  const feedLabel = isDaily ? 'daily-review' : 'weekly-review';
+  const periodLabel = isDaily ? 'day' : `${days} days`;
+  const articlesLabel = isDaily ? 'Articles Today' : 'Articles This Week';
+
   const date = new Date().toISOString().slice(0, 10);
-  const filename = `_weekly-review-${date}.md`;
+  const filename = `_${feedLabel}-${date}.md`;
   const fullPath = join(outputPath, filename);
 
   const articles = getRecentArticles(outputPath, days);
   const markdown = `---
-title: "Weekly Review — ${date}"
+title: "${reviewLabel} — ${date}"
 bookmarked: ${new Date().toISOString()}
 domain: pullread
-feed: weekly-review
+feed: ${feedLabel}
 ---
 
-# Weekly Review — ${date}
+# ${reviewLabel} — ${date}
 
-*${articles.length} articles from the past ${days} days*
+*${articles.length} articles from the past ${periodLabel}*
 
 ${review}
 
 ---
 
-## Articles This Week
+## ${articlesLabel}
 
 ${articles.map(a => `- [${a.title}](${a.url}) — ${a.domain}`).join('\n')}
 `;

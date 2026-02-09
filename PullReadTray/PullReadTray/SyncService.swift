@@ -234,7 +234,7 @@ class SyncService {
         // If viewer is already running, just open the browser
         if isViewerRunning() {
             let url = URL(string: "http://localhost:\(viewerPort)")!
-            NSWorkspace.shared.open(url)
+            openInSafari(url)
             completion(.success(()))
             return
         }
@@ -264,16 +264,30 @@ class SyncService {
                 try process.run()
                 self.viewerProcess = process
 
-                // Wait briefly for the server to start listening, then open the browser
+                // Wait briefly for the server to start listening, then open in Safari
                 Thread.sleep(forTimeInterval: 0.5)
                 DispatchQueue.main.async {
                     let url = URL(string: "http://localhost:\(self.viewerPort)")!
-                    NSWorkspace.shared.open(url)
+                    self.openInSafari(url)
                 }
 
                 completion(.success(()))
             } catch {
                 completion(.failure(error))
+            }
+        }
+    }
+
+    /// Opens a URL in Safari for best web app experience (Add to Dock support).
+    /// Falls back to the default browser if Safari is not available.
+    private func openInSafari(_ url: URL) {
+        let safariURL = URL(fileURLWithPath: "/Applications/Safari.app")
+        let config = NSWorkspace.OpenConfiguration()
+        config.activates = true
+        NSWorkspace.shared.open([url], withApplicationAt: safariURL, configuration: config) { _, error in
+            if error != nil {
+                // Fallback to default browser
+                NSWorkspace.shared.open(url)
             }
         }
     }

@@ -29,9 +29,8 @@
     <!-- Sparkle auto-update configuration -->
     <key>SUFeedURL</key>
     <string>https://shellen.github.io/pullread/appcast.xml</string>
-    <!-- SUPublicEDKey: generate with Sparkle's generate_keys tool, then paste base64 key here -->
-    <!-- <key>SUPublicEDKey</key> -->
-    <!-- <string>YOUR_ED25519_PUBLIC_KEY_HERE</string> -->
+    <key>SUPublicEDKey</key>
+    <string>kp53pifY8xCdPlB+Z+laUwknXBgRMJLTxFIAk+7/0rc=</string>
     <key>SUEnableAutomaticChecks</key>
     <true/>
     <key>SUScheduledCheckInterval</key>

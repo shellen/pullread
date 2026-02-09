@@ -4,13 +4,13 @@
 import Cocoa
 import SwiftUI
 import UserNotifications
-// Sparkle import - uncomment when Sparkle SPM package is added:
-// import Sparkle
+import Sparkle
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var syncService: SyncService!
     private var lastSyncMenuItem: NSMenuItem!
+    private var nextSyncMenuItem: NSMenuItem!
     private var syncMenuItem: NSMenuItem!
     private var statusMenuItem: NSMenuItem!
     private var checkForUpdatesMenuItem: NSMenuItem!
@@ -20,12 +20,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var syncTimer: Timer?
     private var hasUnreadReview: Bool = false
 
-    // Sparkle updater - uncomment when Sparkle SPM package is added:
-    // private let updaterController = SPUStandardUpdaterController(
-    //     startingUpdater: true,
-    //     updaterDelegate: nil,
-    //     userDriverDelegate: nil
-    // )
+    private let updaterController = SPUStandardUpdaterController(
+        startingUpdater: true,
+        updaterDelegate: nil,
+        userDriverDelegate: nil
+    )
 
     /// Returns true if running in a unit test environment
     /// Uses multiple detection methods for reliability across different test runners
@@ -83,6 +82,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Set up scheduled review timer and auto-sync timer
         scheduleReviewTimerIfNeeded()
         scheduleSyncTimerIfNeeded()
+
+        // Sync on launch if config is valid and auto-sync is enabled (or first reopen)
+        if !syncService.isFirstRun() && syncService.isConfigValid() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                self?.runSync(retryFailed: false)
+            }
+        }
     }
 
     private func checkFirstRunOrInvalidConfig() {
@@ -138,6 +144,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         lastSyncMenuItem.isEnabled = false
         menu.addItem(lastSyncMenuItem)
 
+        // Next sync time
+        nextSyncMenuItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        nextSyncMenuItem.isEnabled = false
+        nextSyncMenuItem.isHidden = true
+        menu.addItem(nextSyncMenuItem)
+
         menu.addItem(NSMenuItem.separator())
 
         // Sync Now
@@ -177,11 +189,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         logsMenuItem.target = self
         menu.addItem(logsMenuItem)
 
-        // Check for Updates (Sparkle) - only show when Sparkle is fully integrated
-        // Uncomment when Sparkle SPM package is added and configured:
-        // checkForUpdatesMenuItem = NSMenuItem(title: "Check for Updates...", action: #selector(checkForUpdates), keyEquivalent: "")
-        // checkForUpdatesMenuItem.target = self
-        // menu.addItem(checkForUpdatesMenuItem)
+        // Check for Updates (Sparkle)
+        checkForUpdatesMenuItem = NSMenuItem(title: "Check for Updates...", action: #selector(checkForUpdates), keyEquivalent: "")
+        checkForUpdatesMenuItem.target = self
+        menu.addItem(checkForUpdatesMenuItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -275,8 +286,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         syncTimer?.invalidate()
         syncTimer = nil
 
-        let interval = UserDefaults.standard.string(forKey: "syncInterval") ?? "manual"
-        guard interval != "manual" else { return }
+        let interval = UserDefaults.standard.string(forKey: "syncInterval") ?? "1h"
+        guard interval != "manual" else {
+            nextSyncMenuItem?.isHidden = true
+            return
+        }
 
         let seconds: TimeInterval
         switch interval {
@@ -289,7 +303,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         syncTimer = Timer.scheduledTimer(withTimeInterval: seconds, repeats: true) { [weak self] _ in
             self?.runSync(retryFailed: false)
+            self?.updateNextSyncTime(interval: seconds)
         }
+
+        updateNextSyncTime(interval: seconds)
+    }
+
+    private func updateNextSyncTime(interval: TimeInterval) {
+        let nextFire = Date().addingTimeInterval(interval)
+        let formatter = DateFormatter()
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        nextSyncMenuItem?.title = "Next sync: \(formatter.string(from: nextFire))"
+        nextSyncMenuItem?.isHidden = false
     }
 
     private func runScheduledReview() {
@@ -464,19 +490,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func checkForUpdates() {
-        // When Sparkle SPM package is added, uncomment:
-        // updaterController.checkForUpdates(nil)
-        // And remove the placeholder below.
-
-        // Placeholder until Sparkle is fully integrated:
-        // 1. Add Sparkle 2.x via SPM: https://github.com/sparkle-project/Sparkle
-        // 2. Run generate_keys to create Ed25519 keypair
-        // 3. Add SUPublicEDKey to Info.plist
-        // 4. Uncomment `import Sparkle` and `updaterController` above
-        showAlert(
-            title: "Check for Updates",
-            message: "Automatic updates via Sparkle are configured but not yet active.\n\nTo complete setup:\n1. Add Sparkle 2.x as an SPM dependency\n2. Generate Ed25519 signing keys\n3. Uncomment the Sparkle code in AppDelegate\n\nVisit the project README for details."
-        )
+        updaterController.checkForUpdates(nil)
     }
 
     private func checkForVersionUpdate() {

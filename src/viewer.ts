@@ -8,6 +8,7 @@ import { exec } from 'child_process';
 import { homedir } from 'os';
 import { VIEWER_HTML } from './viewer-html';
 import { summarizeText, loadLLMConfig, saveLLMConfig, getDefaultModel, KNOWN_MODELS, LLMConfig } from './summarizer';
+import { APP_ICON } from './app-icon';
 
 interface FileMeta {
   filename: string;
@@ -159,6 +160,31 @@ export function startViewer(outputPath: string, port = 7777): void {
     if (url.pathname === '/' || url.pathname === '/index.html') {
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(VIEWER_HTML);
+      return;
+    }
+
+    // Web app manifest for Safari "Add to Dock" / PWA support
+    if (url.pathname === '/manifest.json') {
+      const manifest = {
+        name: 'PullRead',
+        short_name: 'PullRead',
+        start_url: '/',
+        display: 'standalone',
+        background_color: '#ffffff',
+        theme_color: '#1a6daa',
+        icons: [
+          { src: '/icon-256.png', sizes: '256x256', type: 'image/png' },
+        ],
+      };
+      res.writeHead(200, { 'Content-Type': 'application/manifest+json' });
+      res.end(JSON.stringify(manifest));
+      return;
+    }
+
+    // Serve app icon for web app manifest / favicon
+    if (url.pathname === '/icon-256.png') {
+      res.writeHead(200, { 'Content-Type': 'image/png' });
+      res.end(APP_ICON);
       return;
     }
 
@@ -350,6 +376,33 @@ export function startViewer(outputPath: string, port = 7777): void {
         }
         return;
       }
+    }
+
+    // Sync status API
+    if (url.pathname === '/api/sync-status' && req.method === 'GET') {
+      const config = loadJsonFile(join(homedir(), '.config', 'pullread', 'feeds.json')) as Record<string, unknown>;
+      const syncInterval = (config as any).syncInterval || '1h';
+      const intervals: Record<string, number> = { '30m': 30, '1h': 60, '4h': 240, '12h': 720 };
+      const minutes = intervals[syncInterval as string] || null;
+
+      // Check last sync from file mtime
+      const outputFiles = existsSync(outputPath) ? readdirSync(outputPath).filter(f => f.endsWith('.md')) : [];
+      let lastSyncFile = null;
+      let latestMtime = 0;
+      for (const f of outputFiles.slice(-20)) {
+        try {
+          const mt = statSync(join(outputPath, f)).mtimeMs;
+          if (mt > latestMtime) { latestMtime = mt; lastSyncFile = f; }
+        } catch {}
+      }
+
+      sendJson(res, {
+        syncInterval,
+        intervalMinutes: minutes,
+        lastActivity: latestMtime > 0 ? new Date(latestMtime).toISOString() : null,
+        articleCount: outputFiles.length
+      });
+      return;
     }
 
     // Summarize API
