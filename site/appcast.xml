@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Pull Read</title>
+    <link>https://pullread.com/appcast.xml</link>
+    <description>Pull Read updates</description>
+    <language>en</language>
+    <item>
+      <title>Version 1.1.1</title>
+      <sparkle:version>1.1.1</sparkle:version>
+      <sparkle:shortVersionString>1.1.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+      <pubDate>Mon, 09 Feb 2026 06:24:00 +0000</pubDate>
+      <enclosure url="https://github.com/shellen/pullread/releases/download/v1.1.1/PullRead.dmg"
+                 length="56650574"
+                 type="application/octet-stream"
+                 sparkle:edSignature="nKcV9jXRW5Gr62/6Upgo6OZ/NJiKdET9+0HuP2IcyCja/DRFWl+LiQDdPbZaxcbJxHEgFZe0TKkTTGvQFlWMBQ==" length="56650574" />
+    </item>
+  </channel>
+</rss>
