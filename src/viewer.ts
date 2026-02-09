@@ -8,6 +8,7 @@ import { exec } from 'child_process';
 import { homedir } from 'os';
 import { VIEWER_HTML } from './viewer-html';
 import { summarizeText, loadLLMConfig, saveLLMConfig, getDefaultModel, KNOWN_MODELS, LLMConfig } from './summarizer';
+import { APP_ICON } from './app-icon';
 
 interface FileMeta {
   filename: string;
@@ -159,6 +160,31 @@ export function startViewer(outputPath: string, port = 7777): void {
     if (url.pathname === '/' || url.pathname === '/index.html') {
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(VIEWER_HTML);
+      return;
+    }
+
+    // Web app manifest for Safari "Add to Dock" / PWA support
+    if (url.pathname === '/manifest.json') {
+      const manifest = {
+        name: 'PullRead',
+        short_name: 'PullRead',
+        start_url: '/',
+        display: 'standalone',
+        background_color: '#ffffff',
+        theme_color: '#1a6daa',
+        icons: [
+          { src: '/icon-256.png', sizes: '256x256', type: 'image/png' },
+        ],
+      };
+      res.writeHead(200, { 'Content-Type': 'application/manifest+json' });
+      res.end(JSON.stringify(manifest));
+      return;
+    }
+
+    // Serve app icon for web app manifest / favicon
+    if (url.pathname === '/icon-256.png') {
+      res.writeHead(200, { 'Content-Type': 'image/png' });
+      res.end(APP_ICON);
       return;
     }
 

@@ -1,5 +1,5 @@
-// ABOUTME: Reads cookies from Chrome browser for authenticated requests
-// ABOUTME: Uses macOS Keychain for decryption key, works with Bun's built-in SQLite
+// ABOUTME: Reads cookies from Chromium-based browsers for authenticated requests
+// ABOUTME: Supports Chrome, Arc, Brave, and Edge via macOS Keychain decryption
 
 import { existsSync, copyFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
@@ -8,10 +8,39 @@ import { execSync } from 'child_process';
 import { createDecipheriv, pbkdf2Sync } from 'crypto';
 import { Database } from 'bun:sqlite';
 
-const CHROME_COOKIES_PATH = join(
-  homedir(),
-  'Library/Application Support/Google/Chrome/Default/Cookies'
-);
+interface BrowserConfig {
+  name: string;
+  cookiePath: string;
+  keychainService: string;
+  keychainAccount: string;
+}
+
+const BROWSERS: BrowserConfig[] = [
+  {
+    name: 'Chrome',
+    cookiePath: join(homedir(), 'Library/Application Support/Google/Chrome/Default/Cookies'),
+    keychainService: 'Chrome Safe Storage',
+    keychainAccount: 'Chrome',
+  },
+  {
+    name: 'Arc',
+    cookiePath: join(homedir(), 'Library/Application Support/Arc/User Data/Default/Cookies'),
+    keychainService: 'Arc Safe Storage',
+    keychainAccount: 'Arc',
+  },
+  {
+    name: 'Brave',
+    cookiePath: join(homedir(), 'Library/Application Support/BraveSoftware/Brave-Browser/Default/Cookies'),
+    keychainService: 'Brave Safe Storage',
+    keychainAccount: 'Brave',
+  },
+  {
+    name: 'Edge',
+    cookiePath: join(homedir(), 'Library/Application Support/Microsoft Edge/Default/Cookies'),
+    keychainService: 'Microsoft Edge Safe Storage',
+    keychainAccount: 'Microsoft Edge',
+  },
+];
 
 const SALT = 'saltysalt';
 const IV = Buffer.alloc(16, ' '); // 16 spaces
@@ -29,21 +58,40 @@ interface Cookie {
 }
 
 /**
- * Gets the Chrome Safe Storage encryption key from macOS Keychain.
+ * Gets the encryption key for a Chromium browser from macOS Keychain.
  * This will prompt the user for permission on first access.
  */
-function getEncryptionKey(): Buffer | null {
+function getEncryptionKey(browser: BrowserConfig): Buffer | null {
   try {
     const result = execSync(
-      'security find-generic-password -w -s "Chrome Safe Storage" -a "Chrome"',
+      `security find-generic-password -w -s "${browser.keychainService}" -a "${browser.keychainAccount}"`,
       { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
     );
     const password = result.trim();
     return pbkdf2Sync(password, SALT, ITERATIONS, KEY_LENGTH, 'sha1');
   } catch {
-    // User denied access or Chrome not installed
+    // User denied access or browser not installed
     return null;
   }
+}
+
+/**
+ * Finds the first available Chromium browser on the system.
+ */
+function findAvailableBrowser(): BrowserConfig | null {
+  for (const browser of BROWSERS) {
+    if (existsSync(browser.cookiePath)) {
+      return browser;
+    }
+  }
+  return null;
+}
+
+/**
+ * Returns a list of all available Chromium browsers.
+ */
+export function getAvailableBrowsers(): string[] {
+  return BROWSERS.filter(b => existsSync(b.cookiePath)).map(b => b.name);
 }
 
 /**
@@ -79,30 +127,32 @@ function decryptValue(encryptedValue: Buffer, key: Buffer): string {
 }
 
 /**
- * Checks if Chrome cookies database exists
+ * Checks if any Chromium browser cookies database exists
  */
 export function isChromeAvailable(): boolean {
-  return existsSync(CHROME_COOKIES_PATH);
+  return findAvailableBrowser() !== null;
 }
 
 /**
- * Gets cookies for a specific domain from Chrome.
+ * Gets cookies for a specific domain from the first available Chromium browser.
+ * Tries Chrome, Arc, Brave, and Edge in order.
  * Returns cookies as a string suitable for the Cookie header.
  */
 export function getCookiesForDomain(domain: string): string | null {
-  if (!isChromeAvailable()) {
+  const browser = findAvailableBrowser();
+  if (!browser) {
     return null;
   }
 
-  const key = getEncryptionKey();
+  const key = getEncryptionKey(browser);
   if (!key) {
     return null;
   }
 
-  // Copy database to temp location to avoid locking issues with Chrome
+  // Copy database to temp location to avoid locking issues
   const tempDbPath = join(homedir(), '.config/pullread/.cookies-temp.db');
   try {
-    copyFileSync(CHROME_COOKIES_PATH, tempDbPath);
+    copyFileSync(browser.cookiePath, tempDbPath);
   } catch {
     return null;
   }

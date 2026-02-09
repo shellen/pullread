@@ -1,4 +1,7 @@
-<!DOCTYPE html>
+// ABOUTME: Auto-generated from viewer.html — do not edit directly
+// ABOUTME: Contains the full viewer HTML as an inline string for the server
+
+export const VIEWER_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1589,12 +1592,12 @@ function setTheme(theme) {
 }
 
 function setFont(font) {
-  document.body.className = document.body.className.replace(/font-[\w-]+/, 'font-' + font);
+  document.body.className = document.body.className.replace(/font-[\\w-]+/, 'font-' + font);
   localStorage.setItem('pr-font', font);
 }
 
 function setSize(size) {
-  document.body.className = document.body.className.replace(/size-\w+/, 'size-' + size);
+  document.body.className = document.body.className.replace(/size-\\w+/, 'size-' + size);
   document.querySelectorAll('[data-size-btn]').forEach(b =>
     b.classList.toggle('active', b.getAttribute('data-size-btn') === size)
   );
@@ -1610,19 +1613,19 @@ function toggleSidebar() {
 }
 
 function setLineHeight(val) {
-  document.body.className = document.body.className.replace(/leading-\w+/g, '');
+  document.body.className = document.body.className.replace(/leading-\\w+/g, '');
   if (val !== 'default') document.body.classList.add('leading-' + val);
   localStorage.setItem('pr-leading', val);
 }
 
 function setSpacing(val) {
-  document.body.className = document.body.className.replace(/spacing-\w+/g, '');
+  document.body.className = document.body.className.replace(/spacing-\\w+/g, '');
   if (val !== 'default') document.body.classList.add('spacing-' + val);
   localStorage.setItem('pr-spacing', val);
 }
 
 function setWidth(val) {
-  document.body.className = document.body.className.replace(/width-\w+/g, '');
+  document.body.className = document.body.className.replace(/width-\\w+/g, '');
   if (val !== 'default') document.body.classList.add('width-' + val);
   localStorage.setItem('pr-width', val);
 }
@@ -1644,60 +1647,60 @@ function toggleSettingsDropdown() {
   panel.setAttribute('role', 'region');
   panel.setAttribute('aria-label', 'Reader settings');
   panel.onclick = function(e) { e.stopPropagation(); };
-  panel.innerHTML = `
+  panel.innerHTML = \`
     <label>Theme</label>
     <div class="setting-row">
-      <button onclick="setTheme('light');updateDropdownState()" ${currentTheme==='light'?'class="active"':''}>Light</button>
-      <button onclick="setTheme('dark');updateDropdownState()" ${currentTheme==='dark'?'class="active"':''}>Dark</button>
-      <button onclick="setTheme('sepia');updateDropdownState()" ${currentTheme==='sepia'?'class="active"':''}>Sepia</button>
-      <button onclick="setTheme('high-contrast');updateDropdownState()" ${currentTheme==='high-contrast'?'class="active"':''} title="High contrast">Hi-Con</button>
+      <button onclick="setTheme('light');updateDropdownState()" \${currentTheme==='light'?'class="active"':''}>Light</button>
+      <button onclick="setTheme('dark');updateDropdownState()" \${currentTheme==='dark'?'class="active"':''}>Dark</button>
+      <button onclick="setTheme('sepia');updateDropdownState()" \${currentTheme==='sepia'?'class="active"':''}>Sepia</button>
+      <button onclick="setTheme('high-contrast');updateDropdownState()" \${currentTheme==='high-contrast'?'class="active"':''} title="High contrast">Hi-Con</button>
     </div>
     <label>Font</label>
     <div class="setting-row">
       <select onchange="setFont(this.value)" id="font-select" aria-label="Font family">
-        <option value="serif" ${currentFont==='serif'?'selected':''}>Serif</option>
-        <option value="sans" ${currentFont==='sans'?'selected':''}>Sans-serif</option>
-        <option value="system" ${currentFont==='system'?'selected':''}>Charter</option>
-        <option value="mono" ${currentFont==='mono'?'selected':''}>Monospace</option>
-        <option value="inter" ${currentFont==='inter'?'selected':''}>Inter</option>
-        <option value="lora" ${currentFont==='lora'?'selected':''}>Lora</option>
-        <option value="literata" ${currentFont==='literata'?'selected':''}>Literata</option>
-        <option value="source-serif" ${currentFont==='source-serif'?'selected':''}>Source Serif</option>
-        <option value="opendyslexic" ${currentFont==='opendyslexic'?'selected':''}>OpenDyslexic</option>
+        <option value="serif" \${currentFont==='serif'?'selected':''}>Serif</option>
+        <option value="sans" \${currentFont==='sans'?'selected':''}>Sans-serif</option>
+        <option value="system" \${currentFont==='system'?'selected':''}>Charter</option>
+        <option value="mono" \${currentFont==='mono'?'selected':''}>Monospace</option>
+        <option value="inter" \${currentFont==='inter'?'selected':''}>Inter</option>
+        <option value="lora" \${currentFont==='lora'?'selected':''}>Lora</option>
+        <option value="literata" \${currentFont==='literata'?'selected':''}>Literata</option>
+        <option value="source-serif" \${currentFont==='source-serif'?'selected':''}>Source Serif</option>
+        <option value="opendyslexic" \${currentFont==='opendyslexic'?'selected':''}>OpenDyslexic</option>
       </select>
     </div>
     <label>Size</label>
     <div class="setting-row">
-      <button onclick="setSize('small');updateDropdownState()" ${currentSize==='small'?'class="active"':''} aria-label="Small text">A</button>
-      <button onclick="setSize('medium');updateDropdownState()" ${currentSize==='medium'?'class="active"':''} style="font-size:14px" aria-label="Medium text">A</button>
-      <button onclick="setSize('large');updateDropdownState()" ${currentSize==='large'?'class="active"':''} style="font-size:17px" aria-label="Large text">A</button>
+      <button onclick="setSize('small');updateDropdownState()" \${currentSize==='small'?'class="active"':''} aria-label="Small text">A</button>
+      <button onclick="setSize('medium');updateDropdownState()" \${currentSize==='medium'?'class="active"':''} style="font-size:14px" aria-label="Medium text">A</button>
+      <button onclick="setSize('large');updateDropdownState()" \${currentSize==='large'?'class="active"':''} style="font-size:17px" aria-label="Large text">A</button>
     </div>
     <label>Line height</label>
     <div class="setting-row">
       <select onchange="setLineHeight(this.value)" aria-label="Line height">
-        <option value="default" ${currentLeading==='default'?'selected':''}>Default</option>
-        <option value="compact" ${currentLeading==='compact'?'selected':''}>Compact</option>
-        <option value="relaxed" ${currentLeading==='relaxed'?'selected':''}>Relaxed</option>
-        <option value="loose" ${currentLeading==='loose'?'selected':''}>Loose</option>
+        <option value="default" \${currentLeading==='default'?'selected':''}>Default</option>
+        <option value="compact" \${currentLeading==='compact'?'selected':''}>Compact</option>
+        <option value="relaxed" \${currentLeading==='relaxed'?'selected':''}>Relaxed</option>
+        <option value="loose" \${currentLeading==='loose'?'selected':''}>Loose</option>
       </select>
     </div>
     <label>Letter spacing</label>
     <div class="setting-row">
       <select onchange="setSpacing(this.value)" aria-label="Letter spacing">
-        <option value="default" ${currentSpacing==='default'?'selected':''}>Default</option>
-        <option value="wide" ${currentSpacing==='wide'?'selected':''}>Wide</option>
-        <option value="wider" ${currentSpacing==='wider'?'selected':''}>Wider</option>
+        <option value="default" \${currentSpacing==='default'?'selected':''}>Default</option>
+        <option value="wide" \${currentSpacing==='wide'?'selected':''}>Wide</option>
+        <option value="wider" \${currentSpacing==='wider'?'selected':''}>Wider</option>
       </select>
     </div>
     <label>Content width</label>
     <div class="setting-row">
       <select onchange="setWidth(this.value)" aria-label="Content width">
-        <option value="narrow" ${currentWidth==='narrow'?'selected':''}>Narrow</option>
-        <option value="default" ${currentWidth==='default'?'selected':''}>Default</option>
-        <option value="wide" ${currentWidth==='wide'?'selected':''}>Wide</option>
+        <option value="narrow" \${currentWidth==='narrow'?'selected':''}>Narrow</option>
+        <option value="default" \${currentWidth==='default'?'selected':''}>Default</option>
+        <option value="wide" \${currentWidth==='wide'?'selected':''}>Wide</option>
       </select>
     </div>
-  `;
+  \`;
   document.querySelector('.settings-dropdown').appendChild(panel);
   btn.setAttribute('aria-expanded', 'true');
 }
@@ -1720,14 +1723,14 @@ document.addEventListener('click', function(e) {
 
 // Frontmatter
 function parseFrontmatter(text) {
-  const match = text.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  const match = text.match(/^---\\n([\\s\\S]*?)\\n---\\n([\\s\\S]*)\$/);
   if (!match) return { meta: null, body: text };
   const meta = {};
-  match[1].split('\n').forEach(line => {
+  match[1].split('\\n').forEach(line => {
     const idx = line.indexOf(':');
     if (idx > 0) {
       const key = line.slice(0, idx).trim();
-      const val = line.slice(idx + 1).trim().replace(/^"(.*)"$/, '$1');
+      const val = line.slice(idx + 1).trim().replace(/^"(.*)"\$/, '\$1');
       meta[key] = val;
     }
   });
@@ -1743,17 +1746,17 @@ function escapeHtml(s) {
 // Clean up broken markdown patterns that marked.js can't handle
 function cleanMarkdown(md) {
   // Fix image/link patterns split across lines:
-  // [\n![alt](img)\n]\n(url) -> [![alt](img)](url)
-  md = md.replace(/\[\s*\n\s*(!\[[^\]]*\]\([^)]*\))\s*\n\s*\]\s*\n\s*(\([^)]*\))/g, '[$1]$2');
+  // [\\n![alt](img)\\n]\\n(url) -> [![alt](img)](url)
+  md = md.replace(/\\[\\s*\\n\\s*(!\\[[^\\]]*\\]\\([^)]*\\))\\s*\\n\\s*\\]\\s*\\n\\s*(\\([^)]*\\))/g, '[\$1]\$2');
 
-  // Fix simpler case: [text\n](url) -> [text](url)
-  md = md.replace(/\[([^\]]*?)\s*\n\s*\]\s*\n?\s*(\([^)]*\))/g, '[$1]$2');
+  // Fix simpler case: [text\\n](url) -> [text](url)
+  md = md.replace(/\\[([^\\]]*?)\\s*\\n\\s*\\]\\s*\\n?\\s*(\\([^)]*\\))/g, '[\$1]\$2');
 
-  // Fix standalone brackets around images: [\n![alt](url)\n] without a link
-  md = md.replace(/\[\s*\n(!\[[^\]]*\]\([^)]*\))\s*\n\]/g, '$1');
+  // Fix standalone brackets around images: [\\n![alt](url)\\n] without a link
+  md = md.replace(/\\[\\s*\\n(!\\[[^\\]]*\\]\\([^)]*\\))\\s*\\n\\]/g, '\$1');
 
-  // Fix image syntax broken by newlines: ![\nalt\n]\n(url) -> ![alt](url)
-  md = md.replace(/!\[\s*\n?\s*([^\]]*?)\s*\n?\s*\]\s*\n\s*(\([^)]*\))/g, '![$1]$2');
+  // Fix image syntax broken by newlines: ![\\nalt\\n]\\n(url) -> ![alt](url)
+  md = md.replace(/!\\[\\s*\\n?\\s*([^\\]]*?)\\s*\\n?\\s*\\]\\s*\\n\\s*(\\([^)]*\\))/g, '![\$1]\$2');
 
   return md;
 }
@@ -1805,9 +1808,9 @@ function renderArticle(text, filename) {
   // Strip the leading H1 from markdown body if it matches the title (avoid duplication)
   let articleBody = cleanMarkdown(body);
   if (meta && meta.title) {
-    var h1Match = articleBody.match(/^#\s+(.+)\s*\n/);
+    var h1Match = articleBody.match(/^#\\s+(.+)\\s*\\n/);
     if (h1Match) {
-      var normalize = function(s) { return s.toLowerCase().replace(/[\u2018\u2019\u201C\u201D]/g, "'").replace(/[^a-z0-9]/g, ''); };
+      var normalize = function(s) { return s.toLowerCase().replace(/[\\u2018\\u2019\\u201C\\u201D]/g, "'").replace(/[^a-z0-9]/g, ''); };
       // Strip if title matches, or if it's a review (title always duplicated in body)
       if (normalize(h1Match[1]) === normalize(meta.title) || isReviewArticle) {
         articleBody = articleBody.slice(h1Match[0].length);
@@ -1846,7 +1849,7 @@ function renderArticle(text, filename) {
 
   // Convert YouTube thumbnail links into embedded video iframes
   html = html.replace(
-    /<a[^>]*href="(https?:\/\/(www\.)?youtube\.com\/watch\?v=([^"&]+)[^"]*|https?:\/\/youtu\.be\/([^"/?]+)[^"]*)"[^>]*>\s*<img[^>]*src="https:\/\/img\.youtube\.com\/vi\/[^"]*"[^>]*>\s*<\/a>/gi,
+    /<a[^>]*href="(https?:\\/\\/(www\\.)?youtube\\.com\\/watch\\?v=([^"&]+)[^"]*|https?:\\/\\/youtu\\.be\\/([^"/?]+)[^"]*)"[^>]*>\\s*<img[^>]*src="https:\\/\\/img\\.youtube\\.com\\/vi\\/[^"]*"[^>]*>\\s*<\\/a>/gi,
     function(match, url, _yt, id1, id2) {
       var videoId = id1 || id2;
       if (!videoId) return match;
@@ -1951,10 +1954,10 @@ function renderFileItem(f, i) {
 
   // Favicon from Google service
   const favicon = f.domain && f.domain !== 'pullread'
-    ? '<img class="file-item-favicon" src="https://www.google.com/s2/favicons?domain=' + encodeURIComponent(f.domain) + '&sz=32" alt="" loading="lazy" onerror="this.style.display=\'none\'" aria-hidden="true">'
+    ? '<img class="file-item-favicon" src="https://www.google.com/s2/favicons?domain=' + encodeURIComponent(f.domain) + '&sz=32" alt="" loading="lazy" onerror="this.style.display=\\'none\\'" aria-hidden="true">'
     : '';
 
-  return '<div class="file-item' + isActive + (isRead && !isActive ? ' read' : '') + '" data-index="' + i + '" onclick="loadFile(' + i + ')" role="option" aria-selected="' + (activeFile === f.filename) + '" tabindex="0" onkeydown="if(event.key===\'Enter\')loadFile(' + i + ')">'
+  return '<div class="file-item' + isActive + (isRead && !isActive ? ' read' : '') + '" data-index="' + i + '" onclick="loadFile(' + i + ')" role="option" aria-selected="' + (activeFile === f.filename) + '" tabindex="0" onkeydown="if(event.key===\\'Enter\\')loadFile(' + i + ')">'
     + '<div class="file-item-title">' + favicon + escapeHtml(f.title) + '</div>'
     + '<div class="file-item-meta">'
     + (date ? '<span><svg class="icon icon-sm" style="opacity:0.5" aria-hidden="true"><use href="#i-calendar"/></svg> ' + date + '</span>' : '')
@@ -2354,13 +2357,13 @@ function showHlToolbar(x, y) {
   removeHlToolbar();
   const bar = document.createElement('div');
   bar.className = 'hl-toolbar';
-  bar.innerHTML = `
+  bar.innerHTML = \`
     <button class="hl-yellow-btn" aria-label="Highlight yellow" onclick="createHighlight('yellow')"></button>
     <button class="hl-green-btn" aria-label="Highlight green" onclick="createHighlight('green')"></button>
     <button class="hl-blue-btn" aria-label="Highlight blue" onclick="createHighlight('blue')"></button>
     <button class="hl-pink-btn" aria-label="Highlight pink" onclick="createHighlight('pink')"></button>
     <button class="hl-note-btn" aria-label="Add note" onclick="addInlineNote()">+ Note</button>
-  `;
+  \`;
   bar.style.left = x + 'px';
   bar.style.top = y + 'px';
   document.getElementById('content-pane').appendChild(bar);
@@ -2372,14 +2375,14 @@ function showHighlightContextMenu(e, hl) {
   const bar = document.createElement('div');
   bar.className = 'hl-toolbar';
   const noteLabel = hl.note ? 'Edit Note' : 'Note';
-  bar.innerHTML = `
-    <button class="hl-yellow-btn" aria-label="Yellow" onclick="changeHighlightColor('${hl.id}','yellow')"></button>
-    <button class="hl-green-btn" aria-label="Green" onclick="changeHighlightColor('${hl.id}','green')"></button>
-    <button class="hl-blue-btn" aria-label="Blue" onclick="changeHighlightColor('${hl.id}','blue')"></button>
-    <button class="hl-pink-btn" aria-label="Pink" onclick="changeHighlightColor('${hl.id}','pink')"></button>
-    <button class="hl-note-btn" aria-label="${noteLabel}" onclick="editHighlightNote('${hl.id}', event)">${noteLabel}</button>
-    <button class="hl-note-btn" style="color:red;border-color:red" aria-label="Delete highlight" onclick="deleteHighlight('${hl.id}')">Del</button>
-  `;
+  bar.innerHTML = \`
+    <button class="hl-yellow-btn" aria-label="Yellow" onclick="changeHighlightColor('\${hl.id}','yellow')"></button>
+    <button class="hl-green-btn" aria-label="Green" onclick="changeHighlightColor('\${hl.id}','green')"></button>
+    <button class="hl-blue-btn" aria-label="Blue" onclick="changeHighlightColor('\${hl.id}','blue')"></button>
+    <button class="hl-pink-btn" aria-label="Pink" onclick="changeHighlightColor('\${hl.id}','pink')"></button>
+    <button class="hl-note-btn" aria-label="\${noteLabel}" onclick="editHighlightNote('\${hl.id}', event)">\${noteLabel}</button>
+    <button class="hl-note-btn" style="color:red;border-color:red" aria-label="Delete highlight" onclick="deleteHighlight('\${hl.id}')">Del</button>
+  \`;
   const pane = document.getElementById('content-pane');
   bar.style.left = (e.clientX - pane.getBoundingClientRect().left) + 'px';
   bar.style.top = (e.clientY - pane.getBoundingClientRect().top + pane.scrollTop - 40) + 'px';
@@ -2409,15 +2412,15 @@ function editHighlightNote(id, e) {
   popover.className = 'annotation-popover';
   popover.style.left = (e.clientX - paneRect.left) + 'px';
   popover.style.top = (e.clientY - paneRect.top + pane.scrollTop + 10) + 'px';
-  popover.innerHTML = `
-    <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Note on highlight: "${escapeHtml(hl.text.slice(0, 50))}${hl.text.length > 50 ? '...' : ''}"</div>
-    <textarea placeholder="Add a note to this highlight...">${escapeHtml(hl.note || '')}</textarea>
+  popover.innerHTML = \`
+    <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Note on highlight: "\${escapeHtml(hl.text.slice(0, 50))}\${hl.text.length > 50 ? '...' : ''}"</div>
+    <textarea placeholder="Add a note to this highlight...">\${escapeHtml(hl.note || '')}</textarea>
     <div class="btn-row">
-      ${hl.note ? '<button style="color:red;border-color:red" onclick="clearHighlightNote(\'' + id + '\')">Remove</button>' : ''}
+      \${hl.note ? '<button style="color:red;border-color:red" onclick="clearHighlightNote(\\'' + id + '\\')">Remove</button>' : ''}
       <button onclick="removeAnnotationPopover()">Cancel</button>
-      <button class="primary" onclick="saveHighlightNote('${id}', this)">Save</button>
+      <button class="primary" onclick="saveHighlightNote('\${id}', this)">Save</button>
     </div>
-  `;
+  \`;
   popover.onclick = function(ev) { ev.stopPropagation(); };
   pane.appendChild(popover);
   popover.querySelector('textarea').focus();
@@ -2493,14 +2496,14 @@ function addInlineNote() {
   popover.className = 'annotation-popover';
   popover.style.left = (rect.left - paneRect.left) + 'px';
   popover.style.top = (rect.bottom - paneRect.top + pane.scrollTop + 5) + 'px';
-  popover.innerHTML = `
-    <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Note on: "${escapeHtml(anchorText.slice(0, 50))}${anchorText.length > 50 ? '...' : ''}"</div>
+  popover.innerHTML = \`
+    <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Note on: "\${escapeHtml(anchorText.slice(0, 50))}\${anchorText.length > 50 ? '...' : ''}"</div>
     <textarea placeholder="Add your note..." autofocus></textarea>
     <div class="btn-row">
       <button onclick="removeAnnotationPopover()">Cancel</button>
-      <button class="primary" onclick="saveInlineNote(this, '${escapeHtml(anchorText.replace(/'/g, "\\'"))}')">Save</button>
+      <button class="primary" onclick="saveInlineNote(this, '\${escapeHtml(anchorText.replace(/'/g, "\\\\'"))}')">Save</button>
     </div>
-  `;
+  \`;
   popover.onclick = function(e) { e.stopPropagation(); };
   pane.appendChild(popover);
   popover.querySelector('textarea').focus();
@@ -2541,14 +2544,14 @@ function showAnnotationPopover(e, ann) {
   popover.className = 'annotation-popover';
   popover.style.left = (e.clientX - paneRect.left) + 'px';
   popover.style.top = (e.clientY - paneRect.top + pane.scrollTop + 10) + 'px';
-  popover.innerHTML = `
-    <textarea>${escapeHtml(ann.note)}</textarea>
+  popover.innerHTML = \`
+    <textarea>\${escapeHtml(ann.note)}</textarea>
     <div class="btn-row">
-      <button style="color:red;border-color:red" onclick="deleteAnnotation('${ann.id}')">Delete</button>
+      <button style="color:red;border-color:red" onclick="deleteAnnotation('\${ann.id}')">Delete</button>
       <button onclick="removeAnnotationPopover()">Cancel</button>
-      <button class="primary" onclick="updateAnnotation('${ann.id}', this)">Save</button>
+      <button class="primary" onclick="updateAnnotation('\${ann.id}', this)">Save</button>
     </div>
-  `;
+  \`;
   popover.onclick = function(e) { e.stopPropagation(); };
   pane.appendChild(popover);
 }
@@ -2597,7 +2600,7 @@ function renderNotesPanel() {
 
   const tags = articleNotes.tags || [];
   const isFav = articleNotes.isFavorite || false;
-  const tagsHtml = tags.map(t => '<span class="tag">' + escapeHtml(t) + '<span class="tag-remove" onclick="removeTag(\'' + escapeHtml(t.replace(/'/g, "\\'")) + '\')">&times;</span></span>').join('');
+  const tagsHtml = tags.map(t => '<span class="tag">' + escapeHtml(t) + '<span class="tag-remove" onclick="removeTag(\\'' + escapeHtml(t.replace(/'/g, "\\\\'")) + '\\')">&times;</span></span>').join('');
 
   // Build list of highlight notes and inline annotations for display
   let hlNotesHtml = '';
@@ -2611,7 +2614,7 @@ function renderNotesPanel() {
       const preview = hl.text.length > 60 ? hl.text.slice(0, 60) + '...' : hl.text;
       hlNotesHtml += '<div style="padding:8px 0;border-bottom:1px solid var(--border)">'
         + '<div style="color:var(--muted);font-size:11px;margin-bottom:3px">'
-        + '<span class="pr-highlight hl-' + hl.color + '" style="padding:1px 4px;border-radius:2px;cursor:pointer" onclick="scrollToHighlight(\'' + hl.id + '\')">' + escapeHtml(preview) + '</span>'
+        + '<span class="pr-highlight hl-' + hl.color + '" style="padding:1px 4px;border-radius:2px;cursor:pointer" onclick="scrollToHighlight(\\'' + hl.id + '\\')">' + escapeHtml(preview) + '</span>'
         + '</div>'
         + '<div style="white-space:pre-wrap;word-break:break-word">' + escapeHtml(hl.note) + '</div>'
         + '</div>';
@@ -2630,20 +2633,20 @@ function renderNotesPanel() {
     hlNotesHtml += '</div>';
   }
 
-  panel.innerHTML = `
-    <summary>${summaryText}</summary>
+  panel.innerHTML = \`
+    <summary>\${summaryText}</summary>
     <div class="favorite-row">
-      <button class="favorite-btn${isFav ? ' active' : ''}" onclick="toggleFavorite(this)" title="Mark as favorite"><svg class="icon"><use href="#i-${isFav ? 'heart' : 'heart-o'}"/></svg></button>
-      <span style="color:var(--muted);font-size:12px">${isFav ? 'Favorited' : 'Mark favorite'}</span>
+      <button class="favorite-btn\${isFav ? ' active' : ''}" onclick="toggleFavorite(this)" title="Mark as favorite"><svg class="icon"><use href="#i-\${isFav ? 'heart' : 'heart-o'}"/></svg></button>
+      <span style="color:var(--muted);font-size:12px">\${isFav ? 'Favorited' : 'Mark favorite'}</span>
     </div>
     <div class="tags-row">
-      ${tagsHtml}
+      \${tagsHtml}
       <input type="text" placeholder="Add tag..." onkeydown="handleTagKey(event)" />
     </div>
-    <textarea placeholder="Add notes about this article...">${escapeHtml(noteText)}</textarea>
+    <textarea placeholder="Add notes about this article...">\${escapeHtml(noteText)}</textarea>
     <div class="notes-save-hint">Auto-saved</div>
-    ${hlNotesHtml}
-  `;
+    \${hlNotesHtml}
+  \`;
 
   if (noteText || isFav || tags.length || hlsWithNotes.length || annotations.length) panel.setAttribute('open', '');
 
@@ -2871,7 +2874,7 @@ function showShortcutsModal() {
   overlay.setAttribute('aria-modal', 'true');
   overlay.setAttribute('aria-label', 'Keyboard shortcuts');
   overlay.onclick = function(e) { if (e.target === overlay) closeModal(); };
-  overlay.innerHTML = `
+  overlay.innerHTML = \`
     <div class="modal-card" onclick="event.stopPropagation()">
       <h2>Keyboard Shortcuts</h2>
       <div class="shortcuts-grid">
@@ -2888,7 +2891,7 @@ function showShortcutsModal() {
       </div>
       <button class="modal-close" onclick="closeModal()">Done</button>
     </div>
-  `;
+  \`;
   document.body.appendChild(overlay);
   trapFocus(overlay);
   overlay.querySelector('.modal-close').focus();
@@ -2904,7 +2907,7 @@ function showGuideModal() {
   overlay.setAttribute('aria-modal', 'true');
   overlay.setAttribute('aria-label', 'PullRead guide');
   overlay.onclick = function(e) { if (e.target === overlay) closeModal(); };
-  overlay.innerHTML = `
+  overlay.innerHTML = \`
     <div class="modal-card" onclick="event.stopPropagation()">
       <div class="modal-updated">Last updated: Feb 2026</div>
       <h2>PullRead Guide</h2>
@@ -2953,7 +2956,7 @@ function showGuideModal() {
 
       <button class="modal-close" onclick="closeModal()">Done</button>
     </div>
-  `;
+  \`;
   document.body.appendChild(overlay);
   trapFocus(overlay);
   overlay.querySelector('.modal-close').focus();
@@ -3118,7 +3121,7 @@ document.addEventListener('drop', e => {
       // Create a virtual entry
       const entry = {
         filename: file.name,
-        title: (meta && meta.title) || file.name.replace(/\.md$/, ''),
+        title: (meta && meta.title) || file.name.replace(/\\.md\$/, ''),
         url: (meta && meta.url) || '',
         domain: (meta && meta.domain) || '',
         bookmarked: (meta && meta.bookmarked) || '',
@@ -3210,7 +3213,7 @@ function showTagCloud() {
     const maxCount = sortedTags[0][1];
     for (const [tag, count] of sortedTags) {
       const size = Math.max(11, Math.min(20, 11 + (count / maxCount) * 9));
-      tagsHtml += '<span class="tag-cloud-item" style="font-size:' + size + 'px" onclick="closeModal();document.getElementById(\'search\').value=\'' + escapeHtml(tag) + '\';filterFiles()">' + escapeHtml(tag) + ' <span style="opacity:0.5;font-size:10px">' + count + '</span></span>';
+      tagsHtml += '<span class="tag-cloud-item" style="font-size:' + size + 'px" onclick="closeModal();document.getElementById(\\'search\\').value=\\'' + escapeHtml(tag) + '\\';filterFiles()">' + escapeHtml(tag) + ' <span style="opacity:0.5;font-size:10px">' + count + '</span></span>';
     }
     tagsHtml += '</div>';
   }
@@ -3218,12 +3221,12 @@ function showTagCloud() {
   let domainsHtml = '<h3>Sources <span style="font-weight:400;color:var(--muted);font-size:12px">(' + Object.keys(domainArticles).length + ' sites)</span></h3>';
   for (const [domain, articles] of sortedDomains) {
     domainsHtml += '<div class="domain-group">';
-    domainsHtml += '<div class="domain-group-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">';
-    domainsHtml += '<img class="file-item-favicon" src="https://www.google.com/s2/favicons?domain=' + encodeURIComponent(domain) + '&sz=32" alt="" loading="lazy" onerror="this.style.display=\'none\'">';
+    domainsHtml += '<div class="domain-group-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\\'none\\'?\\'block\\':\\'none\\'">';
+    domainsHtml += '<img class="file-item-favicon" src="https://www.google.com/s2/favicons?domain=' + encodeURIComponent(domain) + '&sz=32" alt="" loading="lazy" onerror="this.style.display=\\'none\\'">';
     domainsHtml += escapeHtml(domain) + ' <span class="domain-group-count">' + articles.length + ' article' + (articles.length !== 1 ? 's' : '') + '</span></div>';
     domainsHtml += '<div class="domain-group-articles" style="display:none">';
     for (const a of articles.slice(0, 10)) {
-      domainsHtml += '<a href="#" onclick="event.preventDefault();closeModal();jumpToArticle(\'' + escapeHtml(a.filename.replace(/'/g, "\\'")) + '\')">' + escapeHtml(a.title) + '</a>';
+      domainsHtml += '<a href="#" onclick="event.preventDefault();closeModal();jumpToArticle(\\'' + escapeHtml(a.filename.replace(/'/g, "\\\\'")) + '\\')">' + escapeHtml(a.title) + '</a>';
     }
     if (articles.length > 10) {
       domainsHtml += '<span style="font-size:11px;color:var(--muted)">+ ' + (articles.length - 10) + ' more</span>';
@@ -3243,15 +3246,15 @@ function showTagCloud() {
   statsHtml += '<span><strong style="color:var(--fg)">' + Object.keys(domainArticles).length + '</strong> sources</span>';
   statsHtml += '</div>';
 
-  overlay.innerHTML = `
+  overlay.innerHTML = \`
     <div class="modal-card" style="max-width:560px;max-height:80vh;overflow-y:auto" onclick="event.stopPropagation()">
       <h2>Explore Your Library</h2>
-      ${statsHtml}
-      ${tagsHtml}
-      ${domainsHtml}
+      \${statsHtml}
+      \${tagsHtml}
+      \${domainsHtml}
       <button class="modal-close" onclick="closeModal()">Done</button>
     </div>
-  `;
+  \`;
   document.body.appendChild(overlay);
   trapFocus(overlay);
   overlay.querySelector('.modal-close').focus();
@@ -3292,7 +3295,7 @@ document.getElementById('content-pane').addEventListener('scroll', function() {
 
 // ---- Read Time & Word Count ----
 function calculateReadStats(text) {
-  const words = text.trim().split(/\s+/).filter(w => w.length > 0).length;
+  const words = text.trim().split(/\\s+/).filter(w => w.length > 0).length;
   const wpm = 238; // average adult reading speed
   const minutes = Math.ceil(words / wpm);
   return { words, minutes };
@@ -3378,7 +3381,7 @@ function applySyntaxHighlighting() {
     hljs.highlightElement(block);
 
     // Add language label if detected
-    const lang = block.className.match(/language-(\w+)/);
+    const lang = block.className.match(/language-(\\w+)/);
     const detected = block.result && block.result.language;
     const langName = (lang && lang[1]) || detected;
     if (langName && langName !== 'undefined') {
@@ -3440,7 +3443,7 @@ function restoreScrollPosition(filename) {
   // Show a "resume" indicator
   const indicator = document.createElement('div');
   indicator.className = 'resume-indicator';
-  indicator.textContent = 'Resume reading \u2193';
+  indicator.textContent = 'Resume reading \\u2193';
   indicator.setAttribute('role', 'button');
   indicator.setAttribute('aria-label', 'Resume reading from where you left off');
   indicator.onclick = function() {
@@ -3552,11 +3555,11 @@ async function migrateAnnotationsIfNeeded() {
       const res = await fetch('/api/file?name=' + encodeURIComponent(file.filename));
       if (!res.ok) continue;
       const text = await res.text();
-      const match = text.match(/^---\n([\s\S]*?)\n---/);
+      const match = text.match(/^---\\n([\\s\\S]*?)\\n---/);
       if (!match) continue;
 
       const frontmatter = match[1];
-      const annotationMatch = frontmatter.match(/^annotation:\s*"?(.*?)"?\s*$/m);
+      const annotationMatch = frontmatter.match(/^annotation:\\s*"?(.*?)"?\\s*\$/m);
       if (!annotationMatch || !annotationMatch[1]) continue;
 
       // Found old-style annotation - migrate to JSON notes
@@ -3661,3 +3664,4 @@ init();
 </script>
 </body>
 </html>
+`;
