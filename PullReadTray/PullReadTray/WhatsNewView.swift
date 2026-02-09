@@ -88,30 +88,30 @@ struct WhatsNewView: View {
 
     private var releaseNotes: [String: [Highlight]] {
         [
-            "1.1": [
+            "1.1.0": [
                 Highlight(
-                    icon: "highlighter",
-                    color: .yellow,
-                    title: "Highlights & Notes",
-                    description: "Select text to highlight passages and add notes to articles. Your annotations are stored locally and persist across sessions."
-                ),
-                Highlight(
-                    icon: "arrow.triangle.2.circlepath",
-                    color: .green,
-                    title: "Resync Recovery",
-                    description: "Deleted output files are now detected automatically. Re-run sync to recover missing articles without manual database cleanup."
-                ),
-                Highlight(
-                    icon: "sparkles",
+                    icon: "book.fill",
                     color: .purple,
-                    title: "Auto-Update Ready",
-                    description: "Sparkle framework integration is configured. Automatic update checks will notify you when new versions are available."
+                    title: "Premium Reading Experience",
+                    description: "Focus mode, reading progress, estimated read time, syntax highlighting, auto-generated table of contents, and print-optimized layouts."
                 ),
                 Highlight(
-                    icon: "person.crop.circle",
+                    icon: "tag.fill",
                     color: .blue,
-                    title: "By A Little Drive",
-                    description: "PullRead is now proudly part of the A Little Drive family at alittledrive.com."
+                    title: "Explore & Organize",
+                    description: "Tag cloud, source groupings, and library stats help you discover patterns across your reading. Search now includes tags."
+                ),
+                Highlight(
+                    icon: "globe",
+                    color: .green,
+                    title: "Multi-Browser Cookie Support",
+                    description: "Now supports Chrome, Arc, Brave, and Edge for paywalled content. Your browser is auto-detected."
+                ),
+                Highlight(
+                    icon: "paintbrush.fill",
+                    color: .orange,
+                    title: "Redesigned Settings & Viewer",
+                    description: "Tabbed settings, favicons in the sidebar, hide-read toggle, daily and weekly AI reviews, and a Safari web app mode."
                 )
             ],
             "1.0": [
@@ -156,5 +156,5 @@ struct WhatsNewView: View {
 }
 
 #Preview {
-    WhatsNewView(version: "1.1")
+    WhatsNewView(version: "1.1.0")
 }
