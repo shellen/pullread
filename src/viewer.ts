@@ -10,6 +10,8 @@ import { VIEWER_HTML } from './viewer-html';
 import { summarizeText, loadLLMConfig, saveLLMConfig, getDefaultModel, KNOWN_MODELS, LLMConfig } from './summarizer';
 import { autotagText, autotagBatch, saveMachineTags, hasMachineTags } from './autotagger';
 import { APP_ICON } from './app-icon';
+import { fetchAndExtract } from './extractor';
+import { generateMarkdown, ArticleData } from './writer';
 
 interface FileMeta {
   filename: string;
@@ -524,6 +526,71 @@ export function startViewer(outputPath: string, port = 7777): void {
         }
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: userMsg }));
+      }
+      return;
+    }
+
+    // Reprocess API — re-fetch article from its frontmatter URL
+    if (url.pathname === '/api/reprocess' && req.method === 'POST') {
+      try {
+        const body = JSON.parse(await readBody(req));
+        const { name } = body;
+        if (!name || name.includes('..') || name.includes('/')) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'valid name is required' }));
+          return;
+        }
+
+        const filePath = join(outputPath, name);
+        if (!existsSync(filePath)) {
+          send404(res);
+          return;
+        }
+
+        // Read existing file to get frontmatter metadata
+        const existing = readFileSync(filePath, 'utf-8');
+        const meta = parseFrontmatter(existing);
+        if (!meta.url) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Article has no source URL in frontmatter' }));
+          return;
+        }
+
+        // Re-fetch and extract
+        const article = await fetchAndExtract(meta.url);
+        if (!article) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Could not extract article from URL' }));
+          return;
+        }
+
+        // Rebuild the markdown file preserving original frontmatter fields
+        const data: ArticleData = {
+          title: meta.title || article.title,
+          url: meta.url,
+          bookmarkedAt: meta.bookmarked || new Date().toISOString(),
+          domain: meta.domain || '',
+          content: article.markdown,
+          feed: meta.feed || undefined,
+          author: article.byline || meta.author || undefined,
+          excerpt: article.excerpt || meta.excerpt || undefined,
+        };
+        const markdown = generateMarkdown(data);
+
+        // Preserve summary if it existed
+        if (meta.summary) {
+          const escaped = meta.summary.replace(/"/g, '\\"').replace(/\n/g, ' ');
+          const withSummary = markdown.replace(/\n---\n/, `\nsummary: "${escaped}"\n---\n`);
+          writeFileSync(filePath, withSummary, 'utf-8');
+        } else {
+          writeFileSync(filePath, markdown, 'utf-8');
+        }
+
+        sendJson(res, { ok: true, title: data.title });
+      } catch (err: any) {
+        const msg = err instanceof Error ? err.message : 'Reprocessing failed';
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: msg }));
       }
       return;
     }
