@@ -299,12 +299,14 @@ jobs:
           DMG_URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}/PullRead.dmg"
 
           # Generate appcast.xml into site/ so it's served alongside the marketing page
+          # sign_update outputs: sparkle:edSignature="..." length="..."
+          # so we must NOT add a separate length attribute (duplicate attrs = invalid XML)
           cat > site/appcast.xml << APPCAST_EOF
           <?xml version="1.0" encoding="utf-8"?>
           <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
             <channel>
               <title>Pull Read</title>
-              <link>https://pullread.com/appcast.xml</link>
+              <link>https://pullread.com</link>
               <description>Pull Read updates</description>
               <language>en</language>
               <item>
@@ -314,7 +316,6 @@ jobs:
                 <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
                 <pubDate>$(date -R)</pubDate>
                 <enclosure url="${DMG_URL}"
-                           length="${DMG_SIZE}"
                            type="application/octet-stream"
                            ${SPARKLE_SIGNATURE} />
               </item>
