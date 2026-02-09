@@ -22,10 +22,9 @@ That's it. The workflow handles building, signing, notarization, DMG creation, G
 
 ## How the Release Workflow Works
 
-The **Build and Release** workflow (`.github/workflows/release.yml`) can be triggered two ways:
+The **Build and Release** workflow (`.github/workflows/release.yml`) is triggered from the GitHub UI:
 
-1. **Manual dispatch** (recommended): Actions > "Build and Release" > Run workflow > enter version
-2. **Tag push**: Push a `v*` tag (e.g. `git tag v1.2.0 && git push origin v1.2.0`)
+**Actions > "Build and Release" > Run workflow > enter version** (e.g. `1.2.0`)
 
 The workflow:
 1. Creates a git tag `v1.2.0` (if triggered manually)
@@ -72,11 +71,7 @@ See `docs/code-signing.md` for how to set these up.
 If a release build fails:
 
 1. **Fix the issue** on a branch and merge to `main`
-2. **Delete the broken tag** (if it was created):
-   ```bash
-   git tag -d v1.1.0
-   git push origin :refs/tags/v1.1.0
-   ```
+2. **Delete the broken tag** (if one was created): go to the repo's Tags page on GitHub > find the tag > click the `...` menu > Delete
 3. **Delete the broken GitHub Release** (if partially created): go to Releases > find it > Delete
 4. **Re-run the release**: Actions > "Build and Release" > Run workflow with the same or bumped version
 5. **Refresh the latest download**: The next push to `main` auto-updates the `latest` tag release via CI
