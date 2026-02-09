@@ -1,7 +1,10 @@
 // ABOUTME: Tests for article content extraction
 // ABOUTME: Verifies Readability extracts clean content from HTML pages
 
-import { extractArticle, resolveRelativeUrls, isYouTubeUrl, extractYouTubeId } from './extractor';
+import {
+  extractArticle, resolveRelativeUrls, isYouTubeUrl, extractYouTubeId,
+  matchPaperSource, fixPdfLigatures, stripRunningHeaders, buildParagraphs, extractPdfTitle
+} from './extractor';
 
 const SAMPLE_HTML = `
 <!DOCTYPE html>
@@ -226,5 +229,216 @@ describe('extractYouTubeId', () => {
 
   test('returns null for invalid URLs', () => {
     expect(extractYouTubeId('not-a-url')).toBeNull();
+  });
+});
+
+// ── Academic paper source matching ──────────────────────────────────
+
+describe('matchPaperSource', () => {
+  test('matches arxiv PDF URLs', () => {
+    const m = matchPaperSource('https://arxiv.org/pdf/2009.14050');
+    expect(m).not.toBeNull();
+    expect(m!.source.name).toBe('arxiv');
+    expect(m!.htmlUrl).toBe('https://arxiv.org/html/2009.14050');
+  });
+
+  test('matches arxiv abs URLs', () => {
+    const m = matchPaperSource('https://arxiv.org/abs/2009.14050v2');
+    expect(m).not.toBeNull();
+    expect(m!.htmlUrl).toBe('https://arxiv.org/html/2009.14050v2');
+  });
+
+  test('matches arxiv old-style IDs with slashes', () => {
+    const m = matchPaperSource('https://arxiv.org/pdf/hep-ph/0601001');
+    expect(m).not.toBeNull();
+    expect(m!.htmlUrl).toBe('https://arxiv.org/html/hep-ph/0601001');
+  });
+
+  test('matches bioRxiv PDF URLs', () => {
+    const m = matchPaperSource('https://www.biorxiv.org/content/10.1101/2024.01.15.575123v1.full.pdf');
+    expect(m).not.toBeNull();
+    expect(m!.source.name).toBe('bioRxiv');
+    expect(m!.htmlUrl).toBe('https://www.biorxiv.org/content/10.1101/2024.01.15.575123v1.full');
+  });
+
+  test('matches medRxiv PDF URLs', () => {
+    const m = matchPaperSource('https://www.medrxiv.org/content/10.1101/2024.03.20.24304567v1.full.pdf');
+    expect(m).not.toBeNull();
+    expect(m!.source.name).toBe('medRxiv');
+    expect(m!.htmlUrl).toContain('.full');
+    expect(m!.htmlUrl).not.toContain('.pdf');
+  });
+
+  test('matches PMC PDF URLs', () => {
+    const m = matchPaperSource('https://pmc.ncbi.nlm.nih.gov/articles/PMC7654321/pdf/');
+    expect(m).not.toBeNull();
+    expect(m!.source.name).toBe('PMC');
+    expect(m!.htmlUrl).toBe('https://pmc.ncbi.nlm.nih.gov/articles/PMC7654321/');
+  });
+
+  test('matches PMC PDF URLs with filename', () => {
+    const m = matchPaperSource('https://pmc.ncbi.nlm.nih.gov/articles/PMC7654321/pdf/main.pdf');
+    expect(m).not.toBeNull();
+    expect(m!.htmlUrl).toBe('https://pmc.ncbi.nlm.nih.gov/articles/PMC7654321/');
+  });
+
+  test('matches PLOS PDF URLs', () => {
+    const m = matchPaperSource('https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0123456&type=printable');
+    expect(m).not.toBeNull();
+    expect(m!.source.name).toBe('PLOS');
+    expect(m!.htmlUrl).toContain('/article?id=10.1371/journal.pone.0123456');
+  });
+
+  test('matches ACM DL PDF URLs', () => {
+    const m = matchPaperSource('https://dl.acm.org/doi/pdf/10.1145/3292500.3330919');
+    expect(m).not.toBeNull();
+    expect(m!.source.name).toBe('ACM');
+    expect(m!.htmlUrl).toBe('https://dl.acm.org/doi/fullHtml/10.1145/3292500.3330919');
+  });
+
+  test('returns null for non-academic URLs', () => {
+    expect(matchPaperSource('https://example.com/paper.pdf')).toBeNull();
+    expect(matchPaperSource('https://nytimes.com/article')).toBeNull();
+  });
+
+  test('returns null for arxiv non-paper pages', () => {
+    expect(matchPaperSource('https://arxiv.org/search/?query=test')).toBeNull();
+    expect(matchPaperSource('https://arxiv.org/list/cs.AI/recent')).toBeNull();
+  });
+
+  test('returns null for bioRxiv non-PDF pages', () => {
+    // abstract page without .full.pdf doesn't get rewritten
+    expect(matchPaperSource('https://www.biorxiv.org/content/10.1101/2024.01.15.575123v1')).toBeNull();
+  });
+});
+
+// ── PDF text cleanup helpers ────────────────────────────────────────
+
+describe('fixPdfLigatures', () => {
+  test('replaces Unicode ligature codepoints', () => {
+    expect(fixPdfLigatures('e\uFB00ect')).toBe('effect');
+    expect(fixPdfLigatures('di\uFB03cult')).toBe('difficult');
+    expect(fixPdfLigatures('\uFB02oor')).toBe('floor');
+    expect(fixPdfLigatures('o\uFB03ce')).toBe('office');
+    expect(fixPdfLigatures('shu\uFB04e')).toBe('shuffle');
+    expect(fixPdfLigatures('a\uFB01x')).toBe('afix');
+  });
+
+  test('leaves normal text unchanged', () => {
+    expect(fixPdfLigatures('hello world')).toBe('hello world');
+    expect(fixPdfLigatures('different')).toBe('different');
+  });
+});
+
+describe('stripRunningHeaders', () => {
+  test('removes repeated short lines from page boundaries', () => {
+    const pages = [
+      'HUMAN LIMITATIONS 1\nFirst page content here.\nMore content on page one.',
+      'HUMAN LIMITATIONS 2\nSecond page content here.\nMore content on page two.',
+      'HUMAN LIMITATIONS 3\nThird page content here.\nMore content on page three.',
+      'HUMAN LIMITATIONS 4\nFourth page content here.\nMore content on page four.',
+    ];
+    const result = stripRunningHeaders(pages);
+    for (const page of result) {
+      expect(page).not.toMatch(/HUMAN LIMITATIONS/);
+    }
+    // Content should be preserved
+    expect(result[0]).toContain('First page content');
+    expect(result[1]).toContain('Second page content');
+  });
+
+  test('removes bare page numbers', () => {
+    const pages = [
+      '1\nContent of page one.',
+      '2\nContent of page two.',
+      '3\nContent of page three.',
+    ];
+    const result = stripRunningHeaders(pages);
+    for (const page of result) {
+      expect(page.trim()).not.toMatch(/^\d+$/m);
+    }
+  });
+
+  test('preserves non-repeated content', () => {
+    const pages = [
+      'Unique Title Page\nIntroduction content here.',
+      'Header\nSection two content here.',
+      'Header\nSection three content here.',
+      'Header\nSection four content here.',
+    ];
+    const result = stripRunningHeaders(pages);
+    expect(result[0]).toContain('Unique Title Page');
+    expect(result[0]).toContain('Introduction content');
+  });
+
+  test('returns pages unchanged when fewer than 3 pages', () => {
+    const pages = ['Page one content.', 'Page two content.'];
+    const result = stripRunningHeaders(pages);
+    expect(result).toEqual(pages);
+  });
+});
+
+describe('buildParagraphs', () => {
+  test('joins consecutive lines into paragraphs', () => {
+    const input = 'First line of paragraph.\nSecond line of paragraph.\n\nNew paragraph here.';
+    const result = buildParagraphs(input);
+    expect(result).toBe('First line of paragraph. Second line of paragraph.\n\nNew paragraph here.');
+  });
+
+  test('handles multiple blank lines as single break', () => {
+    const input = 'Para one.\n\n\n\nPara two.';
+    const result = buildParagraphs(input);
+    expect(result).toBe('Para one.\n\nPara two.');
+  });
+
+  test('trims whitespace from lines', () => {
+    const input = '  Leading space.\n  Trailing space.  \n\n  Another para.  ';
+    const result = buildParagraphs(input);
+    expect(result).toBe('Leading space. Trailing space.\n\nAnother para.');
+  });
+
+  test('handles single line input', () => {
+    expect(buildParagraphs('Just one line.')).toBe('Just one line.');
+  });
+
+  test('handles empty input', () => {
+    expect(buildParagraphs('')).toBe('');
+  });
+});
+
+describe('extractPdfTitle', () => {
+  test('returns first suitable line', () => {
+    const lines = ['Understanding Human Intelligence', 'Thomas L. Griffiths'];
+    expect(extractPdfTitle(lines, 'https://example.com/paper.pdf')).toBe('Understanding Human Intelligence');
+  });
+
+  test('skips Running head: prefix', () => {
+    const lines = ['Running head: HUMAN LIMITATIONS', 'Understanding Human Intelligence'];
+    expect(extractPdfTitle(lines, 'https://example.com/paper.pdf')).toBe('Understanding Human Intelligence');
+  });
+
+  test('skips bare page numbers', () => {
+    const lines = ['1', 'Real Title Here', 'Author Name'];
+    expect(extractPdfTitle(lines, 'https://example.com/paper.pdf')).toBe('Real Title Here');
+  });
+
+  test('skips arxiv IDs', () => {
+    const lines = ['arXiv:2009.14050v3', 'Understanding Human Intelligence'];
+    expect(extractPdfTitle(lines, 'https://arxiv.org/pdf/2009.14050')).toBe('Understanding Human Intelligence');
+  });
+
+  test('skips short lines', () => {
+    const lines = ['Hi', 'Yo', 'A Real Paper Title That Is Long Enough'];
+    expect(extractPdfTitle(lines, 'https://example.com/p.pdf')).toBe('A Real Paper Title That Is Long Enough');
+  });
+
+  test('falls back to filename from URL', () => {
+    const lines = ['1', '2', '3'];
+    expect(extractPdfTitle(lines, 'https://example.com/my-paper.pdf')).toBe('my paper');
+  });
+
+  test('falls back to Untitled PDF for bare URLs', () => {
+    const lines: string[] = [];
+    expect(extractPdfTitle(lines, 'https://example.com/')).toBe('Untitled PDF');
   });
 });
