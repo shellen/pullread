@@ -244,7 +244,7 @@ jobs:
         run: |
           echo "Verifying DMG..."
           codesign -dv --verbose=2 PullRead.dmg
-          spctl -a -v PullRead.dmg
+          spctl -a -v --type open PullRead.dmg
 
       - name: Sign DMG for Sparkle
         if: env.SPARKLE_PRIVATE_KEY != ''
