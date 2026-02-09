@@ -131,11 +131,19 @@ bundle_cli() {
     # Copy binary (viewer.html is embedded in the binary at compile time)
     cp "$ROOT_DIR/dist/pullread" "$RESOURCES_PATH/"
 
-    # Sign the binary
-    codesign --force --sign "Developer ID Application" "$RESOURCES_PATH/pullread"
+    IDENTITY="Developer ID Application"
 
-    # Re-sign the entire app bundle
-    codesign --force --deep --sign "Developer ID Application" "$APP_PATH"
+    # Sign the bundled CLI binary (hardened runtime + timestamp required for notarization)
+    codesign --force --options runtime --timestamp \
+        --sign "$IDENTITY" "$RESOURCES_PATH/pullread"
+
+    # Sign the main app binary
+    codesign --force --options runtime --timestamp \
+        --sign "$IDENTITY" "$APP_PATH/Contents/MacOS/$APP_NAME"
+
+    # Sign the overall app bundle
+    codesign --force --options runtime --timestamp \
+        --sign "$IDENTITY" "$APP_PATH"
 
     echo "  CLI bundled and signed."
 }
