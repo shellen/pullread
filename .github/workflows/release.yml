@@ -269,7 +269,11 @@ jobs:
           tar -xf Sparkle.tar.xz -C sparkle-tools
 
           # Sign the DMG with Sparkle's EdDSA signature
-          SIGNATURE=$(echo "$SPARKLE_PRIVATE_KEY" | sparkle-tools/bin/sign_update PullRead.dmg)
+          # sign_update requires the key via -f flag (does not read from stdin)
+          KEY_FILE=$(mktemp)
+          echo "$SPARKLE_PRIVATE_KEY" > "$KEY_FILE"
+          SIGNATURE=$(sparkle-tools/bin/sign_update PullRead.dmg -f "$KEY_FILE")
+          rm -f "$KEY_FILE"
           echo "SPARKLE_SIGNATURE=$SIGNATURE" >> $GITHUB_ENV
           echo "Sparkle signature generated"
 
