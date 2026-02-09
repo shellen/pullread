@@ -1909,7 +1909,7 @@ function renderArticle(text, filename) {
   // Strip the leading H1 from markdown body if it matches the title (avoid duplication)
   let articleBody = cleanMarkdown(body);
   if (meta && meta.title) {
-    var h1Match = articleBody.match(/^#\s+(.+)\s*\n/);
+    var h1Match = articleBody.match(/^\s*#\s+(.+)\s*\n/);
     if (h1Match) {
       var normalize = function(s) { return s.toLowerCase().replace(/[\u2018\u2019\u201C\u201D]/g, "'").replace(/[^a-z0-9]/g, ''); };
       // Strip if title matches, or if it's a review (title always duplicated in body)
