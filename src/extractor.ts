@@ -6,6 +6,7 @@ import { Readability } from '@mozilla/readability';
 import TurndownService from 'turndown';
 import { getCookiesForDomain, getDomainFromUrl } from './cookies';
 import { extractText, getDocumentProxy } from 'unpdf';
+import { XMLParser } from 'fast-xml-parser';
 
 export interface ExtractedArticle {
   title: string;
@@ -221,6 +222,91 @@ function isHackerNewsUrl(url: string): boolean {
   }
 }
 
+// ── Academic paper sources: PDF → HTML rewriting ────────────────────
+// Each source defines how to convert a PDF URL to an HTML full-text URL.
+// The handler tries HTML first (clean structure via Readability) then falls
+// back to improved PDF text extraction.
+
+interface PaperSource {
+  name: string;
+  match: (u: URL) => boolean;
+  toHtmlUrl: (u: URL) => string | null;
+}
+
+const PAPER_SOURCES: PaperSource[] = [
+  {
+    name: 'arxiv',
+    match: (u) => u.hostname === 'arxiv.org' || u.hostname === 'www.arxiv.org' || u.hostname === 'export.arxiv.org',
+    toHtmlUrl: (u) => {
+      const m = u.pathname.match(/^\/(pdf|abs)\/(.+?)(?:\.pdf)?$/);
+      return m ? `https://arxiv.org/html/${m[2]}` : null;
+    },
+  },
+  {
+    name: 'bioRxiv',
+    match: (u) => u.hostname === 'www.biorxiv.org' || u.hostname === 'biorxiv.org',
+    toHtmlUrl: (u) => {
+      // /content/10.1101/ID.full.pdf → /content/10.1101/ID.full
+      if (u.pathname.endsWith('.full.pdf')) return `${u.origin}${u.pathname.replace(/\.pdf$/, '')}`;
+      return null;
+    },
+  },
+  {
+    name: 'medRxiv',
+    match: (u) => u.hostname === 'www.medrxiv.org' || u.hostname === 'medrxiv.org',
+    toHtmlUrl: (u) => {
+      if (u.pathname.endsWith('.full.pdf')) return `${u.origin}${u.pathname.replace(/\.pdf$/, '')}`;
+      return null;
+    },
+  },
+  {
+    name: 'PMC',
+    match: (u) => (u.hostname === 'pmc.ncbi.nlm.nih.gov' || u.hostname === 'www.ncbi.nlm.nih.gov') && u.pathname.includes('/articles/'),
+    toHtmlUrl: (u) => {
+      // /articles/PMC123/pdf/ or /articles/PMC123/pdf/filename.pdf → /articles/PMC123/
+      const m = u.pathname.match(/^(\/(?:pmc\/)?articles\/PMC\d+)\/pdf\b/);
+      return m ? `${u.origin}${m[1]}/` : null;
+    },
+  },
+  {
+    name: 'PLOS',
+    match: (u) => u.hostname.endsWith('plos.org'),
+    toHtmlUrl: (u) => {
+      // article/file?id=DOI&type=printable → article?id=DOI
+      if (u.pathname.includes('/article/file') && u.searchParams.get('type') === 'printable') {
+        const doi = u.searchParams.get('id');
+        return doi ? `${u.origin}${u.pathname.replace('/article/file', '/article')}?id=${doi}` : null;
+      }
+      return null;
+    },
+  },
+  {
+    name: 'ACM',
+    match: (u) => u.hostname === 'dl.acm.org',
+    toHtmlUrl: (u) => {
+      // /doi/pdf/10.1145/... → /doi/fullHtml/10.1145/...
+      if (u.pathname.startsWith('/doi/pdf/')) return `${u.origin}${u.pathname.replace('/doi/pdf/', '/doi/fullHtml/')}`;
+      return null;
+    },
+  },
+];
+
+/**
+ * Check if a URL matches a known academic paper source that has an HTML version.
+ */
+export function matchPaperSource(url: string): { source: PaperSource; htmlUrl: string } | null {
+  try {
+    const u = new URL(url);
+    for (const source of PAPER_SOURCES) {
+      if (source.match(u)) {
+        const htmlUrl = source.toHtmlUrl(u);
+        if (htmlUrl) return { source, htmlUrl };
+      }
+    }
+  } catch {}
+  return null;
+}
+
 /**
  * Detect if a URL is a social post (any platform)
  */
@@ -401,36 +487,162 @@ export function isPdfUrl(url: string): boolean {
   }
 }
 
+// ── PDF text cleanup helpers ────────────────────────────────────────
+
+/**
+ * Fix common PDF ligature issues. PDF.js sometimes extracts Unicode
+ * ligature codepoints (U+FB00–FB04) instead of ASCII character sequences.
+ */
+export function fixPdfLigatures(text: string): string {
+  return text
+    .replace(/\uFB00/g, 'ff')
+    .replace(/\uFB01/g, 'fi')
+    .replace(/\uFB02/g, 'fl')
+    .replace(/\uFB03/g, 'ffi')
+    .replace(/\uFB04/g, 'ffl');
+}
+
+/**
+ * Strip running headers and footers from per-page PDF text.
+ * Detects short lines that repeat on >50% of pages and removes them.
+ */
+export function stripRunningHeaders(pages: string[]): string[] {
+  if (pages.length < 3) return pages;
+
+  // Count how often each short line appears in the first/last 3 lines of each page
+  const candidateCounts = new Map<string, number>();
+  const N = 3;
+
+  for (const page of pages) {
+    const lines = page.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    if (lines.length === 0) continue;
+
+    const candidates = new Set<string>();
+    const headerLines = lines.slice(0, N);
+    const footerLines = lines.slice(-N);
+
+    for (const line of [...headerLines, ...footerLines]) {
+      if (line.length < 80) {
+        // Normalize: strip trailing page numbers for matching
+        const normalized = line.replace(/\s*\d+\s*$/, '').trim();
+        if (normalized.length > 0 && normalized.length < 80) {
+          candidates.add(normalized);
+        }
+        if (/^\d+$/.test(line)) {
+          candidates.add('__PAGE_NUMBER__');
+        }
+      }
+    }
+
+    for (const c of candidates) {
+      candidateCounts.set(c, (candidateCounts.get(c) || 0) + 1);
+    }
+  }
+
+  const threshold = pages.length * 0.5;
+  const headersToStrip = new Set<string>();
+  for (const [text, count] of candidateCounts) {
+    if (count >= threshold) headersToStrip.add(text);
+  }
+
+  if (headersToStrip.size === 0) return pages;
+
+  return pages.map(page => {
+    const lines = page.split('\n');
+    return lines.filter(line => {
+      const trimmed = line.trim();
+      if (!trimmed) return true; // keep blank lines
+      if (/^\d+$/.test(trimmed) && headersToStrip.has('__PAGE_NUMBER__')) return false;
+      const normalized = trimmed.replace(/\s*\d+\s*$/, '').trim();
+      return !headersToStrip.has(normalized);
+    }).join('\n');
+  });
+}
+
+/**
+ * Convert raw PDF text into proper paragraphs.
+ * PDF text has hard line breaks at column width boundaries — join them.
+ */
+export function buildParagraphs(text: string): string {
+  const lines = text.split('\n');
+  const paragraphs: string[] = [];
+  let current: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed === '') {
+      if (current.length > 0) {
+        paragraphs.push(current.join(' '));
+        current = [];
+      }
+    } else {
+      current.push(trimmed);
+    }
+  }
+  if (current.length > 0) {
+    paragraphs.push(current.join(' '));
+  }
+
+  return paragraphs.join('\n\n');
+}
+
+const PDF_TITLE_SKIP = [
+  /^running head:/i,
+  /^draft$/i,
+  /^preprint$/i,
+  /^\d+$/,
+  /^page \d+/i,
+  /^arxiv:\d/i,
+  /^https?:\/\//,
+];
+
+/**
+ * Extract a title from the first lines of PDF text, skipping headers/noise.
+ */
+export function extractPdfTitle(lines: string[], url: string): string {
+  for (const line of lines.slice(0, 5)) {
+    const trimmed = line.trim();
+    if (trimmed.length < 5 || trimmed.length > 200) continue;
+    if (PDF_TITLE_SKIP.some(p => p.test(trimmed))) continue;
+    return trimmed;
+  }
+  return url.split('/').pop()?.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ') || 'Untitled PDF';
+}
+
 /**
  * Extract text content from a PDF and return as a markdown article.
- * Uses unpdf (Mozilla PDF.js) for text extraction.
+ * Uses unpdf (Mozilla PDF.js) with per-page extraction, ligature fixing,
+ * running header stripping, and paragraph detection.
  */
 export async function extractPdf(data: Uint8Array, url: string): Promise<ExtractedArticle | null> {
   try {
     const pdf = await getDocumentProxy(data);
-    const { totalPages, text } = await extractText(pdf, { mergePages: true });
-    const textStr = typeof text === 'string' ? text : (text as string[]).join('\n\n');
+    const { totalPages, text } = await extractText(pdf, { mergePages: false });
+    const pages = (Array.isArray(text) ? text : [text]) as string[];
 
-    // If very little text extracted, likely a scanned/image PDF
-    if (textStr.trim().length < 100) {
-      return null;
-    }
+    // Fix ligatures on each page
+    const fixedPages = pages.map(fixPdfLigatures);
 
-    // Try to extract title from first line or URL
-    const lines = textStr.trim().split('\n').filter(l => l.trim());
-    const firstLine = lines[0] || '';
-    const title = firstLine.length > 10 && firstLine.length < 200
-      ? firstLine
-      : url.split('/').pop()?.replace('.pdf', '').replace(/[-_]/g, ' ') || 'Untitled PDF';
+    // Strip running headers/footers
+    const cleanPages = stripRunningHeaders(fixedPages);
 
-    // Format as markdown with page count info
-    const markdown = `*PDF document · ${totalPages} page${totalPages !== 1 ? 's' : ''}*\n\n${textStr}`;
+    // Join pages and build paragraphs
+    const rawText = cleanPages.join('\n\n');
+    if (rawText.trim().length < 100) return null;
+
+    const bodyText = buildParagraphs(rawText);
+
+    // Extract title from the first page
+    const firstPageLines = (cleanPages[0] || '').split('\n').filter(l => l.trim());
+    const title = extractPdfTitle(firstPageLines, url);
+
+    const markdown = `*PDF document · ${totalPages} page${totalPages !== 1 ? 's' : ''}*\n\n${bodyText}`;
 
     return {
       title,
-      content: `<p>${textStr}</p>`,
+      content: `<p>${bodyText}</p>`,
       markdown,
-      excerpt: textStr.slice(0, 200).trim()
+      excerpt: bodyText.slice(0, 200).trim()
     };
   } catch {
     return null;
@@ -690,6 +902,134 @@ async function resolveAppleNewsUrl(url: string): Promise<string> {
   return url;
 }
 
+// ── Academic paper extraction ───────────────────────────────────────
+
+/**
+ * Extract arxiv paper ID from a URL for API metadata lookup.
+ */
+function extractArxivId(url: string): string | null {
+  try {
+    const m = new URL(url).pathname.match(/^\/(pdf|abs|html)\/(.+?)(?:\.pdf)?$/);
+    return m ? m[2] : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch title/authors/abstract from the arxiv Atom API.
+ */
+async function fetchArxivMetadata(
+  arxivId: string
+): Promise<{ title: string; authors: string; abstract: string } | null> {
+  try {
+    const apiUrl = `https://export.arxiv.org/api/query?id_list=${encodeURIComponent(arxivId)}&max_results=1`;
+    const response = await fetchWithTimeout(apiUrl, {}, 10_000);
+    if (!response.ok) return null;
+    const xml = await response.text();
+
+    const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+    const parsed = parser.parse(xml);
+    const entry = parsed?.feed?.entry;
+    if (!entry) return null;
+
+    const title = (typeof entry.title === 'string' ? entry.title : '').replace(/\s+/g, ' ').trim();
+    if (!title) return null;
+
+    const authorList = Array.isArray(entry.author) ? entry.author : [entry.author];
+    const authors = authorList.map((a: any) => a?.name).filter(Boolean).join(', ');
+    const abstract = (typeof entry.summary === 'string' ? entry.summary : '').replace(/\s+/g, ' ').trim();
+
+    return { title, authors, abstract };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Handle academic paper URLs: try HTML version first, fall back to PDF.
+ * For arxiv, also fetches metadata from the Atom API.
+ */
+async function extractAcademicPaper(
+  url: string,
+  match: { source: PaperSource; htmlUrl: string },
+  options: FetchOptions
+): Promise<ExtractedArticle | null> {
+  const { source, htmlUrl } = match;
+
+  // For arxiv, start metadata fetch (runs concurrently with HTML attempt)
+  const metadataPromise = source.name === 'arxiv'
+    ? fetchArxivMetadata(extractArxivId(url) || '')
+    : Promise.resolve(null);
+
+  // Try the HTML version first
+  try {
+    const headers = getBrowserHeaders(htmlUrl);
+    const response = await fetchWithTimeout(htmlUrl, headers, FETCH_TIMEOUT_MS);
+    if (response.ok) {
+      const html = await response.text();
+      const article = extractArticle(html, response.url || htmlUrl);
+      if (article && article.markdown.length > 200) {
+        const metadata = await metadataPromise;
+        if (metadata) {
+          article.title = metadata.title;
+          if (metadata.authors) article.byline = metadata.authors;
+          if (metadata.abstract) article.excerpt = metadata.abstract;
+        }
+        return article;
+      }
+    }
+  } catch {
+    // HTML not available — fall through to PDF
+  }
+
+  // Fall back to PDF extraction via the normal fetch path
+  const cleanUrl = normalizeUrl(url);
+  const headers = getBrowserHeaders(cleanUrl);
+  if (options.useBrowserCookies) {
+    const domain = getDomainFromUrl(cleanUrl);
+    const cookies = getCookiesForDomain(domain);
+    if (cookies) headers['Cookie'] = cookies;
+  }
+
+  try {
+    const response = await fetchWithTimeout(cleanUrl, headers, FETCH_TIMEOUT_MS);
+    if (!response.ok) return null;
+
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/pdf') || isPdfUrl(cleanUrl)) {
+      const buffer = await response.arrayBuffer();
+      const article = await extractPdf(new Uint8Array(buffer), cleanUrl);
+      if (article) {
+        const metadata = await metadataPromise;
+        if (metadata) {
+          article.title = metadata.title;
+          if (metadata.authors) article.byline = metadata.authors;
+          if (metadata.abstract) article.excerpt = metadata.abstract;
+        }
+        return article;
+      }
+    } else {
+      // Not a PDF — extract as HTML (e.g., arxiv /abs/ page)
+      const html = await response.text();
+      const article = extractArticle(html, response.url || cleanUrl);
+      if (article) {
+        const metadata = await metadataPromise;
+        if (metadata) {
+          article.title = metadata.title;
+          if (metadata.authors) article.byline = metadata.authors;
+          if (metadata.abstract) article.excerpt = metadata.abstract;
+        }
+        return article;
+      }
+    }
+  } catch {
+    // PDF fetch failed
+  }
+
+  return null;
+}
+
 export async function fetchAndExtract(
   url: string,
   options: FetchOptions = {}
@@ -715,6 +1055,12 @@ export async function fetchAndExtract(
     if (videoId) {
       return extractYouTube(url, videoId, options);
     }
+  }
+
+  // Academic papers: try HTML version first, fall back to improved PDF
+  const paperMatch = matchPaperSource(url);
+  if (paperMatch) {
+    return extractAcademicPaper(url, paperMatch, options);
   }
 
   // Normalize URL (strip tracking, site-specific transforms)

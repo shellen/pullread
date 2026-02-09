@@ -16,11 +16,12 @@ export interface LLMConfig {
 }
 
 // Known models per provider — used for dropdown guidance
+// Ordered cheapest-first within each provider for summarization tasks
 export const KNOWN_MODELS: Record<Provider, string[]> = {
-  anthropic: ['claude-sonnet-4-5-20250929', 'claude-haiku-4-5-20251001', 'claude-opus-4-6'],
-  openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-4.1-mini', 'o3-mini'],
-  gemini: ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-pro'],
-  openrouter: ['anthropic/claude-sonnet-4-5', 'openai/gpt-4o', 'google/gemini-2.0-flash-001', 'meta-llama/llama-4-scout'],
+  anthropic: ['claude-haiku-4-5-20251001', 'claude-sonnet-4-5-20250929', 'claude-opus-4-6'],
+  openai: ['gpt-4.1-nano', 'gpt-4.1-mini', 'gpt-4.1', 'gpt-5-nano', 'gpt-5-mini'],
+  gemini: ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3-flash-preview'],
+  openrouter: ['anthropic/claude-haiku-4.5', 'google/gemini-2.5-flash', 'openai/gpt-4.1-mini', 'anthropic/claude-sonnet-4.5', 'meta-llama/llama-4-scout:free'],
   apple: ['on-device']
 };
 
@@ -60,7 +61,7 @@ export function saveLLMConfig(config: LLMConfig): void {
   writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2));
 }
 
-function httpPost(url: string, headers: Record<string, string>, body: string): Promise<string> {
+function httpPostOnce(url: string, headers: Record<string, string>, body: string): Promise<{ status: number; body: string; retryAfter?: number }> {
   return new Promise((resolve, reject) => {
     const parsed = new URL(url);
     const req = request({
@@ -78,17 +79,33 @@ function httpPost(url: string, headers: Record<string, string>, body: string): P
       res.on('data', (chunk: Buffer) => chunks.push(chunk));
       res.on('end', () => {
         const responseBody = Buffer.concat(chunks).toString('utf-8');
-        if (res.statusCode && res.statusCode >= 400) {
-          reject(new Error(`API error ${res.statusCode}: ${responseBody.slice(0, 200)}`));
-        } else {
-          resolve(responseBody);
-        }
+        const retryHeader = res.headers['retry-after'];
+        const retryAfter = retryHeader ? (parseInt(retryHeader, 10) || 2) : undefined;
+        resolve({ status: res.statusCode || 0, body: responseBody, retryAfter });
       });
     });
     req.on('error', reject);
     req.write(body);
     req.end();
   });
+}
+
+const MAX_RETRIES_429 = 2;
+
+async function httpPost(url: string, headers: Record<string, string>, body: string): Promise<string> {
+  for (let attempt = 0; attempt <= MAX_RETRIES_429; attempt++) {
+    const result = await httpPostOnce(url, headers, body);
+    if (result.status === 429 && attempt < MAX_RETRIES_429) {
+      const waitSec = result.retryAfter || (attempt + 1) * 3;
+      await new Promise(r => setTimeout(r, waitSec * 1000));
+      continue;
+    }
+    if (result.status >= 400) {
+      throw new Error(`API error ${result.status}: ${result.body.slice(0, 200)}`);
+    }
+    return result.body;
+  }
+  throw new Error('Rate limited after retries');
 }
 
 const SUMMARIZE_PROMPT = `Summarize this article in 2-3 concise sentences. Focus on the key argument or finding. Do not use phrases like "This article discusses" — just state the main points directly.`;
@@ -375,11 +392,11 @@ export async function summarizeText(articleText: string, config?: LLMConfig): Pr
 
 export function getDefaultModel(provider: string): string {
   switch (provider) {
-    case 'anthropic': return 'claude-sonnet-4-5-20250929';
-    case 'openai': return 'gpt-4o-mini';
-    case 'gemini': return 'gemini-2.0-flash';
-    case 'openrouter': return 'anthropic/claude-sonnet-4-5';
+    case 'anthropic': return 'claude-haiku-4-5-20251001';
+    case 'openai': return 'gpt-4.1-nano';
+    case 'gemini': return 'gemini-2.5-flash-lite';
+    case 'openrouter': return 'anthropic/claude-haiku-4.5';
     case 'apple': return 'on-device';
-    default: return 'gpt-4o-mini';
+    default: return 'gpt-4.1-nano';
   }
 }

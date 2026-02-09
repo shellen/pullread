@@ -241,6 +241,7 @@
   }
   .toolbar-icon-btn:hover { color: var(--fg) !important; }
   .toolbar-icon-btn.spinning svg { animation: spin 0.8s linear infinite; }
+  svg.spin, .spin { animation: spin 0.8s linear infinite; }
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
   /* Settings dropdown (replaces many toolbar groups) */
@@ -1276,13 +1277,14 @@
   .focus-mode .content-wrap > h3,
   .focus-mode .content-wrap > h4,
   .focus-mode .content-wrap > table {
-    opacity: 0.2;
-    transition: opacity 0.3s ease;
+    opacity: 0.25;
+    transition: opacity 0.6s ease;
   }
   .focus-mode .content-wrap > .focus-active,
   .focus-mode .content-wrap > .focus-active + p,
   .focus-mode .content-wrap > .focus-adjacent {
     opacity: 1;
+    transition: opacity 0.4s ease;
   }
   .focus-mode .content-wrap > .article-header,
   .focus-mode .content-wrap > .article-summary,
@@ -1483,7 +1485,10 @@
     color: var(--muted) !important;
     cursor: pointer;
     transition: color 0.15s;
+    display: inline-flex;
+    align-items: center;
   }
+  .focus-btn .icon { width: 16px; height: 16px; fill: currentColor; }
   .focus-btn:hover { color: var(--fg) !important; }
   .focus-btn.active { color: var(--link) !important; }
 
@@ -1555,6 +1560,7 @@
   <symbol id="i-calendar" viewBox="0 0 448 512"><path d="M152 24c0-13.3-10.7-24-24-24s-24 10.7-24 24v40H64C28.7 64 0 92.7 0 128v16 48V448c0 35.3 28.7 64 64 64h320c35.3 0 64-28.7 64-64V192 144 128c0-35.3-28.7-64-64-64h-40V24c0-13.3-10.7-24-24-24s-24 10.7-24 24v40H152V24zM48 192h352V448c0 8.8-7.2 16-16 16H64c-8.8 0-16-7.2-16-16V192z"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 512 512"><path d="M105.1 202.6c7.7-21.8 20.2-42.3 37.8-59.8c62.5-62.5 163.8-62.5 226.3 0L386.3 160H352c-17.7 0-32 14.3-32 32s14.3 32 32 32h111.5c0 0 .1 0 .1 0c.4 0 .8 0 1.2 0H480c17.7 0 32-14.3 32-32V80c0-17.7-14.3-32-32-32s-32 14.3-32 32v35.2L430.9 99.9C349.7 18.7 221.5 4.2 126 69.3c-9.2 6.3-13.5 18.1-8.3 28.4c5.2 10.4 17.5 15.3 28.5 10.8c1.5-.6 3-1.4 4.5-2.2c-16.2 27.2-27.3 58-31.5 90.3H105.1zm16.5 116.9c-7.7 21.8-20.2 42.3-37.8 59.8c-62.5 62.5-163.8 62.5-226.3 0L125.7 352H160c17.7 0 32-14.3 32-32s-14.3-32-32-32H48.5c0 0-.1 0-.1 0c-.4 0-.8 0-1.2 0H32c-17.7 0-32 14.3-32 32v112c0 17.7 14.3 32 32 32s32-14.3 32-32v-35.2L81.1 412.1c81.2 81.2 209.4 95.6 304.9 30.5c9.2-6.3 13.5-18.1 8.3-28.4c-5.2-10.4-17.5-15.3-28.5-10.8c-1.5 .6-3 1.4-4.5 2.2c16.2-27.2 27.3-58 31.5-90.3h13.9z"/></symbol>
   <symbol id="i-share" viewBox="0 0 512 512"><path d="M307 34.8c-11.5 5.1-19 16.6-19 29.2v64H176C78.8 128 0 206.8 0 304C0 417.3 81.5 467.9 100.2 478.1c2.5 1.4 5.3 1.9 8.1 1.9c10.9 0 19.7-8.9 19.7-19.7c0-7.5-4.3-14.4-9.8-19.5C108.8 431.9 96 414.4 96 384c0-53 43-96 96-96h96v64c0 12.6 7.4 24.1 19 29.2s25 3 34.4-5.4l160-144c6.7-6.1 10.6-14.7 10.6-23.8s-3.8-17.7-10.6-23.8l-160-144c-9.4-8.5-22.9-10.6-34.4-5.4z"/></symbol>
+  <symbol id="i-focus" viewBox="0 0 24 24"><path d="M3 7h18v2H3V7zm0 8h18v2H3v-2z" opacity=".3"/><path d="M3 13h18v2H3z"/></symbol>
 </svg>
 <div class="app" role="application" aria-label="PullRead article reader">
 
@@ -1564,7 +1570,7 @@
 
     <div class="toolbar-spacer"></div>
 
-    <button class="focus-btn" onclick="toggleFocusMode()" aria-label="Toggle focus mode" title="Focus mode (f)" id="focus-btn">&#9681;</button>
+    <button class="focus-btn" onclick="toggleFocusMode()" aria-label="Toggle focus mode" title="Focus mode (f)" id="focus-btn"><svg class="icon" aria-hidden="true"><use href="#i-focus"/></svg></button>
     <button class="toolbar-icon-btn" onclick="refreshArticleList()" aria-label="Refresh articles" title="Refresh" id="refresh-btn"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></button>
     <div class="settings-dropdown">
       <button class="settings-dropdown-btn" onclick="toggleSettingsDropdown()" aria-label="Reader settings" aria-expanded="false" id="settings-toggle-btn"><svg class="icon" aria-hidden="true"><use href="#i-gear"/></svg></button>
@@ -1764,6 +1770,11 @@ function toggleSettingsDropdown() {
         <option value="wide" ${currentWidth==='wide'?'selected':''}>Wide</option>
       </select>
     </div>
+    <hr style="border:none;border-top:1px solid var(--border);margin:12px 0 8px">
+    <label>Article</label>
+    <div class="setting-row">
+      <button onclick="reprocessCurrentArticle(this)" id="reprocess-btn" style="flex:1;text-align:center" title="Re-fetch this article from the original URL"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-refresh"/></svg> Re-fetch from source</button>
+    </div>
   `;
   document.querySelector('.settings-dropdown').appendChild(panel);
   btn.setAttribute('aria-expanded', 'true');
@@ -1801,7 +1812,7 @@ function parseFrontmatter(text) {
     const idx = line.indexOf(':');
     if (idx > 0) {
       const key = line.slice(0, idx).trim();
-      const val = line.slice(idx + 1).trim().replace(/^"(.*)"$/, '$1');
+      const val = line.slice(idx + 1).trim().replace(/^"(.*)"$/, '$1').replace(/\\"/g, '"');
       meta[key] = val;
     }
   });
@@ -1829,6 +1840,45 @@ function cleanMarkdown(md) {
   // Fix image syntax broken by newlines: ![\nalt\n]\n(url) -> ![alt](url)
   md = md.replace(/!\[\s*\n?\s*([^\]]*?)\s*\n?\s*\]\s*\n\s*(\([^)]*\))/g, '![$1]$2');
 
+  // Fix standalone brackets wrapping images on same line: [![alt](img)] -> ![alt](img)
+  md = md.replace(/\[\s*(!\[[^\]]*\]\([^)]*\))\s*\]/g, '$1');
+
+  // Fix broken link-wrapped images where link part is on next line: [![alt](img)]\n(url)
+  md = md.replace(/(!\[[^\]]*\]\([^)]*\))\s*\]\s*\n\s*(\([^)]*\))/g, '$1');
+
+  // Remove orphaned ](...) on its own line after an image (broken link fragment)
+  md = md.replace(/(!\[[^\]]*\]\([^)]*\))\s*\n+\s*\]\([^)]*\)/g, '$1');
+
+  // Remove standalone parenthesized URLs on their own line (leftover link targets)
+  // e.g. a line that is just "(https://substackcdn.com/image/fetch/...)"
+  md = md.replace(/\n\(https?:\/\/[^)]+\)\s*$/gm, '');
+
+  // Remove Wayback Machine parenthesized URLs: (/web/20250908.../https://...)
+  md = md.replace(/\(\/web\/\d+\/https?:\/\/[^)]+\)/g, '');
+
+  // Remove lone [ or ] on their own line (broken markdown fragments)
+  md = md.replace(/^\s*[\[\]]\s*$/gm, '');
+
+  // Remove common image accessibility boilerplate from Wayback/archive extractions
+  md = md.replace(/^\s*Press enter or click to view image in full size\s*$/gm, '');
+
+  // Clean up PDF LaTeX/math artifacts from arxiv and academic papers
+  md = md.replace(/start_POSTSUBSCRIPT\b/g, '');
+  md = md.replace(/end_POSTSUBSCRIPT\b/g, '');
+  md = md.replace(/start_POSTSUPERSCRIPT\b/g, '');
+  md = md.replace(/end_POSTSUPERSCRIPT\b/g, '');
+  md = md.replace(/\\boldsymbol\{[^}]*\}/g, '');
+  md = md.replace(/\\mathbb\{[^}]*\}/g, '');
+  md = md.replace(/\\left[\\\[\({|]/g, '');
+  md = md.replace(/\\right[\\\]\)}|]/g, '');
+  md = md.replace(/\\(?:text|mathrm|mathbf|mathcal|mathit)\{([^}]*)\}/g, '$1');
+  md = md.replace(/\\(?:frac|sqrt|sum|prod|int|partial|nabla|infty|approx|neq|leq|geq|in|notin|subset|supset|cup|cap|forall|exists)\b/g, '');
+  md = md.replace(/\^\{\\prime\}/g, "'");
+  md = md.replace(/\{([^{}]*)\}/g, '$1');
+
+  // Remove leftover empty lines from cleanup
+  md = md.replace(/\n{3,}/g, '\n\n');
+
   return md;
 }
 
@@ -1850,7 +1900,17 @@ function renderArticle(text, filename) {
   }
   html += '<div class="article-byline">';
   const bylineParts = [];
-  if (meta && meta.author) bylineParts.push('<span class="author">' + escapeHtml(meta.author) + '</span>');
+  if (meta && meta.author) {
+    // Truncate overly long bylines (e.g. full author bios from PDFs/arxiv)
+    var authorText = meta.author;
+    if (authorText.length > 80) {
+      // Try to cut at first sentence boundary or period
+      var cutoff = authorText.indexOf('. ');
+      if (cutoff > 10 && cutoff < 80) authorText = authorText.slice(0, cutoff);
+      else authorText = authorText.slice(0, 80).replace(/\s+\S*$/, '') + '\u2026';
+    }
+    bylineParts.push('<span class="author">' + escapeHtml(authorText) + '</span>');
+  }
   if (meta && meta.domain) bylineParts.push('<a href="' + escapeHtml(meta.url || '') + '" target="_blank">' + escapeHtml(meta.domain) + '</a>');
   if (meta && meta.bookmarked) bylineParts.push(escapeHtml(meta.bookmarked.slice(0, 10)));
   html += bylineParts.join('<span class="sep">&middot;</span>');
@@ -1882,7 +1942,7 @@ function renderArticle(text, filename) {
   // Strip the leading H1 from markdown body if it matches the title (avoid duplication)
   let articleBody = cleanMarkdown(body);
   if (meta && meta.title) {
-    var h1Match = articleBody.match(/^#\s+(.+)\s*\n/);
+    var h1Match = articleBody.match(/^\s*#\s+(.+)\s*\n/);
     if (h1Match) {
       var normalize = function(s) { return s.toLowerCase().replace(/[\u2018\u2019\u201C\u201D]/g, "'").replace(/[^a-z0-9]/g, ''); };
       // Strip if title matches, or if it's a review (title always duplicated in body)
@@ -1946,6 +2006,50 @@ function renderArticle(text, filename) {
     }
     table.setAttribute('role', 'table');
   });
+  // Open article content links in new window
+  content.querySelectorAll('a[href]').forEach(function(a) {
+    var href = a.getAttribute('href');
+    if (href && !href.startsWith('#')) {
+      a.setAttribute('target', '_blank');
+      a.setAttribute('rel', 'noopener noreferrer');
+    }
+  });
+  // Wrap standalone images in links to their full-size source
+  content.querySelectorAll('img[src]').forEach(function(img) {
+    var parent = img.parentElement;
+    // Skip images already wrapped in a link
+    if (parent && parent.tagName === 'A') return;
+    var src = img.getAttribute('src');
+    if (!src || src.startsWith('data:')) return;
+    var a = document.createElement('a');
+    a.href = src;
+    a.setAttribute('target', '_blank');
+    a.setAttribute('rel', 'noopener noreferrer');
+    img.parentNode.insertBefore(a, img);
+    a.appendChild(img);
+  });
+  // Clean up leftover broken markdown artifacts (stray brackets, parenthesized URLs)
+  (function cleanBrokenFragments(root) {
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    var removals = [];
+    while (walker.nextNode()) {
+      var node = walker.currentNode;
+      var text = node.textContent;
+      // Remove text nodes that are just lone brackets
+      if (/^\s*[\[\]]\s*$/.test(text)) { removals.push(node); continue; }
+      // Remove text nodes that are just a parenthesized URL
+      if (/^\s*\(https?:\/\/[^)]+\)\s*$/.test(text)) { removals.push(node); continue; }
+      // Remove leading/trailing lone brackets in mixed text
+      var cleaned = text.replace(/^\s*\[\s*/, '').replace(/\s*\]\s*$/, '');
+      if (cleaned !== text) node.textContent = cleaned;
+    }
+    removals.forEach(function(n) {
+      var p = n.parentElement;
+      n.remove();
+      // Remove empty <p> tags left behind
+      if (p && p.tagName === 'P' && !p.textContent.trim() && !p.querySelector('img,a,iframe')) p.remove();
+    });
+  })(content);
 
   // Add read time & word count to byline
   const articleBodyText = content.textContent || '';
@@ -2838,6 +2942,37 @@ function providerLabel(provider) {
   return labels[provider] || provider;
 }
 
+async function reprocessCurrentArticle(btn) {
+  if (!serverMode || !activeFile) return;
+  var origText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<svg class="icon icon-sm spin" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-refresh"/></svg> Re-fetching\u2026';
+  try {
+    var res = await fetch('/api/reprocess', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: activeFile })
+    });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Reprocess failed');
+    btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-refresh"/></svg> Done!';
+    // Reload the article content
+    setTimeout(async function() {
+      btn.innerHTML = origText;
+      btn.disabled = false;
+      // Re-fetch and render the updated article
+      try {
+        var r = await fetch('/api/file?name=' + encodeURIComponent(activeFile));
+        if (r.ok) { var text = await r.text(); renderArticle(text, activeFile); await loadAnnotations(activeFile); }
+      } catch(e) {}
+    }, 800);
+  } catch (err) {
+    btn.innerHTML = origText;
+    btn.disabled = false;
+    alert('Re-fetch failed: ' + (err.message || err));
+  }
+}
+
 async function summarizeArticle() {
   if (!serverMode || !activeFile) return;
   const btn = document.getElementById('summarize-btn');
@@ -3542,7 +3677,14 @@ function updateFocusMode() {
 
   const pane = document.getElementById('content-pane');
   const paneRect = pane.getBoundingClientRect();
-  const centerY = paneRect.top + paneRect.height * 0.4;
+  // Shift the focus point near the top/bottom of the scroll so edge
+  // paragraphs still get highlighted instead of being permanently dimmed.
+  const scrollTop = pane.scrollTop;
+  const scrollBottom = pane.scrollHeight - pane.clientHeight - scrollTop;
+  let focusRatio = 0.4;
+  if (scrollTop < 200) focusRatio = 0.15;
+  else if (scrollBottom < 200) focusRatio = 0.7;
+  const centerY = paneRect.top + paneRect.height * focusRatio;
 
   const blocks = content.querySelectorAll(':scope > p, :scope > blockquote, :scope > ul, :scope > ol, :scope > pre, :scope > h2, :scope > h3, :scope > h4, :scope > table');
 

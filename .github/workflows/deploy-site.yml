@@ -29,16 +29,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Fetch appcast from gh-pages (if exists)
+      - name: Fetch appcast from gh-pages (if not in main)
         run: |
-          # Pull in appcast.xml from gh-pages so it stays available
-          # alongside the marketing site after deployment
-          git fetch origin gh-pages --depth=1 2>/dev/null || true
-          if git show origin/gh-pages:appcast.xml > /dev/null 2>&1; then
-            git show origin/gh-pages:appcast.xml > site/appcast.xml
-            echo "Copied appcast.xml into site/"
+          # Only pull appcast.xml from gh-pages if site/appcast.xml
+          # doesn't already exist on main. This prevents overwriting
+          # a freshly committed appcast from the release workflow.
+          if [ -f site/appcast.xml ]; then
+            echo "site/appcast.xml exists in checkout, keeping it"
           else
-            echo "No appcast.xml found on gh-pages, skipping"
+            git fetch origin gh-pages --depth=1 2>/dev/null || true
+            if git show origin/gh-pages:appcast.xml > /dev/null 2>&1; then
+              git show origin/gh-pages:appcast.xml > site/appcast.xml
+              echo "Copied appcast.xml from gh-pages into site/"
+            else
+              echo "No appcast.xml found anywhere, skipping"
+            fi
           fi
 
       - name: Setup Pages
