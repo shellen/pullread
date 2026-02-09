@@ -368,8 +368,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 switch result {
                 case .success(let output):
                     self?.showNotification(title: "Sync Complete", body: self?.parseSyncSummary(output) ?? "Sync finished")
+                    // Run auto-tagging in the background if enabled
+                    self?.runAutotagIfEnabled()
                 case .failure(let error):
                     self?.showNotification(title: "Sync Failed", body: error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    private func runAutotagIfEnabled() {
+        guard UserDefaults.standard.bool(forKey: "autotagAfterSync") else { return }
+
+        syncService.runAutotag { [weak self] result in
+            DispatchQueue.main.async {
+                if case .failure(let error) = result {
+                    // Log but don't notify — auto-tagging is a background task
+                    print("Auto-tag failed: \(error.localizedDescription)")
                 }
             }
         }

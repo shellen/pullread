@@ -88,6 +88,32 @@ struct WhatsNewView: View {
 
     private var releaseNotes: [String: [Highlight]] {
         [
+            "1.2.0": [
+                Highlight(
+                    icon: "macwindow",
+                    color: .blue,
+                    title: "Built-in Article Viewer",
+                    description: "View Articles now opens in a native in-app window instead of launching Safari. No URL bar — just your articles in a clean reader."
+                ),
+                Highlight(
+                    icon: "tag.fill",
+                    color: .purple,
+                    title: "Machine Tags & Relational Mapping",
+                    description: "Auto-generate topic, entity, and theme tags for articles using your AI provider. Tags power connections between articles."
+                ),
+                Highlight(
+                    icon: "gearshape.fill",
+                    color: .orange,
+                    title: "New Preferences",
+                    description: "Choose between in-app viewer or default browser. Toggle auto-tagging after sync. The app now appears in the Dock when the viewer is open."
+                ),
+                Highlight(
+                    icon: "arrow.triangle.2.circlepath",
+                    color: .green,
+                    title: "Sparkle Update Fix",
+                    description: "Auto-updates now initialize properly, fixing an issue where Check for Updates could fail silently."
+                )
+            ],
             "1.1.0": [
                 Highlight(
                     icon: "book.fill",
@@ -156,5 +182,5 @@ struct WhatsNewView: View {
 }
 
 #Preview {
-    WhatsNewView(version: "1.1.0")
+    WhatsNewView(version: "1.2.0")
 }

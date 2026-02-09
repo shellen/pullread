@@ -32,6 +32,7 @@ struct SettingsView: View {
     @State private var reviewSchedule: String = "off"
     @State private var syncInterval: String = "1h"
     @State private var viewerMode: String = "window"
+    @State private var autotagAfterSync: Bool = false
     @State private var selectedTab: Int = 0
 
     private static let knownModels: [String: [String]] = [
@@ -409,6 +410,21 @@ struct SettingsView: View {
                 Text("Choose whether View Articles opens in the built-in reader or your default web browser.")
                     .font(.caption)
                     .foregroundColor(.secondary)
+
+                Divider()
+
+                // Auto-tagging
+                Toggle(isOn: $autotagAfterSync) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Auto-Tag After Sync")
+                            .fontWeight(.medium)
+                        Text("Automatically generate machine tags for new articles after each sync. Uses your configured AI provider. Tags power relational mapping between articles.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .toggleStyle(.switch)
+                .padding(.vertical, 4)
 
                 Divider()
 
@@ -930,10 +946,11 @@ struct SettingsView: View {
             }
         }
 
-        // Load review schedule, sync interval, and viewer mode from UserDefaults
+        // Load review schedule, sync interval, viewer mode, and autotag from UserDefaults
         reviewSchedule = UserDefaults.standard.string(forKey: "reviewSchedule") ?? "off"
         syncInterval = UserDefaults.standard.string(forKey: "syncInterval") ?? "1h"
         viewerMode = UserDefaults.standard.string(forKey: "viewerMode") ?? "window"
+        autotagAfterSync = UserDefaults.standard.bool(forKey: "autotagAfterSync")
     }
 
     private func saveConfig() {
@@ -1013,10 +1030,11 @@ struct SettingsView: View {
                 try settingsData.write(to: URL(fileURLWithPath: settingsPath))
             }
 
-            // Save review schedule, sync interval, and viewer mode
+            // Save review schedule, sync interval, viewer mode, and autotag
             UserDefaults.standard.set(reviewSchedule, forKey: "reviewSchedule")
             UserDefaults.standard.set(syncInterval, forKey: "syncInterval")
             UserDefaults.standard.set(viewerMode, forKey: "viewerMode")
+            UserDefaults.standard.set(autotagAfterSync, forKey: "autotagAfterSync")
 
             isPresented = false
             if isFirstRun {

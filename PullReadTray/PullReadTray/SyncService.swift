@@ -276,6 +276,66 @@ class SyncService {
         }
     }
 
+    /// Runs batch auto-tagging on articles that don't have machine tags yet.
+    /// Intended to run in the background after a sync completes.
+    func runAutotag(completion: @escaping (Result<String, Error>) -> Void) {
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+
+            guard self.isBinaryAvailable() else {
+                completion(.failure(NSError(domain: "PullRead", code: 1, userInfo: [NSLocalizedDescriptionKey: "PullRead binary not found"])))
+                return
+            }
+
+            let process = Process()
+            let pipe = Pipe()
+            let errorPipe = Pipe()
+
+            process.executableURL = URL(fileURLWithPath: self.binaryPath)
+            process.arguments = ["autotag", "--batch", "--config-path", self.getConfigPath(), "--data-path", "\(self.configDir)/pullread.db"]
+            process.standardOutput = pipe
+            process.standardError = errorPipe
+
+            var outputData = Data()
+            var errorData = Data()
+
+            let outputGroup = DispatchGroup()
+            let errorGroup = DispatchGroup()
+
+            outputGroup.enter()
+            DispatchQueue(label: "pullread.autotag.stdout").async {
+                outputData = pipe.fileHandleForReading.readDataToEndOfFile()
+                outputGroup.leave()
+            }
+
+            errorGroup.enter()
+            DispatchQueue(label: "pullread.autotag.stderr").async {
+                errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+                errorGroup.leave()
+            }
+
+            do {
+                try process.run()
+                process.waitUntilExit()
+                outputGroup.wait()
+                errorGroup.wait()
+
+                let output = String(data: outputData, encoding: .utf8) ?? ""
+                let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
+                self.logOutput(output + errorOutput)
+
+                if process.terminationStatus == 0 {
+                    completion(.success(output))
+                } else {
+                    let msg = errorOutput.isEmpty ? "Auto-tag failed with exit code \(process.terminationStatus)" : errorOutput
+                    completion(.failure(NSError(domain: "PullRead", code: Int(process.terminationStatus), userInfo: [NSLocalizedDescriptionKey: msg])))
+                }
+            } catch {
+                completion(.failure(error))
+            }
+        }
+    }
+
     /// Stops the article viewer server if running
     func stopViewer() {
         viewerProcess?.terminate()
