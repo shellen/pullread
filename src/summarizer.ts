@@ -16,11 +16,12 @@ export interface LLMConfig {
 }
 
 // Known models per provider — used for dropdown guidance
+// Ordered cheapest-first within each provider for summarization tasks
 export const KNOWN_MODELS: Record<Provider, string[]> = {
   anthropic: ['claude-haiku-4-5-20251001', 'claude-sonnet-4-5-20250929', 'claude-opus-4-6'],
-  openai: ['gpt-4.1-mini', 'gpt-4.1-nano', 'gpt-4.1', 'gpt-4o-mini', 'o4-mini'],
-  gemini: ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro'],
-  openrouter: ['anthropic/claude-haiku-4-5', 'anthropic/claude-sonnet-4-5', 'google/gemini-2.5-flash', 'openai/gpt-4.1-mini'],
+  openai: ['gpt-4.1-nano', 'gpt-4.1-mini', 'gpt-4.1', 'gpt-5-nano', 'gpt-5-mini'],
+  gemini: ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3-flash-preview'],
+  openrouter: ['anthropic/claude-haiku-4.5', 'google/gemini-2.5-flash', 'openai/gpt-4.1-mini', 'anthropic/claude-sonnet-4.5', 'meta-llama/llama-4-scout:free'],
   apple: ['on-device']
 };
 
@@ -392,10 +393,10 @@ export async function summarizeText(articleText: string, config?: LLMConfig): Pr
 export function getDefaultModel(provider: string): string {
   switch (provider) {
     case 'anthropic': return 'claude-haiku-4-5-20251001';
-    case 'openai': return 'gpt-4.1-mini';
-    case 'gemini': return 'gemini-2.5-flash';
-    case 'openrouter': return 'anthropic/claude-haiku-4-5';
+    case 'openai': return 'gpt-4.1-nano';
+    case 'gemini': return 'gemini-2.5-flash-lite';
+    case 'openrouter': return 'anthropic/claude-haiku-4.5';
     case 'apple': return 'on-device';
-    default: return 'gpt-4.1-mini';
+    default: return 'gpt-4.1-nano';
   }
 }
