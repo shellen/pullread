@@ -2,6 +2,7 @@
 // ABOUTME: Creates status bar item with sync controls and status display
 
 import Cocoa
+import Combine
 import SwiftUI
 import UserNotifications
 import Sparkle
@@ -22,6 +23,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var hasUnreadReview: Bool = false
 
     private var updaterController: SPUStandardUpdaterController?
+    private var cancellables = Set<AnyCancellable>()
 
     /// Returns true if running in a unit test environment
     /// Uses multiple detection methods for reliability across different test runners
@@ -196,6 +198,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Check for Updates (Sparkle)
         checkForUpdatesMenuItem = NSMenuItem(title: "Check for Updates...", action: #selector(checkForUpdates), keyEquivalent: "")
         checkForUpdatesMenuItem.target = self
+        // Observe Sparkle's canCheckForUpdates to enable/disable the menu item
+        if let updater = updaterController?.updater {
+            updater.publisher(for: \.canCheckForUpdates)
+                .receive(on: RunLoop.main)
+                .sink { [weak self] canCheck in
+                    self?.checkForUpdatesMenuItem.isEnabled = canCheck
+                }
+                .store(in: &cancellables)
+        }
         menu.addItem(checkForUpdatesMenuItem)
 
         menu.addItem(NSMenuItem.separator())
@@ -520,7 +531,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func checkForUpdates() {
-        updaterController?.checkForUpdates(nil)
+        // Use the updater directly to ensure the check runs
+        // SPUStandardUpdaterController.checkForUpdates is an IBAction that
+        // requires a proper sender for the UI flow
+        updaterController?.checkForUpdates(checkForUpdatesMenuItem)
     }
 
     private func checkForVersionUpdate() {

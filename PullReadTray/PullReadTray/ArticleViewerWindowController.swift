@@ -4,10 +4,11 @@
 import Cocoa
 import WebKit
 
-class ArticleViewerWindowController: NSObject, NSWindowDelegate {
+class ArticleViewerWindowController: NSObject, NSWindowDelegate, WKNavigationDelegate {
     private var window: NSWindow?
     private var webView: WKWebView?
     private var titleObservation: NSKeyValueObservation?
+    private let viewerOrigin = "http://localhost:7777"
 
     var isVisible: Bool {
         window?.isVisible ?? false
@@ -26,6 +27,7 @@ class ArticleViewerWindowController: NSObject, NSWindowDelegate {
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
 
         let wv = WKWebView(frame: .zero, configuration: config)
+        wv.navigationDelegate = self
         wv.allowsBackForwardNavigationGestures = true
 
         // Observe the page title so we can reflect it in the window title
@@ -73,6 +75,36 @@ class ArticleViewerWindowController: NSObject, NSWindowDelegate {
         window?.close()
         window = nil
         webView = nil
+    }
+
+    // MARK: - WKNavigationDelegate
+
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        guard let url = navigationAction.request.url else {
+            decisionHandler(.allow)
+            return
+        }
+
+        // Allow the initial page load and any localhost API/navigation
+        if url.absoluteString.hasPrefix(viewerOrigin) {
+            decisionHandler(.allow)
+            return
+        }
+
+        // Allow data URIs and about:blank
+        if url.scheme == "data" || url.scheme == "about" {
+            decisionHandler(.allow)
+            return
+        }
+
+        // External link — open in the user's default browser
+        if url.scheme == "http" || url.scheme == "https" {
+            NSWorkspace.shared.open(url)
+            decisionHandler(.cancel)
+            return
+        }
+
+        decisionHandler(.allow)
     }
 
     // MARK: - NSWindowDelegate

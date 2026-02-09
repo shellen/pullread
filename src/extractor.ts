@@ -166,6 +166,113 @@ export function extractYouTubeId(url: string): string | null {
 }
 
 /**
+ * Detect if a URL is a Bluesky post
+ */
+function isBlueskyUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return host === 'bsky.app' || host === 'staging.bsky.app';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Detect if a URL is a Mastodon post (common instances)
+ */
+function isMastodonUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    const path = new URL(url).pathname;
+    // Common Mastodon instances + path pattern /@user/123456
+    const knownInstances = ['mastodon.social', 'mastodon.online', 'hachyderm.io', 'infosec.exchange', 'fosstodon.org', 'mstdn.social', 'techhub.social'];
+    if (knownInstances.includes(host) && path.match(/^\/@[^/]+\/\d+/)) return true;
+    // Generic detection: /@user/digits pattern (common Mastodon URL structure)
+    if (path.match(/^\/@[^/]+\/\d+$/)) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Detect if a URL is a Reddit post
+ */
+function isRedditUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return host === 'www.reddit.com' || host === 'reddit.com' ||
+           host === 'old.reddit.com' || host === 'np.reddit.com';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Detect if a URL is a Hacker News thread
+ */
+function isHackerNewsUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return (u.hostname === 'news.ycombinator.com' || u.hostname === 'hacker-news.firebaseio.com') &&
+           u.pathname === '/item';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Detect if a URL is a social post (any platform)
+ */
+function isSocialPostUrl(url: string): boolean {
+  return isTwitterUrl(url) || isBlueskyUrl(url) || isMastodonUrl(url);
+}
+
+/**
+ * Generate a friendly title for social posts based on platform
+ */
+function generateSocialTitle(html: string, url: string): string {
+  const { document } = parseHTML(html);
+  const desc = document.querySelector('meta[property="og:description"]')?.getAttribute('content')
+    || document.querySelector('meta[name="description"]')?.getAttribute('content')
+    || '';
+
+  let platform = 'social media';
+  let username = '';
+
+  try {
+    const u = new URL(url);
+    const parts = u.pathname.split('/').filter(Boolean);
+
+    if (isTwitterUrl(url)) {
+      platform = 'X';
+      username = parts[0] ? `@${parts[0]}` : '';
+    } else if (isBlueskyUrl(url)) {
+      platform = 'Bluesky';
+      // bsky.app/profile/user.bsky.social/post/123
+      if (parts[0] === 'profile' && parts[1]) {
+        username = parts[1].includes('.') ? `@${parts[1].split('.')[0]}` : `@${parts[1]}`;
+      }
+    } else if (isMastodonUrl(url)) {
+      platform = 'Mastodon';
+      if (parts[0]?.startsWith('@')) username = parts[0];
+    }
+  } catch {}
+
+  if (desc) {
+    const clean = desc.replace(/\n/g, ' ').trim();
+    const short = clean.length > 80 ? clean.slice(0, 77) + '...' : clean;
+    return short;
+  }
+
+  if (username) {
+    return `A post by ${username} on ${platform}`;
+  }
+
+  return `A post on ${platform}`;
+}
+
+/**
  * Generate a friendly title for X.com/Twitter posts
  */
 function generateTwitterTitle(html: string, url: string): string {
@@ -212,8 +319,10 @@ export function extractArticle(html: string, url: string): ExtractedArticle | nu
     );
     let title = article.title || 'Untitled';
 
-    // For X.com/Twitter, "Untitled" is common — generate a better title
-    if ((title === 'Untitled' || !title.trim()) && isTwitterUrl(url)) {
+    // For social posts, "Untitled" is common — generate a better title
+    if ((title === 'Untitled' || !title.trim()) && isSocialPostUrl(url)) {
+      title = generateSocialTitle(html, url);
+    } else if (isTwitterUrl(url) && (title === 'Untitled' || !title.trim())) {
       title = generateTwitterTitle(html, url);
     }
 
@@ -259,11 +368,15 @@ function extractFallback(document: any, url: string): ExtractedArticle | null {
   const body = jsonLdContent || description;
   if (!title || !body) return null;
 
-  // For X.com/Twitter, replace generic titles
+  // For social posts, replace generic titles
   let finalTitle = title;
-  if ((finalTitle === 'Untitled' || !finalTitle.trim()) && isTwitterUrl(url)) {
-    const clean = description.replace(/\n/g, ' ').trim();
-    finalTitle = clean.length > 80 ? clean.slice(0, 77) + '...' : (clean || 'A post on X');
+  if (!finalTitle.trim() || finalTitle === 'Untitled') {
+    if (isSocialPostUrl(url)) {
+      finalTitle = generateSocialTitle(`<html><head><meta property="og:description" content="${description}"></head></html>`, url);
+    } else if (isTwitterUrl(url)) {
+      const clean = description.replace(/\n/g, ' ').trim();
+      finalTitle = clean.length > 80 ? clean.slice(0, 77) + '...' : (clean || 'A post on X');
+    }
   }
 
   const markdown = body;
@@ -532,6 +645,51 @@ async function extractYouTube(url: string, videoId: string, options: FetchOption
   };
 }
 
+/**
+ * Detect Apple News URLs (apple.news shortlinks)
+ */
+function isAppleNewsUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return host === 'apple.news' || host === 'www.apple.news';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resolve Apple News URL to the original article URL by following redirects.
+ * Apple News links are shortlinks that 302-redirect to the real article.
+ */
+async function resolveAppleNewsUrl(url: string): Promise<string> {
+  try {
+    const response = await fetch(url, {
+      method: 'HEAD',
+      redirect: 'follow',
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' }
+    });
+    // The final URL after redirects is the real article
+    if (response.url && response.url !== url && !isAppleNewsUrl(response.url)) {
+      return response.url;
+    }
+    // Fallback: try GET if HEAD didn't resolve
+    const getResponse = await fetch(url, {
+      redirect: 'follow',
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' }
+    });
+    if (getResponse.url && getResponse.url !== url && !isAppleNewsUrl(getResponse.url)) {
+      return getResponse.url;
+    }
+    // Last resort: parse the HTML for a canonical URL or meta refresh
+    const html = await getResponse.text();
+    const canonMatch = html.match(/<link[^>]*rel=["']canonical["'][^>]*href=["']([^"']+)["']/i);
+    if (canonMatch) return canonMatch[1];
+    const refreshMatch = html.match(/<meta[^>]*http-equiv=["']refresh["'][^>]*content=["'][^"']*url=([^"'\s]+)/i);
+    if (refreshMatch) return refreshMatch[1];
+  } catch {}
+  return url;
+}
+
 export async function fetchAndExtract(
   url: string,
   options: FetchOptions = {}
@@ -540,6 +698,15 @@ export async function fetchAndExtract(
   const skipReason = shouldSkipUrl(url);
   if (skipReason) {
     throw new Error(skipReason);
+  }
+
+  // Resolve Apple News shortlinks to original article URLs
+  if (isAppleNewsUrl(url)) {
+    const resolved = await resolveAppleNewsUrl(url);
+    if (resolved !== url) {
+      // Recursively extract the resolved URL
+      return fetchAndExtract(resolved, options);
+    }
   }
 
   // YouTube videos get special handling — embed + transcript

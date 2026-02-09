@@ -180,6 +180,69 @@
     color: var(--link) !important;
   }
 
+  /* Share dropdown */
+  .share-dropdown {
+    position: relative;
+    display: inline-block;
+  }
+  .share-dropdown-panel {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    width: 200px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    padding: 6px;
+    z-index: 55;
+    animation: fadeIn 0.12s ease;
+    font-size: 13px;
+  }
+  .share-dropdown-panel a,
+  .share-dropdown-panel button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 10px;
+    border: none;
+    background: none;
+    color: var(--fg);
+    font-size: 13px;
+    text-decoration: none;
+    border-radius: 5px;
+    cursor: pointer;
+    text-align: left;
+  }
+  .share-dropdown-panel a:hover,
+  .share-dropdown-panel button:hover {
+    background: var(--sidebar-hover);
+  }
+  .share-dropdown-panel .share-icon {
+    width: 16px;
+    text-align: center;
+    flex-shrink: 0;
+    opacity: 0.7;
+  }
+  .share-dropdown-panel hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 4px 0;
+  }
+
+  .toolbar-icon-btn {
+    background: none !important;
+    border: 1px solid transparent !important;
+    font-size: 15px !important;
+    padding: 2px 6px !important;
+    color: var(--muted) !important;
+    cursor: pointer;
+  }
+  .toolbar-icon-btn:hover { color: var(--fg) !important; }
+  .toolbar-icon-btn.spinning svg { animation: spin 0.8s linear infinite; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
   /* Settings dropdown (replaces many toolbar groups) */
   .settings-dropdown {
     position: relative;
@@ -1490,6 +1553,8 @@
   <symbol id="i-tags" viewBox="0 0 512 512"><path d="M345 39.1L472.8 168.4c52.4 53 52.4 138.2 0 191.2L360.8 472.9c-9.3 9.4-24.5 9.5-33.9.2s-9.5-24.5-.2-33.9L438.6 325.9c33.9-34.3 33.9-89.4 0-123.7L310.9 72.9c-9.3-9.4-9.2-24.6.2-33.9s24.6-9.2 33.9.2zM0 229.5V80C0 53.5 21.5 32 48 32H197.5c17 0 33.3 6.7 45.3 18.7l168 168c25 25 25 65.5 0 90.5L277.3 442.7c-25 25-65.5 25-90.5 0l-168-168C6.7 262.7 0 246.5 0 229.5zM144 144a32 32 0 1 0-64 0 32 32 0 1 0 64 0z"/></symbol>
   <symbol id="i-book" viewBox="0 0 448 512"><path d="M96 0C43 0 0 43 0 96v320c0 53 43 96 96 96h320c17.7 0 32-14.3 32-32s-14.3-32-32-32v-64c17.7 0 32-14.3 32-32V32c0-17.7-14.3-32-32-32H96zm0 384h256v64H96c-17.7 0-32-14.3-32-32s14.3-32 32-32zm32-240c0-8.8 7.2-16 16-16h192c8.8 0 16 7.2 16 16s-7.2 16-16 16H144c-8.8 0-16-7.2-16-16zm16 48h192c8.8 0 16 7.2 16 16s-7.2 16-16 16H144c-8.8 0-16-7.2-16-16s7.2-16 16-16z"/></symbol>
   <symbol id="i-calendar" viewBox="0 0 448 512"><path d="M152 24c0-13.3-10.7-24-24-24s-24 10.7-24 24v40H64C28.7 64 0 92.7 0 128v16 48V448c0 35.3 28.7 64 64 64h320c35.3 0 64-28.7 64-64V192 144 128c0-35.3-28.7-64-64-64h-40V24c0-13.3-10.7-24-24-24s-24 10.7-24 24v40H152V24zM48 192h352V448c0 8.8-7.2 16-16 16H64c-8.8 0-16-7.2-16-16V192z"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 512 512"><path d="M105.1 202.6c7.7-21.8 20.2-42.3 37.8-59.8c62.5-62.5 163.8-62.5 226.3 0L386.3 160H352c-17.7 0-32 14.3-32 32s14.3 32 32 32h111.5c0 0 .1 0 .1 0c.4 0 .8 0 1.2 0H480c17.7 0 32-14.3 32-32V80c0-17.7-14.3-32-32-32s-32 14.3-32 32v35.2L430.9 99.9C349.7 18.7 221.5 4.2 126 69.3c-9.2 6.3-13.5 18.1-8.3 28.4c5.2 10.4 17.5 15.3 28.5 10.8c1.5-.6 3-1.4 4.5-2.2c-16.2 27.2-27.3 58-31.5 90.3H105.1zm16.5 116.9c-7.7 21.8-20.2 42.3-37.8 59.8c-62.5 62.5-163.8 62.5-226.3 0L125.7 352H160c17.7 0 32-14.3 32-32s-14.3-32-32-32H48.5c0 0-.1 0-.1 0c-.4 0-.8 0-1.2 0H32c-17.7 0-32 14.3-32 32v112c0 17.7 14.3 32 32 32s32-14.3 32-32v-35.2L81.1 412.1c81.2 81.2 209.4 95.6 304.9 30.5c9.2-6.3 13.5-18.1 8.3-28.4c-5.2-10.4-17.5-15.3-28.5-10.8c-1.5 .6-3 1.4-4.5 2.2c16.2-27.2 27.3-58 31.5-90.3h13.9z"/></symbol>
+  <symbol id="i-share" viewBox="0 0 512 512"><path d="M307 34.8c-11.5 5.1-19 16.6-19 29.2v64H176C78.8 128 0 206.8 0 304C0 417.3 81.5 467.9 100.2 478.1c2.5 1.4 5.3 1.9 8.1 1.9c10.9 0 19.7-8.9 19.7-19.7c0-7.5-4.3-14.4-9.8-19.5C108.8 431.9 96 414.4 96 384c0-53 43-96 96-96h96v64c0 12.6 7.4 24.1 19 29.2s25 3 34.4-5.4l160-144c6.7-6.1 10.6-14.7 10.6-23.8s-3.8-17.7-10.6-23.8l-160-144c-9.4-8.5-22.9-10.6-34.4-5.4z"/></symbol>
 </svg>
 <div class="app" role="application" aria-label="PullRead article reader">
 
@@ -1500,6 +1565,7 @@
     <div class="toolbar-spacer"></div>
 
     <button class="focus-btn" onclick="toggleFocusMode()" aria-label="Toggle focus mode" title="Focus mode (f)" id="focus-btn">&#9681;</button>
+    <button class="toolbar-icon-btn" onclick="refreshArticleList()" aria-label="Refresh articles" title="Refresh" id="refresh-btn"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></button>
     <div class="settings-dropdown">
       <button class="settings-dropdown-btn" onclick="toggleSettingsDropdown()" aria-label="Reader settings" aria-expanded="false" id="settings-toggle-btn"><svg class="icon" aria-hidden="true"><use href="#i-gear"/></svg></button>
     </div>
@@ -1523,6 +1589,7 @@
         <button class="sidebar-footer-btn" onclick="showShortcutsModal()" aria-label="Keyboard shortcuts"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-keyboard"/></svg> Shortcuts</button>
         <button class="sidebar-footer-btn" onclick="showTagCloud()" aria-label="Explore tags"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-tags"/></svg> Explore</button>
         <button class="sidebar-footer-btn" onclick="showGuideModal()" aria-label="Features guide"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-book"/></svg> Guide</button>
+        <button class="sidebar-footer-btn" onclick="batchAutotagAll()" aria-label="Auto-tag all articles" id="batch-tag-btn"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-wand"/></svg> Tag All</button>
       </div>
     </aside>
 
@@ -1647,10 +1714,10 @@ function toggleSettingsDropdown() {
   panel.innerHTML = `
     <label>Theme</label>
     <div class="setting-row">
-      <button onclick="setTheme('light');updateDropdownState()" ${currentTheme==='light'?'class="active"':''}>Light</button>
-      <button onclick="setTheme('dark');updateDropdownState()" ${currentTheme==='dark'?'class="active"':''}>Dark</button>
-      <button onclick="setTheme('sepia');updateDropdownState()" ${currentTheme==='sepia'?'class="active"':''}>Sepia</button>
-      <button onclick="setTheme('high-contrast');updateDropdownState()" ${currentTheme==='high-contrast'?'class="active"':''} title="High contrast">Hi-Con</button>
+      <button data-setting="theme" data-val="light" onclick="setTheme('light');updateDropdownState()" ${currentTheme==='light'?'class="active"':''}>Light</button>
+      <button data-setting="theme" data-val="dark" onclick="setTheme('dark');updateDropdownState()" ${currentTheme==='dark'?'class="active"':''}>Dark</button>
+      <button data-setting="theme" data-val="sepia" onclick="setTheme('sepia');updateDropdownState()" ${currentTheme==='sepia'?'class="active"':''}>Sepia</button>
+      <button data-setting="theme" data-val="high-contrast" onclick="setTheme('high-contrast');updateDropdownState()" ${currentTheme==='high-contrast'?'class="active"':''} title="High contrast">Hi-Con</button>
     </div>
     <label>Font</label>
     <div class="setting-row">
@@ -1668,9 +1735,9 @@ function toggleSettingsDropdown() {
     </div>
     <label>Size</label>
     <div class="setting-row">
-      <button onclick="setSize('small');updateDropdownState()" ${currentSize==='small'?'class="active"':''} aria-label="Small text">A</button>
-      <button onclick="setSize('medium');updateDropdownState()" ${currentSize==='medium'?'class="active"':''} style="font-size:14px" aria-label="Medium text">A</button>
-      <button onclick="setSize('large');updateDropdownState()" ${currentSize==='large'?'class="active"':''} style="font-size:17px" aria-label="Large text">A</button>
+      <button data-setting="size" data-val="small" onclick="setSize('small');updateDropdownState()" ${currentSize==='small'?'class="active"':''} aria-label="Small text">A</button>
+      <button data-setting="size" data-val="medium" onclick="setSize('medium');updateDropdownState()" ${currentSize==='medium'?'class="active"':''} style="font-size:14px" aria-label="Medium text">A</button>
+      <button data-setting="size" data-val="large" onclick="setSize('large');updateDropdownState()" ${currentSize==='large'?'class="active"':''} style="font-size:17px" aria-label="Large text">A</button>
     </div>
     <label>Line height</label>
     <div class="setting-row">
@@ -1705,9 +1772,16 @@ function toggleSettingsDropdown() {
 function updateDropdownState() {
   const panel = document.querySelector('.settings-dropdown-panel');
   if (!panel) return;
-  // Just close and reopen to refresh active states
-  toggleSettingsDropdown();
-  toggleSettingsDropdown();
+  const currentTheme = document.body.getAttribute('data-theme') || 'light';
+  const currentSize = localStorage.getItem('pr-size') || 'medium';
+  // Update theme buttons
+  panel.querySelectorAll('[data-setting="theme"]').forEach(b =>
+    b.classList.toggle('active', b.getAttribute('data-val') === currentTheme)
+  );
+  // Update size buttons
+  panel.querySelectorAll('[data-setting="size"]').forEach(b =>
+    b.classList.toggle('active', b.getAttribute('data-val') === currentSize)
+  );
 }
 
 // Close settings dropdown when clicking outside
@@ -1793,6 +1867,9 @@ function renderArticle(text, filename) {
   html += '<button onclick="toggleNotesFromHeader()" aria-label="Toggle notes panel"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-pen"/></svg> Notes</button>';
   if (!isReviewArticle) {
     html += '<button onclick="summarizeArticle()" id="summarize-btn" aria-label="Summarize article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Summarize</button>';
+  }
+  if (meta && meta.url) {
+    html += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg> Share</button></div>';
   }
   html += '</div>';
   html += '</div>';
@@ -2847,6 +2924,114 @@ function hideSummary() {
 }
 
 // Modal focus management
+// ---- Sharing ----
+
+function getShareData() {
+  if (!activeFile) return null;
+  const file = allFiles.find(f => f.filename === activeFile);
+  if (!file || !file.url) return null;
+  return { title: file.title || '', url: file.url };
+}
+
+function toggleShareDropdown(e) {
+  e.stopPropagation();
+  // Close any existing share dropdown
+  const existing = document.querySelector('.share-dropdown-panel');
+  if (existing) { existing.remove(); return; }
+
+  const data = getShareData();
+  if (!data) return;
+
+  const panel = document.createElement('div');
+  panel.className = 'share-dropdown-panel';
+  panel.onclick = function(ev) { ev.stopPropagation(); };
+
+  const encodedUrl = encodeURIComponent(data.url);
+  const encodedTitle = encodeURIComponent(data.title);
+  const encodedText = encodeURIComponent(data.title + ' ' + data.url);
+
+  panel.innerHTML = `
+    <a href="https://bsky.app/intent/compose?text=${encodedText}" target="_blank" rel="noopener"><span class="share-icon">&#x1f98b;</span> Bluesky</a>
+    <a href="https://www.threads.net/intent/post?text=${encodedText}" target="_blank" rel="noopener"><span class="share-icon">@</span> Threads</a>
+    <a href="https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}" target="_blank" rel="noopener"><span class="share-icon">in</span> LinkedIn</a>
+    <hr>
+    <a href="mailto:?subject=${encodedTitle}&body=${encodedText}" target="_blank"><span class="share-icon">&#9993;</span> Email</a>
+    <a href="sms:&body=${encodedText}"><span class="share-icon">&#128172;</span> Messages</a>
+    <hr>
+    <button onclick="copyArticleLink()"><span class="share-icon">&#128279;</span> Copy Link</button>
+    <button onclick="saveArticleLink()"><span class="share-icon">&#128278;</span> Save to Reading List</button>
+  `;
+
+  e.target.closest('.share-dropdown').appendChild(panel);
+}
+
+function copyArticleLink() {
+  const data = getShareData();
+  if (!data) return;
+  navigator.clipboard.writeText(data.url).then(() => {
+    // Brief feedback
+    const existing = document.querySelector('.share-dropdown-panel');
+    if (existing) {
+      const btn = existing.querySelector('button');
+      if (btn) { const orig = btn.innerHTML; btn.innerHTML = '<span class="share-icon">&#10003;</span> Copied!'; setTimeout(() => { btn.innerHTML = orig; }, 1200); }
+    }
+  });
+}
+
+function saveArticleLink() {
+  const data = getShareData();
+  if (!data) return;
+  // Use the Web Share API if available (for Safari reading list), otherwise just copy
+  if (navigator.share) {
+    navigator.share({ title: data.title, url: data.url }).catch(() => {});
+  } else {
+    // Fallback: open a bookmarklet-style URL for adding to reading list
+    copyArticleLink();
+  }
+  const existing = document.querySelector('.share-dropdown-panel');
+  if (existing) existing.remove();
+}
+
+// Close share dropdown when clicking outside
+document.addEventListener('click', function(e) {
+  const panel = document.querySelector('.share-dropdown-panel');
+  if (panel && !panel.contains(e.target) && !e.target.closest('.share-dropdown')) {
+    panel.remove();
+  }
+});
+
+// Batch auto-tag all articles
+async function batchAutotagAll() {
+  if (!serverMode) return;
+  const btn = document.getElementById('batch-tag-btn');
+  if (!btn) return;
+  const origText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-wand"/></svg> Tagging...';
+
+  try {
+    const res = await fetch('/api/autotag-batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ force: false })
+    });
+    const data = await res.json();
+    if (data.error) {
+      alert('Auto-tag failed: ' + data.error);
+    } else {
+      btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-wand"/></svg> Done!';
+      // Refresh annotations index to pick up new tags
+      await loadAnnotationsIndex();
+      renderFileList();
+      setTimeout(() => { btn.innerHTML = origText; }, 2000);
+    }
+  } catch (err) {
+    alert('Auto-tag request failed.');
+  }
+  btn.disabled = false;
+  if (btn.innerHTML.includes('Tagging')) btn.innerHTML = origText;
+}
+
 let _modalReturnFocus = null;
 
 function trapFocus(overlay) {
@@ -2894,69 +3079,94 @@ function showShortcutsModal() {
   overlay.querySelector('.modal-close').focus();
 }
 
-// Guide modal
+// Guide — renders as an inline article in the content pane
 function showGuideModal() {
-  closeModal();
-  _modalReturnFocus = document.activeElement;
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-label', 'PullRead guide');
-  overlay.onclick = function(e) { if (e.target === overlay) closeModal(); };
-  overlay.innerHTML = `
-    <div class="modal-card" onclick="event.stopPropagation()">
-      <div class="modal-updated">Last updated: Feb 2026</div>
-      <h2>PullRead Guide</h2>
+  const content = document.getElementById('content');
+  const empty = document.getElementById('empty-state');
+  empty.style.display = 'none';
+  content.style.display = 'block';
 
-      <h3>What is PullRead?</h3>
-      <p>PullRead syncs your bookmarks and RSS feeds into clean markdown files you can read, search, highlight, and keep forever. Articles are stored locally on your Mac.</p>
+  // Deselect sidebar
+  activeFile = null;
+  renderFileList();
 
-      <h3>How does syncing work?</h3>
-      <p>PullRead fetches new items from your configured feeds (Instapaper, Pinboard, Raindrop, RSS, etc.) and extracts the article content into markdown. You can sync manually from the menu bar, or set an automatic interval in Settings (every 30 min, 1 hour, 4 hours, or 12 hours).</p>
-
-      <h3>What are reviews?</h3>
-      <p>Reviews are AI-generated thematic summaries of your recent reading. You can schedule them daily or weekly in Settings. Daily reviews cover the past 24 hours; weekly reviews cover the past 7 days. They require a configured LLM provider (Anthropic, OpenAI, Gemini, OpenRouter, or Apple Intelligence).</p>
-
-      <h3>Highlights &amp; Notes</h3>
-      <p>Select any text and press <strong>h</strong> to highlight it, or use the floating toolbar to choose a color. Click a highlight to add a note. Press <strong>n</strong> to open the notes panel for article-level notes, tags, and favorites.</p>
-
-      <h3>Summaries</h3>
-      <p>Click the Summarize button on any article to generate an AI summary. Summaries are saved in the article frontmatter so they persist across sessions.</p>
-
-      <h3>Focus Mode</h3>
-      <p>Press <strong>f</strong> or click the half-circle icon in the toolbar to enter Focus Mode. This dims all content except the paragraph you're currently reading, helping you concentrate on one section at a time. Inspired by IA Writer's focus feature.</p>
-
-      <h3>Reading Progress</h3>
-      <p>A thin progress bar at the top tracks how far you've read. Each article also shows estimated read time and word count in the header. Your reading position is automatically saved so you can pick up where you left off.</p>
-
-      <h3>Table of Contents</h3>
-      <p>On wide screens, articles with 3 or more headings show an auto-generated table of contents on the left. Click any heading to jump to that section. The active section is highlighted as you scroll.</p>
-
-      <h3>Themes &amp; Fonts</h3>
-      <p>Click the gear icon to switch between Light, Dark, Sepia, and High Contrast themes. Choose from 9 fonts including OpenDyslexic. Adjust text size, line height, letter spacing, and content width. Preferences are saved automatically.</p>
-
-      <h3>Code Highlighting</h3>
-      <p>Technical articles with code blocks are automatically syntax highlighted with language detection. The highlighting theme adapts to your chosen reading theme.</p>
-
-      <h3>Printing</h3>
-      <p>Press <strong>p</strong> or use your browser's print function to get a clean, optimized print layout of any article. Links are expanded with their URLs for reference.</p>
-
-      <h3>Browser Cookies</h3>
-      <p>Enable browser cookies in Settings to access paywalled content from sites like NYTimes or WSJ using your existing login sessions. PullRead supports <strong>Chrome, Arc, Brave, and Edge</strong> — it automatically detects which Chromium browser you have installed. Cookies stay on your Mac and are never uploaded.</p>
-
-      <h3>Why not Safari cookies?</h3>
-      <p>Safari stores cookies in a proprietary binary format (<code>Cookies.binarycookies</code>) and heavily sandboxes access through macOS system protections. Unlike Chromium-based browsers which share a common SQLite format and Keychain pattern, Safari cookies require reverse-engineering Apple's private format and bypassing TCC/sandbox restrictions. This makes reliable Safari cookie extraction impractical. If you use Safari, consider also installing a Chromium browser for sites that need login sessions, or use the browser extension for your paywall subscriptions.</p>
-
-      <h3>Importing Bookmarks</h3>
-      <p>You can import bookmarks.html files exported from Chrome, Safari, Firefox, or Pocket directly from Settings or via the CLI with <code>pullread import &lt;file&gt;</code>.</p>
-
-      <button class="modal-close" onclick="closeModal()">Done</button>
+  content.innerHTML = `
+    <div class="article-header">
+      <h1>PullRead Guide</h1>
+      <div class="article-byline"><span>Last updated Feb 2026</span></div>
     </div>
+
+    <h2>What is PullRead?</h2>
+    <p>PullRead syncs your bookmarks and RSS feeds into clean markdown files you can read, search, highlight, and keep forever. Articles are stored locally on your Mac.</p>
+
+    <h2>How does syncing work?</h2>
+    <p>PullRead fetches new items from your configured feeds (Instapaper, Pinboard, Raindrop, RSS, etc.) and extracts the article content into markdown. You can sync manually from the menu bar, or set an automatic interval in Settings (every 30 min, 1 hour, 4 hours, or 12 hours).</p>
+
+    <h2>What are reviews?</h2>
+    <p>Reviews are AI-generated thematic summaries of your recent reading. You can schedule them daily or weekly in Settings. Daily reviews cover the past 24 hours; weekly reviews cover the past 7 days. They require a configured LLM provider (Anthropic, OpenAI, Gemini, OpenRouter, or Apple Intelligence).</p>
+
+    <h2>Highlights &amp; Notes</h2>
+    <p>Select any text and press <strong>h</strong> to highlight it, or use the floating toolbar to choose a color. Click a highlight to add a note. Press <strong>n</strong> to open the notes panel for article-level notes, tags, and favorites.</p>
+
+    <h2>Summaries</h2>
+    <p>Click the Summarize button on any article to generate an AI summary. Summaries are saved in the article frontmatter so they persist across sessions.</p>
+
+    <h2>Focus Mode</h2>
+    <p>Press <strong>f</strong> or click the half-circle icon in the toolbar to enter Focus Mode. This dims all content except the paragraph you're currently reading, helping you concentrate on one section at a time.</p>
+
+    <h2>Reading Progress</h2>
+    <p>A thin progress bar at the top tracks how far you've read. Each article also shows estimated read time and word count in the header. Your reading position is automatically saved so you can pick up where you left off.</p>
+
+    <h2>Table of Contents</h2>
+    <p>On wide screens, articles with 3 or more headings show an auto-generated table of contents on the left. Click any heading to jump to that section. The active section is highlighted as you scroll.</p>
+
+    <h2>Themes &amp; Fonts</h2>
+    <p>Click the gear icon to switch between Light, Dark, Sepia, and High Contrast themes. Choose from 9 fonts including OpenDyslexic. Adjust text size, line height, letter spacing, and content width. Preferences are saved automatically.</p>
+
+    <h2>Sharing</h2>
+    <p>Click the share icon on any article to send it to Bluesky, Threads, LinkedIn, email, Messages, or copy the link. Sharing uses the article's original URL so the recipient gets the source.</p>
+
+    <h2>Machine Tags</h2>
+    <p>PullRead can auto-generate topic, entity, and theme tags for your articles using your configured AI provider. Tags power relational mapping — discover connections between articles through the Explore panel. Use the <strong>Tag All</strong> button in the sidebar or enable auto-tagging after sync in the macOS app settings.</p>
+
+    <h2>Apple News &amp; Social Posts</h2>
+    <p>PullRead resolves Apple News links (apple.news) to their original article URLs before extraction. Social posts from X/Twitter, Bluesky, Mastodon, Reddit, and Hacker News are extracted with special handling to preserve the post structure.</p>
+
+    <h2>Code Highlighting</h2>
+    <p>Technical articles with code blocks are automatically syntax highlighted with language detection. The highlighting theme adapts to your chosen reading theme.</p>
+
+    <h2>Printing</h2>
+    <p>Press <strong>p</strong> or use your browser's print function to get a clean, optimized print layout of any article. Links are expanded with their URLs for reference.</p>
+
+    <h2>Browser Cookies</h2>
+    <p>Enable browser cookies in Settings to access paywalled content from sites like NYTimes or WSJ using your existing login sessions. PullRead supports <strong>Chrome, Arc, Brave, and Edge</strong>. Cookies stay on your Mac and are never uploaded.</p>
+
+    <h2>Why not Safari cookies?</h2>
+    <p>Safari stores cookies in a proprietary binary format and heavily sandboxes access. Unlike Chromium-based browsers which share a common SQLite format, Safari cookies require reverse-engineering Apple's private format. If you use Safari, consider also installing a Chromium browser for sites that need login sessions.</p>
+
+    <h2>Importing Bookmarks</h2>
+    <p>You can import bookmarks.html files exported from Chrome, Safari, Firefox, or Pocket directly from Settings or via the CLI with <code>pullread import &lt;file&gt;</code>.</p>
+
+    <h2>Keyboard Shortcuts</h2>
+    <table>
+      <thead><tr><th>Key</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr><td><kbd>j</kbd> / <kbd>&rarr;</kbd></td><td>Next article</td></tr>
+        <tr><td><kbd>k</kbd> / <kbd>&larr;</kbd></td><td>Previous article</td></tr>
+        <tr><td><kbd>&uarr;</kbd> <kbd>&darr;</kbd></td><td>Scroll (jumps articles at edges)</td></tr>
+        <tr><td><kbd>/</kbd></td><td>Search articles</td></tr>
+        <tr><td><kbd>[</kbd></td><td>Toggle sidebar</td></tr>
+        <tr><td><kbd>h</kbd></td><td>Highlight selected text</td></tr>
+        <tr><td><kbd>n</kbd></td><td>Toggle article notes</td></tr>
+        <tr><td><kbd>f</kbd></td><td>Toggle focus mode</td></tr>
+        <tr><td><kbd>p</kbd></td><td>Print article</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>Clear search / close popover</td></tr>
+      </tbody>
+    </table>
   `;
-  document.body.appendChild(overlay);
-  trapFocus(overlay);
-  overlay.querySelector('.modal-close').focus();
+  document.title = 'PullRead Guide';
+  document.getElementById('content-pane').scrollTop = 0;
+  generateToc();
 }
 
 function closeModal() {
@@ -3584,6 +3794,28 @@ async function migrateAnnotationsIfNeeded() {
     await loadAnnotationsIndex(); // Refresh
     renderFileList();
   }
+}
+
+// Refresh article list from server
+async function refreshArticleList() {
+  if (!serverMode) return;
+  const btn = document.getElementById('refresh-btn');
+  btn.classList.add('spinning');
+  try {
+    const res = await fetch('/api/files');
+    if (res.ok) {
+      allFiles = await res.json();
+      filteredFiles = allFiles;
+      await loadAnnotationsIndex();
+      filterFiles();
+      // Reload current article if still in list
+      if (activeFile) {
+        const idx = displayFiles.findIndex(f => f.filename === activeFile);
+        if (idx >= 0) loadFile(idx);
+      }
+    }
+  } catch {}
+  btn.classList.remove('spinning');
 }
 
 // Init: try to load from server, fall back to standalone mode
