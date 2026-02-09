@@ -3644,10 +3644,13 @@ function updateFocusMode() {
 
   const pane = document.getElementById('content-pane');
   const paneRect = pane.getBoundingClientRect();
-  // When scrolled near the top, use a point closer to the top so the first
-  // paragraph gets highlighted; otherwise use 40% of the viewport.
+  // Shift the focus point near the top/bottom of the scroll so edge
+  // paragraphs still get highlighted instead of being permanently dimmed.
   const scrollTop = pane.scrollTop;
-  const focusRatio = scrollTop < 200 ? 0.15 : 0.4;
+  const scrollBottom = pane.scrollHeight - pane.clientHeight - scrollTop;
+  let focusRatio = 0.4;
+  if (scrollTop < 200) focusRatio = 0.15;
+  else if (scrollBottom < 200) focusRatio = 0.7;
   const centerY = paneRect.top + paneRect.height * focusRatio;
 
   const blocks = content.querySelectorAll(':scope > p, :scope > blockquote, :scope > ul, :scope > ol, :scope > pre, :scope > h2, :scope > h3, :scope > h4, :scope > table');
