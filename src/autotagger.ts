@@ -132,12 +132,13 @@ export function saveMachineTags(filename: string, machineTags: string[]): void {
  */
 export async function autotagBatch(
   outputPath: string,
-  options: { minSize?: number; config?: LLMConfig } = {}
+  options: { minSize?: number; config?: LLMConfig; force?: boolean } = {}
 ): Promise<{ tagged: number; skipped: number; failed: number }> {
   const { readdirSync } = require('fs');
   const { extname } = require('path');
 
   const minSize = options.minSize ?? 500;
+  const force = options.force ?? false;
   const llmConfig = options.config || loadLLMConfig();
   if (!llmConfig) {
     throw new Error('No LLM configuration found. Configure an API key in settings.');
@@ -151,8 +152,8 @@ export async function autotagBatch(
   let failed = 0;
 
   for (const file of files) {
-    // Skip if already has machine tags
-    if (hasMachineTags(file)) {
+    // Skip if already has machine tags (unless force mode)
+    if (!force && hasMachineTags(file)) {
       skipped++;
       continue;
     }

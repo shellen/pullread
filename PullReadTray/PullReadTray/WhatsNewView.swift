@@ -88,6 +88,38 @@ struct WhatsNewView: View {
 
     private var releaseNotes: [String: [Highlight]] {
         [
+            "1.3.0": [
+                Highlight(
+                    icon: "square.and.arrow.up",
+                    color: .blue,
+                    title: "Share Articles",
+                    description: "Share any article to Bluesky, Threads, LinkedIn, email, or Messages directly from the reader. Copy links with one click."
+                ),
+                Highlight(
+                    icon: "link",
+                    color: .green,
+                    title: "External Links Open in Browser",
+                    description: "Links in articles now open in your default browser instead of navigating away from the reader."
+                ),
+                Highlight(
+                    icon: "wand.and.stars",
+                    color: .purple,
+                    title: "Batch Machine Tagging",
+                    description: "Tag All button in the sidebar generates AI-powered machine tags across your entire library. Use --force to re-tag everything."
+                ),
+                Highlight(
+                    icon: "newspaper",
+                    color: .orange,
+                    title: "Apple News & Social Posts",
+                    description: "Apple News links are resolved to original articles. Better extraction for Bluesky, Mastodon, and Reddit posts."
+                ),
+                Highlight(
+                    icon: "arrow.triangle.2.circlepath",
+                    color: .teal,
+                    title: "Refresh & Update Fixes",
+                    description: "New refresh button in the toolbar. Fixed Check for Updates reliability with improved Sparkle integration."
+                )
+            ],
             "1.2.0": [
                 Highlight(
                     icon: "macwindow",
@@ -182,5 +214,5 @@ struct WhatsNewView: View {
 }
 
 #Preview {
-    WhatsNewView(version: "1.2.0")
+    WhatsNewView(version: "1.3.0")
 }

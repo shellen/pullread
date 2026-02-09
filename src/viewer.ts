@@ -8,7 +8,7 @@ import { exec } from 'child_process';
 import { homedir } from 'os';
 import { VIEWER_HTML } from './viewer-html';
 import { summarizeText, loadLLMConfig, saveLLMConfig, getDefaultModel, KNOWN_MODELS, LLMConfig } from './summarizer';
-import { autotagText, saveMachineTags, hasMachineTags } from './autotagger';
+import { autotagText, autotagBatch, saveMachineTags, hasMachineTags } from './autotagger';
 import { APP_ICON } from './app-icon';
 
 interface FileMeta {
@@ -445,6 +445,27 @@ export function startViewer(outputPath: string, port = 7777): void {
         sendJson(res, { machineTags: result.machineTags, model: result.model });
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Auto-tagging failed';
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: msg }));
+      }
+      return;
+    }
+
+    // Batch autotag API — tag all articles (or force re-tag)
+    if (url.pathname === '/api/autotag-batch' && req.method === 'POST') {
+      try {
+        const body = JSON.parse(await readBody(req));
+        const force = body.force === true;
+        const llmConfig = loadLLMConfig();
+        if (!llmConfig) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'No LLM provider configured. Add an API key in Settings.' }));
+          return;
+        }
+        const result = await autotagBatch(outputPath, { config: llmConfig, force });
+        sendJson(res, result);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Batch auto-tagging failed';
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: msg }));
       }

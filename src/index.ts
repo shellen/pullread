@@ -478,9 +478,12 @@ if (command === 'sync') {
     ? parseInt(args[minSizeIndex + 1], 10)
     : 500;
 
+  const forceMode = args.includes('--force');
+
   if (!batchMode) {
-    console.log('Usage: pullread autotag --batch [--min-size N]');
+    console.log('Usage: pullread autotag --batch [--min-size N] [--force]');
     console.log('  Auto-generates machine tags for articles missing them.');
+    console.log('  --force  Re-tag all articles, even those with existing tags.');
     process.exit(0);
   }
 
@@ -491,8 +494,8 @@ if (command === 'sync') {
     process.exit(1);
   }
 
-  console.log('Auto-tagging articles...');
-  autotagBatch(config.outputPath, { minSize, config: llmConfig })
+  console.log('Auto-tagging articles' + (forceMode ? ' (force mode — re-tagging all)' : '') + '...');
+  autotagBatch(config.outputPath, { minSize, config: llmConfig, force: forceMode })
     .then(({ tagged, skipped, failed }) => {
       console.log(`\nDone: ${tagged} tagged, ${skipped} skipped, ${failed} failed`);
     })
@@ -512,6 +515,7 @@ Commands:
   summarize --batch       Summarize articles missing summaries
   summarize --min-size N  Skip articles under N chars (default: 500)
   autotag --batch         Generate machine tags for untagged articles
+  autotag --batch --force Re-tag all articles (including already tagged)
   autotag --min-size N    Skip articles under N chars (default: 500)
   import <file.html>      Import bookmarks from HTML file (Netscape format)
   review                  Generate a weekly review of recent articles
