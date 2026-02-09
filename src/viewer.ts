@@ -33,7 +33,7 @@ function parseFrontmatter(content: string): Record<string, string> {
     const idx = line.indexOf(':');
     if (idx > 0) {
       const key = line.slice(0, idx).trim();
-      const val = line.slice(idx + 1).trim().replace(/^"(.*)"$/, '$1');
+      const val = line.slice(idx + 1).trim().replace(/^"(.*)"$/, '$1').replace(/\\"/g, '"');
       meta[key] = val;
     }
   }

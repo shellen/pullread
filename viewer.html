@@ -1812,7 +1812,7 @@ function parseFrontmatter(text) {
     const idx = line.indexOf(':');
     if (idx > 0) {
       const key = line.slice(0, idx).trim();
-      const val = line.slice(idx + 1).trim().replace(/^"(.*)"$/, '$1');
+      const val = line.slice(idx + 1).trim().replace(/^"(.*)"$/, '$1').replace(/\\"/g, '"');
       meta[key] = val;
     }
   });
@@ -1853,8 +1853,31 @@ function cleanMarkdown(md) {
   // e.g. a line that is just "(https://substackcdn.com/image/fetch/...)"
   md = md.replace(/\n\(https?:\/\/[^)]+\)\s*$/gm, '');
 
+  // Remove Wayback Machine parenthesized URLs: (/web/20250908.../https://...)
+  md = md.replace(/\(\/web\/\d+\/https?:\/\/[^)]+\)/g, '');
+
   // Remove lone [ or ] on their own line (broken markdown fragments)
   md = md.replace(/^\s*[\[\]]\s*$/gm, '');
+
+  // Remove common image accessibility boilerplate from Wayback/archive extractions
+  md = md.replace(/^\s*Press enter or click to view image in full size\s*$/gm, '');
+
+  // Clean up PDF LaTeX/math artifacts from arxiv and academic papers
+  md = md.replace(/start_POSTSUBSCRIPT\b/g, '');
+  md = md.replace(/end_POSTSUBSCRIPT\b/g, '');
+  md = md.replace(/start_POSTSUPERSCRIPT\b/g, '');
+  md = md.replace(/end_POSTSUPERSCRIPT\b/g, '');
+  md = md.replace(/\\boldsymbol\{[^}]*\}/g, '');
+  md = md.replace(/\\mathbb\{[^}]*\}/g, '');
+  md = md.replace(/\\left[\\\[\({|]/g, '');
+  md = md.replace(/\\right[\\\]\)}|]/g, '');
+  md = md.replace(/\\(?:text|mathrm|mathbf|mathcal|mathit)\{([^}]*)\}/g, '$1');
+  md = md.replace(/\\(?:frac|sqrt|sum|prod|int|partial|nabla|infty|approx|neq|leq|geq|in|notin|subset|supset|cup|cap|forall|exists)\b/g, '');
+  md = md.replace(/\^\{\\prime\}/g, "'");
+  md = md.replace(/\{([^{}]*)\}/g, '$1');
+
+  // Remove leftover empty lines from cleanup
+  md = md.replace(/\n{3,}/g, '\n\n');
 
   return md;
 }
@@ -1877,7 +1900,17 @@ function renderArticle(text, filename) {
   }
   html += '<div class="article-byline">';
   const bylineParts = [];
-  if (meta && meta.author) bylineParts.push('<span class="author">' + escapeHtml(meta.author) + '</span>');
+  if (meta && meta.author) {
+    // Truncate overly long bylines (e.g. full author bios from PDFs/arxiv)
+    var authorText = meta.author;
+    if (authorText.length > 80) {
+      // Try to cut at first sentence boundary or period
+      var cutoff = authorText.indexOf('. ');
+      if (cutoff > 10 && cutoff < 80) authorText = authorText.slice(0, cutoff);
+      else authorText = authorText.slice(0, 80).replace(/\s+\S*$/, '') + '\u2026';
+    }
+    bylineParts.push('<span class="author">' + escapeHtml(authorText) + '</span>');
+  }
   if (meta && meta.domain) bylineParts.push('<a href="' + escapeHtml(meta.url || '') + '" target="_blank">' + escapeHtml(meta.domain) + '</a>');
   if (meta && meta.bookmarked) bylineParts.push(escapeHtml(meta.bookmarked.slice(0, 10)));
   html += bylineParts.join('<span class="sep">&middot;</span>');
