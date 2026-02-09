@@ -453,10 +453,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.async {
                 switch result {
                 case .success(let url):
-                    if self?.articleViewerController == nil {
-                        self?.articleViewerController = ArticleViewerWindowController()
+                    let mode = UserDefaults.standard.string(forKey: "viewerMode") ?? "window"
+                    if mode == "browser" {
+                        NSWorkspace.shared.open(url)
+                    } else {
+                        if self?.articleViewerController == nil {
+                            self?.articleViewerController = ArticleViewerWindowController()
+                        }
+                        self?.articleViewerController?.showViewer(url: url)
                     }
-                    self?.articleViewerController?.showViewer(url: url)
                 case .failure(let error):
                     self?.showAlert(title: "Viewer Error", message: error.localizedDescription)
                 }

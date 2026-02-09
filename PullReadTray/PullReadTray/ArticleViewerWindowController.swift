@@ -4,7 +4,7 @@
 import Cocoa
 import WebKit
 
-class ArticleViewerWindowController: NSObject {
+class ArticleViewerWindowController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
     private var webView: WKWebView?
     private var titleObservation: NSKeyValueObservation?
@@ -49,6 +49,7 @@ class ArticleViewerWindowController: NSObject {
         newWindow.contentView = wv
         newWindow.center()
         newWindow.isReleasedWhenClosed = false
+        newWindow.delegate = self
 
         // Remember window position and size across launches
         newWindow.setFrameAutosaveName("ArticleViewer")
@@ -58,6 +59,9 @@ class ArticleViewerWindowController: NSObject {
 
         // Load the local viewer
         wv.load(URLRequest(url: url))
+
+        // Show the app in the Dock so users can Cmd-Tab to the viewer
+        NSApp.setActivationPolicy(.regular)
 
         newWindow.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -69,5 +73,17 @@ class ArticleViewerWindowController: NSObject {
         window?.close()
         window = nil
         webView = nil
+    }
+
+    // MARK: - NSWindowDelegate
+
+    func windowWillClose(_ notification: Notification) {
+        titleObservation?.invalidate()
+        titleObservation = nil
+        window = nil
+        webView = nil
+
+        // Hide the app from the Dock again (menu bar-only mode)
+        NSApp.setActivationPolicy(.accessory)
     }
 }
