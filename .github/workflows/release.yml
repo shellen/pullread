@@ -16,6 +16,8 @@ permissions:
 jobs:
   build:
     runs-on: macos-latest
+    env:
+      HAS_SPARKLE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
 
     steps:
       - name: Checkout code
@@ -97,6 +99,9 @@ jobs:
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          # Compute build number: major*10000 + minor*100 + patch
+          BUILD_NUMBER=$(echo "$VERSION" | awk -F. '{printf "%d", $1*10000+$2*100+$3}')
           cd PullReadTray
           xcodebuild -project PullReadTray.xcodeproj \
             -scheme PullReadTray \
@@ -107,6 +112,8 @@ jobs:
             CODE_SIGN_IDENTITY="Developer ID Application" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             ENABLE_HARDENED_RUNTIME=YES \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             clean build
 
       - name: Bundle CLI binary into app
@@ -257,7 +264,7 @@ jobs:
           spctl -a -v --type open --context context:primary-signature PullRead.dmg
 
       - name: Sign DMG for Sparkle
-        if: env.SPARKLE_PRIVATE_KEY != ''
+        if: env.HAS_SPARKLE_KEY != ''
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
@@ -289,7 +296,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update Sparkle appcast
-        if: env.SPARKLE_PRIVATE_KEY != ''
+        if: env.HAS_SPARKLE_KEY != ''
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
