@@ -106,6 +106,7 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Developer ID Application" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            ENABLE_HARDENED_RUNTIME=YES \
             clean build
 
       - name: Bundle CLI binary into app
@@ -116,6 +117,34 @@ jobs:
 
           # Copy binary to app resources
           cp dist/pullread "$RESOURCES_PATH/"
+
+          # Re-sign all embedded frameworks for notarization.
+          # Sparkle (via SPM) includes nested executables (Autoupdate, Updater.app,
+          # Installer.xpc) that all need hardened runtime + secure timestamps.
+          # Xcode's build-time signing may not apply these flags to SPM dependencies.
+          # Sign from inside out: individual Mach-O binaries first, then bundles
+          # from deepest to shallowest.
+          if [ -d "$APP_PATH/Contents/Frameworks" ]; then
+            echo "Signing embedded frameworks..."
+
+            # 1. Sign all Mach-O binaries inside Frameworks/
+            find "$APP_PATH/Contents/Frameworks" -type f | while read -r f; do
+              if file "$f" | grep -qE "Mach-O"; then
+                echo "  Signing binary: $f"
+                codesign --force --options runtime --timestamp \
+                  --sign "$IDENTITY" "$f"
+              fi
+            done
+
+            # 2. Sign all sub-bundles (.xpc, .app) deepest first, then .framework
+            find "$APP_PATH/Contents/Frameworks" -depth \
+              \( -name "*.xpc" -o -name "*.app" -o -name "*.framework" \) \
+              -type d | while read -r bundle; do
+              echo "  Signing bundle: $bundle"
+              codesign --force --options runtime --timestamp \
+                --sign "$IDENTITY" "$bundle"
+            done
+          fi
 
           # Sign the bundled CLI binary (hardened runtime + timestamp required for notarization)
           codesign --force --options runtime --timestamp \
@@ -135,6 +164,11 @@ jobs:
           # Verify signing
           codesign -dv --verbose=2 "$APP_PATH"
           codesign -d --verbose=2 "$APP_PATH" 2>&1 | grep -i runtime
+
+          # Verify all nested code is properly signed before notarization
+          echo "Verifying all code signatures..."
+          codesign --verify --deep --strict "$APP_PATH"
+          echo "All signatures valid."
 
           # Free disk space: remove intermediate build artifacts
           rm -rf dist
