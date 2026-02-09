@@ -523,6 +523,8 @@ export function startViewer(outputPath: string, port = 7777): void {
           userMsg = 'Article too long for this model. Try a model with a larger context window.';
         } else if (msg.includes('No API key')) {
           userMsg = 'No model configured. Open Settings to add a provider.';
+        } else if (msg.includes('API error 429') || msg.includes('Rate limit') || msg.includes('rate limit')) {
+          userMsg = 'Rate limited by provider. Wait a moment and try again, or switch to a different model.';
         }
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: userMsg }));
