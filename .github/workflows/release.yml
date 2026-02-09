@@ -217,11 +217,21 @@ jobs:
         run: |
           APP_PATH="PullReadTray/build/Build/Products/Release/Pull Read.app"
 
-          # Create DMG
+          # Create a temporary directory for DMG contents
+          mkdir -p dmg-contents
+          cp -R "$APP_PATH" dmg-contents/
+
+          # Create a symlink to Applications for drag-to-install
+          ln -s /Applications dmg-contents/Applications
+
+          # Create the DMG (volume name shows as "Pull Read" to users)
           hdiutil create -volname "Pull Read" \
-            -srcfolder "$APP_PATH" \
+            -srcfolder dmg-contents \
             -ov -format UDZO \
             PullRead.dmg
+
+          # Clean up
+          rm -rf dmg-contents
 
           # Sign DMG
           codesign --force --sign "Developer ID Application" --timestamp PullRead.dmg
@@ -244,7 +254,7 @@ jobs:
         run: |
           echo "Verifying DMG..."
           codesign -dv --verbose=2 PullRead.dmg
-          spctl -a -v PullRead.dmg
+          spctl -a -v --type open --context context:primary-signature PullRead.dmg
 
       - name: Sign DMG for Sparkle
         if: env.SPARKLE_PRIVATE_KEY != ''
