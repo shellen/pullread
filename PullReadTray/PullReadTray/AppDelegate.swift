@@ -16,15 +16,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var checkForUpdatesMenuItem: NSMenuItem!
     private var settingsWindowController: SettingsWindowController!
     private var whatsNewWindowController: SettingsWindowController?
+    private var articleViewerController: ArticleViewerWindowController?
     private var reviewTimer: Timer?
     private var syncTimer: Timer?
     private var hasUnreadReview: Bool = false
 
-    private let updaterController = SPUStandardUpdaterController(
-        startingUpdater: true,
-        updaterDelegate: nil,
-        userDriverDelegate: nil
-    )
+    private var updaterController: SPUStandardUpdaterController?
 
     /// Returns true if running in a unit test environment
     /// Uses multiple detection methods for reliability across different test runners
@@ -64,6 +61,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Skip ALL UI setup during tests - UI operations block/hang in headless CI
         guard !isRunningTests else { return }
+
+        // Initialize Sparkle after the app has fully launched
+        updaterController = SPUStandardUpdaterController(
+            startingUpdater: true,
+            updaterDelegate: nil,
+            userDriverDelegate: nil
+        )
 
         setupStatusBar()
         requestNotificationPermission()
@@ -364,8 +368,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 switch result {
                 case .success(let output):
                     self?.showNotification(title: "Sync Complete", body: self?.parseSyncSummary(output) ?? "Sync finished")
+                    // Run auto-tagging in the background if enabled
+                    self?.runAutotagIfEnabled()
                 case .failure(let error):
                     self?.showNotification(title: "Sync Failed", body: error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    private func runAutotagIfEnabled() {
+        guard UserDefaults.standard.bool(forKey: "autotagAfterSync") else { return }
+
+        syncService.runAutotag { [weak self] result in
+            DispatchQueue.main.async {
+                if case .failure(let error) = result {
+                    // Log but don't notify — auto-tagging is a background task
+                    print("Auto-tag failed: \(error.localizedDescription)")
                 }
             }
         }
@@ -445,9 +464,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         hasUnreadReview = false
         updateBadge()
 
-        syncService.openViewer { [weak self] result in
+        syncService.ensureViewerRunning { [weak self] result in
             DispatchQueue.main.async {
-                if case .failure(let error) = result {
+                switch result {
+                case .success(let url):
+                    let mode = UserDefaults.standard.string(forKey: "viewerMode") ?? "window"
+                    if mode == "browser" {
+                        NSWorkspace.shared.open(url)
+                    } else {
+                        if self?.articleViewerController == nil {
+                            self?.articleViewerController = ArticleViewerWindowController()
+                        }
+                        self?.articleViewerController?.showViewer(url: url)
+                    }
+                case .failure(let error):
                     self?.showAlert(title: "Viewer Error", message: error.localizedDescription)
                 }
             }
@@ -490,7 +520,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func checkForUpdates() {
-        updaterController.checkForUpdates(nil)
+        updaterController?.checkForUpdates(nil)
     }
 
     private func checkForVersionUpdate() {
@@ -540,6 +570,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func quit() {
         reviewTimer?.invalidate()
         syncTimer?.invalidate()
+        articleViewerController?.close()
         syncService.stopViewer()
         NSApplication.shared.terminate(nil)
     }

@@ -8,6 +8,7 @@ import { exec } from 'child_process';
 import { homedir } from 'os';
 import { VIEWER_HTML } from './viewer-html';
 import { summarizeText, loadLLMConfig, saveLLMConfig, getDefaultModel, KNOWN_MODELS, LLMConfig } from './summarizer';
+import { autotagText, saveMachineTags, hasMachineTags } from './autotagger';
 import { APP_ICON } from './app-icon';
 
 interface FileMeta {
@@ -263,12 +264,15 @@ export function startViewer(outputPath: string, port = 7777): void {
             res.end(JSON.stringify({ error: 'name is required' }));
             return;
           }
-          const allNotes = loadJsonFile(NOTES_PATH) as Record<string, unknown>;
+          const allNotes = loadJsonFile(NOTES_PATH) as Record<string, any>;
+          const existing = allNotes[name] || {};
           allNotes[name] = {
             articleNote: articleNote || '',
             annotations: annotations || [],
             tags: tags || [],
-            isFavorite: !!isFavorite
+            isFavorite: !!isFavorite,
+            // Preserve machine tags — they're managed by the autotagger, not the UI
+            ...(existing.machineTags ? { machineTags: existing.machineTags } : {})
           };
           saveJsonFile(NOTES_PATH, allNotes);
           sendJson(res, { ok: true });
@@ -402,6 +406,48 @@ export function startViewer(outputPath: string, port = 7777): void {
         lastActivity: latestMtime > 0 ? new Date(latestMtime).toISOString() : null,
         articleCount: outputFiles.length
       });
+      return;
+    }
+
+    // Auto-tag API
+    if (url.pathname === '/api/autotag' && req.method === 'POST') {
+      try {
+        const body = JSON.parse(await readBody(req));
+        const { name } = body;
+        if (!name) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'name is required' }));
+          return;
+        }
+
+        const filePath = join(outputPath, name);
+        if (!existsSync(filePath)) {
+          send404(res);
+          return;
+        }
+
+        // Check if already tagged
+        if (hasMachineTags(name)) {
+          const allNotes = loadJsonFile(NOTES_PATH) as Record<string, any>;
+          sendJson(res, { machineTags: allNotes[name]?.machineTags || [], cached: true });
+          return;
+        }
+
+        const content = readFileSync(filePath, 'utf-8');
+        const match = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
+        const articleText = match ? match[1] : content;
+
+        const result = await autotagText(articleText);
+        if (result.machineTags.length > 0) {
+          saveMachineTags(name, result.machineTags);
+        }
+
+        sendJson(res, { machineTags: result.machineTags, model: result.model });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Auto-tagging failed';
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: msg }));
+      }
       return;
     }
 

@@ -10,6 +10,7 @@ import { writeArticle } from './writer';
 import { Storage } from './storage';
 import { startViewer } from './viewer';
 import { summarizeText, loadLLMConfig } from './summarizer';
+import { autotagBatch } from './autotagger';
 import { parseBookmarksHtml, bookmarksToEntries } from './bookmarks';
 
 // Default paths for standalone binary
@@ -469,6 +470,36 @@ if (command === 'sync') {
     console.error('Fatal error:', err.message);
     process.exit(1);
   });
+} else if (command === 'autotag') {
+  const config = loadConfig();
+  const batchMode = args.includes('--batch');
+  const minSizeIndex = args.indexOf('--min-size');
+  const minSize = minSizeIndex !== -1 && args[minSizeIndex + 1]
+    ? parseInt(args[minSizeIndex + 1], 10)
+    : 500;
+
+  if (!batchMode) {
+    console.log('Usage: pullread autotag --batch [--min-size N]');
+    console.log('  Auto-generates machine tags for articles missing them.');
+    process.exit(0);
+  }
+
+  const llmConfig = loadLLMConfig();
+  if (!llmConfig) {
+    console.error('Error: No LLM API key configured.');
+    console.error('Add your key via the viewer settings or create ~/.config/pullread/settings.json');
+    process.exit(1);
+  }
+
+  console.log('Auto-tagging articles...');
+  autotagBatch(config.outputPath, { minSize, config: llmConfig })
+    .then(({ tagged, skipped, failed }) => {
+      console.log(`\nDone: ${tagged} tagged, ${skipped} skipped, ${failed} failed`);
+    })
+    .catch(err => {
+      console.error('Fatal error:', err.message);
+      process.exit(1);
+    });
 } else {
   console.log(`Usage: pullread <command>
 
@@ -480,6 +511,8 @@ Commands:
   view --port <number>    Use a custom port (default: 7777)
   summarize --batch       Summarize articles missing summaries
   summarize --min-size N  Skip articles under N chars (default: 500)
+  autotag --batch         Generate machine tags for untagged articles
+  autotag --min-size N    Skip articles under N chars (default: 500)
   import <file.html>      Import bookmarks from HTML file (Netscape format)
   review                  Generate a weekly review of recent articles
   review --days N         Review the past N days (default: 7)

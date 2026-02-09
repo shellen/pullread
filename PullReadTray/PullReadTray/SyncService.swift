@@ -2,7 +2,6 @@
 // ABOUTME: Executes bundled pullread binary for article syncing
 
 import Foundation
-import AppKit
 
 class SyncService {
     private let configDir: String
@@ -229,13 +228,16 @@ class SyncService {
         return process.isRunning
     }
 
-    /// Starts the article viewer server, or opens the browser if already running
-    func openViewer(completion: @escaping (Result<Void, Error>) -> Void) {
-        // If viewer is already running, just open the browser
+    /// The URL for the running viewer server
+    var viewerURL: URL {
+        URL(string: "http://localhost:\(viewerPort)")!
+    }
+
+    /// Ensures the article viewer server is running, starting it if necessary.
+    /// Calls completion with the viewer URL on success.
+    func ensureViewerRunning(completion: @escaping (Result<URL, Error>) -> Void) {
         if isViewerRunning() {
-            let url = URL(string: "http://localhost:\(viewerPort)")!
-            openInSafari(url)
-            completion(.success(()))
+            completion(.success(viewerURL))
             return
         }
 
@@ -264,30 +266,72 @@ class SyncService {
                 try process.run()
                 self.viewerProcess = process
 
-                // Wait briefly for the server to start listening, then open in Safari
+                // Wait briefly for the server to start listening
                 Thread.sleep(forTimeInterval: 0.5)
-                DispatchQueue.main.async {
-                    let url = URL(string: "http://localhost:\(self.viewerPort)")!
-                    self.openInSafari(url)
-                }
 
-                completion(.success(()))
+                completion(.success(self.viewerURL))
             } catch {
                 completion(.failure(error))
             }
         }
     }
 
-    /// Opens a URL in Safari for best web app experience (Add to Dock support).
-    /// Falls back to the default browser if Safari is not available.
-    private func openInSafari(_ url: URL) {
-        let safariURL = URL(fileURLWithPath: "/Applications/Safari.app")
-        let config = NSWorkspace.OpenConfiguration()
-        config.activates = true
-        NSWorkspace.shared.open([url], withApplicationAt: safariURL, configuration: config) { _, error in
-            if error != nil {
-                // Fallback to default browser
-                NSWorkspace.shared.open(url)
+    /// Runs batch auto-tagging on articles that don't have machine tags yet.
+    /// Intended to run in the background after a sync completes.
+    func runAutotag(completion: @escaping (Result<String, Error>) -> Void) {
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+
+            guard self.isBinaryAvailable() else {
+                completion(.failure(NSError(domain: "PullRead", code: 1, userInfo: [NSLocalizedDescriptionKey: "PullRead binary not found"])))
+                return
+            }
+
+            let process = Process()
+            let pipe = Pipe()
+            let errorPipe = Pipe()
+
+            process.executableURL = URL(fileURLWithPath: self.binaryPath)
+            process.arguments = ["autotag", "--batch", "--config-path", self.getConfigPath(), "--data-path", "\(self.configDir)/pullread.db"]
+            process.standardOutput = pipe
+            process.standardError = errorPipe
+
+            var outputData = Data()
+            var errorData = Data()
+
+            let outputGroup = DispatchGroup()
+            let errorGroup = DispatchGroup()
+
+            outputGroup.enter()
+            DispatchQueue(label: "pullread.autotag.stdout").async {
+                outputData = pipe.fileHandleForReading.readDataToEndOfFile()
+                outputGroup.leave()
+            }
+
+            errorGroup.enter()
+            DispatchQueue(label: "pullread.autotag.stderr").async {
+                errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+                errorGroup.leave()
+            }
+
+            do {
+                try process.run()
+                process.waitUntilExit()
+                outputGroup.wait()
+                errorGroup.wait()
+
+                let output = String(data: outputData, encoding: .utf8) ?? ""
+                let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
+                self.logOutput(output + errorOutput)
+
+                if process.terminationStatus == 0 {
+                    completion(.success(output))
+                } else {
+                    let msg = errorOutput.isEmpty ? "Auto-tag failed with exit code \(process.terminationStatus)" : errorOutput
+                    completion(.failure(NSError(domain: "PullRead", code: Int(process.terminationStatus), userInfo: [NSLocalizedDescriptionKey: msg])))
+                }
+            } catch {
+                completion(.failure(error))
             }
         }
     }
