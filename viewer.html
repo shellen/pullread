@@ -1946,6 +1946,14 @@ function renderArticle(text, filename) {
     }
     table.setAttribute('role', 'table');
   });
+  // Open article content links in new window
+  content.querySelectorAll('a[href]').forEach(function(a) {
+    var href = a.getAttribute('href');
+    if (href && !href.startsWith('#')) {
+      a.setAttribute('target', '_blank');
+      a.setAttribute('rel', 'noopener noreferrer');
+    }
+  });
 
   // Add read time & word count to byline
   const articleBodyText = content.textContent || '';
