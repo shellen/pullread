@@ -106,6 +106,7 @@ jobs:
           VERSION="${{ steps.version.outputs.VERSION }}"
           # Compute build number: major*10000 + minor*100 + patch
           BUILD_NUMBER=$(echo "$VERSION" | awk -F. '{printf "%d", $1*10000+$2*100+$3}')
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
           cd PullReadTray
           xcodebuild -project PullReadTray.xcodeproj \
             -scheme PullReadTray \
@@ -325,7 +326,7 @@ jobs:
               <language>en</language>
               <item>
                 <title>Version ${VERSION}</title>
-                <sparkle:version>${VERSION}</sparkle:version>
+                <sparkle:version>${BUILD_NUMBER}</sparkle:version>
                 <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
                 <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
                 <pubDate>$(date -R)</pubDate>
