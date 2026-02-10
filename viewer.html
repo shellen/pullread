@@ -455,7 +455,13 @@
     margin-left: auto;
     flex-shrink: 0;
     opacity: 0.7;
+    filter: grayscale(100%);
+    transition: filter 0.2s;
   }
+  .file-item:hover .file-item-favicon,
+  .file-item.active .file-item-favicon,
+  .dash-card:hover .dash-card-meta img,
+  .domain-group-header:hover .file-item-favicon { filter: grayscale(0%); }
 
   /* Content pane */
   .content-pane {
@@ -594,6 +600,8 @@
     width: 14px;
     height: 14px;
     border-radius: 2px;
+    filter: grayscale(100%);
+    transition: filter 0.2s;
   }
   .dash-card-badge {
     font-size: 10px;
@@ -1947,58 +1955,130 @@
     opacity: 0.7;
   }
 
-  /* Tag cloud modal */
+  /* Explore tabs */
+  .explore-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin: 0 0 20px;
+  }
+  .explore-tab {
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+    font-family: inherit;
+    white-space: nowrap;
+  }
+  .explore-tab:hover { color: var(--fg); }
+  .explore-tab.active {
+    color: var(--fg);
+    border-bottom-color: var(--link);
+    font-weight: 600;
+  }
+  .explore-tab-panel { display: none; }
+  .explore-tab-panel.active { display: block; }
+
+  /* Flat tag pills — Tailwind-inspired */
   .tag-cloud {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    margin: 12px 0;
-    justify-content: center;
+    gap: 8px;
+    margin: 16px 0;
   }
-  .tag-cloud-item {
-    display: inline-block;
-    padding: 4px 12px;
-    background: var(--code-bg);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    color: var(--fg);
-    cursor: pointer;
-    transition: background 0.15s, border-color 0.15s;
+  .tag-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 500;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    text-decoration: none;
+    color: var(--fg);
+    background: var(--code-bg);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
     white-space: nowrap;
+    line-height: 1.4;
   }
-  .tag-cloud-item:hover {
-    background: var(--sidebar-hover);
-    border-color: var(--link);
+  .tag-pill:hover {
+    background: var(--sidebar-active);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
   }
+  .tag-pill .tag-count {
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--muted);
+    background: color-mix(in srgb, var(--fg) 6%, transparent);
+    padding: 1px 6px;
+    border-radius: 10px;
+    line-height: 1.4;
+  }
+
+  /* Quick filter pills — colored variants */
+  .tag-pill-blue { background: color-mix(in srgb, var(--link) 12%, var(--bg)); color: var(--link); }
+  .tag-pill-blue:hover { background: color-mix(in srgb, var(--link) 22%, var(--bg)); }
+  .tag-pill-green { background: color-mix(in srgb, #22c55e 12%, var(--bg)); color: #16a34a; }
+  .tag-pill-green:hover { background: color-mix(in srgb, #22c55e 22%, var(--bg)); }
+  [data-theme="dark"] .tag-pill-green { color: #4ade80; }
+  .tag-pill-amber { background: color-mix(in srgb, #f59e0b 12%, var(--bg)); color: #d97706; }
+  .tag-pill-amber:hover { background: color-mix(in srgb, #f59e0b 22%, var(--bg)); }
+  [data-theme="dark"] .tag-pill-amber { color: #fbbf24; }
+  .tag-pill-pink { background: color-mix(in srgb, #ec4899 10%, var(--bg)); color: #db2777; }
+  .tag-pill-pink:hover { background: color-mix(in srgb, #ec4899 20%, var(--bg)); }
+  [data-theme="dark"] .tag-pill-pink { color: #f472b6; }
+
+  /* Explore stats bar */
+  .explore-stats {
+    display: flex;
+    gap: 24px;
+    padding: 14px 0;
+    font-size: 13px;
+    color: var(--muted);
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
+  }
+  .explore-stats strong { color: var(--fg); }
+
+  /* Source / domain list */
   .domain-group {
-    margin: 16px 0 8px;
+    margin: 0 0 2px;
     padding: 0;
   }
   .domain-group-header {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
     color: var(--fg);
-    margin-bottom: 6px;
+    padding: 8px 10px;
+    border-radius: 6px;
     cursor: pointer;
+    transition: background 0.15s;
   }
-  .domain-group-header:hover { color: var(--link); }
+  .domain-group-header:hover { background: var(--code-bg); }
   .domain-group-count {
     font-weight: 400;
     color: var(--muted);
     font-size: 11px;
+    margin-left: auto;
   }
   .domain-group-articles {
-    padding-left: 8px;
+    padding: 0 10px 8px 34px;
     font-size: 12px;
   }
   .domain-group-articles a {
     display: block;
-    padding: 2px 0;
+    padding: 3px 0;
     color: var(--muted);
     text-decoration: none;
     overflow: hidden;
@@ -2006,6 +2086,112 @@
     white-space: nowrap;
   }
   .domain-group-articles a:hover { color: var(--link); }
+
+  /* Ontological connections */
+  .connection-group {
+    margin: 0 0 16px;
+    padding: 14px 16px;
+    background: var(--code-bg);
+    border-radius: 8px;
+  }
+  .connection-group-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fg);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .connection-group-title .conn-tag {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--link) 14%, var(--bg));
+    color: var(--link);
+  }
+  .connection-group-articles {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .connection-article {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--fg);
+    transition: background 0.15s;
+  }
+  .connection-article:hover { background: var(--sidebar-hover); }
+  .connection-article img {
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+    filter: grayscale(100%);
+    flex-shrink: 0;
+  }
+  .connection-article:hover img { filter: grayscale(0%); }
+  .connection-article .conn-domain {
+    font-size: 11px;
+    color: var(--muted);
+    margin-left: auto;
+    white-space: nowrap;
+  }
+
+  /* Most viewed list */
+  .most-viewed-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .most-viewed-item:hover { background: var(--code-bg); }
+  .most-viewed-rank {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--border);
+    width: 28px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .most-viewed-info { flex: 1; min-width: 0; }
+  .most-viewed-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--fg);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .most-viewed-meta {
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 2px;
+  }
+  .most-viewed-meta img {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    filter: grayscale(100%);
+  }
+  .most-viewed-item:hover .most-viewed-meta img { filter: grayscale(0%); }
+  .most-viewed-pct {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--link);
+    white-space: nowrap;
+  }
 
   /* Focus mode toggle button in toolbar */
   .focus-btn {
@@ -5316,117 +5502,198 @@ function showTagCloud() {
   activeFile = null;
   renderFileList();
 
-  // Collect all tags (user tags + machine tags) and domain groupings
+  // Collect all tags (user + machine), domain groupings, feed counts
   const tagCounts = {};
+  const tagArticles = {};  // tag -> [articles]
   const domainArticles = {};
   const feedCounts = {};
 
   for (const f of allFiles) {
-    // Domain grouping
     if (f.domain && f.domain !== 'pullread') {
       if (!domainArticles[f.domain]) domainArticles[f.domain] = [];
       domainArticles[f.domain].push(f);
     }
-    // Feed grouping
     if (f.feed) {
       feedCounts[f.feed] = (feedCounts[f.feed] || 0) + 1;
     }
-    // User tags
     const notes = allNotesIndex[f.filename];
-    if (notes && notes.tags) {
-      for (const tag of notes.tags) {
-        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-      }
-    }
-    // Machine tags (from auto-tagging)
-    if (notes && notes.machineTags) {
-      for (const tag of notes.machineTags) {
-        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-      }
+    const allTags = [];
+    if (notes && notes.tags) allTags.push(...notes.tags);
+    if (notes && notes.machineTags) allTags.push(...notes.machineTags);
+    for (const tag of allTags) {
+      tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+      if (!tagArticles[tag]) tagArticles[tag] = [];
+      tagArticles[tag].push(f);
     }
   }
 
-  // Sort domains by count
   const sortedDomains = Object.entries(domainArticles)
-    .sort((a, b) => b[1].length - a[1].length)
-    .slice(0, 30);
-
-  // Sort tags by count
+    .sort((a, b) => b[1].length - a[1].length);
   const sortedTags = Object.entries(tagCounts)
     .sort((a, b) => b[1] - a[1]);
 
-  let tagsHtml = '';
-  if (sortedTags.length > 0) {
-    tagsHtml = '<h3>Tags</h3><div class="tag-cloud">';
-    const maxCount = sortedTags[0][1];
-    for (const [tag, count] of sortedTags) {
-      const size = Math.max(11, Math.min(20, 11 + (count / maxCount) * 9));
-      tagsHtml += '<span class="tag-cloud-item" style="font-size:' + size + 'px" onclick="document.getElementById(\'search\').value=\'' + escapeHtml(tag) + '\';filterFiles()">' + escapeHtml(tag) + ' <span style="opacity:0.5;font-size:10px">' + count + '</span></span>';
-    }
-    tagsHtml += '</div>';
-  }
-
-  let domainsHtml = '<h3>Sources <span style="font-weight:400;color:var(--muted);font-size:12px">(' + Object.keys(domainArticles).length + ' sites)</span></h3>';
-  for (const [domain, articles] of sortedDomains) {
-    domainsHtml += '<div class="domain-group">';
-    domainsHtml += '<div class="domain-group-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">';
-    domainsHtml += '<img class="file-item-favicon" src="https://www.google.com/s2/favicons?domain=' + encodeURIComponent(domain) + '&sz=32" alt="" loading="lazy" onerror="this.style.display=\'none\'">';
-    domainsHtml += escapeHtml(domain) + ' <span class="domain-group-count">' + articles.length + ' article' + (articles.length !== 1 ? 's' : '') + '</span></div>';
-    domainsHtml += '<div class="domain-group-articles" style="display:none">';
-    for (const a of articles.slice(0, 10)) {
-      domainsHtml += '<a href="#" onclick="event.preventDefault();jumpToArticle(\'' + escapeHtml(a.filename.replace(/'/g, "\\'")) + '\')">' + escapeHtml(a.title) + '</a>';
-    }
-    if (articles.length > 10) {
-      domainsHtml += '<span style="font-size:11px;color:var(--muted)">+ ' + (articles.length - 10) + ' more</span>';
-    }
-    domainsHtml += '</div></div>';
-  }
-
-  // Stats
+  // Stats bar
   const totalArticles = allFiles.length;
   const totalHighlights = Object.values(allHighlightsIndex).reduce((s, h) => s + (h ? h.length : 0), 0);
   const totalFavorites = Object.values(allNotesIndex).filter(n => n && n.isFavorite).length;
   const totalSummaries = allFiles.filter(f => f.hasSummary).length;
   const totalUnread = allFiles.filter(f => !readArticles.has(f.filename)).length;
 
-  let statsHtml = '<div style="display:flex;gap:20px;margin:12px 0;font-size:13px;color:var(--muted);flex-wrap:wrap">';
-  statsHtml += '<span><strong style="color:var(--fg)">' + totalArticles + '</strong> articles</span>';
-  statsHtml += '<span><strong style="color:var(--fg)">' + totalUnread + '</strong> unread</span>';
-  statsHtml += '<span><strong style="color:var(--fg)">' + totalHighlights + '</strong> highlights</span>';
-  statsHtml += '<span><strong style="color:var(--fg)">' + totalFavorites + '</strong> favorites</span>';
-  statsHtml += '<span><strong style="color:var(--fg)">' + totalSummaries + '</strong> summaries</span>';
-  statsHtml += '<span><strong style="color:var(--fg)">' + Object.keys(domainArticles).length + '</strong> sources</span>';
+  let statsHtml = '<div class="explore-stats">';
+  statsHtml += '<span><strong>' + totalArticles + '</strong> articles</span>';
+  statsHtml += '<span><strong>' + totalUnread + '</strong> unread</span>';
+  statsHtml += '<span><strong>' + totalHighlights + '</strong> highlights</span>';
+  statsHtml += '<span><strong>' + totalFavorites + '</strong> favorites</span>';
+  statsHtml += '<span><strong>' + totalSummaries + '</strong> summaries</span>';
+  statsHtml += '<span><strong>' + Object.keys(domainArticles).length + '</strong> sources</span>';
   statsHtml += '</div>';
 
-  // Quick filter buttons
-  const makeQf = function(label, query) {
-    return '<button class="tag-cloud-item" style="font-size:12px;cursor:pointer;border:none" onclick="document.getElementById(\'search\').value=\'' + query + '\';filterFiles()">' + label + '</button>';
+  // --- Tab: Discover (quick filters + ontological connections) ---
+  const makeQf = function(label, query, variant) {
+    return '<button class="tag-pill' + (variant ? ' tag-pill-' + variant : '') + '" onclick="document.getElementById(\'search\').value=\'' + query + '\';filterFiles()">' + label + '</button>';
   };
-  let filtersHtml = '<h3>Quick Filters</h3><div class="tag-cloud" style="justify-content:flex-start">';
-  filtersHtml += makeQf('Favorites', 'is:favorite');
-  filtersHtml += makeQf('Unread', 'is:unread');
-  filtersHtml += makeQf('Has Summary', 'has:summary');
-  filtersHtml += makeQf('Has Highlights', 'has:highlights');
-  filtersHtml += makeQf('Has Notes', 'has:notes');
-  filtersHtml += makeQf('Has Tags', 'has:tags');
-  // Add feed-specific filters
+  let discoverHtml = '<div class="tag-cloud">';
+  discoverHtml += makeQf('Favorites', 'is:favorite', 'pink');
+  discoverHtml += makeQf('Unread', 'is:unread', 'blue');
+  discoverHtml += makeQf('Has Summary', 'has:summary', 'green');
+  discoverHtml += makeQf('Has Highlights', 'has:highlights', 'amber');
+  discoverHtml += makeQf('Has Notes', 'has:notes', '');
+  discoverHtml += makeQf('Has Tags', 'has:tags', '');
   const sortedFeeds = Object.entries(feedCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
-  for (const [feed, count] of sortedFeeds) {
-    filtersHtml += makeQf(escapeHtml(feed) + ' <span style="opacity:0.5;font-size:10px">' + count + '</span>', 'feed:' + feed);
+  for (const [feed] of sortedFeeds) {
+    discoverHtml += makeQf(escapeHtml(feed), 'feed:' + feed, '');
   }
-  filtersHtml += '</div>';
+  discoverHtml += '</div>';
 
-  content.innerHTML = `
-    <div class="article-header">
-      <h1>Explore Your Library</h1>
-    </div>
-    ${statsHtml}
-    ${filtersHtml}
-    ${tagsHtml}
-    ${domainsHtml}
-  `;
+  // Ontological connections: find tags shared by 2+ articles and show the clusters
+  const connectionsHtml = buildConnectionsHtml(tagArticles, sortedTags);
+  if (connectionsHtml) {
+    discoverHtml += '<h3 style="font-size:14px;font-weight:600;margin:24px 0 12px">Connections</h3>';
+    discoverHtml += connectionsHtml;
+  }
+
+  // --- Tab: Most Viewed ---
+  const positions = JSON.parse(localStorage.getItem('pr-scroll-positions') || '{}');
+  const viewedArticles = allFiles
+    .filter(f => positions[f.filename] || readArticles.has(f.filename))
+    .sort((a, b) => {
+      const pctA = positions[a.filename]?.pct || 0;
+      const pctB = positions[b.filename]?.pct || 0;
+      const tsA = positions[a.filename]?.ts || 0;
+      const tsB = positions[b.filename]?.ts || 0;
+      if (Math.abs(pctB - pctA) > 0.1) return pctB - pctA;
+      return tsB - tsA;
+    })
+    .slice(0, 30);
+
+  let viewedHtml = '';
+  if (viewedArticles.length > 0) {
+    viewedArticles.forEach(function(f, i) {
+      const pct = positions[f.filename]?.pct;
+      const pctStr = pct ? Math.round(pct * 100) + '%' : 'Opened';
+      const domain = f.domain || '';
+      const favicon = domain ? 'https://www.google.com/s2/favicons?domain=' + encodeURIComponent(domain) + '&sz=32' : '';
+      viewedHtml += '<div class="most-viewed-item" onclick="jumpToArticle(\'' + escapeHtml(f.filename.replace(/'/g, "\\'")) + '\')">';
+      viewedHtml += '<div class="most-viewed-rank">' + (i + 1) + '</div>';
+      viewedHtml += '<div class="most-viewed-info">';
+      viewedHtml += '<div class="most-viewed-title">' + escapeHtml(f.title) + '</div>';
+      viewedHtml += '<div class="most-viewed-meta">';
+      if (favicon) viewedHtml += '<img src="' + escapeHtml(favicon) + '" alt="" loading="lazy">';
+      if (domain) viewedHtml += '<span>' + escapeHtml(domain) + '</span>';
+      viewedHtml += '</div></div>';
+      viewedHtml += '<div class="most-viewed-pct">' + pctStr + '</div>';
+      viewedHtml += '</div>';
+    });
+  } else {
+    viewedHtml = '<p style="color:var(--muted);font-size:13px;padding:12px 0">No reading history yet. Articles you read will appear here.</p>';
+  }
+
+  // --- Tab: Tags ---
+  let tagsHtml = '';
+  if (sortedTags.length > 0) {
+    tagsHtml = '<div class="tag-cloud">';
+    for (const [tag, count] of sortedTags) {
+      tagsHtml += '<button class="tag-pill" onclick="document.getElementById(\'search\').value=\'' + escapeHtml(tag) + '\';filterFiles()">' + escapeHtml(tag) + '<span class="tag-count">' + count + '</span></button>';
+    }
+    tagsHtml += '</div>';
+  } else {
+    tagsHtml = '<p style="color:var(--muted);font-size:13px;padding:12px 0">No tags yet. Tag articles from the notes panel, or use auto-tagging to generate topic tags.</p>';
+  }
+
+  // --- Tab: Sources ---
+  let domainsHtml = '';
+  for (const [domain, articles] of sortedDomains.slice(0, 40)) {
+    domainsHtml += '<div class="domain-group">';
+    domainsHtml += '<div class="domain-group-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">';
+    domainsHtml += '<img class="file-item-favicon" src="https://www.google.com/s2/favicons?domain=' + encodeURIComponent(domain) + '&sz=32" alt="" loading="lazy" onerror="this.style.display=\'none\'">';
+    domainsHtml += '<span>' + escapeHtml(domain) + '</span><span class="domain-group-count">' + articles.length + ' article' + (articles.length !== 1 ? 's' : '') + '</span></div>';
+    domainsHtml += '<div class="domain-group-articles" style="display:none">';
+    for (const a of articles.slice(0, 10)) {
+      domainsHtml += '<a href="#" onclick="event.preventDefault();jumpToArticle(\'' + escapeHtml(a.filename.replace(/'/g, "\\'")) + '\')">' + escapeHtml(a.title) + '</a>';
+    }
+    if (articles.length > 10) {
+      domainsHtml += '<a href="#" onclick="event.preventDefault();document.getElementById(\'search\').value=\'domain:' + escapeHtml(domain) + '\';filterFiles()" style="color:var(--link)">+ ' + (articles.length - 10) + ' more</a>';
+    }
+    domainsHtml += '</div></div>';
+  }
+
+  content.innerHTML =
+    '<div class="article-header"><h1>Explore</h1></div>' +
+    statsHtml +
+    '<div class="explore-tabs">' +
+      '<button class="explore-tab active" data-tab="discover">Discover</button>' +
+      '<button class="explore-tab" data-tab="most-viewed">Most Viewed</button>' +
+      '<button class="explore-tab" data-tab="tags">Tags</button>' +
+      '<button class="explore-tab" data-tab="sources">Sources</button>' +
+    '</div>' +
+    '<div id="explore-discover" class="explore-tab-panel active">' + discoverHtml + '</div>' +
+    '<div id="explore-most-viewed" class="explore-tab-panel">' + viewedHtml + '</div>' +
+    '<div id="explore-tags" class="explore-tab-panel">' + tagsHtml + '</div>' +
+    '<div id="explore-sources" class="explore-tab-panel">' + domainsHtml + '</div>';
+
+  // Wire up tab switching
+  content.querySelectorAll('.explore-tab').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      content.querySelectorAll('.explore-tab').forEach(function(b) { b.classList.remove('active'); });
+      content.querySelectorAll('.explore-tab-panel').forEach(function(p) { p.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById('explore-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
   document.title = 'Explore Your Library';
   document.getElementById('content-pane').scrollTop = 0;
+}
+
+// Build ontological connections: clusters of articles sharing the same tags
+function buildConnectionsHtml(tagArticles, sortedTags) {
+  // Pick tags with 2-8 articles (meaningful clusters, not too noisy)
+  const clusters = sortedTags
+    .filter(function(entry) { return entry[1] >= 2 && entry[1] <= 8; })
+    .slice(0, 12);
+  if (clusters.length === 0) return '';
+
+  let html = '';
+  for (const [tag, count] of clusters) {
+    const articles = tagArticles[tag].slice(0, 5);
+    html += '<div class="connection-group">';
+    html += '<div class="connection-group-title"><span class="conn-tag">' + escapeHtml(tag) + '</span> <span style="font-size:11px;color:var(--muted);font-weight:400">' + count + ' articles</span></div>';
+    html += '<div class="connection-group-articles">';
+    for (const f of articles) {
+      const domain = f.domain || '';
+      const favicon = domain ? 'https://www.google.com/s2/favicons?domain=' + encodeURIComponent(domain) + '&sz=32' : '';
+      html += '<div class="connection-article" onclick="jumpToArticle(\'' + escapeHtml(f.filename.replace(/'/g, "\\'")) + '\')">';
+      if (favicon) html += '<img src="' + escapeHtml(favicon) + '" alt="" loading="lazy">';
+      html += '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(f.title) + '</span>';
+      if (domain) html += '<span class="conn-domain">' + escapeHtml(domain) + '</span>';
+      html += '</div>';
+    }
+    if (tagArticles[tag].length > 5) {
+      html += '<div style="padding:4px 8px;font-size:11px"><a href="#" style="color:var(--link);text-decoration:none" onclick="event.preventDefault();document.getElementById(\'search\').value=\'' + escapeHtml(tag) + '\';filterFiles()">View all ' + count + ' &rsaquo;</a></div>';
+    }
+    html += '</div></div>';
+  }
+  return html;
 }
 
 function jumpToArticle(filename) {
