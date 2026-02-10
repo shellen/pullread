@@ -20,6 +20,13 @@
 		B1000002200000010000000A /* AppDelegateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002100000010000000A /* AppDelegateTests.swift */; };
 		C1000001200000010000000A /* PullReadTrayUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000001100000010000000A /* PullReadTrayUITests.swift */; };
 		C1000002200000010000000A /* PullReadTrayUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000002100000010000000A /* PullReadTrayUITestsLaunchTests.swift */; };
+		E1000001200000010000000A /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000001100000010000000A /* KeychainService.swift */; };
+		E1000002200000010000000A /* SpotlightIndexer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002100000010000000A /* SpotlightIndexer.swift */; };
+		E1000003200000010000000A /* SaveArticleIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000003100000010000000A /* SaveArticleIntent.swift */; };
+		E1000004200000010000000A /* OpenViewerIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000004100000010000000A /* OpenViewerIntent.swift */; };
+		E1000005200000010000000A /* SyncIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000005100000010000000A /* SyncIntent.swift */; };
+		E1000006200000010000000A /* UnreadCountIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000006100000010000000A /* UnreadCountIntent.swift */; };
+		E1000007200000010000000A /* PullReadShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000007100000010000000A /* PullReadShortcuts.swift */; };
 		D1000001200000010000000A /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = D1000003100000010000000A /* Sparkle */; };
 /* End PBXBuildFile section */
 
@@ -52,6 +59,13 @@
 		A1000007100000010000000B /* WhatsNewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhatsNewView.swift; sourceTree = "<group>"; };
 		A1000008100000010000000B /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		A1000009100000010000000B /* ArticleViewerWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArticleViewerWindowController.swift; sourceTree = "<group>"; };
+		E1000001100000010000000A /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
+		E1000002100000010000000A /* SpotlightIndexer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotlightIndexer.swift; sourceTree = "<group>"; };
+		E1000003100000010000000A /* SaveArticleIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveArticleIntent.swift; sourceTree = "<group>"; };
+		E1000004100000010000000A /* OpenViewerIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenViewerIntent.swift; sourceTree = "<group>"; };
+		E1000005100000010000000A /* SyncIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncIntent.swift; sourceTree = "<group>"; };
+		E1000006100000010000000A /* UnreadCountIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnreadCountIntent.swift; sourceTree = "<group>"; };
+		E1000007100000010000000A /* PullReadShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PullReadShortcuts.swift; sourceTree = "<group>"; };
 		A1000007100000010000000A /* Pull Read.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Pull Read.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B1000001100000010000000A /* SyncServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncServiceTests.swift; sourceTree = "<group>"; };
 		B1000002100000010000000A /* AppDelegateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegateTests.swift; sourceTree = "<group>"; };
@@ -103,16 +117,31 @@
 				A1000001100000010000000A /* PullReadTrayApp.swift */,
 				A1000002100000010000000A /* AppDelegate.swift */,
 				A1000003100000010000000A /* SyncService.swift */,
+				E1000001100000010000000A /* KeychainService.swift */,
+				E1000002100000010000000A /* SpotlightIndexer.swift */,
 				A1000005100000010000000B /* SettingsView.swift */,
 				A1000006100000010000000B /* SettingsWindowController.swift */,
 				A1000007100000010000000B /* WhatsNewView.swift */,
 				A1000008100000010000000B /* OnboardingView.swift */,
 				A1000009100000010000000B /* ArticleViewerWindowController.swift */,
+				E1000010400000010000000A /* Intents */,
 				A1000004100000010000000A /* Assets.xcassets */,
 				A1000005100000010000000A /* Info.plist */,
 				A1000006100000010000000A /* PullReadTray.entitlements */,
 			);
 			path = PullReadTray;
+			sourceTree = "<group>";
+		};
+		E1000010400000010000000A /* Intents */ = {
+			isa = PBXGroup;
+			children = (
+				E1000003100000010000000A /* SaveArticleIntent.swift */,
+				E1000004100000010000000A /* OpenViewerIntent.swift */,
+				E1000005100000010000000A /* SyncIntent.swift */,
+				E1000006100000010000000A /* UnreadCountIntent.swift */,
+				E1000007100000010000000A /* PullReadShortcuts.swift */,
+			);
+			path = Intents;
 			sourceTree = "<group>";
 		};
 		A100000B400000010000000A /* Products */ = {
@@ -281,11 +310,18 @@
 				A1000001200000010000000A /* PullReadTrayApp.swift in Sources */,
 				A1000002200000010000000A /* AppDelegate.swift in Sources */,
 				A1000003200000010000000A /* SyncService.swift in Sources */,
+				E1000001200000010000000A /* KeychainService.swift in Sources */,
+				E1000002200000010000000A /* SpotlightIndexer.swift in Sources */,
 				A1000005200000010000000A /* SettingsView.swift in Sources */,
 				A1000006200000010000000A /* SettingsWindowController.swift in Sources */,
 				A1000007200000010000000B /* WhatsNewView.swift in Sources */,
 				A1000008200000010000000B /* OnboardingView.swift in Sources */,
 				A1000009200000010000000B /* ArticleViewerWindowController.swift in Sources */,
+				E1000003200000010000000A /* SaveArticleIntent.swift in Sources */,
+				E1000004200000010000000A /* OpenViewerIntent.swift in Sources */,
+				E1000005200000010000000A /* SyncIntent.swift in Sources */,
+				E1000006200000010000000A /* UnreadCountIntent.swift in Sources */,
+				E1000007200000010000000A /* PullReadShortcuts.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
