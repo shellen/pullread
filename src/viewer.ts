@@ -348,6 +348,7 @@ export function startViewer(outputPath: string, port = 7777): void {
             title: body.title ?? existing.title ?? '',
             content: body.content ?? existing.content ?? '',
             sources: body.sources ?? existing.sources ?? [],
+            tags: body.tags ?? existing.tags ?? [],
             createdAt: existing.createdAt || new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };

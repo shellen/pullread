@@ -1947,6 +1947,110 @@
   .hl-picker-item input[type="checkbox"] { margin-top: 3px; }
   .hl-picker-item-text { font-size: 12px; color: var(--fg); line-height: 1.4; }
 
+  /* Writing focus mode — distraction-free, full-screen */
+  .writing-focus .notebook-editor textarea {
+    color: color-mix(in srgb, var(--fg) 35%, transparent);
+    caret-color: var(--fg);
+  }
+  .notebook-focus-line {
+    position: absolute;
+    left: 17px; right: 17px;
+    height: 1.7em;
+    background: color-mix(in srgb, var(--fg) 6%, transparent);
+    border-radius: 3px;
+    pointer-events: none;
+    transition: top 0.08s ease;
+    z-index: 1;
+  }
+  .writing-focus .notebook-editor textarea::selection {
+    background: color-mix(in srgb, var(--link) 25%, transparent);
+  }
+  /* Full distraction-free overlay */
+  .writing-focus-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9000;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .writing-focus-overlay .wf-toolbar {
+    width: 100%;
+    max-width: 720px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .writing-focus-overlay:hover .wf-toolbar,
+  .writing-focus-overlay .wf-toolbar:focus-within { opacity: 1; }
+  .writing-focus-overlay .wf-toolbar button {
+    border: none; background: transparent; color: var(--muted);
+    font-size: 13px; cursor: pointer; font-family: inherit; padding: 4px 10px;
+    border-radius: 4px;
+  }
+  .writing-focus-overlay .wf-toolbar button:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 6%, transparent); }
+  .writing-focus-overlay .wf-title {
+    font-size: 13px; color: var(--muted); font-weight: 500;
+  }
+  .writing-focus-overlay .wf-body {
+    flex: 1;
+    width: 100%;
+    max-width: 720px;
+    padding: 0 24px 48px;
+    overflow-y: auto;
+    position: relative;
+  }
+  .writing-focus-overlay .wf-body textarea {
+    width: 100%; height: 100%;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 16px; line-height: 1.8;
+    border: none; outline: none; resize: none;
+    background: transparent;
+    color: color-mix(in srgb, var(--fg) 35%, transparent);
+    caret-color: var(--fg);
+  }
+  .writing-focus-overlay .wf-focus-line {
+    position: absolute;
+    left: 24px; right: 24px;
+    height: 1.8em;
+    background: color-mix(in srgb, var(--fg) 6%, transparent);
+    border-radius: 3px;
+    pointer-events: none;
+    transition: top 0.08s ease;
+  }
+  .writing-focus-overlay .wf-word-count {
+    font-size: 11px; color: var(--muted);
+  }
+
+  /* Sidebar nav tabs */
+  .sidebar-nav {
+    display: flex;
+    padding: 8px 8px 0;
+    gap: 2px;
+  }
+  .sidebar-nav-tab {
+    flex: 1;
+    padding: 7px 0;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+    font-family: inherit;
+  }
+  .sidebar-nav-tab:hover { color: var(--fg); }
+  .sidebar-nav-tab.active {
+    color: var(--fg);
+    border-bottom-color: var(--link);
+  }
+
   /* Reading progress bar */
   .reading-progress {
     position: sticky;
@@ -2489,6 +2593,11 @@
 
   <div class="main">
     <aside class="sidebar" id="sidebar" aria-label="Article list">
+      <div class="sidebar-nav" id="sidebar-nav">
+        <button class="sidebar-nav-tab active" data-view="library" onclick="switchSidebarView('library')">Library</button>
+        <button class="sidebar-nav-tab" data-view="explore" onclick="switchSidebarView('explore')">Explore</button>
+        <button class="sidebar-nav-tab" data-view="notebook" onclick="switchSidebarView('notebook')">Notebook</button>
+      </div>
       <div class="sidebar-search" role="search">
         <label for="search" class="sr-only">Search articles</label>
         <input type="text" id="search" placeholder="Search... try is:favorite or tag:tech" oninput="filterFiles()" />
@@ -2529,10 +2638,7 @@
       </div>
       <div class="sidebar-footer">
         <button class="sidebar-footer-btn" onclick="showShortcutsModal()" aria-label="Keyboard shortcuts"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-keyboard"/></svg> Shortcuts</button>
-        <button class="sidebar-footer-btn" onclick="showNotebook()" aria-label="Notebook"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-pen"/></svg> Notebook</button>
-        <button class="sidebar-footer-btn" onclick="showTagCloud()" aria-label="Explore tags"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-tags"/></svg> Explore</button>
         <button class="sidebar-footer-btn" onclick="showGuideModal()" aria-label="Features guide"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-book"/></svg> Guide</button>
-        <button class="sidebar-footer-btn" onclick="batchAutotagAll()" aria-label="Auto-tag all articles" id="batch-tag-btn"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-wand"/></svg> Tag All</button>
       </div>
     </aside>
 
@@ -2636,6 +2742,46 @@ function setWidth(val) {
   localStorage.setItem('pr-width', val);
 }
 
+function setIntegrationEditor(val) {
+  localStorage.setItem('pr-integration-editor', val);
+}
+
+function getIntegrationEditor() {
+  return localStorage.getItem('pr-integration-editor') || 'none';
+}
+
+function openInExternalEditor(markdownContent, title) {
+  var editor = getIntegrationEditor();
+  if (editor === 'none') return;
+
+  // Create a .md file and trigger download — the user's OS handles "Open with"
+  // For URL-scheme apps, we can deep-link
+  var filename = (title || 'Untitled').replace(/[^a-zA-Z0-9 _-]/g, '').trim() + '.md';
+
+  if (editor === 'obsidian') {
+    // Obsidian URI: obsidian://new?name=Title&content=...
+    var uri = 'obsidian://new?name=' + encodeURIComponent(title || 'Untitled') + '&content=' + encodeURIComponent(markdownContent);
+    window.open(uri);
+  } else if (editor === 'bear') {
+    // Bear URI: bear://x-callback-url/create?title=...&text=...
+    var uri = 'bear://x-callback-url/create?title=' + encodeURIComponent(title || 'Untitled') + '&text=' + encodeURIComponent(markdownContent);
+    window.open(uri);
+  } else if (editor === 'ulysses') {
+    // Ulysses URI: ulysses://x-callback-url/new-sheet?text=...
+    var uri = 'ulysses://x-callback-url/new-sheet?text=' + encodeURIComponent(markdownContent);
+    window.open(uri);
+  } else {
+    // iA Writer, Typora, etc. — download .md file
+    var blob = new Blob([markdownContent], { type: 'text/markdown' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+}
+
 function toggleSettingsDropdown() {
   const existing = document.querySelector('.settings-dropdown-panel');
   const btn = document.getElementById('settings-toggle-btn');
@@ -2711,6 +2857,19 @@ function toggleSettingsDropdown() {
     <label>Article</label>
     <div class="setting-row">
       <button onclick="reprocessCurrentArticle(this)" id="reprocess-btn" style="flex:1;text-align:center" title="Re-fetch this article from the original URL"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-cloud-download"/></svg> Re-fetch from source</button>
+    </div>
+    <hr style="border:none;border-top:1px solid var(--border);margin:12px 0 8px">
+    <label>Integrations</label>
+    <div class="setting-row" style="flex-direction:column;gap:6px">
+      <select id="integration-editor-select" onchange="setIntegrationEditor(this.value)" aria-label="External editor for notebooks" style="width:100%">
+        <option value="none" ${(localStorage.getItem('pr-integration-editor')||'none')==='none'?'selected':''}>None (use built-in editor)</option>
+        <option value="obsidian" ${localStorage.getItem('pr-integration-editor')==='obsidian'?'selected':''}>Obsidian</option>
+        <option value="ia-writer" ${localStorage.getItem('pr-integration-editor')==='ia-writer'?'selected':''}>iA Writer</option>
+        <option value="bear" ${localStorage.getItem('pr-integration-editor')==='bear'?'selected':''}>Bear</option>
+        <option value="ulysses" ${localStorage.getItem('pr-integration-editor')==='ulysses'?'selected':''}>Ulysses</option>
+        <option value="typora" ${localStorage.getItem('pr-integration-editor')==='typora'?'selected':''}>Typora</option>
+      </select>
+      <span style="font-size:11px;color:var(--muted)">When set, "Open in..." buttons appear on notebooks and exports to let you edit in your preferred app.</span>
     </div>
   `;
   document.querySelector('.settings-dropdown').appendChild(panel);
@@ -2971,6 +3130,7 @@ function dashCardHtml(f, progressPct) {
 }
 
 function goHome() {
+  _sidebarView = 'library'; syncSidebarTabs();
   activeFile = null;
   document.title = 'PullRead';
   renderDashboard();
@@ -3410,6 +3570,7 @@ function filterFiles() {
 async function loadFile(index) {
   const file = displayFiles[index];
   if (!file) return;
+  _sidebarView = 'library'; syncSidebarTabs();
   activeFile = file.filename;
   markAsRead(file.filename);
   renderFileList();
@@ -5305,35 +5466,46 @@ document.addEventListener('click', function(e) {
 });
 
 // Batch auto-tag all articles
-async function batchAutotagAll() {
+async function batchAutotagAll(force) {
   if (!serverMode) return;
-  const btn = document.getElementById('batch-tag-btn');
-  if (!btn) return;
-  const origText = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-wand"/></svg> Tagging...';
+
+  // Show warning before proceeding
+  var msg = force
+    ? 'This will re-tag ALL articles using AI, replacing any existing machine-generated tags. User tags will be preserved. Continue?'
+    : 'This will auto-tag all untagged articles using AI. This may take a while for large libraries. Continue?';
+  if (!confirm(msg)) return;
+
+  var btn = document.getElementById('batch-tag-btn');
+  var origText = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-wand"/></svg> Tagging...';
+  }
 
   try {
     const res = await fetch('/api/autotag-batch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ force: false })
+      body: JSON.stringify({ force: !!force })
     });
     const data = await res.json();
     if (data.error) {
       alert('Auto-tag failed: ' + data.error);
     } else {
-      btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-wand"/></svg> Done!';
+      if (btn) btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-wand"/></svg> Done!';
       // Refresh annotations index to pick up new tags
       await loadAnnotationsIndex();
       renderFileList();
-      setTimeout(() => { btn.innerHTML = origText; }, 2000);
+      // Refresh the explore page to show updated tag counts
+      setTimeout(function() { if (_sidebarView === 'explore') showTagCloud(); }, 2000);
     }
   } catch (err) {
     alert('Auto-tag request failed.');
   }
-  btn.disabled = false;
-  if (btn.innerHTML.includes('Tagging')) btn.innerHTML = origText;
+  if (btn) {
+    btn.disabled = false;
+    if (btn.innerHTML.includes('Tagging')) btn.innerHTML = origText;
+  }
 }
 
 let _modalReturnFocus = null;
@@ -5457,6 +5629,9 @@ function showGuideModal() {
     <h2>Export &amp; Sharing</h2>
     <p>Click the share icon on any article to send it to Bluesky, Threads, LinkedIn, email, or Messages. Use <strong>Export Markdown</strong> to download or copy the article as a .md file — choose which sections to include (summary, highlights, notes, tags).</p>
 
+    <h2>Notebook</h2>
+    <p>Write synthesis notes, reflections, or essays using the built-in Notebook. Click the <strong>Notebook</strong> tab in the sidebar to create and manage notebooks. Insert highlights from articles, tag notebooks, and use <strong>Focus Mode</strong> for a full-screen, distraction-free writing experience inspired by iA Writer. Export notebooks as .md files or open them directly in external editors like Obsidian or Bear.</p>
+
     <h2>Focus Mode</h2>
     <p>Press <strong>f</strong> or click the half-circle icon in the toolbar to enter Focus Mode. This dims all content except the paragraph you're currently reading, helping you concentrate on one section at a time.</p>
 
@@ -5470,7 +5645,10 @@ function showGuideModal() {
     <p>Click the gear icon to switch between Light, Dark, Sepia, and High Contrast themes. Choose from fonts including Inter, Lora, Source Serif, Work Sans, and OpenDyslexic. Adjust text size, line height, letter spacing, and content width. Preferences are saved automatically.</p>
 
     <h2>Machine Tags &amp; Explore</h2>
-    <p>PullRead can auto-generate topic, entity, and theme tags using your configured AI provider. Tags power relational mapping — discover connections between articles through the <strong>Explore</strong> page. Use the <strong>Tag All</strong> button in the sidebar footer or enable auto-tagging after sync in the macOS app settings.</p>
+    <p>PullRead can auto-generate topic, entity, and theme tags using your configured AI provider. Tags power relational mapping — discover connections between articles through the <strong>Explore</strong> page. Use the auto-tagging buttons on the Explore page's Discover tab, or enable auto-tagging after sync in the macOS app settings.</p>
+
+    <h2>Integrations</h2>
+    <p>PullRead works with external writing apps. Configure an integration in the Settings gear menu to add "Open in..." buttons to notebooks. Supported apps: <strong>Obsidian</strong>, <strong>iA Writer</strong>, <strong>Bear</strong>, <strong>Ulysses</strong>, and <strong>Typora</strong>. Obsidian, Bear, and Ulysses use URL schemes for direct handoff; others export as .md files.</p>
 
     <h2>Apple News &amp; Social Posts</h2>
     <p>PullRead resolves Apple News links (apple.news) to their original article URLs. Social posts from X/Twitter, Bluesky, Mastodon, Reddit, and Hacker News are extracted with special handling to preserve the post structure.</p>
@@ -5768,6 +5946,7 @@ async function deleteNotebook(id) {
 }
 
 function showNotebook(openId) {
+  _sidebarView = 'notebook'; syncSidebarTabs();
   activeFile = null;
   document.getElementById('margin-notes').innerHTML = '';
   renderFileList();
@@ -5822,14 +6001,18 @@ function showNotebook(openId) {
 
     document.getElementById('content-pane').scrollTop = 0;
 
-    // Set up auto-grow and auto-save for textarea
+    // Set up auto-grow, auto-save, and focus tracking for textarea
     const ta = content.querySelector('.notebook-editor textarea');
     if (ta) {
       autoGrowTextarea(ta);
       ta.addEventListener('input', () => {
         autoGrowTextarea(ta);
         notebookDebounceSave();
+        updateWritingFocusLine();
       });
+      ta.addEventListener('click', updateWritingFocusLine);
+      ta.addEventListener('keyup', updateWritingFocusLine);
+      ta.addEventListener('scroll', updateWritingFocusLine);
       ta.focus();
     }
   });
@@ -5837,6 +6020,7 @@ function showNotebook(openId) {
 
 function buildNotebookEditor(nb) {
   const previewActive = _notebookPreviewMode ? ' active' : '';
+  const focusActive = _writingFocusActive ? ' active' : '';
   const sources = (nb.sources || []);
   const sourcesHtml = sources.length
     ? '<div class="notebook-sources"><span class="notebook-sources-label">Sources</span>'
@@ -5847,6 +6031,14 @@ function buildNotebookEditor(nb) {
       + '</div>'
     : '';
 
+  // Tags row (reuse .tags-row pattern from notes panel)
+  const nbTags = (nb.tags || []);
+  const tagsHtml = '<div class="tags-row" style="margin-top:12px">'
+    + nbTags.map(function(t) { return '<span class="tag">' + escapeHtml(t)
+      + '<span class="tag-remove" onclick="removeNotebookTag(\'' + escapeHtml(t.replace(/'/g, "\\'")) + '\')">&times;</span></span>'; }).join('')
+    + '<input type="text" placeholder="Add tag..." onkeydown="handleNotebookTagKey(event)" style="flex:1;min-width:80px">'
+    + '</div>';
+
   let bodyHtml;
   if (_notebookPreviewMode) {
     bodyHtml = '<div class="notebook-preview">' + marked.parse(nb.content || '*Start writing...*') + '</div>';
@@ -5856,16 +6048,24 @@ function buildNotebookEditor(nb) {
       + '</div></div>';
   }
 
+  var editorIntegration = getIntegrationEditor();
+  var openInBtn = editorIntegration !== 'none'
+    ? '<button onclick="openInExternalEditor(_activeNotebook.content, _activeNotebook.title)" style="margin-left:4px"><svg class="icon icon-sm" style="vertical-align:-1px"><use href="#i-share"/></svg> Open in ' + escapeHtml(editorIntegration.replace(/-/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); })) + '</button>'
+    : '';
+
   return '<div class="notebook-toolbar">'
     + '<button onclick="showHighlightPicker()"><svg class="icon icon-sm" style="vertical-align:-1px"><use href="#i-pen"/></svg> Insert Highlights</button>'
     + '<button class="' + previewActive + '" onclick="toggleNotebookPreview()">Preview</button>'
+    + '<button class="' + focusActive + '" onclick="toggleWritingFocus()"><svg class="icon icon-sm" style="vertical-align:-1px"><use href="#i-focus"/></svg> Focus</button>'
     + '<button onclick="exportNotebook()" style="margin-left:4px">Export .md</button>'
+    + openInBtn
     + '<button onclick="if(confirm(\'Delete this notebook?\')) deleteNotebook(\'' + nb.id + '\')" style="color:var(--muted)">Delete</button>'
     + '<span class="save-hint" id="notebook-save-hint">Saved</span>'
     + '</div>'
     + '<input class="notebook-title-input" value="' + escapeHtml(nb.title || '') + '" placeholder="Untitled" oninput="notebookDebounceSave()">'
     + bodyHtml
-    + sourcesHtml;
+    + sourcesHtml
+    + tagsHtml;
 }
 
 function autoGrowTextarea(ta) {
@@ -5880,7 +6080,9 @@ function notebookDebounceSave() {
   _notebookSaveTimeout = setTimeout(() => {
     if (!_activeNotebook) return;
     const titleInput = document.querySelector('.notebook-title-input');
-    const ta = document.querySelector('.notebook-editor textarea');
+    // Read from full-screen focus textarea if active, else inline editor
+    const wfTa = document.getElementById('wf-textarea');
+    const ta = wfTa || document.querySelector('.notebook-editor textarea');
     if (titleInput) _activeNotebook.title = titleInput.value;
     if (ta) _activeNotebook.content = ta.value;
     _activeNotebook.updatedAt = new Date().toISOString();
@@ -6052,8 +6254,160 @@ function startNotebookFromArticle() {
   });
 }
 
+// Notebook tag handlers (mirrors article notes tag pattern)
+function handleNotebookTagKey(e) {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    var tag = e.target.value.trim().replace(/,/g, '');
+    if (!tag || !_activeNotebook) return;
+    if (!_activeNotebook.tags) _activeNotebook.tags = [];
+    if (!_activeNotebook.tags.includes(tag)) {
+      _activeNotebook.tags.push(tag);
+      notebookDebounceSave();
+      showNotebook(_activeNotebook.id);
+    }
+    e.target.value = '';
+  }
+}
+
+function removeNotebookTag(tag) {
+  if (!_activeNotebook || !_activeNotebook.tags) return;
+  _activeNotebook.tags = _activeNotebook.tags.filter(function(t) { return t !== tag; });
+  notebookDebounceSave();
+  showNotebook(_activeNotebook.id);
+}
+
+// ---- Writing Focus Mode ----
+// ---- Sidebar nav view switching ----
+let _sidebarView = 'library';
+
+function switchSidebarView(view) {
+  _sidebarView = view;
+  syncSidebarTabs();
+
+  // Trigger the appropriate view in the content area
+  if (view === 'explore') showTagCloud();
+  else if (view === 'notebook') showNotebook();
+  else if (view === 'library') goHome();
+}
+
+function syncSidebarTabs() {
+  document.querySelectorAll('.sidebar-nav-tab').forEach(function(t) {
+    t.classList.toggle('active', t.dataset.view === _sidebarView);
+  });
+  var fileCount = document.getElementById('file-count');
+  var fileList = document.getElementById('file-list');
+  if (fileCount) fileCount.style.display = _sidebarView === 'library' ? '' : 'none';
+  if (fileList) fileList.style.display = _sidebarView === 'library' ? '' : 'none';
+
+  // Update search placeholder contextually
+  var search = document.getElementById('search');
+  if (search) {
+    if (_sidebarView === 'library') search.placeholder = 'Search... try is:favorite or tag:tech';
+    else if (_sidebarView === 'explore') search.placeholder = 'Search tags, sources, highlights...';
+    else if (_sidebarView === 'notebook') search.placeholder = 'Search notebooks...';
+  }
+}
+
+let _writingFocusActive = false;
+
+function toggleWritingFocus() {
+  if (_writingFocusActive) {
+    exitWritingFocus();
+    return;
+  }
+  if (!_activeNotebook) return;
+  _writingFocusActive = true;
+
+  // Create full-screen distraction-free overlay
+  var overlay = document.createElement('div');
+  overlay.className = 'writing-focus-overlay';
+  overlay.id = 'writing-focus-overlay';
+
+  var title = _activeNotebook.title || 'Untitled';
+  var content = _activeNotebook.content || '';
+  var wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
+
+  overlay.innerHTML = '<div class="wf-toolbar">'
+    + '<button onclick="exitWritingFocus()" title="Exit focus mode (Esc)">Exit Focus</button>'
+    + '<span class="wf-title">' + escapeHtml(title) + '</span>'
+    + '<span class="wf-word-count" id="wf-word-count">' + wordCount + ' words</span>'
+    + '</div>'
+    + '<div class="wf-body">'
+    + '<div class="wf-focus-line" id="wf-focus-line"></div>'
+    + '<textarea id="wf-textarea">' + escapeHtml(content) + '</textarea>'
+    + '</div>';
+
+  document.body.appendChild(overlay);
+
+  var ta = document.getElementById('wf-textarea');
+  ta.focus();
+  // Move cursor to end
+  ta.selectionStart = ta.selectionEnd = ta.value.length;
+
+  ta.addEventListener('input', function() {
+    notebookDebounceSave();
+    updateWritingFocusLine();
+    var wc = ta.value.trim() ? ta.value.trim().split(/\s+/).length : 0;
+    var wcEl = document.getElementById('wf-word-count');
+    if (wcEl) wcEl.textContent = wc + ' words';
+  });
+  ta.addEventListener('click', updateWritingFocusLine);
+  ta.addEventListener('keyup', updateWritingFocusLine);
+  ta.addEventListener('scroll', updateWritingFocusLine);
+
+  // Escape key to exit
+  overlay.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') { exitWritingFocus(); }
+  });
+
+  updateWritingFocusLine();
+
+  // Update the inline Focus button state
+  var btn = document.querySelector('.notebook-toolbar button[onclick="toggleWritingFocus()"]');
+  if (btn) btn.classList.add('active');
+}
+
+function exitWritingFocus() {
+  _writingFocusActive = false;
+
+  // Sync content back from overlay textarea
+  var ta = document.getElementById('wf-textarea');
+  if (ta && _activeNotebook) {
+    _activeNotebook.content = ta.value;
+    notebookDebounceSave();
+  }
+
+  var overlay = document.getElementById('writing-focus-overlay');
+  if (overlay) overlay.remove();
+
+  // Refresh the notebook editor to show updated content
+  if (_activeNotebook) {
+    showNotebook(_activeNotebook.id);
+  }
+}
+
+function updateWritingFocusLine() {
+  if (!_writingFocusActive) return;
+  // Check full-screen overlay first
+  var ta = document.getElementById('wf-textarea');
+  var line = document.getElementById('wf-focus-line');
+  if (!ta || !line) {
+    // Fallback to inline mode
+    ta = document.querySelector('.notebook-editor textarea');
+    line = document.querySelector('.notebook-focus-line');
+  }
+  if (!ta || !line) return;
+  var text = ta.value.substring(0, ta.selectionStart);
+  var lineNum = text.split('\n').length - 1;
+  var lineHeight = parseFloat(getComputedStyle(ta).lineHeight) || 28.8;
+  var padding = 0;
+  line.style.top = (padding + lineNum * lineHeight - ta.scrollTop) + 'px';
+}
+
 // ---- Tag Cloud / Explore ---- (renders as inline page like Guide)
 function showTagCloud() {
+  _sidebarView = 'explore'; syncSidebarTabs();
   const content = document.getElementById('content');
   const empty = document.getElementById('empty-state');
   empty.style.display = 'none';
@@ -6125,6 +6479,19 @@ function showTagCloud() {
   for (const [feed] of sortedFeeds) {
     discoverHtml += makeQf(escapeHtml(feed), 'feed:' + feed, '');
   }
+  discoverHtml += '</div>';
+
+  // Auto-tag actions
+  const taggedCount = allFiles.filter(function(f) { const n = allNotesIndex[f.filename]; return n && ((n.tags && n.tags.length) || (n.machineTags && n.machineTags.length)); }).length;
+  const untaggedCount = totalArticles - taggedCount;
+  discoverHtml += '<h3 style="font-size:14px;font-weight:600;margin:24px 0 12px">Auto-Tagging</h3>';
+  discoverHtml += '<p style="font-size:13px;color:var(--muted);margin:0 0 10px">' + taggedCount + ' of ' + totalArticles + ' articles tagged. ';
+  if (untaggedCount > 0) discoverHtml += untaggedCount + ' remaining.';
+  else discoverHtml += 'All articles tagged!';
+  discoverHtml += '</p>';
+  discoverHtml += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+  discoverHtml += '<button class="tag-pill" id="batch-tag-btn" onclick="batchAutotagAll(false)" title="Tag untagged articles using AI"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-wand"/></svg> Tag Untagged</button>';
+  discoverHtml += '<button class="tag-pill" onclick="batchAutotagAll(true)" title="Re-tag all articles, replacing existing AI tags"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-refresh"/></svg> Retag All</button>';
   discoverHtml += '</div>';
 
   // Ontological connections: find tags shared by 2+ articles and show the clusters
