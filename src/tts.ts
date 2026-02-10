@@ -229,14 +229,9 @@ function httpsPost(url: string, headers: Record<string, string>, body: string | 
 }
 
 /** Check if Kokoro model is downloaded and ready */
-export function getKokoroStatus(): { installed: boolean; modelPath: string; packageAvailable: boolean } {
+export function getKokoroStatus(): { installed: boolean; modelPath: string } {
   const installed = existsSync(KOKORO_MODEL_DIR) && readdirSync(KOKORO_MODEL_DIR).length > 0;
-  let packageAvailable = false;
-  try {
-    require.resolve('kokoro-js');
-    packageAvailable = true;
-  } catch {}
-  return { installed, modelPath: KOKORO_MODEL_DIR, packageAvailable };
+  return { installed, modelPath: KOKORO_MODEL_DIR };
 }
 
 /** Lazy-loaded Kokoro pipeline singleton */
@@ -400,7 +395,19 @@ export async function generateSpeech(articleName: string, text: string, config: 
 
   switch (config.provider) {
     case 'kokoro':
-      audio = await kokoroTTS(plainText, config);
+      try {
+        audio = await kokoroTTS(plainText, config);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        // Translate native library / code signing errors into user-friendly messages
+        if (msg.includes('dlopen') || msg.includes('code signature') || msg.includes('not valid for use')) {
+          throw new Error('Kokoro voice engine could not load. This is a code signing issue — please update to the latest version of Pull Read.');
+        }
+        if (msg.includes('kokoro-js') || msg.includes('Cannot find module') || msg.includes('Cannot find package')) {
+          throw new Error('Kokoro voice engine is not available in this build. Please update to the latest version of Pull Read.');
+        }
+        throw new Error('Kokoro voice failed: ' + (msg.length > 120 ? msg.slice(0, 120) + '…' : msg));
+      }
       break;
     case 'openai':
       if (!config.apiKey) throw new Error('OpenAI API key required for TTS');

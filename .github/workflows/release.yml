@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   build:
@@ -157,8 +158,11 @@ jobs:
           fi
 
           # Sign the bundled CLI binary (hardened runtime + timestamp required for notarization)
+          # disable-library-validation allows loading native addons (e.g. onnxruntime
+          # for Kokoro TTS) that Bun extracts at runtime to a temp directory
           codesign --force --options runtime --timestamp \
             --sign "$IDENTITY" \
+            --entitlements PullReadTray/cli-entitlements.plist \
             "$RESOURCES_PATH/pullread"
 
           # Sign the main app binary

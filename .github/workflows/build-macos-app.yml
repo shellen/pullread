@@ -274,8 +274,11 @@ jobs:
           IDENTITY="Developer ID Application"
 
           # Sign the bundled CLI binary (hardened runtime required for notarization)
+          # disable-library-validation allows loading native addons (e.g. onnxruntime
+          # for Kokoro TTS) that Bun extracts at runtime to a temp directory
           codesign --force --options runtime --timestamp \
             --sign "$IDENTITY" \
+            --entitlements cli-entitlements.plist \
             "$APP_PATH/Contents/Resources/pullread"
 
           # Sign the main app binary (PRODUCT_NAME is "Pull Read", not "PullReadTray")
