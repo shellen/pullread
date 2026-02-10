@@ -22,6 +22,22 @@ const turndown = new TurndownService({
   codeBlockStyle: 'fenced'
 });
 
+// When <a> wraps a single <img> (Substack lightbox, etc.), emit just the image.
+// The wrapping link produces [![alt](url)](url) which marked.js chokes on for long URLs.
+turndown.addRule('linkedImage', {
+  filter: function(node) {
+    return node.nodeName === 'A'
+      && node.childNodes.length === 1
+      && node.childNodes[0].nodeName === 'IMG';
+  },
+  replacement: function(_content, node) {
+    const img = node.childNodes[0] as any;
+    const alt = img.getAttribute?.('alt') || '';
+    const src = img.getAttribute?.('src') || '';
+    return `\n\n![${alt}](${src})\n\n`;
+  }
+});
+
 // URLs that are never articles (apps, login walls, product pages, etc.)
 const SKIP_PATTERNS = [
   /^https?:\/\/(www\.)?instagram\.com/,

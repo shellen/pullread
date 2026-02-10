@@ -2680,9 +2680,15 @@ function cleanMarkdown(md) {
   // Remove orphaned ](...) on its own line after an image (broken link fragment)
   md = md.replace(/(!\[[^\]]*\]\([^)]*\))\s*\n+\s*\]\([^)]*\)/g, '$1');
 
+  // Collapse linked images where link URL = image URL: [![alt](url)](url) → ![alt](url)
+  md = md.replace(/\[!\[([^\]]*)\]\(([^)]+)\)\]\(\2\)/g, '![$1]($2)');
+
   // Remove standalone parenthesized URLs on their own line (leftover link targets)
   // e.g. a line that is just "(https://substackcdn.com/image/fetch/...)"
   md = md.replace(/^\(https?:\/\/[^)]+\)\s*$/gm, '');
+
+  // Remove parenthesized URLs that span multiple lines (long substackcdn URLs wrap)
+  md = md.replace(/^\(https?:\/\/[^\n)]*\n[^)]*\)\s*$/gm, '');
 
   // Remove Wayback Machine parenthesized URLs: (/web/20250908.../https://...)
   md = md.replace(/\(\/web\/\d+\/https?:\/\/[^)]+\)/g, '');
