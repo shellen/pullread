@@ -3358,7 +3358,9 @@ function addCurrentToTTSQueue() {
   addToTTSQueue(activeFile);
 }
 
-function addToTTSQueue(filename) {
+let ttsConsentGiven = false; // session-level consent for paid TTS
+
+async function addToTTSQueue(filename) {
   const file = allFiles.find(f => f.filename === filename);
   if (!file) return;
   if (ttsQueue.some(q => q.filename === filename)) {
@@ -3367,6 +3369,36 @@ function addToTTSQueue(filename) {
     if (idx >= 0) playTTSItem(idx);
     return;
   }
+
+  // Check if user has a paid TTS provider configured
+  if (!ttsConsentGiven && serverMode) {
+    try {
+      const res = await fetch('/api/tts-settings');
+      if (res.ok) {
+        const cfg = await res.json();
+        ttsProvider = cfg.provider || 'browser';
+        if (cfg.provider !== 'browser' && cfg.hasKey) {
+          // Show one-time session confirmation
+          const model = cfg.model || '';
+          const perK = TTS_COST_PER_1K[model];
+          let costMsg = '';
+          if (perK) {
+            const perArticle = (perK * TTS_AVG_ARTICLE_CHARS / 1000).toFixed(2);
+            costMsg = '\n\nEstimated cost: ~$' + perArticle + ' per article (~$5 per ' + Math.floor(5 / (perK * TTS_AVG_ARTICLE_CHARS / 1000)) + ' articles). Audio is cached after first listen.';
+          }
+          const ok = confirm(
+            'Listen with ' + cfg.provider.charAt(0).toUpperCase() + cfg.provider.slice(1) + '?\n\n'
+            + 'This will send the article text to the ' + cfg.provider.charAt(0).toUpperCase() + cfg.provider.slice(1) + ' API and use your TTS API key.'
+            + costMsg
+            + '\n\nFor free playback, switch to Browser in TTS Settings.'
+          );
+          if (!ok) return;
+          ttsConsentGiven = true;
+        }
+      }
+    } catch {}
+  }
+
   ttsQueue.push({ filename, title: file.title });
   renderAudioPlayer();
   if (ttsQueue.length === 1) playTTSItem(0);
@@ -3782,36 +3814,48 @@ function showTTSSettings() {
     }
 
     overlay.innerHTML = `
-      <div class="modal-card" onclick="event.stopPropagation()" style="max-width:420px">
+      <div class="modal-card" onclick="event.stopPropagation()" style="max-width:440px">
         <h2>Text-to-Speech Settings</h2>
-        <p>Choose how articles are read aloud.</p>
+        <p>Choose how articles are read aloud. Browser TTS is always free.</p>
         <div style="margin:12px 0">
           <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Provider</label>
           <select id="tts-provider-select" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px" onchange="ttsSettingsProviderChanged()">
             ${providers.map(p => '<option value="' + p.id + '"' + (data.provider === p.id ? ' selected' : '') + '>' + p.label + '</option>').join('')}
           </select>
         </div>
+        <div id="tts-cost-info" style="display:${data.provider === 'browser' ? 'none' : 'block'}">
+          <div id="tts-cost-estimate" style="background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin:10px 0;font-size:12px;line-height:1.5">
+            ${ttsGetCostHtml(data.provider, data.model)}
+          </div>
+        </div>
         <div id="tts-cloud-settings" style="display:${data.provider === 'browser' ? 'none' : 'block'}">
           <div style="margin:12px 0">
-            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">API Key</label>
-            <input type="password" id="tts-api-key" placeholder="Enter API key" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px" />
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">API Key <span style="font-weight:400;color:var(--muted)">(separate from your Summaries key)</span></label>
+            <input type="password" id="tts-api-key" placeholder="Enter API key for TTS" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px" />
+            <div style="font-size:11px;color:var(--muted);margin-top:3px">This key is used <strong>only</strong> for audio generation, never for summaries.</div>
           </div>
           <div style="margin:12px 0" id="tts-voice-row">
             <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Voice</label>
-            <select id="tts-voice-select" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px">
+            <select id="tts-voice-select" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px" onchange="ttsSettingsModelChanged()">
               ${renderVoiceOptions(data.provider)}
             </select>
           </div>
           <div style="margin:12px 0" id="tts-model-row">
             <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Model</label>
-            <select id="tts-model-select" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px">
+            <select id="tts-model-select" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px" onchange="ttsSettingsModelChanged()">
               ${renderModelOptions(data.provider)}
             </select>
+          </div>
+          <div style="margin:14px 0;padding:10px 12px;background:var(--code-bg);border:1px solid var(--border);border-radius:6px">
+            <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;cursor:pointer;line-height:1.5">
+              <input type="checkbox" id="tts-consent" style="margin-top:3px;width:16px;height:16px;accent-color:var(--link);flex-shrink:0" />
+              <span>I understand that using this provider will send article text to their API and incur charges on my API key. Audio is cached locally so each article is only generated once.</span>
+            </label>
           </div>
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
-          <button class="btn-primary" onclick="saveTTSSettings()">Save</button>
+          <button class="btn-primary" onclick="saveTTSSettings()" id="tts-save-btn">Save</button>
         </div>
       </div>
     `;
@@ -3825,10 +3869,48 @@ function showTTSSettings() {
   });
 }
 
+// Cost estimates per model ($ per 1K characters, based on a ~2000-word / 10K char article)
+const TTS_COST_PER_1K = {
+  'tts-1': 0.015,
+  'tts-1-hd': 0.030,
+  'gpt-4o-mini-tts': 0.015,
+  'eleven_multilingual_v2': 0.24,
+  'eleven_turbo_v2_5': 0.12,
+  'eleven_flash_v2_5': 0.12,
+};
+const TTS_AVG_ARTICLE_CHARS = 10000; // ~2000 words
+
+function ttsGetCostHtml(provider, model) {
+  if (provider === 'browser') return '';
+  const perK = TTS_COST_PER_1K[model];
+  if (!perK) return '<span style="color:var(--muted)">Cost varies by model</span>';
+  const perArticle = (perK * TTS_AVG_ARTICLE_CHARS / 1000);
+  const articlesPerFive = Math.floor(5 / perArticle);
+  let html = '<strong style="color:var(--fg)">Estimated cost</strong><br>';
+  html += '<span style="color:var(--muted)">~$' + perArticle.toFixed(2) + ' per article</span>';
+  html += '<span style="color:var(--muted)"> &middot; </span>';
+  html += '<span style="color:var(--muted)">~<strong>$5 per ' + articlesPerFive + ' articles</strong></span>';
+  html += '<br><span style="font-size:11px;color:var(--muted)">Based on a typical 2,000-word article. Cached after first listen.</span>';
+  return html;
+}
+
+function ttsSettingsModelChanged() {
+  const provider = document.getElementById('tts-provider-select').value;
+  const model = document.getElementById('tts-model-select').value;
+  const costEl = document.getElementById('tts-cost-estimate');
+  if (costEl) costEl.innerHTML = ttsGetCostHtml(provider, model);
+}
+
 function ttsSettingsProviderChanged() {
   const provider = document.getElementById('tts-provider-select').value;
   const cloudSettings = document.getElementById('tts-cloud-settings');
+  const costInfo = document.getElementById('tts-cost-info');
   cloudSettings.style.display = provider === 'browser' ? 'none' : 'block';
+  costInfo.style.display = provider === 'browser' ? 'none' : 'block';
+
+  // Reset consent checkbox when changing providers
+  const consent = document.getElementById('tts-consent');
+  if (consent) consent.checked = false;
 
   const overlay = document.querySelector('.modal-overlay');
   const data = overlay?._ttsData;
@@ -3853,6 +3935,11 @@ function ttsSettingsProviderChanged() {
   } else {
     modelSelect.innerHTML = '';
   }
+
+  // Update cost estimate
+  const model = modelSelect.value;
+  const costEl = document.getElementById('tts-cost-estimate');
+  if (costEl) costEl.innerHTML = ttsGetCostHtml(provider, model);
 }
 
 function saveTTSSettings() {
@@ -3860,11 +3947,22 @@ function saveTTSSettings() {
   const config = { provider };
 
   if (provider !== 'browser') {
+    const consent = document.getElementById('tts-consent');
+    if (!consent || !consent.checked) {
+      // Briefly highlight the consent checkbox
+      const label = consent?.closest('label');
+      if (label) {
+        label.style.outline = '2px solid #ef4444';
+        label.style.outlineOffset = '2px';
+        setTimeout(() => { label.style.outline = ''; label.style.outlineOffset = ''; }, 2000);
+      }
+      return;
+    }
     config.apiKey = document.getElementById('tts-api-key').value;
     config.voice = document.getElementById('tts-voice-select').value;
     config.model = document.getElementById('tts-model-select').value;
     if (!config.apiKey) {
-      alert('API key is required for ' + provider);
+      alert('Please enter a dedicated API key for TTS.\nThis is separate from your Summaries API key.');
       return;
     }
   }
