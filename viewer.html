@@ -2459,7 +2459,6 @@ function findAndWrap(container, hl) {
   // Find the best match position using context
   let targetGlobalIdx = -1;
   if (hl.contextBefore || hl.contextAfter) {
-    // Try context-anchored search first
     const ctxBefore = (hl.contextBefore || '').slice(-15);
     const ctxAfter = (hl.contextAfter || '').slice(0, 15);
     const needle = ctxBefore + searchText + ctxAfter;
@@ -2473,39 +2472,51 @@ function findAndWrap(container, hl) {
   }
   if (targetGlobalIdx < 0) return;
 
-  // Walk text nodes to find the one containing our target position
+  const endGlobalIdx = targetGlobalIdx + searchText.length;
+
+  // Walk text nodes to find start and end positions (handles cross-element spans)
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
   let charCount = 0;
+  let startNode = null, startOffset = 0;
+  let endNode = null, endOffset = 0;
   let node;
 
   while (node = walker.nextNode()) {
     const nodeLen = node.textContent.length;
-    if (charCount + nodeLen > targetGlobalIdx) {
-      const localIdx = targetGlobalIdx - charCount;
-      // Check that the text actually matches at this position
-      if (node.textContent.slice(localIdx, localIdx + searchText.length) !== searchText) break;
-
-      try {
-        const range = document.createRange();
-        range.setStart(node, localIdx);
-        range.setEnd(node, localIdx + searchText.length);
-
-        const mark = document.createElement('mark');
-        mark.className = 'pr-highlight hl-' + hl.color;
-        mark.setAttribute('data-hl-id', hl.id);
-        mark.onclick = function(e) {
-          e.stopPropagation();
-          showHighlightContextMenu(e, hl);
-        };
-
-        range.surroundContents(mark);
-      } catch {
-        // surroundContents can fail if selection spans nodes; skip gracefully
-        return;
-      }
-      return;
+    if (!startNode && charCount + nodeLen > targetGlobalIdx) {
+      startNode = node;
+      startOffset = targetGlobalIdx - charCount;
+    }
+    if (startNode && charCount + nodeLen >= endGlobalIdx) {
+      endNode = node;
+      endOffset = endGlobalIdx - charCount;
+      break;
     }
     charCount += nodeLen;
+  }
+
+  if (!startNode || !endNode) return;
+
+  try {
+    const range = document.createRange();
+    range.setStart(startNode, startOffset);
+    range.setEnd(endNode, endOffset);
+
+    const mark = document.createElement('mark');
+    mark.className = 'pr-highlight hl-' + hl.color;
+    mark.setAttribute('data-hl-id', hl.id);
+    mark.onclick = function(e) {
+      e.stopPropagation();
+      showHighlightContextMenu(e, hl);
+    };
+
+    // extractContents handles cross-element ranges (bold/italic boundaries)
+    // where surroundContents would throw
+    const fragment = range.extractContents();
+    mark.appendChild(fragment);
+    range.insertNode(mark);
+  } catch {
+    return;
   }
 }
 
@@ -2556,6 +2567,9 @@ function showHlToolbar(x, y) {
   removeHlToolbar();
   const bar = document.createElement('div');
   bar.className = 'hl-toolbar';
+  // Prevent mousedown from clearing the text selection — critical for
+  // highlight/note buttons to read the selection when their onclick fires
+  bar.addEventListener('mousedown', e => e.preventDefault());
   bar.innerHTML = `
     <button class="hl-yellow-btn" aria-label="Highlight yellow" onclick="createHighlight('yellow')"></button>
     <button class="hl-green-btn" aria-label="Highlight green" onclick="createHighlight('green')"></button>
@@ -2573,6 +2587,7 @@ function showHighlightContextMenu(e, hl) {
   removeHlToolbar();
   const bar = document.createElement('div');
   bar.className = 'hl-toolbar';
+  bar.addEventListener('mousedown', e => e.preventDefault());
   const noteLabel = hl.note ? 'Edit Note' : 'Note';
   bar.innerHTML = `
     <button class="hl-yellow-btn" aria-label="Yellow" onclick="changeHighlightColor('${hl.id}','yellow')"></button>
@@ -2698,12 +2713,15 @@ function addInlineNote() {
   popover.className = 'annotation-popover';
   popover.style.left = (rect.left - paneRect.left) + 'px';
   popover.style.top = (rect.bottom - paneRect.top + pane.scrollTop + 5) + 'px';
+  // Store anchor text as data attribute to avoid escaping issues with
+  // newlines/quotes in onclick string literals
+  popover.setAttribute('data-anchor', anchorText);
   popover.innerHTML = `
     <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Note on: "${escapeHtml(anchorText.slice(0, 50))}${anchorText.length > 50 ? '...' : ''}"</div>
     <textarea placeholder="Add your note..." autofocus></textarea>
     <div class="btn-row">
       <button onclick="removeAnnotationPopover()">Cancel</button>
-      <button class="primary" onclick="saveInlineNote(this, '${escapeHtml(anchorText.replace(/'/g, "\\'"))}')">Save</button>
+      <button class="primary" onclick="saveInlineNote(this)">Save</button>
     </div>
   `;
   popover.onclick = function(e) { e.stopPropagation(); };
@@ -2712,8 +2730,9 @@ function addInlineNote() {
   sel.removeAllRanges();
 }
 
-function saveInlineNote(btn, anchorText) {
+function saveInlineNote(btn) {
   const popover = btn.closest('.annotation-popover');
+  const anchorText = popover.getAttribute('data-anchor') || '';
   const note = popover.querySelector('textarea').value.trim();
   if (!note) { removeAnnotationPopover(); return; }
 

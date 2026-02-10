@@ -23,7 +23,13 @@ struct SettingsView: View {
     @State private var selectedFeed: FeedItem.ID?
     @State private var useBrowserCookies: Bool = false
     @State private var showingCookieInfo: Bool = false
-    @State private var llmProvider: String = "anthropic"
+    @State private var llmProvider: String = {
+        // Default to Apple Intelligence on macOS 26+ (Tahoe)
+        if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26 {
+            return "apple"
+        }
+        return "anthropic"
+    }()
     @State private var llmApiKey: String = ""
     @State private var llmModel: String = ""
     @State private var llmModelCustom: String = ""
@@ -128,7 +134,7 @@ struct SettingsView: View {
                         }
                         .padding(20)
                     }
-                    .tabItem { Label("AI", systemImage: "text.quote") }
+                    .tabItem { Label("Summaries", systemImage: "text.quote") }
                     .tag(2)
                 }
 
@@ -1067,7 +1073,8 @@ struct SettingsView: View {
         if let settingsData = FileManager.default.contents(atPath: settingsPath),
            let settings = try? JSONSerialization.jsonObject(with: settingsData) as? [String: Any],
            let llm = settings["llm"] as? [String: Any] {
-            llmProvider = (llm["provider"] as? String) ?? "anthropic"
+            let defaultProvider = ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26 ? "apple" : "anthropic"
+            llmProvider = (llm["provider"] as? String) ?? defaultProvider
             llmApiKey = (llm["apiKey"] as? String) ?? ""
             let savedModel = (llm["model"] as? String) ?? ""
             let knownList = Self.knownModels[llmProvider] ?? []
