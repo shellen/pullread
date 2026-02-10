@@ -337,6 +337,16 @@ jobs:
           git commit -m "Update appcast for v${VERSION}" || echo "No changes to commit"
           git push origin HEAD:main
 
+      - name: Trigger site deploy
+        if: env.HAS_SPARKLE_KEY != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # The appcast push above uses GITHUB_TOKEN, which does not trigger
+          # other workflows. Explicitly dispatch the deploy workflow so the
+          # updated appcast.xml goes live on pullread.com.
+          gh workflow run deploy-site.yml --ref main
+
       - name: Clean up keychain
         if: always()
         run: |
