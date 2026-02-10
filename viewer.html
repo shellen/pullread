@@ -2164,7 +2164,7 @@
           </div>
           <div id="audio-queue-list"></div>
         </div>
-        <button class="audio-settings-link" onclick="showTTSSettings()">TTS Settings</button>
+        <button class="audio-settings-link" onclick="showTTSSettings()">Voice Playback Settings</button>
       </div>
       <div class="sidebar-footer">
         <button class="sidebar-footer-btn" onclick="showShortcutsModal()" aria-label="Keyboard shortcuts"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-keyboard"/></svg> Shortcuts</button>
@@ -3877,7 +3877,7 @@ async function addToTTSQueue(filename) {
             'Listen with ' + cfg.provider.charAt(0).toUpperCase() + cfg.provider.slice(1) + '?\n\n'
             + 'This will send the article text to the ' + cfg.provider.charAt(0).toUpperCase() + cfg.provider.slice(1) + ' API and use your TTS API key.'
             + costMsg
-            + '\n\nFor free playback, switch to Browser in TTS Settings.'
+            + '\n\nFor free playback, switch to Browser in Voice Playback Settings.'
           );
           if (!ok) return;
           ttsConsentGiven = true;
@@ -4269,7 +4269,7 @@ function stripMarkdownForTTS(md) {
 
 function showTTSSettings() {
   if (!serverMode) {
-    alert('TTS settings are only available in server mode.');
+    alert('Voice playback settings are only available in server mode.');
     return;
   }
 
@@ -4303,8 +4303,8 @@ function showTTSSettings() {
 
     overlay.innerHTML = `
       <div class="modal-card" onclick="event.stopPropagation()" style="max-width:440px">
-        <h2>Text-to-Speech Settings</h2>
-        <p>Choose how articles are read aloud. Browser TTS is always free.</p>
+        <h2>Voice Playback Settings</h2>
+        <p>Choose how articles are read aloud. Browser voice is always free.</p>
         <div style="margin:12px 0">
           <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Provider</label>
           <select id="tts-provider-select" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px" onchange="ttsSettingsProviderChanged()">
@@ -4317,12 +4317,11 @@ function showTTSSettings() {
             <span style="color:var(--muted)">Kokoro runs entirely on your machine — no API key, no cost, no data sent anywhere.</span><br>
             <span style="color:var(--muted)">The model (~86MB) downloads automatically on first use.</span>
             <div id="kokoro-status" style="margin-top:6px">
-              ${data.kokoro?.installed
-                ? '<span style="color:#22c55e">&#10003; Model downloaded and ready</span>'
-                : '<span style="color:var(--muted)">Model will download on first listen</span>'}
-              ${!data.kokoro?.packageAvailable
-                ? '<br><span style="color:#f59e0b;font-size:11px">Note: kokoro-js package not yet installed. Run: npm install kokoro-js</span>'
-                : ''}
+              ${data.kokoro?.installed && data.kokoro?.packageAvailable
+                ? '<span style="color:#22c55e">&#10003; Ready</span>'
+                : data.kokoro?.packageAvailable
+                  ? '<span style="color:var(--muted)">Model will download on first listen</span>'
+                  : '<span style="color:var(--muted)">Kokoro will be set up automatically on first listen</span><br><button onclick="installKokoroNow(this)" style="margin-top:6px;padding:4px 12px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--link);cursor:pointer">Set up now</button>'}
             </div>
           </div>
           <div style="margin:12px 0">
@@ -4380,7 +4379,7 @@ function showTTSSettings() {
     // Store full settings data for dynamic updates
     overlay._ttsData = data;
   }).catch(() => {
-    alert('Could not load TTS settings.');
+    alert('Could not load voice playback settings.');
   });
 }
 
@@ -4498,8 +4497,23 @@ function saveTTSSettings() {
       const overlay = document.querySelector('.modal-overlay');
       if (overlay) overlay.remove();
     } else {
-      alert('Failed to save TTS settings.');
+      alert('Failed to save voice playback settings.');
     }
+  });
+}
+
+function installKokoroNow(btn) {
+  btn.disabled = true;
+  btn.textContent = 'Setting up…';
+  const statusEl = document.getElementById('kokoro-status');
+  fetch('/api/kokoro-install', { method: 'POST' }).then(r => r.json()).then(data => {
+    if (data.success) {
+      statusEl.innerHTML = '<span style="color:#22c55e">&#10003; Package installed</span><br><span style="color:var(--muted);font-size:11px">Model will download on first listen</span>';
+    } else {
+      statusEl.innerHTML = '<span style="color:#ef4444">Setup failed: ' + escapeHtml(data.error || 'Unknown error') + '</span>';
+    }
+  }).catch(() => {
+    statusEl.innerHTML = '<span style="color:#ef4444">Setup failed — could not reach server</span>';
   });
 }
 
@@ -5030,7 +5044,7 @@ function showGuideModal() {
         <tr><td>ElevenLabs</td><td>~$1.20/article</td><td>Cloud API, bring your own key</td></tr>
       </tbody>
     </table>
-    <p>Configure in TTS Settings (at the bottom of the audio player). Paid providers require a separate API key — never shared with your Summaries key. Audio is cached locally after first listen.</p>
+    <p>Configure in Voice Playback Settings (at the bottom of the audio player). Paid providers require a separate API key — never shared with your Summaries key. Audio is cached locally after first listen.</p>
 
     <h2>Export &amp; Sharing</h2>
     <p>Click the share icon on any article to send it to Bluesky, Threads, LinkedIn, email, or Messages. Use <strong>Export Markdown</strong> to download or copy the article as a .md file — choose which sections to include (summary, highlights, notes, tags).</p>

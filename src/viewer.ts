@@ -12,7 +12,7 @@ import { autotagText, autotagBatch, saveMachineTags, hasMachineTags } from './au
 import { APP_ICON } from './app-icon';
 import { fetchAndExtract } from './extractor';
 import { generateMarkdown, ArticleData } from './writer';
-import { loadTTSConfig, saveTTSConfig, generateSpeech, getAudioContentType, getKokoroStatus, TTS_VOICES, TTS_MODELS } from './tts';
+import { loadTTSConfig, saveTTSConfig, generateSpeech, getAudioContentType, getKokoroStatus, installKokoroPackage, TTS_VOICES, TTS_MODELS } from './tts';
 
 interface FileMeta {
   filename: string;
@@ -648,6 +648,19 @@ export function startViewer(outputPath: string, port = 7777): void {
         }
         return;
       }
+    }
+
+    // Kokoro package auto-install API
+    if (url.pathname === '/api/kokoro-install' && req.method === 'POST') {
+      try {
+        const result = installKokoroPackage();
+        sendJson(res, result);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Installation failed';
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: msg }));
+      }
+      return;
     }
 
     // TTS Audio generation API
