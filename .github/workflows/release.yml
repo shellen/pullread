@@ -239,10 +239,17 @@ jobs:
           # Create a symlink to Applications for drag-to-install
           ln -s /Applications dmg-contents/Applications
 
+          # Calculate source size with generous padding — hdiutil -srcfolder
+          # underestimates for large Bun-compiled binaries, causing
+          # "No space left on device" on the temp R/W volume
+          SIZE_MB=$(du -sm dmg-contents | awk '{print int($1 * 1.5 + 30)}')
+          echo "DMG source size with padding: ${SIZE_MB}MB"
+
           # Create the DMG (volume name shows as "Pull Read" to users)
           hdiutil create -volname "Pull Read" \
             -srcfolder dmg-contents \
             -ov -format UDZO \
+            -size ${SIZE_MB}m \
             PullRead.dmg
 
           # Clean up
