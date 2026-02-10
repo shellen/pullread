@@ -6,12 +6,10 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { createHash } from 'crypto';
 import { request as httpsRequest } from 'https';
-import { execSync } from 'child_process';
 
 const SETTINGS_PATH = join(homedir(), '.config', 'pullread', 'settings.json');
 const CACHE_DIR = join(homedir(), '.config', 'pullread', 'tts-cache');
 const KOKORO_MODEL_DIR = join(homedir(), '.config', 'pullread', 'kokoro-model');
-const KOKORO_ENV_DIR = join(homedir(), '.config', 'pullread', 'kokoro-env');
 
 export interface TTSConfig {
   provider: 'browser' | 'kokoro' | 'openai' | 'elevenlabs';
@@ -230,80 +228,15 @@ function httpsPost(url: string, headers: Record<string, string>, body: string | 
   });
 }
 
-/** Find a usable package manager on the system */
-function findPackageManager(): string | null {
-  for (const cmd of ['npm', 'bun']) {
-    try {
-      execSync(`which ${cmd}`, { stdio: 'ignore' });
-      return cmd;
-    } catch {}
-  }
-  return null;
-}
-
-/** Check if kokoro-js is available (bundled or locally installed) */
-function isKokoroPackageAvailable(): boolean {
-  // Check if bundled in the compiled binary
-  try {
-    require.resolve('kokoro-js');
-    return true;
-  } catch {}
-  // Check local install
-  return existsSync(join(KOKORO_ENV_DIR, 'node_modules', 'kokoro-js'));
-}
-
-/** Install kokoro-js to the local env directory */
-export function installKokoroPackage(): { success: boolean; error?: string } {
-  if (isKokoroPackageAvailable()) return { success: true };
-
-  const pm = findPackageManager();
-  if (!pm) {
-    return {
-      success: false,
-      error: 'No package manager found. Please install Node.js from nodejs.org, then reopen Pull Read.',
-    };
-  }
-
-  mkdirSync(KOKORO_ENV_DIR, { recursive: true });
-  if (!existsSync(join(KOKORO_ENV_DIR, 'package.json'))) {
-    writeFileSync(join(KOKORO_ENV_DIR, 'package.json'), JSON.stringify({ private: true }));
-  }
-
-  try {
-    const cmd = pm === 'npm' ? 'npm install kokoro-js' : 'bun add kokoro-js';
-    execSync(cmd, { cwd: KOKORO_ENV_DIR, timeout: 180000, stdio: 'pipe' });
-    return { success: true };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Installation failed';
-    return { success: false, error: msg };
-  }
-}
-
 /** Check if Kokoro model is downloaded and ready */
-export function getKokoroStatus(): { installed: boolean; modelPath: string; packageAvailable: boolean; installing: boolean } {
+export function getKokoroStatus(): { installed: boolean; modelPath: string } {
   const installed = existsSync(KOKORO_MODEL_DIR) && readdirSync(KOKORO_MODEL_DIR).length > 0;
-  const packageAvailable = isKokoroPackageAvailable();
-  return { installed, modelPath: KOKORO_MODEL_DIR, packageAvailable, installing: kokoroInstalling };
-}
-
-/** Import kokoro-js from bundled modules or local install */
-async function importKokoroJS(): Promise<any> {
-  // Try bundled first
-  try {
-    return await import('kokoro-js');
-  } catch {}
-  // Try local install
-  const localPath = join(KOKORO_ENV_DIR, 'node_modules', 'kokoro-js');
-  if (existsSync(localPath)) {
-    return await import(localPath);
-  }
-  throw new Error('kokoro-js is not available');
+  return { installed, modelPath: KOKORO_MODEL_DIR };
 }
 
 /** Lazy-loaded Kokoro pipeline singleton */
 let kokoroPipeline: any = null;
 let kokoroLoading = false;
-let kokoroInstalling = false;
 
 async function getKokoroPipeline(model: string): Promise<any> {
   if (kokoroPipeline) return kokoroPipeline;
@@ -315,17 +248,7 @@ async function getKokoroPipeline(model: string): Promise<any> {
 
   kokoroLoading = true;
   try {
-    // Auto-install kokoro-js if needed
-    if (!isKokoroPackageAvailable()) {
-      kokoroInstalling = true;
-      const result = installKokoroPackage();
-      kokoroInstalling = false;
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to install kokoro-js');
-      }
-    }
-
-    const { KokoroTTS } = await importKokoroJS();
+    const { KokoroTTS } = await import('kokoro-js');
     const dtype = model === 'kokoro-v1-q4' ? 'q4' : 'q8';
     kokoroPipeline = await KokoroTTS.from_pretrained(
       'onnx-community/Kokoro-82M-v1.0-ONNX',
@@ -334,7 +257,6 @@ async function getKokoroPipeline(model: string): Promise<any> {
     return kokoroPipeline;
   } finally {
     kokoroLoading = false;
-    kokoroInstalling = false;
   }
 }
 
@@ -473,7 +395,19 @@ export async function generateSpeech(articleName: string, text: string, config: 
 
   switch (config.provider) {
     case 'kokoro':
-      audio = await kokoroTTS(plainText, config);
+      try {
+        audio = await kokoroTTS(plainText, config);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        // Translate native library / code signing errors into user-friendly messages
+        if (msg.includes('dlopen') || msg.includes('code signature') || msg.includes('not valid for use')) {
+          throw new Error('Kokoro voice engine could not load. This is a code signing issue — please update to the latest version of Pull Read.');
+        }
+        if (msg.includes('kokoro-js') || msg.includes('Cannot find module') || msg.includes('Cannot find package')) {
+          throw new Error('Kokoro voice engine is not available in this build. Please update to the latest version of Pull Read.');
+        }
+        throw new Error('Kokoro voice failed: ' + (msg.length > 120 ? msg.slice(0, 120) + '…' : msg));
+      }
       break;
     case 'openai':
       if (!config.apiKey) throw new Error('OpenAI API key required for TTS');

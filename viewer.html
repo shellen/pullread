@@ -375,11 +375,11 @@
   }
 
   .file-item {
-    padding: 8px 10px;
+    padding: 10px 12px;
     border-radius: 7px;
     cursor: pointer;
     transition: background 0.12s;
-    margin-bottom: 1px;
+    margin-bottom: 2px;
   }
   .file-item:hover {
     background: color-mix(in srgb, var(--fg) 5%, transparent);
@@ -400,8 +400,8 @@
   .file-item-title {
     font-size: 13px;
     font-weight: 500;
-    line-height: 1.35;
-    margin-bottom: 3px;
+    line-height: 1.4;
+    margin-bottom: 4px;
     overflow: hidden;
     text-overflow: ellipsis;
     display: -webkit-box;
@@ -447,14 +447,14 @@
     cursor: pointer;
   }
 
-  /* Favicon in sidebar */
+  /* Favicon in sidebar — shown on meta line, pushed to far right */
   .file-item-favicon {
     width: 14px;
     height: 14px;
     border-radius: 3px;
-    margin-right: 4px;
-    vertical-align: -2px;
-    opacity: 0.8;
+    margin-left: auto;
+    flex-shrink: 0;
+    opacity: 0.7;
   }
 
   /* Content pane */
@@ -2887,8 +2887,8 @@ function renderFileItem(f, i) {
   const metaHtml = metaParts.join('<span class="meta-sep"></span>');
 
   return '<div class="file-item' + isActive + (isRead && !isActive ? ' read' : '') + '" data-index="' + i + '" data-filename="' + escapeHtml(f.filename) + '" onclick="loadFile(' + i + ')" role="option" aria-selected="' + (activeFile === f.filename) + '" tabindex="0" onkeydown="if(event.key===\'Enter\')loadFile(' + i + ')">'
-    + '<div class="file-item-title">' + favicon + escapeHtml(f.title) + '</div>'
-    + '<div class="file-item-meta">' + metaHtml + '</div>'
+    + '<div class="file-item-title">' + escapeHtml(f.title) + '</div>'
+    + '<div class="file-item-meta">' + metaHtml + favicon + '</div>'
     + indicators
     + '</div>';
 }
@@ -4317,11 +4317,9 @@ function showTTSSettings() {
             <span style="color:var(--muted)">Kokoro runs entirely on your machine — no API key, no cost, no data sent anywhere.</span><br>
             <span style="color:var(--muted)">The model (~86MB) downloads automatically on first use.</span>
             <div id="kokoro-status" style="margin-top:6px">
-              ${data.kokoro?.installed && data.kokoro?.packageAvailable
+              ${data.kokoro?.installed
                 ? '<span style="color:#22c55e">&#10003; Ready</span>'
-                : data.kokoro?.packageAvailable
-                  ? '<span style="color:var(--muted)">Model will download on first listen</span>'
-                  : '<span style="color:var(--muted)">Kokoro will be set up automatically on first listen</span><br><button onclick="installKokoroNow(this)" style="margin-top:6px;padding:4px 12px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--link);cursor:pointer">Set up now</button>'}
+                : '<span style="color:var(--muted)">Model will download on first listen</span>'}
             </div>
           </div>
           <div style="margin:12px 0">
@@ -4499,21 +4497,6 @@ function saveTTSSettings() {
     } else {
       alert('Failed to save voice playback settings.');
     }
-  });
-}
-
-function installKokoroNow(btn) {
-  btn.disabled = true;
-  btn.textContent = 'Setting up…';
-  const statusEl = document.getElementById('kokoro-status');
-  fetch('/api/kokoro-install', { method: 'POST' }).then(r => r.json()).then(data => {
-    if (data.success) {
-      statusEl.innerHTML = '<span style="color:#22c55e">&#10003; Package installed</span><br><span style="color:var(--muted);font-size:11px">Model will download on first listen</span>';
-    } else {
-      statusEl.innerHTML = '<span style="color:#ef4444">Setup failed: ' + escapeHtml(data.error || 'Unknown error') + '</span>';
-    }
-  }).catch(() => {
-    statusEl.innerHTML = '<span style="color:#ef4444">Setup failed — could not reach server</span>';
   });
 }
 
