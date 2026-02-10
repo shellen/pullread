@@ -6194,11 +6194,22 @@ async function refreshArticleList(silent) {
   if (!silent) btn.classList.remove('spinning');
 }
 
-// Auto-refresh sidebar every 30 seconds when in server mode
+// Auto-refresh: poll lightweight /api/files-changed every 5s, full refresh only when files change
 let _autoRefreshTimer = null;
+let _lastKnownChangeAt = 0;
 function startAutoRefresh() {
   if (_autoRefreshTimer) return;
-  _autoRefreshTimer = setInterval(() => refreshArticleList(true), 30000);
+  _autoRefreshTimer = setInterval(async () => {
+    try {
+      const res = await fetch('/api/files-changed');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.changedAt > _lastKnownChangeAt) {
+        _lastKnownChangeAt = data.changedAt;
+        refreshArticleList(true);
+      }
+    } catch {}
+  }, 5000);
 }
 function stopAutoRefresh() {
   if (_autoRefreshTimer) { clearInterval(_autoRefreshTimer); _autoRefreshTimer = null; }
@@ -6271,6 +6282,8 @@ async function init() {
       // Show dashboard instead of auto-loading first article
       renderDashboard();
       showOnboardingIfNeeded();
+      // Seed the change tracker so first poll doesn't false-trigger
+      fetch('/api/files-changed').then(r => r.json()).then(d => { _lastKnownChangeAt = d.changedAt; }).catch(() => {});
       startAutoRefresh();
       return;
     }

@@ -2,7 +2,7 @@
 // ABOUTME: Serves viewer UI and provides API for listing/reading articles
 
 import { createServer, IncomingMessage, ServerResponse } from 'http';
-import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, mkdirSync } from 'fs';
+import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, mkdirSync, watch } from 'fs';
 import { join, extname, dirname } from 'path';
 import { exec } from 'child_process';
 import { homedir } from 'os';
@@ -168,6 +168,16 @@ function writeSummaryToFile(filePath: string, summary: string, provider?: string
 }
 
 export function startViewer(outputPath: string, port = 7777): void {
+  // Watch output directory for .md file changes
+  let filesChangedAt = Date.now();
+  try {
+    watch(outputPath, (event, filename) => {
+      if (filename && filename.endsWith('.md')) {
+        filesChangedAt = Date.now();
+      }
+    });
+  } catch {}
+
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url || '/', `http://localhost:${port}`);
 
@@ -215,6 +225,12 @@ export function startViewer(outputPath: string, port = 7777): void {
 
     if (url.pathname === '/api/files') {
       sendJson(res, listFiles(outputPath));
+      return;
+    }
+
+    // Lightweight poll: returns timestamp of last .md file change
+    if (url.pathname === '/api/files-changed') {
+      sendJson(res, { changedAt: filesChangedAt });
       return;
     }
 
