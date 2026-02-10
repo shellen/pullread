@@ -221,9 +221,12 @@
   }
   .share-dropdown-panel .share-icon {
     width: 16px;
-    text-align: center;
+    height: 16px;
     flex-shrink: 0;
     opacity: 0.7;
+    fill: currentColor;
+    display: inline-block;
+    vertical-align: middle;
   }
   .share-dropdown-panel hr {
     border: none;
@@ -381,6 +384,13 @@
   }
   .file-item.read .file-item-title {
     opacity: 0.6;
+  }
+  .file-item-new {
+    animation: fileNewFade 3s ease;
+  }
+  @keyframes fileNewFade {
+    0% { background: var(--link); opacity: 0.8; }
+    100% { background: transparent; opacity: 1; }
   }
   .file-item-title {
     font-size: 13px;
@@ -1558,9 +1568,19 @@
   <symbol id="i-tags" viewBox="0 0 512 512"><path d="M345 39.1L472.8 168.4c52.4 53 52.4 138.2 0 191.2L360.8 472.9c-9.3 9.4-24.5 9.5-33.9.2s-9.5-24.5-.2-33.9L438.6 325.9c33.9-34.3 33.9-89.4 0-123.7L310.9 72.9c-9.3-9.4-9.2-24.6.2-33.9s24.6-9.2 33.9.2zM0 229.5V80C0 53.5 21.5 32 48 32H197.5c17 0 33.3 6.7 45.3 18.7l168 168c25 25 25 65.5 0 90.5L277.3 442.7c-25 25-65.5 25-90.5 0l-168-168C6.7 262.7 0 246.5 0 229.5zM144 144a32 32 0 1 0-64 0 32 32 0 1 0 64 0z"/></symbol>
   <symbol id="i-book" viewBox="0 0 448 512"><path d="M96 0C43 0 0 43 0 96v320c0 53 43 96 96 96h320c17.7 0 32-14.3 32-32s-14.3-32-32-32v-64c17.7 0 32-14.3 32-32V32c0-17.7-14.3-32-32-32H96zm0 384h256v64H96c-17.7 0-32-14.3-32-32s14.3-32 32-32zm32-240c0-8.8 7.2-16 16-16h192c8.8 0 16 7.2 16 16s-7.2 16-16 16H144c-8.8 0-16-7.2-16-16zm16 48h192c8.8 0 16 7.2 16 16s-7.2 16-16 16H144c-8.8 0-16-7.2-16-16s7.2-16 16-16z"/></symbol>
   <symbol id="i-calendar" viewBox="0 0 448 512"><path d="M152 24c0-13.3-10.7-24-24-24s-24 10.7-24 24v40H64C28.7 64 0 92.7 0 128v16 48V448c0 35.3 28.7 64 64 64h320c35.3 0 64-28.7 64-64V192 144 128c0-35.3-28.7-64-64-64h-40V24c0-13.3-10.7-24-24-24s-24 10.7-24 24v40H152V24zM48 192h352V448c0 8.8-7.2 16-16 16H64c-8.8 0-16-7.2-16-16V192z"/></symbol>
-  <symbol id="i-refresh" viewBox="0 0 512 512"><path d="M105.1 202.6c7.7-21.8 20.2-42.3 37.8-59.8c62.5-62.5 163.8-62.5 226.3 0L386.3 160H352c-17.7 0-32 14.3-32 32s14.3 32 32 32h111.5c0 0 .1 0 .1 0c.4 0 .8 0 1.2 0H480c17.7 0 32-14.3 32-32V80c0-17.7-14.3-32-32-32s-32 14.3-32 32v35.2L430.9 99.9C349.7 18.7 221.5 4.2 126 69.3c-9.2 6.3-13.5 18.1-8.3 28.4c5.2 10.4 17.5 15.3 28.5 10.8c1.5-.6 3-1.4 4.5-2.2c-16.2 27.2-27.3 58-31.5 90.3H105.1zm16.5 116.9c-7.7 21.8-20.2 42.3-37.8 59.8c-62.5 62.5-163.8 62.5-226.3 0L125.7 352H160c17.7 0 32-14.3 32-32s-14.3-32-32-32H48.5c0 0-.1 0-.1 0c-.4 0-.8 0-1.2 0H32c-17.7 0-32 14.3-32 32v112c0 17.7 14.3 32 32 32s32-14.3 32-32v-35.2L81.1 412.1c81.2 81.2 209.4 95.6 304.9 30.5c9.2-6.3 13.5-18.1 8.3-28.4c-5.2-10.4-17.5-15.3-28.5-10.8c-1.5 .6-3 1.4-4.5 2.2c16.2-27.2 27.3-58 31.5-90.3h13.9z"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 512 512"><path d="M105.1 202.6c7.7-21.8 20.2-42.3 37.8-59.8c62.5-62.5 163.8-62.5 226.3 0L386.3 160 352 160c-17.7 0-32 14.3-32 32s14.3 32 32 32l111.5 0c0 0 0 0 0 0l.4 0c17.7 0 32-14.3 32-32l0-112c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 35.2L414.4 97.6c-87.5-87.5-229.3-87.5-316.8 0C73.2 122 55.6 150.7 44.8 181.4c-5.9 16.7 2.9 34.9 19.5 40.8s34.9-2.9 40.8-19.5zM39 289.3c-5 1.5-9.8 4.2-13.7 8.2c-4 4-6.7 8.8-8.1 14c-.3 1.2-.6 2.5-.8 3.8c-.3 1.7-.4 3.4-.4 5.1L16 432c0 17.7 14.3 32 32 32s32-14.3 32-32l0-35.1 17.6 17.5c87.5 87.4 229.3 87.4 316.7 0c24.4-24.4 42.1-53.1 52.9-83.8c5.9-16.7-2.9-34.9-19.5-40.8s-34.9 2.9-40.8 19.5c-7.7 21.8-20.2 42.3-37.8 59.8c-62.5 62.5-163.8 62.5-226.3 0l-.1-.1L125.6 352l34.4 0c17.7 0 32-14.3 32-32s-14.3-32-32-32L48.4 288c-1.6 0-3.2 .1-4.8 .3s-3.1 .5-4.6 1z"/></symbol>
   <symbol id="i-share" viewBox="0 0 512 512"><path d="M307 34.8c-11.5 5.1-19 16.6-19 29.2v64H176C78.8 128 0 206.8 0 304C0 417.3 81.5 467.9 100.2 478.1c2.5 1.4 5.3 1.9 8.1 1.9c10.9 0 19.7-8.9 19.7-19.7c0-7.5-4.3-14.4-9.8-19.5C108.8 431.9 96 414.4 96 384c0-53 43-96 96-96h96v64c0 12.6 7.4 24.1 19 29.2s25 3 34.4-5.4l160-144c6.7-6.1 10.6-14.7 10.6-23.8s-3.8-17.7-10.6-23.8l-160-144c-9.4-8.5-22.9-10.6-34.4-5.4z"/></symbol>
   <symbol id="i-focus" viewBox="0 0 24 24"><path d="M3 7h18v2H3V7zm0 8h18v2H3v-2z" opacity=".3"/><path d="M3 13h18v2H3z"/></symbol>
+  <!-- Brand icons (FontAwesome Free 6.x Brands, CC BY 4.0) -->
+  <symbol id="i-bluesky" viewBox="0 0 512 512"><path d="M111.8 62.2C170.2 105.9 233 194.7 256 242.4c23-47.6 85.8-136.4 144.2-180.2c42.1-31.6 110.3-56 110.3 21.8c0 15.5-8.9 130.5-14.1 149.2C478.2 298 412 314.6 353.1 304.5c102.9 17.5 129.1 75.5 72.5 133.5c-107.4 110.2-154.3-27.6-166.3-62.9l0 0c-1.7-4.9-2.6-7.8-3.3-7.8s-1.6 3-3.3 7.8l0 0c-12 35.3-59 173.1-166.3 62.9c-56.5-58-30.4-116 72.5-133.5C100 314.6 33.8 298 15.7 233.1C10.4 214.4 1.5 99.4 1.5 83.9c0-77.8 68.2-53.4 110.3-21.8z"/></symbol>
+  <symbol id="i-threads" viewBox="0 0 448 512"><path d="M331.5 235.7c2.2 .9 4.2 1.9 6.3 2.8c29.2 14.1 50.6 35.2 61.8 61.4c15.7 36.5 17.2 95.8-30.3 143.2c-36.2 36.2-80.3 52.5-142.6 53h-.3c-70.2-.5-124.1-24.1-160.4-70.2c-32.3-41-48.9-98.1-49.5-169.6V256v-.2C17 184.3 33.6 127.2 65.9 86.2C102.2 40.1 156.2 16.5 226.4 16h.3c70.3 .5 124.9 24 162.3 69.9c18.4 22.7 32 50 40.6 81.7l-40.4 10.8c-7.1-25.8-17.8-47.8-32.2-65.4c-29.2-35.8-73-54.2-130.5-54.6c-57 .5-100.1 18.8-128.2 54.4C72.1 146.1 58.5 194.3 58 256c.5 61.7 14.1 109.9 40.3 143.3c28 35.6 71.2 53.9 128.2 54.4c51.4-.4 85.4-12.6 113.7-40.9c32.3-32.2 31.7-71.8 21.4-95.9c-6.1-14.2-17.1-26-31.9-34.9c-3.7 26.9-11.8 48.3-24.7 64.8c-17.1 21.8-41.4 33.6-72.7 35.3c-23.6 1.3-46.3-4.4-63.9-16c-20.8-13.8-33-34.8-34.3-59.3c-2.5-48.3 35.7-83 95.2-86.4c21.1-1.2 40.9-.3 59.2 2.8c-2.4-14.8-7.3-26.6-14.6-35.2c-10-11.7-25.6-17.7-46.2-17.8H227c-16.6 0-39 4.6-53.3 26.3l-34.4-23.6c19.2-29.1 50.3-45.1 87.8-45.1h.8c62.6 .4 99.9 39.5 103.7 107.7l-.2 .2zm-156 68.8c1.3 25.1 28.4 36.8 54.6 35.3c25.6-1.4 54.6-11.4 59.5-73.2c-13.2-2.9-27.8-4.4-43.4-4.4c-4.8 0-9.6 .1-14.4 .4c-42.9 2.4-57.2 23.2-56.2 41.8l-.1 .1z"/></symbol>
+  <symbol id="i-linkedin" viewBox="0 0 448 512"><path d="M100.28 448H7.4V148.9h92.88zM53.79 108.1C24.09 108.1 0 83.5 0 53.8a53.79 53.79 0 0 1 107.58 0c0 29.7-24.1 54.3-53.79 54.3zM447.9 448h-92.68V302.4c0-34.7-.7-79.2-48.29-79.2-48.29 0-55.69 37.7-55.69 76.7V448h-92.78V148.9h89.08v40.8h1.3c12.4-23.5 42.69-48.3 87.88-48.3 94 0 111.28 61.9 111.28 142.3V448z"/></symbol>
+  <symbol id="i-mastodon" viewBox="0 0 448 512"><path d="M433 179.11c0-97.2-63.71-125.7-63.71-125.7-62.52-28.7-228.56-28.4-290.48 0 0 0-63.72 28.5-63.72 125.7 0 115.7-6.6 259.4 105.63 289.1 40.51 10.7 75.32 13 103.33 11.4 50.81-2.8 79.32-18.1 79.32-18.1l-1.7-36.9s-36.31 11.4-77.12 10.1c-40.41-1.4-83-4.4-89.63-54a102.54 102.54 0 0 1-.9-13.9c85.63 20.9 158.65 9.1 178.75 6.7 56.12-6.7 105-41.3 111.23-72.9 9.8-49.8 9-121.5 9-121.5zm-75.12 125.2h-46.63v-114.2c0-49.7-64-51.6-64 6.9v62.5h-46.33V197c0-58.5-64-56.6-64-6.9v114.2H90.19c0-122.1-5.2-147.9 18.41-175 25.9-28.9 79.82-30.8 103.83 6.1l11.6 19.5 11.6-19.5c24.11-37.1 78.12-34.8 103.83-6.1 23.71 27.3 18.4 53 18.4 175z"/></symbol>
+  <symbol id="i-facebook" viewBox="0 0 320 512"><path d="M80 299.3V512H196V299.3h86.5l18-97.8H196V166.9c0-51.7 20.3-71.5 72.7-71.5c16.3 0 29.4 .4 37 1.2V7.9C291.4 4 256.4 0 236.2 0C129.3 0 80 50.5 80 159.4v42.1H14v97.8H80z"/></symbol>
+  <symbol id="i-envelope" viewBox="0 0 512 512"><path d="M48 64C21.5 64 0 85.5 0 112c0 15.1 7.1 29.3 19.2 38.4L236.8 313.6c11.4 8.5 27 8.5 38.4 0L492.8 150.4c12.1-9.1 19.2-23.3 19.2-38.4c0-26.5-21.5-48-48-48L48 64zM0 176L0 384c0 35.3 28.7 64 64 64l384 0c35.3 0 64-28.7 64-64l0-208L294.4 339.2c-22.8 17.1-54 17.1-76.8 0L0 176z"/></symbol>
+  <symbol id="i-comment" viewBox="0 0 512 512"><path d="M512 240c0 114.9-114.6 208-256 208c-37.1 0-72.3-6.4-104.1-17.9c-11.9 8.7-31.3 20.6-54.3 30.6C73.6 471.1 44.7 480 16 480c-6.5 0-12.3-3.9-14.8-9.9c-2.5-6-1.1-12.8 3.4-17.4l.3-.3c.3-.3 .7-.7 1.3-1.4c1.1-1.2 2.8-3.1 4.9-5.7c4.1-5 9.6-12.4 15.2-21.6c10-16.6 19.5-38.4 21.4-62.9C17.7 326.8 0 285.1 0 240C0 125.1 114.6 32 256 32s256 93.1 256 208z"/></symbol>
+  <symbol id="i-link" viewBox="0 0 640 512"><path d="M579.8 267.7c56.5-56.5 56.5-148 0-204.5c-50-50-128.8-56.5-186.3-15.4l-1.6 1.1c-14.4 10.3-17.7 30.3-7.4 44.6s30.3 17.7 44.6 7.4l1.6-1.1c32.1-22.9 76-19.3 103.8 8.6c31.5 31.5 31.5 82.5 0 114L422.3 334.8c-31.5 31.5-82.5 31.5-114 0c-27.9-27.9-31.5-71.8-8.6-103.8l1.1-1.6c10.3-14.4 6.9-34.4-7.4-44.6s-34.4-6.9-44.6 7.4l-1.1 1.6C206.5 251.2 213 330 263 380c56.5 56.5 148 56.5 204.5 0L579.8 267.7zM60.2 244.3c-56.5 56.5-56.5 148 0 204.5c50 50 128.8 56.5 186.3 15.4l1.6-1.1c14.4-10.3 17.7-30.3 7.4-44.6s-30.3-17.7-44.6-7.4l-1.6 1.1c-32.1 22.9-76 19.3-103.8-8.6C74 372 74 321 105.5 289.5L217.7 177.2c31.5-31.5 82.5-31.5 114 0c27.9 27.9 31.5 71.8 8.6 103.9l-1.1 1.6c-10.3 14.4-6.9 34.4 7.4 44.6s34.4 6.9 44.6-7.4l1.1-1.6C433.5 260.8 427 182 377 132c-56.5-56.5-148-56.5-204.5 0L60.2 244.3z"/></symbol>
+  <symbol id="i-cloud-download" viewBox="0 0 640 512"><path d="M144 480C64.5 480 0 415.5 0 336c0-62.8 40.2-116.2 96.2-135.9c-.1-2.7-.2-5.4-.2-8.1c0-88.4 71.6-160 160-160c59.3 0 111 32.2 138.7 80.2C409.9 102 428.3 96 448 96c53 0 96 43 96 96c0 12.2-2.3 23.8-6.4 34.6C596 238.4 640 290.1 640 352c0 70.7-57.3 128-128 128l-368 0zm79-167l80 80c9.4 9.4 24.6 9.4 33.9 0l80-80c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0l-39 39L344 184c0-13.3-10.7-24-24-24s-24 10.7-24 24l0 134.1-39-39c-9.4-9.4-24.6-9.4-33.9 0s-9.4 24.6 0 33.9z"/></symbol>
 </svg>
 <div class="app" role="application" aria-label="PullRead article reader">
 
@@ -1773,7 +1793,7 @@ function toggleSettingsDropdown() {
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0 8px">
     <label>Article</label>
     <div class="setting-row">
-      <button onclick="reprocessCurrentArticle(this)" id="reprocess-btn" style="flex:1;text-align:center" title="Re-fetch this article from the original URL"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-refresh"/></svg> Re-fetch from source</button>
+      <button onclick="reprocessCurrentArticle(this)" id="reprocess-btn" style="flex:1;text-align:center" title="Re-fetch this article from the original URL"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-cloud-download"/></svg> Re-fetch from source</button>
     </div>
   `;
   document.querySelector('.settings-dropdown').appendChild(panel);
@@ -1851,7 +1871,7 @@ function cleanMarkdown(md) {
 
   // Remove standalone parenthesized URLs on their own line (leftover link targets)
   // e.g. a line that is just "(https://substackcdn.com/image/fetch/...)"
-  md = md.replace(/\n\(https?:\/\/[^)]+\)\s*$/gm, '');
+  md = md.replace(/^\(https?:\/\/[^)]+\)\s*$/gm, '');
 
   // Remove Wayback Machine parenthesized URLs: (/web/20250908.../https://...)
   md = md.replace(/\(\/web\/\d+\/https?:\/\/[^)]+\)/g, '');
@@ -2135,7 +2155,7 @@ function renderFileItem(f, i) {
     ? '<img class="file-item-favicon" src="https://www.google.com/s2/favicons?domain=' + encodeURIComponent(f.domain) + '&sz=32" alt="" loading="lazy" onerror="this.style.display=\'none\'" aria-hidden="true">'
     : '';
 
-  return '<div class="file-item' + isActive + (isRead && !isActive ? ' read' : '') + '" data-index="' + i + '" onclick="loadFile(' + i + ')" role="option" aria-selected="' + (activeFile === f.filename) + '" tabindex="0" onkeydown="if(event.key===\'Enter\')loadFile(' + i + ')">'
+  return '<div class="file-item' + isActive + (isRead && !isActive ? ' read' : '') + '" data-index="' + i + '" data-filename="' + escapeHtml(f.filename) + '" onclick="loadFile(' + i + ')" role="option" aria-selected="' + (activeFile === f.filename) + '" tabindex="0" onkeydown="if(event.key===\'Enter\')loadFile(' + i + ')">'
     + '<div class="file-item-title">' + favicon + escapeHtml(f.title) + '</div>'
     + '<div class="file-item-meta">'
     + (date ? '<span><svg class="icon icon-sm" style="opacity:0.5" aria-hidden="true"><use href="#i-calendar"/></svg> ' + date + '</span>' : '')
@@ -2170,7 +2190,8 @@ function filterFiles() {
       f.title.toLowerCase().includes(q) ||
       f.domain.toLowerCase().includes(q) ||
       f.feed.toLowerCase().includes(q) ||
-      (allNotesIndex[f.filename]?.tags || []).some(t => t.toLowerCase().includes(q))
+      (allNotesIndex[f.filename]?.tags || []).some(t => t.toLowerCase().includes(q)) ||
+      (allNotesIndex[f.filename]?.machineTags || []).some(t => t.toLowerCase().includes(q))
     );
   }
   renderFileList();
@@ -2648,6 +2669,9 @@ document.addEventListener('mouseup', e => {
   const sel = window.getSelection();
   if (!sel || sel.isCollapsed || !sel.toString().trim()) return;
 
+  // Don't show highlight toolbar on Guide or Explore pages
+  if (!activeFile) return;
+
   const pane = document.getElementById('content-pane');
   const range = sel.getRangeAt(0);
   const rect = range.getBoundingClientRect();
@@ -2946,7 +2970,7 @@ async function reprocessCurrentArticle(btn) {
   if (!serverMode || !activeFile) return;
   var origText = btn.innerHTML;
   btn.disabled = true;
-  btn.innerHTML = '<svg class="icon icon-sm spin" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-refresh"/></svg> Re-fetching\u2026';
+  btn.innerHTML = '<svg class="icon icon-sm spin" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-cloud-download"/></svg> Re-fetching\u2026';
   try {
     var res = await fetch('/api/reprocess', {
       method: 'POST',
@@ -2955,7 +2979,7 @@ async function reprocessCurrentArticle(btn) {
     });
     var data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Reprocess failed');
-    btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-refresh"/></svg> Done!';
+    btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-cloud-download"/></svg> Done!';
     // Reload the article content
     setTimeout(async function() {
       btn.innerHTML = origText;
@@ -3086,15 +3110,16 @@ function toggleShareDropdown(e) {
   const encodedText = encodeURIComponent(data.title + ' ' + data.url);
 
   panel.innerHTML = `
-    <a href="https://bsky.app/intent/compose?text=${encodedText}" target="_blank" rel="noopener"><span class="share-icon">&#x1f98b;</span> Bluesky</a>
-    <a href="https://www.threads.net/intent/post?text=${encodedText}" target="_blank" rel="noopener"><span class="share-icon">@</span> Threads</a>
-    <a href="https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}" target="_blank" rel="noopener"><span class="share-icon">in</span> LinkedIn</a>
+    <button onclick="copyArticleLink()"><svg class="share-icon" viewBox="0 0 640 512"><use href="#i-link"/></svg> Copy Link</button>
     <hr>
-    <a href="mailto:?subject=${encodedTitle}&body=${encodedText}" target="_blank"><span class="share-icon">&#9993;</span> Email</a>
-    <a href="sms:&body=${encodedText}"><span class="share-icon">&#128172;</span> Messages</a>
+    <a href="https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}" target="_blank" rel="noopener"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-linkedin"/></svg> LinkedIn</a>
+    <a href="https://bsky.app/intent/compose?text=${encodedText}" target="_blank" rel="noopener"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-bluesky"/></svg> Bluesky</a>
+    <a href="https://mastodon.social/share?text=${encodedText}" target="_blank" rel="noopener"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-mastodon"/></svg> Mastodon</a>
+    <a href="https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}" target="_blank" rel="noopener"><svg class="share-icon" viewBox="0 0 320 512"><use href="#i-facebook"/></svg> Facebook</a>
+    <a href="https://www.threads.net/intent/post?text=${encodedText}" target="_blank" rel="noopener"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-threads"/></svg> Threads</a>
     <hr>
-    <button onclick="copyArticleLink()"><span class="share-icon">&#128279;</span> Copy Link</button>
-    <button onclick="saveArticleLink()"><span class="share-icon">&#128278;</span> Save to Reading List</button>
+    <a href="mailto:?subject=${encodedTitle}&body=${encodedText}" target="_blank"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-envelope"/></svg> Email</a>
+    <a href="sms:&body=${encodedText}"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-comment"/></svg> Messages</a>
   `;
 
   e.target.closest('.share-dropdown').appendChild(panel);
@@ -3228,7 +3253,7 @@ function showGuideModal() {
   content.innerHTML = `
     <div class="article-header">
       <h1>PullRead Guide</h1>
-      <div class="article-byline"><span>Last updated Feb 2026</span></div>
+      <div class="article-byline"><span>Last updated ${new Date().toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}</span></div>
     </div>
 
     <h2>What is PullRead?</h2>
@@ -3356,8 +3381,8 @@ document.addEventListener('keydown', e => {
     }
   }
 
-  // h to highlight selection (yellow)
-  if (e.key === 'h' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+  // h to highlight selection (yellow) — not on Guide/Explore pages
+  if (e.key === 'h' && activeFile && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
     const sel = window.getSelection();
     if (sel && !sel.isCollapsed && sel.toString().trim()) {
       e.preventDefault();
@@ -3382,8 +3407,8 @@ document.addEventListener('keydown', e => {
     }
   }
 
-  // n to toggle notes panel
-  if (e.key === 'n' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+  // n to toggle notes panel — not on Guide/Explore pages
+  if (e.key === 'n' && activeFile && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
     const panel = document.querySelector('.notes-panel');
     if (panel) {
       e.preventDefault();
@@ -3505,18 +3530,18 @@ function showOnboardingIfNeeded() {
   }
 }
 
-// ---- Tag Cloud / Explore ----
+// ---- Tag Cloud / Explore ---- (renders as inline page like Guide)
 function showTagCloud() {
-  closeModal();
-  _modalReturnFocus = document.activeElement;
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-label', 'Explore articles');
-  overlay.onclick = function(e) { if (e.target === overlay) closeModal(); };
+  const content = document.getElementById('content');
+  const empty = document.getElementById('empty-state');
+  empty.style.display = 'none';
+  content.style.display = 'block';
 
-  // Collect all tags and domain groupings
+  // Deselect sidebar — disables highlights/notes on this page
+  activeFile = null;
+  renderFileList();
+
+  // Collect all tags (user tags + machine tags) and domain groupings
   const tagCounts = {};
   const domainArticles = {};
   const feedCounts = {};
@@ -3538,6 +3563,12 @@ function showTagCloud() {
         tagCounts[tag] = (tagCounts[tag] || 0) + 1;
       }
     }
+    // Machine tags (from auto-tagging)
+    if (notes && notes.machineTags) {
+      for (const tag of notes.machineTags) {
+        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+      }
+    }
   }
 
   // Sort domains by count
@@ -3555,7 +3586,7 @@ function showTagCloud() {
     const maxCount = sortedTags[0][1];
     for (const [tag, count] of sortedTags) {
       const size = Math.max(11, Math.min(20, 11 + (count / maxCount) * 9));
-      tagsHtml += '<span class="tag-cloud-item" style="font-size:' + size + 'px" onclick="closeModal();document.getElementById(\'search\').value=\'' + escapeHtml(tag) + '\';filterFiles()">' + escapeHtml(tag) + ' <span style="opacity:0.5;font-size:10px">' + count + '</span></span>';
+      tagsHtml += '<span class="tag-cloud-item" style="font-size:' + size + 'px" onclick="document.getElementById(\'search\').value=\'' + escapeHtml(tag) + '\';filterFiles()">' + escapeHtml(tag) + ' <span style="opacity:0.5;font-size:10px">' + count + '</span></span>';
     }
     tagsHtml += '</div>';
   }
@@ -3568,7 +3599,7 @@ function showTagCloud() {
     domainsHtml += escapeHtml(domain) + ' <span class="domain-group-count">' + articles.length + ' article' + (articles.length !== 1 ? 's' : '') + '</span></div>';
     domainsHtml += '<div class="domain-group-articles" style="display:none">';
     for (const a of articles.slice(0, 10)) {
-      domainsHtml += '<a href="#" onclick="event.preventDefault();closeModal();jumpToArticle(\'' + escapeHtml(a.filename.replace(/'/g, "\\'")) + '\')">' + escapeHtml(a.title) + '</a>';
+      domainsHtml += '<a href="#" onclick="event.preventDefault();jumpToArticle(\'' + escapeHtml(a.filename.replace(/'/g, "\\'")) + '\')">' + escapeHtml(a.title) + '</a>';
     }
     if (articles.length > 10) {
       domainsHtml += '<span style="font-size:11px;color:var(--muted)">+ ' + (articles.length - 10) + ' more</span>';
@@ -3588,18 +3619,16 @@ function showTagCloud() {
   statsHtml += '<span><strong style="color:var(--fg)">' + Object.keys(domainArticles).length + '</strong> sources</span>';
   statsHtml += '</div>';
 
-  overlay.innerHTML = `
-    <div class="modal-card" style="max-width:560px;max-height:80vh;overflow-y:auto" onclick="event.stopPropagation()">
-      <h2>Explore Your Library</h2>
-      ${statsHtml}
-      ${tagsHtml}
-      ${domainsHtml}
-      <button class="modal-close" onclick="closeModal()">Done</button>
+  content.innerHTML = `
+    <div class="article-header">
+      <h1>Explore Your Library</h1>
     </div>
+    ${statsHtml}
+    ${tagsHtml}
+    ${domainsHtml}
   `;
-  document.body.appendChild(overlay);
-  trapFocus(overlay);
-  overlay.querySelector('.modal-close').focus();
+  document.title = 'Explore Your Library';
+  document.getElementById('content-pane').scrollTop = 0;
 }
 
 function jumpToArticle(filename) {
@@ -3939,25 +3968,49 @@ async function migrateAnnotationsIfNeeded() {
 }
 
 // Refresh article list from server
-async function refreshArticleList() {
+async function refreshArticleList(silent) {
   if (!serverMode) return;
   const btn = document.getElementById('refresh-btn');
-  btn.classList.add('spinning');
+  if (!silent) btn.classList.add('spinning');
   try {
     const res = await fetch('/api/files');
     if (res.ok) {
+      const prevCount = allFiles.length;
+      const prevFilenames = new Set(allFiles.map(f => f.filename));
       allFiles = await res.json();
       filteredFiles = allFiles;
       await loadAnnotationsIndex();
       filterFiles();
+      // Highlight new articles with a fade-in effect
+      if (silent && allFiles.length > prevCount) {
+        requestAnimationFrame(() => {
+          document.querySelectorAll('.file-item').forEach(el => {
+            const fn = el.getAttribute('data-filename');
+            if (fn && !prevFilenames.has(fn)) {
+              el.classList.add('file-item-new');
+              setTimeout(() => el.classList.remove('file-item-new'), 3000);
+            }
+          });
+        });
+      }
       // Reload current article if still in list
       if (activeFile) {
         const idx = displayFiles.findIndex(f => f.filename === activeFile);
-        if (idx >= 0) loadFile(idx);
+        if (idx >= 0 && !silent) loadFile(idx);
       }
     }
   } catch {}
-  btn.classList.remove('spinning');
+  if (!silent) btn.classList.remove('spinning');
+}
+
+// Auto-refresh sidebar every 30 seconds when in server mode
+let _autoRefreshTimer = null;
+function startAutoRefresh() {
+  if (_autoRefreshTimer) return;
+  _autoRefreshTimer = setInterval(() => refreshArticleList(true), 30000);
+}
+function stopAutoRefresh() {
+  if (_autoRefreshTimer) { clearInterval(_autoRefreshTimer); _autoRefreshTimer = null; }
 }
 
 // Init: try to load from server, fall back to standalone mode
@@ -4021,6 +4074,7 @@ async function init() {
         loadFile(0);
       }
       showOnboardingIfNeeded();
+      startAutoRefresh();
       return;
     }
   } catch {}

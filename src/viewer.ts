@@ -513,7 +513,9 @@ export function startViewer(outputPath: string, port = 7777): void {
         const msg = err instanceof Error ? err.message : 'Summarization failed';
         // Provide user-friendly error messages
         let userMsg = msg;
-        if (msg.includes('Apple Intelligence requires macOS 26')) {
+        if (msg.includes('FoundationModels not found')) {
+          userMsg = 'Apple Intelligence failed — FoundationModels not found. Run "xcode-select --install" in Terminal, or choose a different provider in Settings.';
+        } else if (msg.includes('Apple Intelligence requires macOS 26')) {
           userMsg = 'Apple Intelligence requires macOS 26 (Tahoe). Update macOS or choose a different provider in Settings.';
         } else if (msg.includes('Apple Intelligence is not available')) {
           userMsg = 'Apple Intelligence is not available on this Mac. Choose a cloud provider in Settings.';

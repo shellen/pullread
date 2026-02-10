@@ -227,6 +227,16 @@ function runApplePrompt(prompt: string): string {
   } catch (err: any) {
     const stderr = err.stderr || '';
     if (stderr.includes('No such module') || stderr.includes('FoundationModels')) {
+      // Check actual macOS version to give a better error message
+      try {
+        const ver = execFileSync('sw_vers', ['-productVersion'], { encoding: 'utf-8' }).trim();
+        const major = parseInt(ver.split('.')[0], 10);
+        if (major >= 26) {
+          throw new Error('Apple Intelligence failed — FoundationModels not found. Ensure Xcode command line tools are installed: xcode-select --install');
+        }
+      } catch (verErr: any) {
+        if (verErr.message?.includes('FoundationModels')) throw verErr;
+      }
       throw new Error('Apple Intelligence requires macOS 26 (Tahoe) with Xcode command line tools installed.');
     }
     if (stderr.includes('not eligible') || stderr.includes('not available')) {
@@ -344,6 +354,15 @@ function runAppleRLM(articleText: string): string {
   } catch (err: any) {
     const stderr = err.stderr || '';
     if (stderr.includes('No such module') || stderr.includes('FoundationModels')) {
+      try {
+        const ver = execFileSync('sw_vers', ['-productVersion'], { encoding: 'utf-8' }).trim();
+        const major = parseInt(ver.split('.')[0], 10);
+        if (major >= 26) {
+          throw new Error('Apple Intelligence failed — FoundationModels not found. Ensure Xcode command line tools are installed: xcode-select --install');
+        }
+      } catch (verErr: any) {
+        if (verErr.message?.includes('FoundationModels')) throw verErr;
+      }
       throw new Error('Apple Intelligence requires macOS 26 (Tahoe) with Xcode command line tools installed.');
     }
     if (stderr.includes('not eligible') || stderr.includes('not available')) {

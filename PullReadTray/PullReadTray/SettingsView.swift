@@ -36,18 +36,18 @@ struct SettingsView: View {
     @State private var selectedTab: Int = 0
 
     private static let knownModels: [String: [String]] = [
-        "anthropic": ["claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001", "claude-opus-4-6"],
-        "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "o3-mini"],
-        "gemini": ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-pro"],
-        "openrouter": ["anthropic/claude-sonnet-4-5", "openai/gpt-4o", "google/gemini-2.0-flash-001", "meta-llama/llama-4-scout"],
+        "anthropic": ["claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250929", "claude-opus-4-6"],
+        "openai": ["gpt-4.1-nano", "gpt-4.1-mini", "gpt-4.1", "gpt-5-nano", "gpt-5-mini"],
+        "gemini": ["gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-2.5-pro", "gemini-3-flash-preview"],
+        "openrouter": ["anthropic/claude-haiku-4.5", "google/gemini-2.5-flash", "openai/gpt-4.1-mini", "anthropic/claude-sonnet-4.5", "meta-llama/llama-4-scout:free"],
         "apple": ["on-device"]
     ]
 
     private static let defaultModels: [String: String] = [
-        "anthropic": "claude-sonnet-4-5-20250929",
-        "openai": "gpt-4o-mini",
-        "gemini": "gemini-2.0-flash",
-        "openrouter": "anthropic/claude-sonnet-4-5",
+        "anthropic": "claude-haiku-4-5-20251001",
+        "openai": "gpt-4.1-nano",
+        "gemini": "gemini-2.5-flash-lite",
+        "openrouter": "anthropic/claude-haiku-4.5",
         "apple": "on-device"
     ]
 
