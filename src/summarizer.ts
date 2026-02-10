@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { request } from 'https';
-import { execFileSync } from 'child_process';
+import { execFileSync, execSync } from 'child_process';
 
 export type Provider = 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'apple';
 
@@ -56,6 +56,23 @@ interface SummarizeResult {
 
 const SETTINGS_PATH = join(homedir(), '.config', 'pullread', 'settings.json');
 
+/**
+ * Load API key from macOS Keychain. Falls back gracefully on non-macOS or if not found.
+ * Uses the same pattern as src/cookies.ts for Keychain access.
+ */
+function loadKeyFromKeychain(account: string): string | null {
+  if (process.platform !== 'darwin') return null;
+  try {
+    const result = execSync(
+      `security find-generic-password -w -s "com.pullread.api-keys" -a "${account}"`,
+      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
+    );
+    return result.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 export function loadLLMConfig(): LLMConfig | null {
   if (!existsSync(SETTINGS_PATH)) return null;
   try {
@@ -63,8 +80,14 @@ export function loadLLMConfig(): LLMConfig | null {
     if (!settings.llm || !settings.llm.provider) return null;
     // Apple Intelligence doesn't need an API key
     if (settings.llm.provider === 'apple') return settings.llm;
-    if (!settings.llm.apiKey) return null;
-    return settings.llm;
+
+    // Try plaintext key first (backward compat), then Keychain
+    let apiKey = settings.llm.apiKey;
+    if (!apiKey) {
+      apiKey = loadKeyFromKeychain(`llm-${settings.llm.provider}`);
+    }
+    if (!apiKey) return null;
+    return { ...settings.llm, apiKey };
   } catch {
     return null;
   }

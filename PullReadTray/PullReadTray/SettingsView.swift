@@ -620,7 +620,7 @@ struct SettingsView: View {
                         HStack(spacing: 8) {
                             Image(systemName: "checkmark.shield.fill")
                                 .foregroundColor(.green)
-                            Text("Key stored locally at ~/.config/pullread/settings.json")
+                            Text("Key stored securely in macOS Keychain")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -1073,7 +1073,6 @@ struct SettingsView: View {
            let llm = settings["llm"] as? [String: Any] {
             let defaultProvider = ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26 ? "apple" : "anthropic"
             llmProvider = (llm["provider"] as? String) ?? defaultProvider
-            llmApiKey = (llm["apiKey"] as? String) ?? ""
             let savedModel = (llm["model"] as? String) ?? ""
             let knownList = Self.knownModels[llmProvider] ?? []
             if knownList.contains(savedModel) || savedModel.isEmpty {
@@ -1084,13 +1083,43 @@ struct SettingsView: View {
                 llmModel = Self.defaultModels[llmProvider] ?? ""
                 useCustomModel = true
             }
-            // Load all saved provider keys
+
+            // Migration: move plaintext keys from settings.json to Keychain
+            var needsResave = false
             if let keys = llm["savedKeys"] as? [String: String] {
-                savedApiKeys = keys
+                for (provider, key) in keys where !key.isEmpty {
+                    _ = KeychainService.save(account: KeychainService.llmAccount(for: provider), password: key)
+                    savedApiKeys[provider] = key
+                }
+                needsResave = true
             }
-            // Also store current key
-            if !llmApiKey.isEmpty {
-                savedApiKeys[llmProvider] = llmApiKey
+            if let plainKey = llm["apiKey"] as? String, !plainKey.isEmpty {
+                _ = KeychainService.save(account: KeychainService.llmAccount(for: llmProvider), password: plainKey)
+                savedApiKeys[llmProvider] = plainKey
+                needsResave = true
+            }
+
+            // Load keys from Keychain for all known providers
+            if savedApiKeys.isEmpty {
+                if let providers = llm["savedKeyProviders"] as? [String] {
+                    for provider in providers {
+                        if let key = KeychainService.load(account: KeychainService.llmAccount(for: provider)) {
+                            savedApiKeys[provider] = key
+                        }
+                    }
+                }
+            }
+
+            // Set current API key from Keychain
+            llmApiKey = savedApiKeys[llmProvider]
+                ?? KeychainService.load(account: KeychainService.llmAccount(for: llmProvider))
+                ?? ""
+
+            // If we migrated, re-save to strip plaintext keys from settings.json
+            if needsResave {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [self] in
+                    self.migrateKeysFromSettingsJSON()
+                }
             }
         }
 
@@ -1099,6 +1128,32 @@ struct SettingsView: View {
         syncInterval = UserDefaults.standard.string(forKey: "syncInterval") ?? "1h"
         viewerMode = UserDefaults.standard.string(forKey: "viewerMode") ?? "window"
         autotagAfterSync = UserDefaults.standard.bool(forKey: "autotagAfterSync")
+    }
+
+    /// Remove plaintext API keys from settings.json after migrating to Keychain
+    private func migrateKeysFromSettingsJSON() {
+        let settingsPath = (configPath as NSString).deletingLastPathComponent + "/settings.json"
+        guard let settingsData = FileManager.default.contents(atPath: settingsPath),
+              var settings = try? JSONSerialization.jsonObject(with: settingsData) as? [String: Any],
+              var llm = settings["llm"] as? [String: Any] else { return }
+
+        var changed = false
+        if llm["apiKey"] != nil {
+            llm.removeValue(forKey: "apiKey")
+            changed = true
+        }
+        if llm["savedKeys"] != nil {
+            llm.removeValue(forKey: "savedKeys")
+            changed = true
+        }
+        if changed {
+            llm["hasKey"] = !llmApiKey.isEmpty || isAppleProvider
+            llm["savedKeyProviders"] = Array(savedApiKeys.keys.filter { !savedApiKeys[$0]!.isEmpty })
+            settings["llm"] = llm
+            if let data = try? JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted, .sortedKeys]) {
+                try? data.write(to: URL(fileURLWithPath: settingsPath))
+            }
+        }
     }
 
     private func saveConfig() {
@@ -1147,11 +1202,16 @@ struct SettingsView: View {
                 try FileManager.default.createDirectory(atPath: expandedPath, withIntermediateDirectories: true)
             }
 
-            // Save LLM settings to settings.json (separate from feeds config)
+            // Save LLM settings — keys go to Keychain, metadata to settings.json
             do {
-                // Save current key to savedApiKeys before persisting
+                // Save current key to Keychain and in-memory map
                 if !isAppleProvider && !llmApiKey.isEmpty {
                     savedApiKeys[llmProvider] = llmApiKey
+                    _ = KeychainService.save(account: KeychainService.llmAccount(for: llmProvider), password: llmApiKey)
+                }
+                // Save all saved keys to Keychain
+                for (provider, key) in savedApiKeys where !key.isEmpty {
+                    _ = KeychainService.save(account: KeychainService.llmAccount(for: provider), password: key)
                 }
 
                 let settingsPath = (configPath as NSString).deletingLastPathComponent + "/settings.json"
@@ -1160,14 +1220,15 @@ struct SettingsView: View {
                    let parsed = try? JSONSerialization.jsonObject(with: settingsData) as? [String: Any] {
                     existingSettings = parsed
                 }
+                // Only store metadata in settings.json — NO plaintext keys
                 var llm: [String: Any] = [
                     "provider": llmProvider,
-                    "savedKeys": savedApiKeys
+                    "hasKey": !llmApiKey.isEmpty || isAppleProvider,
+                    "savedKeyProviders": Array(savedApiKeys.keys.filter { !savedApiKeys[$0]!.isEmpty })
                 ]
                 if isAppleProvider {
                     llm["model"] = "on-device"
                 } else {
-                    llm["apiKey"] = llmApiKey
                     let effectiveModel = useCustomModel ? llmModelCustom : llmModel
                     if !effectiveModel.isEmpty {
                         llm["model"] = effectiveModel

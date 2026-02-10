@@ -235,6 +235,41 @@ export function startViewer(outputPath: string, port = 7777): void {
       return;
     }
 
+    // Inbox API — for URL scheme, share extension, and services menu saved URLs
+    const inboxPath = join(homedir(), '.config', 'pullread', 'inbox.json');
+    if (url.pathname === '/api/inbox') {
+      if (req.method === 'GET') {
+        const inbox = existsSync(inboxPath) ? JSON.parse(readFileSync(inboxPath, 'utf-8')) : [];
+        sendJson(res, inbox);
+        return;
+      }
+      if (req.method === 'DELETE') {
+        writeFileSync(inboxPath, '[]');
+        sendJson(res, { ok: true });
+        return;
+      }
+    }
+    if (url.pathname === '/api/save' && req.method === 'POST') {
+      let body = '';
+      req.on('data', (c: Buffer) => { body += c.toString(); });
+      req.on('end', () => {
+        try {
+          const { url: articleUrl } = JSON.parse(body);
+          if (!articleUrl) { res.writeHead(400); res.end('{"error":"url required"}'); return; }
+          let inbox: { url: string; addedAt: string; title?: string }[] = [];
+          if (existsSync(inboxPath)) {
+            try { inbox = JSON.parse(readFileSync(inboxPath, 'utf-8')); } catch {}
+          }
+          inbox.push({ url: articleUrl, addedAt: new Date().toISOString() });
+          const dir = join(homedir(), '.config', 'pullread');
+          if (!existsSync(dir)) require('fs').mkdirSync(dir, { recursive: true });
+          writeFileSync(inboxPath, JSON.stringify(inbox, null, 2));
+          sendJson(res, { ok: true });
+        } catch { res.writeHead(400); res.end('{"error":"invalid json"}'); }
+      });
+      return;
+    }
+
     if (url.pathname === '/api/file') {
       const filename = url.searchParams.get('name');
       if (!filename || filename.includes('..') || filename.includes('/')) {
