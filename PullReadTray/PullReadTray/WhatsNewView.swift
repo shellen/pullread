@@ -88,6 +88,38 @@ struct WhatsNewView: View {
 
     private var releaseNotes: [String: [Highlight]] {
         [
+            "1.3.2": [
+                Highlight(
+                    icon: "key.fill",
+                    color: .green,
+                    title: "Keychain Security",
+                    description: "API keys are now stored in the macOS Keychain instead of plaintext. Existing keys are migrated automatically."
+                ),
+                Highlight(
+                    icon: "square.and.arrow.up",
+                    color: .blue,
+                    title: "Share Extension",
+                    description: "Save articles from Safari or any app using the Share sheet. Works alongside your existing Instapaper, Pocket, or Raindrop workflow."
+                ),
+                Highlight(
+                    icon: "magnifyingglass",
+                    color: .purple,
+                    title: "Spotlight Search",
+                    description: "Your articles are indexed in Spotlight. Search for any article title, author, or tag right from the macOS search bar."
+                ),
+                Highlight(
+                    icon: "command",
+                    color: .orange,
+                    title: "Shortcuts & Siri",
+                    description: "Save articles, sync feeds, and check your library using Shortcuts or Siri voice commands."
+                ),
+                Highlight(
+                    icon: "link",
+                    color: .teal,
+                    title: "URL Scheme & Services Menu",
+                    description: "Deep link with pullread:// URLs. Right-click any URL and use Services \u{2192} Save to PullRead."
+                )
+            ],
             "1.3.0": [
                 Highlight(
                     icon: "square.and.arrow.up",
