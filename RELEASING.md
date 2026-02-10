@@ -70,6 +70,7 @@ The CLI binary (`pullread`) is signed with `PullReadTray/cli-entitlements.plist`
 
 - **`com.apple.security.cs.disable-library-validation`** — Required because `kokoro-js` depends on ONNX Runtime, which has a native `.node` addon. Bun's compiled binary extracts native addons to a temp directory at runtime, and macOS would reject them without this entitlement (different Team ID on the extracted binary).
 - **`com.apple.security.cs.allow-unsigned-executable-memory`** — Required for ONNX Runtime's JIT execution.
+- **`com.apple.security.cs.allow-dyld-environment-variables`** — Required so the Swift app can set `DYLD_LIBRARY_PATH` to point at the bundled `libonnxruntime` dylib in Resources. Without this, macOS hardened runtime strips DYLD env vars.
 
 These entitlements are compatible with notarization. Both `release.yml` and `build-macos-app.yml` pass `--entitlements` when signing the CLI binary.
 

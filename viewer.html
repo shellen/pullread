@@ -4619,6 +4619,13 @@ async function playCloudTTS(filename) {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: 'TTS failed' }));
+      // If Kokoro native engine failed, fall back to browser TTS silently
+      if (err.fallback === 'browser') {
+        console.warn('Kokoro unavailable, falling back to browser TTS:', err.error);
+        ttsGenerating = false;
+        await playBrowserTTS(filename);
+        return;
+      }
       alert('TTS Error: ' + (err.error || 'Unknown error'));
       ttsPlaying = false;
       renderAudioPlayer();

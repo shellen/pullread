@@ -26,6 +26,17 @@ class SyncService {
         return FileManager.default.fileExists(atPath: binaryPath)
     }
 
+    /// Build process environment with DYLD_LIBRARY_PATH pointing to Resources
+    /// so the ONNX Runtime dylib (bundled for Kokoro TTS) is found at runtime.
+    private func processEnvironment() -> [String: String] {
+        var env = ProcessInfo.processInfo.environment
+        if let resourcePath = Bundle.main.resourcePath {
+            let existing = env["DYLD_LIBRARY_PATH"] ?? ""
+            env["DYLD_LIBRARY_PATH"] = existing.isEmpty ? resourcePath : "\(resourcePath):\(existing)"
+        }
+        return env
+    }
+
     func getConfigPath() -> String {
         return "\(configDir)/feeds.json"
     }
@@ -98,6 +109,7 @@ class SyncService {
         let errorPipe = Pipe()
 
         process.executableURL = URL(fileURLWithPath: binaryPath)
+        process.environment = processEnvironment()
 
         // Build arguments
         var args = ["sync", "--config-path", getConfigPath(), "--data-path", "\(configDir)/pullread.db"]
@@ -176,6 +188,7 @@ class SyncService {
             let errorPipe = Pipe()
 
             process.executableURL = URL(fileURLWithPath: self.binaryPath)
+            process.environment = self.processEnvironment()
             process.arguments = ["review", "--days", "\(days)", "--config-path", self.getConfigPath(), "--data-path", "\(self.configDir)/pullread.db"]
             process.standardOutput = pipe
             process.standardError = errorPipe
@@ -255,6 +268,7 @@ class SyncService {
 
             let process = Process()
             process.executableURL = URL(fileURLWithPath: self.binaryPath)
+            process.environment = self.processEnvironment()
             process.arguments = ["view", "--config-path", self.getConfigPath()]
 
             // Viewer output goes to log
@@ -292,6 +306,7 @@ class SyncService {
             let errorPipe = Pipe()
 
             process.executableURL = URL(fileURLWithPath: self.binaryPath)
+            process.environment = self.processEnvironment()
             process.arguments = ["autotag", "--batch", "--config-path", self.getConfigPath(), "--data-path", "\(self.configDir)/pullread.db"]
             process.standardOutput = pipe
             process.standardError = errorPipe
