@@ -1558,7 +1558,7 @@
   }
   .dot-highlight { background: #ffeb3b; }
   .dot-note { background: var(--link); }
-  .dot-summary { background: #ab47bc; }
+  .dot-summary { background: var(--muted); opacity: 0.6; }
   .dot-favorite { color: #e91e63; font-size: 8px; line-height: 6px; }
 
   /* Highlight note marker (small icon after highlighted text) */
@@ -1638,43 +1638,36 @@
   .favorite-btn.active { color: #e91e63; }
   .favorite-btn:hover { opacity: 0.8; }
 
-  /* Summary display — theme-aware complementary colors */
+  /* Summary display */
   .article-summary {
-    background: rgba(171, 71, 188, 0.06);
-    border-left: 3px solid #ab47bc;
-    padding: 12px 16px;
+    background: color-mix(in srgb, var(--fg) 4%, transparent);
+    border: 1px solid color-mix(in srgb, var(--fg) 8%, transparent);
+    padding: 14px 16px;
     margin: 12px 0 20px;
     font-size: 14px;
-    line-height: 1.6;
+    line-height: 1.65;
     color: var(--fg);
-    border-radius: 0 6px 6px 0;
+    border-radius: 8px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
-  [data-theme="dark"] .article-summary {
-    background: rgba(171, 71, 188, 0.1);
-  }
-  [data-theme="sepia"] .article-summary {
-    background: rgba(171, 71, 188, 0.06);
-    border-left-color: #9c5ba0;
-  }
-  [data-theme="high-contrast"] .article-summary {
-    background: rgba(171, 71, 188, 0.15);
-    border-left-color: #ce93d8;
-  }
-  .article-summary .summary-label {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--muted);
-    margin-bottom: 4px;
+  .article-summary .summary-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    margin-bottom: 8px;
+    gap: 8px;
+  }
+  .article-summary .summary-header-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
   }
   .article-summary .summary-actions {
     display: flex;
     gap: 6px;
     align-items: center;
+    flex-shrink: 0;
   }
   .article-summary .summary-actions button {
     background: none;
@@ -1686,6 +1679,67 @@
     line-height: 1;
   }
   .article-summary .summary-actions button:hover { color: var(--fg); }
+
+  /* Flat badges (summary provider, tags, etc.) */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 5px;
+    padding: 2px 7px;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.4;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .badge-gray {
+    background: color-mix(in srgb, var(--fg) 8%, transparent);
+    color: var(--muted);
+  }
+  .badge-blue {
+    background: rgba(37, 99, 235, 0.1);
+    color: #2563eb;
+  }
+  [data-theme="dark"] .badge-blue {
+    background: rgba(96, 165, 250, 0.1);
+    color: #60a5fa;
+  }
+  .badge-green {
+    background: rgba(22, 163, 74, 0.1);
+    color: #16a34a;
+  }
+  [data-theme="dark"] .badge-green {
+    background: rgba(74, 222, 128, 0.1);
+    color: #4ade80;
+  }
+  .badge-indigo {
+    background: rgba(79, 70, 229, 0.1);
+    color: #4f46e5;
+  }
+  [data-theme="dark"] .badge-indigo {
+    background: rgba(129, 140, 248, 0.1);
+    color: #818cf8;
+  }
+  .badge-purple {
+    background: rgba(147, 51, 234, 0.1);
+    color: #9333ea;
+  }
+  [data-theme="dark"] .badge-purple {
+    background: rgba(192, 132, 252, 0.1);
+    color: #c084fc;
+  }
+  .badge-amber {
+    background: rgba(217, 119, 6, 0.1);
+    color: #d97706;
+  }
+  [data-theme="dark"] .badge-amber {
+    background: rgba(251, 191, 36, 0.1);
+    color: #fbbf24;
+  }
+  [data-theme="sepia"] .badge-blue { background: rgba(37, 99, 235, 0.08); }
+  [data-theme="sepia"] .badge-green { background: rgba(22, 163, 74, 0.08); }
+  [data-theme="sepia"] .badge-indigo { background: rgba(79, 70, 229, 0.08); }
+  [data-theme="sepia"] .badge-purple { background: rgba(147, 51, 234, 0.08); }
+  [data-theme="sepia"] .badge-amber { background: rgba(217, 119, 6, 0.08); }
   .summarize-btn {
     display: inline-block;
     padding: 3px 10px;
@@ -2076,7 +2130,7 @@
     <aside class="sidebar" id="sidebar" aria-label="Article list">
       <div class="sidebar-search" role="search">
         <label for="search" class="sr-only">Search articles</label>
-        <input type="text" id="search" placeholder="Search articles..." oninput="filterFiles()" />
+        <input type="text" id="search" placeholder="Search... try is:favorite or tag:tech" oninput="filterFiles()" />
       </div>
       <div class="file-count" id="file-count" aria-live="polite" aria-atomic="true">
         <span id="file-count-text"></span>
@@ -2623,7 +2677,12 @@ function renderArticle(text, filename) {
 
   // Show existing summary if present in frontmatter
   if (meta && meta.summary) {
-    html += '<div class="article-summary"><div class="summary-label"><span>Summary</span><span class="summary-actions"><button onclick="hideSummary()" title="Hide summary"><svg class="icon icon-sm"><use href="#i-xmark"/></svg></button></span></div>' + escapeHtml(meta.summary) + '</div>';
+    const sp = meta.summaryProvider || '';
+    const sm = meta.summaryModel || '';
+    html += '<div class="article-summary"><div class="summary-header"><div class="summary-header-left">'
+      + summaryBadgesHtml(sp, sm)
+      + '</div><span class="summary-actions"><button onclick="hideSummary()" title="Hide summary"><svg class="icon icon-sm"><use href="#i-xmark"/></svg></button></span></div>'
+      + escapeHtml(meta.summary) + '</div>';
   }
 
   // Strip the leading H1 from markdown body if it matches the title (avoid duplication)
@@ -2851,18 +2910,77 @@ function markAsRead(filename) {
 }
 
 function filterFiles() {
-  const q = document.getElementById('search').value.toLowerCase();
-  if (!q) {
+  const raw = document.getElementById('search').value.trim();
+  if (!raw) {
     filteredFiles = allFiles;
-  } else {
-    filteredFiles = allFiles.filter(f =>
-      f.title.toLowerCase().includes(q) ||
-      f.domain.toLowerCase().includes(q) ||
-      f.feed.toLowerCase().includes(q) ||
-      (allNotesIndex[f.filename]?.tags || []).some(t => t.toLowerCase().includes(q)) ||
-      (allNotesIndex[f.filename]?.machineTags || []).some(t => t.toLowerCase().includes(q))
-    );
+    renderFileList();
+    return;
   }
+
+  // Parse search query into groups separated by OR
+  // Each group is an array of terms that must ALL match (AND)
+  // Groups are combined with OR
+  const orGroups = raw.split(/\bOR\b/i).map(g => g.trim()).filter(Boolean);
+
+  filteredFiles = allFiles.filter(f => {
+    const notes = allNotesIndex[f.filename];
+    const { hasHl, hasNote, isFavorite, hasTags } = hasAnnotations(f.filename);
+
+    return orGroups.some(group => {
+      // Split group into individual terms (AND logic)
+      const terms = group.match(/"[^"]*"|\S+/g) || [];
+      return terms.every(term => {
+        // Remove surrounding quotes if present
+        const t = term.replace(/^"(.*)"$/, '$1');
+        const tl = t.toLowerCase();
+
+        // Operator: is:favorite / is:fav
+        if (tl === 'is:favorite' || tl === 'is:fav') return isFavorite;
+        // Operator: is:read
+        if (tl === 'is:read') return readArticles.has(f.filename);
+        // Operator: is:unread
+        if (tl === 'is:unread') return !readArticles.has(f.filename);
+        // Operator: has:summary
+        if (tl === 'has:summary') return f.hasSummary;
+        // Operator: has:highlights
+        if (tl === 'has:highlights' || tl === 'has:highlight') return hasHl;
+        // Operator: has:notes
+        if (tl === 'has:notes' || tl === 'has:note') return hasNote;
+        // Operator: has:tags
+        if (tl === 'has:tags' || tl === 'has:tag') return hasTags;
+        // Operator: tag:value
+        if (tl.startsWith('tag:')) {
+          const tagQ = tl.slice(4);
+          if (!tagQ) return hasTags;
+          const allTags = [...(notes?.tags || []), ...(notes?.machineTags || [])];
+          return allTags.some(t => t.toLowerCase().includes(tagQ));
+        }
+        // Operator: feed:value
+        if (tl.startsWith('feed:')) {
+          const feedQ = tl.slice(5);
+          return f.feed.toLowerCase().includes(feedQ);
+        }
+        // Operator: domain:value
+        if (tl.startsWith('domain:')) {
+          const domQ = tl.slice(7);
+          return f.domain.toLowerCase().includes(domQ);
+        }
+        // Operator: author:value
+        if (tl.startsWith('author:')) {
+          const authQ = tl.slice(7);
+          return (f.author || '').toLowerCase().includes(authQ);
+        }
+
+        // Plain text search — match against title, domain, feed, tags
+        return f.title.toLowerCase().includes(tl) ||
+          f.domain.toLowerCase().includes(tl) ||
+          f.feed.toLowerCase().includes(tl) ||
+          (notes?.tags || []).some(t => t.toLowerCase().includes(tl)) ||
+          (notes?.machineTags || []).some(t => t.toLowerCase().includes(tl));
+      });
+    });
+  });
+
   renderFileList();
 }
 
@@ -4411,6 +4529,23 @@ function providerLabel(provider) {
   return labels[provider] || provider;
 }
 
+function providerBadgeColor(provider) {
+  const colors = { anthropic: 'amber', openai: 'green', gemini: 'blue', openrouter: 'purple', apple: 'indigo' };
+  return colors[provider] || 'gray';
+}
+
+function summaryBadgesHtml(provider, model) {
+  let html = '<span class="badge badge-gray">Summary</span>';
+  if (provider) {
+    const color = providerBadgeColor(provider);
+    html += ' <span class="badge badge-' + color + '">' + escapeHtml(providerLabel(provider)) + '</span>';
+  }
+  if (model) {
+    html += ' <span class="badge badge-gray">' + escapeHtml(model) + '</span>';
+  }
+  return html;
+}
+
 async function reprocessCurrentArticle(btn) {
   if (!serverMode || !activeFile) return;
   var origText = btn.innerHTML;
@@ -4489,11 +4624,10 @@ async function summarizeArticle() {
 
     const summaryDiv = document.createElement('div');
     summaryDiv.className = 'article-summary';
-    summaryDiv.innerHTML = '<div class="summary-label"><span>Summary</span><span class="summary-actions"><button onclick="hideSummary()" title="Hide summary"><svg class="icon icon-sm"><use href="#i-xmark"/></svg></button></span></div>'
-      + escapeHtml(data.summary)
-      + '<div style="font-size:10px;color:var(--muted);margin-top:6px">'
-      + providerLabel(lastSummaryProvider) + ' · ' + escapeHtml(lastSummaryModel)
-      + '</div>';
+    summaryDiv.innerHTML = '<div class="summary-header"><div class="summary-header-left">'
+      + summaryBadgesHtml(lastSummaryProvider, lastSummaryModel)
+      + '</div><span class="summary-actions"><button onclick="hideSummary()" title="Hide summary"><svg class="icon icon-sm"><use href="#i-xmark"/></svg></button></span></div>'
+      + escapeHtml(data.summary);
 
     const articleHeader = content.querySelector('.article-header');
     if (articleHeader) {

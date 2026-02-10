@@ -321,8 +321,11 @@ if (command === 'sync') {
         const fmMatch = content.match(/^(---\n)([\s\S]*?)(\n---)([\s\S]*)$/);
         if (fmMatch) {
           let fm = fmMatch[2].replace(/\nsummary: ".*?"$/m, '').replace(/\nsummary: .*$/m, '');
+          fm = fm.replace(/\nsummaryProvider: .*$/m, '').replace(/\nsummaryModel: .*$/m, '');
           const escaped = result.summary.replace(/"/g, '\\"').replace(/\n/g, ' ');
           fm += `\nsummary: "${escaped}"`;
+          fm += `\nsummaryProvider: ${llmConfig.provider}`;
+          fm += `\nsummaryModel: ${result.model}`;
           const { writeFileSync: wf } = require('fs');
           wf(filePath, `${fmMatch[1]}${fm}${fmMatch[3]}${fmMatch[4]}`);
         }

@@ -24,6 +24,8 @@ interface FileMeta {
   author: string;
   mtime: string;
   hasSummary: boolean;
+  summaryProvider: string;
+  summaryModel: string;
   excerpt: string;
   image: string;
 }
@@ -82,6 +84,8 @@ function listFiles(outputPath: string): FileMeta[] {
         author: meta.author || '',
         mtime: stat.mtime.toISOString(),
         hasSummary: !!meta.summary,
+        summaryProvider: meta.summaryProvider || '',
+        summaryModel: meta.summaryModel || '',
         excerpt: meta.excerpt || '',
         image,
       });
@@ -141,20 +145,24 @@ function send404(res: ServerResponse) {
   res.end('Not found');
 }
 
-function writeSummaryToFile(filePath: string, summary: string): void {
+function writeSummaryToFile(filePath: string, summary: string, provider?: string, model?: string): void {
   if (!existsSync(filePath)) return;
   const content = readFileSync(filePath, 'utf-8');
   const match = content.match(/^(---\n)([\s\S]*?)(\n---)([\s\S]*)$/);
   if (!match) return;
 
   let frontmatter = match[2];
-  // Remove existing summary if present
+  // Remove existing summary fields if present
   frontmatter = frontmatter.replace(/\nsummary: ".*?"$/m, '');
   frontmatter = frontmatter.replace(/\nsummary: .*$/m, '');
+  frontmatter = frontmatter.replace(/\nsummaryProvider: .*$/m, '');
+  frontmatter = frontmatter.replace(/\nsummaryModel: .*$/m, '');
 
   // Add summary to frontmatter
   const escaped = summary.replace(/"/g, '\\"').replace(/\n/g, ' ');
   frontmatter += `\nsummary: "${escaped}"`;
+  if (provider) frontmatter += `\nsummaryProvider: ${provider}`;
+  if (model) frontmatter += `\nsummaryModel: ${model}`;
 
   writeFileSync(filePath, `${match[1]}${frontmatter}${match[3]}${match[4]}`);
 }
@@ -519,7 +527,7 @@ export function startViewer(outputPath: string, port = 7777): void {
 
         // If summarized by filename, write the summary into the markdown frontmatter
         if (name) {
-          writeSummaryToFile(join(outputPath, name), result.summary);
+          writeSummaryToFile(join(outputPath, name), result.summary, provider, result.model);
         }
 
         sendJson(res, { summary: result.summary, model: result.model, provider });
