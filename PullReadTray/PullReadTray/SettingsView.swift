@@ -34,6 +34,8 @@ struct SettingsView: View {
     @State private var viewerMode: String = "window"
     @State private var autotagAfterSync: Bool = false
     @State private var selectedTab: Int = 0
+    @State private var fetchedModels: [String: [String]] = [:]  // provider -> live models from API
+    @State private var isFetchingModels: Bool = false
 
     private static let knownModels: [String: [String]] = [
         "anthropic": ["claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250929", "claude-opus-4-5-20251101", "claude-opus-4-6"],
@@ -56,7 +58,10 @@ struct SettingsView: View {
     }
 
     private var modelsForProvider: [String] {
-        Self.knownModels[llmProvider] ?? []
+        if let fetched = fetchedModels[llmProvider], !fetched.isEmpty {
+            return fetched
+        }
+        return Self.knownModels[llmProvider] ?? []
     }
 
     private var keyPlaceholder: String {
@@ -135,6 +140,7 @@ struct SettingsView: View {
         .frame(width: 520, height: isFirstRun ? 640 : 600)
         .onAppear {
             loadConfig()
+            fetchModelsIfNeeded()
         }
         .alert("Error", isPresented: $showingError) {
             Button("OK", role: .cancel) {}
@@ -499,6 +505,8 @@ struct SettingsView: View {
                         useCustomModel = false
                         llmModel = Self.defaultModels[newProvider] ?? ""
                         llmModelCustom = ""
+                        // Fetch live models for the new provider
+                        fetchModelsIfNeeded()
                     }
                 }
 
@@ -567,6 +575,20 @@ struct SettingsView: View {
                             .font(.caption)
                             .buttonStyle(.borderless)
                             .foregroundColor(.accentColor)
+
+                            if isFetchingModels {
+                                ProgressView()
+                                    .scaleEffect(0.5)
+                                    .frame(width: 14, height: 14)
+                            } else if !llmApiKey.isEmpty {
+                                Button(action: refreshModels) {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.caption2)
+                                }
+                                .buttonStyle(.borderless)
+                                .foregroundColor(.secondary)
+                                .help("Refresh models from API")
+                            }
                         }
                     }
 
@@ -575,6 +597,16 @@ struct SettingsView: View {
                             .font(.caption2)
                             .foregroundColor(.secondary)
                             .padding(.leading, 68)
+                    } else if fetchedModels[llmProvider] != nil {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 6, height: 6)
+                            Text("Live from API")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.leading, 68)
                     }
 
                     if !llmApiKey.isEmpty {
@@ -893,6 +925,117 @@ struct SettingsView: View {
 
     private func deleteFeed(at offsets: IndexSet) {
         feeds.remove(atOffsets: offsets)
+    }
+
+    // MARK: - Live Model Fetching
+
+    private func fetchModelsIfNeeded() {
+        guard !isAppleProvider, !llmApiKey.isEmpty else { return }
+        // Don't re-fetch if we already have live models for this provider
+        guard fetchedModels[llmProvider] == nil else { return }
+        fetchModelsFromAPI()
+    }
+
+    private func refreshModels() {
+        fetchedModels.removeValue(forKey: llmProvider)
+        fetchModelsFromAPI()
+    }
+
+    private func fetchModelsFromAPI() {
+        let provider = llmProvider
+        let apiKey = llmApiKey
+        guard !apiKey.isEmpty, provider != "apple" else { return }
+
+        isFetchingModels = true
+
+        var request: URLRequest
+        switch provider {
+        case "anthropic":
+            request = URLRequest(url: URL(string: "https://api.anthropic.com/v1/models?limit=100")!)
+            request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+            request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        case "openai":
+            request = URLRequest(url: URL(string: "https://api.openai.com/v1/models")!)
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        case "gemini":
+            request = URLRequest(url: URL(string: "https://generativelanguage.googleapis.com/v1beta/models?key=\(apiKey)&pageSize=100")!)
+        case "openrouter":
+            request = URLRequest(url: URL(string: "https://openrouter.ai/api/v1/models")!)
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        default:
+            isFetchingModels = false
+            return
+        }
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            defer { DispatchQueue.main.async { self.isFetchingModels = false } }
+            guard let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return
+            }
+
+            let models: [String]
+            switch provider {
+            case "anthropic":
+                models = Self.parseAnthropicModels(json)
+            case "openai":
+                models = Self.parseOpenAIModels(json)
+            case "gemini":
+                models = Self.parseGeminiModels(json)
+            case "openrouter":
+                models = Self.parseOpenRouterModels(json)
+            default:
+                return
+            }
+
+            guard !models.isEmpty else { return }
+            DispatchQueue.main.async {
+                self.fetchedModels[provider] = models
+                // If current selection isn't in the fetched list, pick the default
+                if !self.useCustomModel && !models.contains(self.llmModel) {
+                    self.llmModel = Self.defaultModels[provider] ?? models.first ?? ""
+                }
+            }
+        }.resume()
+    }
+
+    private static func parseAnthropicModels(_ json: [String: Any]) -> [String] {
+        guard let data = json["data"] as? [[String: Any]] else { return [] }
+        return data.compactMap { $0["id"] as? String }.sorted()
+    }
+
+    private static func parseOpenAIModels(_ json: [String: Any]) -> [String] {
+        guard let data = json["data"] as? [[String: Any]] else { return [] }
+        let chatPrefixes = ["gpt-", "o1", "o3", "o4"]
+        let excludePatterns = ["instruct", "realtime", "audio", "search"]
+        return data.compactMap { $0["id"] as? String }
+            .filter { id in chatPrefixes.contains(where: { id.hasPrefix($0) }) }
+            .filter { id in !excludePatterns.contains(where: { id.contains($0) }) }
+            .sorted()
+    }
+
+    private static func parseGeminiModels(_ json: [String: Any]) -> [String] {
+        guard let models = json["models"] as? [[String: Any]] else { return [] }
+        return models
+            .filter { model in
+                guard let methods = model["supportedGenerationMethods"] as? [String] else { return false }
+                return methods.contains("generateContent")
+            }
+            .compactMap { model -> String? in
+                guard let name = model["name"] as? String else { return nil }
+                // Strip "models/" prefix that Gemini API returns
+                return name.hasPrefix("models/") ? String(name.dropFirst(7)) : name
+            }
+            .sorted()
+    }
+
+    private static func parseOpenRouterModels(_ json: [String: Any]) -> [String] {
+        guard let data = json["data"] as? [[String: Any]] else { return [] }
+        // OpenRouter has thousands of models — filter to major providers
+        let prefixes = ["anthropic/", "openai/", "google/", "meta-llama/", "deepseek/", "mistralai/"]
+        return data.compactMap { $0["id"] as? String }
+            .filter { id in prefixes.contains(where: { id.hasPrefix($0) }) }
+            .sorted()
     }
 
     private func loadConfig() {
