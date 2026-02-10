@@ -21,7 +21,7 @@ struct OnboardingView: View {
     let configPath: String
     var onComplete: (() -> Void)?
 
-    private let totalSteps = 5
+    private let totalSteps = 6
 
     var body: some View {
         ZStack {
@@ -43,7 +43,8 @@ struct OnboardingView: View {
                         case 1: outputFolderStep
                         case 2: feedsStep
                         case 3: optionsStep
-                        case 4: readyStep
+                        case 4: savingArticlesStep
+                        case 5: readyStep
                         default: EmptyView()
                         }
                     }
@@ -55,7 +56,7 @@ struct OnboardingView: View {
                     .padding(24)
             }
         }
-        .frame(width: 520, height: 540)
+        .frame(width: 520, height: 580)
         .onAppear {
             loadExistingConfig()
         }
@@ -99,8 +100,9 @@ struct OnboardingView: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 380)
 
-            HStack(spacing: 16) {
+            HStack(spacing: 12) {
                 featurePill(icon: "bookmark.fill", text: "Bookmark sync")
+                featurePill(icon: "square.and.arrow.up", text: "Share Extension")
                 featurePill(icon: "doc.text", text: "Markdown files")
                 featurePill(icon: "sparkles", text: "AI summaries")
             }
@@ -307,7 +309,100 @@ struct OnboardingView: View {
         }
     }
 
-    // MARK: - Step 5: Ready
+    // MARK: - Step 5: Saving Articles
+
+    private var savingArticlesStep: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            stepHeader(
+                icon: "square.and.arrow.down.fill",
+                iconColor: .blue,
+                title: "Saving Articles",
+                subtitle: "There are several ways to get articles into PullRead. Use any combination that fits your workflow."
+            )
+
+            // Primary: RSS feeds from hosted services
+            GlassCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "antenna.radiowaves.left.and.right")
+                            .font(.title3)
+                            .foregroundColor(.orange)
+                            .frame(width: 24)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("RSS Feeds")
+                                .fontWeight(.medium)
+                            Text("Your primary source. Instapaper, Pinboard, Raindrop, Pocket, and any RSS feed sync automatically on a schedule.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+
+                    Divider()
+
+                    HStack(spacing: 10) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.title3)
+                            .foregroundColor(.blue)
+                            .frame(width: 24)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Share Extension")
+                                .fontWeight(.medium)
+                            Text("In Safari or any app, tap Share \u{2192} Save to PullRead. The article is queued and fetched on next sync.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+
+                    Divider()
+
+                    HStack(spacing: 10) {
+                        Image(systemName: "contextualmenu.and.cursorarrow")
+                            .font(.title3)
+                            .foregroundColor(.green)
+                            .frame(width: 24)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Services Menu")
+                                .fontWeight(.medium)
+                            Text("Select any URL, then right-click \u{2192} Services \u{2192} Save to PullRead.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+
+                    Divider()
+
+                    HStack(spacing: 10) {
+                        Image(systemName: "command")
+                            .font(.title3)
+                            .foregroundColor(.purple)
+                            .frame(width: 24)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Shortcuts & Siri")
+                                .fontWeight(.medium)
+                            Text("Use the Shortcuts app or say \"Save article to PullRead\" to automate your workflow.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
+
+            HStack(spacing: 8) {
+                Image(systemName: "info.circle")
+                    .foregroundColor(.secondary)
+                Text("All save methods queue articles locally. They're fetched and converted to markdown on the next sync.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    // MARK: - Step 6: Ready
 
     private var readyStep: some View {
         VStack(spacing: 24) {

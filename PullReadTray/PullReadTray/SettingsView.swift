@@ -40,8 +40,8 @@ struct SettingsView: View {
     @State private var viewerMode: String = "window"
     @State private var autotagAfterSync: Bool = false
     @State private var selectedTab: Int = 0
-    @State private var fetchedModels: [String: [String]] = [:]  // provider -> live models from API
-    @State private var isFetchingModels: Bool = false
+    @State private var isTestingConnection: Bool = false
+    @State private var connectionTestResult: String? = nil
 
     private static let knownModels: [String: [String]] = [
         "anthropic": ["claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250929", "claude-opus-4-5-20251101", "claude-opus-4-6"],
@@ -63,10 +63,32 @@ struct SettingsView: View {
         llmProvider == "apple"
     }
 
+    private static let modelLabels: [String: String] = [
+        "claude-haiku-4-5-20251001": "Haiku 4.5 (fast & cheap)",
+        "claude-sonnet-4-5-20250929": "Sonnet 4.5 (balanced)",
+        "claude-opus-4-5-20251101": "Opus 4.5 (best quality)",
+        "claude-opus-4-6": "Opus 4.6 (latest)",
+        "gpt-4.1-nano": "GPT-4.1 Nano (cheapest)",
+        "gpt-4.1-mini": "GPT-4.1 Mini",
+        "gpt-4.1": "GPT-4.1",
+        "gpt-5-nano": "GPT-5 Nano (fastest)",
+        "gpt-5-mini": "GPT-5 Mini (balanced)",
+        "gpt-5": "GPT-5 (best quality)",
+        "o3-mini": "o3-mini (reasoning)",
+        "gemini-2.5-flash-lite-preview": "Flash Lite (cheapest)",
+        "gemini-2.5-flash": "Flash 2.5 (balanced)",
+        "gemini-2.5-pro": "Pro 2.5 (best quality)",
+        "gemini-3-flash-preview": "Flash 3 (preview)",
+        "anthropic/claude-haiku-4.5": "Claude Haiku 4.5",
+        "google/gemini-2.5-flash": "Gemini 2.5 Flash",
+        "deepseek/deepseek-v3.2": "DeepSeek V3.2",
+        "openai/gpt-5-mini": "GPT-5 Mini",
+        "anthropic/claude-sonnet-4.5": "Claude Sonnet 4.5",
+        "meta-llama/llama-3.3-70b-instruct:free": "Llama 3.3 70B (free)",
+        "on-device": "On-device"
+    ]
+
     private var modelsForProvider: [String] {
-        if let fetched = fetchedModels[llmProvider], !fetched.isEmpty {
-            return fetched
-        }
         return Self.knownModels[llmProvider] ?? []
     }
 
@@ -146,7 +168,6 @@ struct SettingsView: View {
         .frame(width: 520, height: isFirstRun ? 640 : 600)
         .onAppear {
             loadConfig()
-            fetchModelsIfNeeded()
         }
         .alert("Error", isPresented: $showingError) {
             Button("OK", role: .cancel) {}
@@ -511,8 +532,7 @@ struct SettingsView: View {
                         useCustomModel = false
                         llmModel = Self.defaultModels[newProvider] ?? ""
                         llmModelCustom = ""
-                        // Fetch live models for the new provider
-                        fetchModelsIfNeeded()
+                        connectionTestResult = nil
                     }
                 }
 
@@ -575,7 +595,7 @@ struct SettingsView: View {
                         } else {
                             Picker("", selection: $llmModel) {
                                 ForEach(modelsForProvider, id: \.self) { model in
-                                    Text(model).tag(model)
+                                    Text(Self.modelLabels[model] ?? model).tag(model)
                                 }
                             }
                             .pickerStyle(.menu)
@@ -586,20 +606,6 @@ struct SettingsView: View {
                             .font(.caption)
                             .buttonStyle(.borderless)
                             .foregroundColor(.accentColor)
-
-                            if isFetchingModels {
-                                ProgressView()
-                                    .scaleEffect(0.5)
-                                    .frame(width: 14, height: 14)
-                            } else if !llmApiKey.isEmpty {
-                                Button(action: refreshModels) {
-                                    Image(systemName: "arrow.clockwise")
-                                        .font(.caption2)
-                                }
-                                .buttonStyle(.borderless)
-                                .foregroundColor(.secondary)
-                                .help("Refresh models from API")
-                            }
                         }
                     }
 
@@ -608,29 +614,39 @@ struct SettingsView: View {
                             .font(.caption2)
                             .foregroundColor(.secondary)
                             .padding(.leading, 68)
-                    } else if fetchedModels[llmProvider] != nil {
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(Color.green)
-                                .frame(width: 6, height: 6)
-                            Text("Live from API")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.leading, 68)
                     }
 
                     if !llmApiKey.isEmpty {
                         HStack(spacing: 8) {
                             Image(systemName: "checkmark.shield.fill")
                                 .foregroundColor(.green)
-                            Text("Key stored locally at ~/.config/pullread/settings.json")
+                            Text("Key stored securely in macOS Keychain")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
                         .padding(10)
                         .background(Color.green.opacity(0.1))
                         .cornerRadius(8)
+
+                        HStack(spacing: 8) {
+                            Button(action: testConnection) {
+                                HStack(spacing: 4) {
+                                    if isTestingConnection {
+                                        ProgressView()
+                                            .scaleEffect(0.5)
+                                            .frame(width: 12, height: 12)
+                                    } else {
+                                        Image(systemName: connectionTestResult == "success" ? "checkmark.circle.fill" : connectionTestResult != nil ? "xmark.circle.fill" : "bolt.fill")
+                                            .foregroundColor(connectionTestResult == "success" ? .green : connectionTestResult != nil ? .red : .accentColor)
+                                    }
+                                    Text(connectionTestResult == "success" ? "Connected" : connectionTestResult ?? "Test Connection")
+                                        .font(.caption)
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(isTestingConnection)
+                        }
+                        .padding(.leading, 68)
                     }
                 }
             }
@@ -938,115 +954,92 @@ struct SettingsView: View {
         feeds.remove(atOffsets: offsets)
     }
 
-    // MARK: - Live Model Fetching
+    // MARK: - Connection Test
 
-    private func fetchModelsIfNeeded() {
-        guard !isAppleProvider, !llmApiKey.isEmpty else { return }
-        // Don't re-fetch if we already have live models for this provider
-        guard fetchedModels[llmProvider] == nil else { return }
-        fetchModelsFromAPI()
-    }
-
-    private func refreshModels() {
-        fetchedModels.removeValue(forKey: llmProvider)
-        fetchModelsFromAPI()
-    }
-
-    private func fetchModelsFromAPI() {
+    private func testConnection() {
         let provider = llmProvider
         let apiKey = llmApiKey
-        guard !apiKey.isEmpty, provider != "apple" else { return }
-
-        isFetchingModels = true
-
-        var request: URLRequest
-        switch provider {
-        case "anthropic":
-            request = URLRequest(url: URL(string: "https://api.anthropic.com/v1/models?limit=100")!)
-            request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-            request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        case "openai":
-            request = URLRequest(url: URL(string: "https://api.openai.com/v1/models")!)
-            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        case "gemini":
-            request = URLRequest(url: URL(string: "https://generativelanguage.googleapis.com/v1beta/models?key=\(apiKey)&pageSize=100")!)
-        case "openrouter":
-            request = URLRequest(url: URL(string: "https://openrouter.ai/api/v1/models")!)
-            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        default:
-            isFetchingModels = false
+        let model = useCustomModel ? llmModelCustom : llmModel
+        guard !apiKey.isEmpty, !model.isEmpty else {
+            connectionTestResult = "Missing key or model"
             return
         }
 
+        isTestingConnection = true
+        connectionTestResult = nil
+
+        var request: URLRequest
+        var body: Data
+
+        switch provider {
+        case "anthropic":
+            request = URLRequest(url: URL(string: "https://api.anthropic.com/v1/messages")!)
+            request.httpMethod = "POST"
+            request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+            request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            body = try! JSONSerialization.data(withJSONObject: [
+                "model": model,
+                "max_tokens": 5,
+                "messages": [["role": "user", "content": "Say hi"]]
+            ])
+        case "openai":
+            request = URLRequest(url: URL(string: "https://api.openai.com/v1/chat/completions")!)
+            request.httpMethod = "POST"
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            body = try! JSONSerialization.data(withJSONObject: [
+                "model": model,
+                "max_tokens": 5,
+                "messages": [["role": "user", "content": "Say hi"]]
+            ])
+        case "gemini":
+            let urlStr = "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent?key=\(apiKey)"
+            request = URLRequest(url: URL(string: urlStr)!)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            body = try! JSONSerialization.data(withJSONObject: [
+                "contents": [["parts": [["text": "Say hi"]]]]
+            ])
+        case "openrouter":
+            request = URLRequest(url: URL(string: "https://openrouter.ai/api/v1/chat/completions")!)
+            request.httpMethod = "POST"
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            body = try! JSONSerialization.data(withJSONObject: [
+                "model": model,
+                "max_tokens": 5,
+                "messages": [["role": "user", "content": "Say hi"]]
+            ])
+        default:
+            isTestingConnection = false
+            connectionTestResult = "Unsupported provider"
+            return
+        }
+
+        request.httpBody = body
+        request.timeoutInterval = 15
+
         URLSession.shared.dataTask(with: request) { data, response, error in
-            defer { DispatchQueue.main.async { self.isFetchingModels = false } }
-            guard let data = data,
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                return
-            }
-
-            let models: [String]
-            switch provider {
-            case "anthropic":
-                models = Self.parseAnthropicModels(json)
-            case "openai":
-                models = Self.parseOpenAIModels(json)
-            case "gemini":
-                models = Self.parseGeminiModels(json)
-            case "openrouter":
-                models = Self.parseOpenRouterModels(json)
-            default:
-                return
-            }
-
-            guard !models.isEmpty else { return }
             DispatchQueue.main.async {
-                self.fetchedModels[provider] = models
-                // If current selection isn't in the fetched list, pick the default
-                if !self.useCustomModel && !models.contains(self.llmModel) {
-                    self.llmModel = Self.defaultModels[provider] ?? models.first ?? ""
+                self.isTestingConnection = false
+                if let error = error {
+                    self.connectionTestResult = "Error: \(error.localizedDescription.prefix(50))"
+                    return
+                }
+                let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+                if statusCode >= 200 && statusCode < 300 {
+                    self.connectionTestResult = "success"
+                } else if statusCode == 401 {
+                    self.connectionTestResult = "Invalid API key"
+                } else if statusCode == 404 {
+                    self.connectionTestResult = "Model not found"
+                } else {
+                    let bodyStr = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+                    self.connectionTestResult = "HTTP \(statusCode): \(bodyStr.prefix(60))"
                 }
             }
         }.resume()
-    }
-
-    private static func parseAnthropicModels(_ json: [String: Any]) -> [String] {
-        guard let data = json["data"] as? [[String: Any]] else { return [] }
-        return data.compactMap { $0["id"] as? String }.sorted()
-    }
-
-    private static func parseOpenAIModels(_ json: [String: Any]) -> [String] {
-        guard let data = json["data"] as? [[String: Any]] else { return [] }
-        let chatPrefixes = ["gpt-", "o1", "o3", "o4"]
-        let excludePatterns = ["instruct", "realtime", "audio", "search"]
-        return data.compactMap { $0["id"] as? String }
-            .filter { id in chatPrefixes.contains(where: { id.hasPrefix($0) }) }
-            .filter { id in !excludePatterns.contains(where: { id.contains($0) }) }
-            .sorted()
-    }
-
-    private static func parseGeminiModels(_ json: [String: Any]) -> [String] {
-        guard let models = json["models"] as? [[String: Any]] else { return [] }
-        return models
-            .filter { model in
-                guard let methods = model["supportedGenerationMethods"] as? [String] else { return false }
-                return methods.contains("generateContent")
-            }
-            .compactMap { model -> String? in
-                guard let name = model["name"] as? String else { return nil }
-                // Strip "models/" prefix that Gemini API returns
-                return name.hasPrefix("models/") ? String(name.dropFirst(7)) : name
-            }
-            .sorted()
-    }
-
-    private static func parseOpenRouterModels(_ json: [String: Any]) -> [String] {
-        guard let data = json["data"] as? [[String: Any]] else { return [] }
-        // OpenRouter has thousands of models — filter to major providers
-        let prefixes = ["anthropic/", "openai/", "google/", "meta-llama/", "deepseek/", "mistralai/"]
-        return data.compactMap { $0["id"] as? String }
-            .filter { id in prefixes.contains(where: { id.hasPrefix($0) }) }
-            .sorted()
     }
 
     private func loadConfig() {
@@ -1080,7 +1073,6 @@ struct SettingsView: View {
            let llm = settings["llm"] as? [String: Any] {
             let defaultProvider = ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26 ? "apple" : "anthropic"
             llmProvider = (llm["provider"] as? String) ?? defaultProvider
-            llmApiKey = (llm["apiKey"] as? String) ?? ""
             let savedModel = (llm["model"] as? String) ?? ""
             let knownList = Self.knownModels[llmProvider] ?? []
             if knownList.contains(savedModel) || savedModel.isEmpty {
@@ -1091,13 +1083,43 @@ struct SettingsView: View {
                 llmModel = Self.defaultModels[llmProvider] ?? ""
                 useCustomModel = true
             }
-            // Load all saved provider keys
+
+            // Migration: move plaintext keys from settings.json to Keychain
+            var needsResave = false
             if let keys = llm["savedKeys"] as? [String: String] {
-                savedApiKeys = keys
+                for (provider, key) in keys where !key.isEmpty {
+                    _ = KeychainService.save(account: KeychainService.llmAccount(for: provider), password: key)
+                    savedApiKeys[provider] = key
+                }
+                needsResave = true
             }
-            // Also store current key
-            if !llmApiKey.isEmpty {
-                savedApiKeys[llmProvider] = llmApiKey
+            if let plainKey = llm["apiKey"] as? String, !plainKey.isEmpty {
+                _ = KeychainService.save(account: KeychainService.llmAccount(for: llmProvider), password: plainKey)
+                savedApiKeys[llmProvider] = plainKey
+                needsResave = true
+            }
+
+            // Load keys from Keychain for all known providers
+            if savedApiKeys.isEmpty {
+                if let providers = llm["savedKeyProviders"] as? [String] {
+                    for provider in providers {
+                        if let key = KeychainService.load(account: KeychainService.llmAccount(for: provider)) {
+                            savedApiKeys[provider] = key
+                        }
+                    }
+                }
+            }
+
+            // Set current API key from Keychain
+            llmApiKey = savedApiKeys[llmProvider]
+                ?? KeychainService.load(account: KeychainService.llmAccount(for: llmProvider))
+                ?? ""
+
+            // If we migrated, re-save to strip plaintext keys from settings.json
+            if needsResave {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [self] in
+                    self.migrateKeysFromSettingsJSON()
+                }
             }
         }
 
@@ -1106,6 +1128,32 @@ struct SettingsView: View {
         syncInterval = UserDefaults.standard.string(forKey: "syncInterval") ?? "1h"
         viewerMode = UserDefaults.standard.string(forKey: "viewerMode") ?? "window"
         autotagAfterSync = UserDefaults.standard.bool(forKey: "autotagAfterSync")
+    }
+
+    /// Remove plaintext API keys from settings.json after migrating to Keychain
+    private func migrateKeysFromSettingsJSON() {
+        let settingsPath = (configPath as NSString).deletingLastPathComponent + "/settings.json"
+        guard let settingsData = FileManager.default.contents(atPath: settingsPath),
+              var settings = try? JSONSerialization.jsonObject(with: settingsData) as? [String: Any],
+              var llm = settings["llm"] as? [String: Any] else { return }
+
+        var changed = false
+        if llm["apiKey"] != nil {
+            llm.removeValue(forKey: "apiKey")
+            changed = true
+        }
+        if llm["savedKeys"] != nil {
+            llm.removeValue(forKey: "savedKeys")
+            changed = true
+        }
+        if changed {
+            llm["hasKey"] = !llmApiKey.isEmpty || isAppleProvider
+            llm["savedKeyProviders"] = Array(savedApiKeys.keys.filter { !savedApiKeys[$0]!.isEmpty })
+            settings["llm"] = llm
+            if let data = try? JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted, .sortedKeys]) {
+                try? data.write(to: URL(fileURLWithPath: settingsPath))
+            }
+        }
     }
 
     private func saveConfig() {
@@ -1154,11 +1202,16 @@ struct SettingsView: View {
                 try FileManager.default.createDirectory(atPath: expandedPath, withIntermediateDirectories: true)
             }
 
-            // Save LLM settings to settings.json (separate from feeds config)
+            // Save LLM settings — keys go to Keychain, metadata to settings.json
             do {
-                // Save current key to savedApiKeys before persisting
+                // Save current key to Keychain and in-memory map
                 if !isAppleProvider && !llmApiKey.isEmpty {
                     savedApiKeys[llmProvider] = llmApiKey
+                    _ = KeychainService.save(account: KeychainService.llmAccount(for: llmProvider), password: llmApiKey)
+                }
+                // Save all saved keys to Keychain
+                for (provider, key) in savedApiKeys where !key.isEmpty {
+                    _ = KeychainService.save(account: KeychainService.llmAccount(for: provider), password: key)
                 }
 
                 let settingsPath = (configPath as NSString).deletingLastPathComponent + "/settings.json"
@@ -1167,14 +1220,15 @@ struct SettingsView: View {
                    let parsed = try? JSONSerialization.jsonObject(with: settingsData) as? [String: Any] {
                     existingSettings = parsed
                 }
+                // Only store metadata in settings.json — NO plaintext keys
                 var llm: [String: Any] = [
                     "provider": llmProvider,
-                    "savedKeys": savedApiKeys
+                    "hasKey": !llmApiKey.isEmpty || isAppleProvider,
+                    "savedKeyProviders": Array(savedApiKeys.keys.filter { !savedApiKeys[$0]!.isEmpty })
                 ]
                 if isAppleProvider {
                     llm["model"] = "on-device"
                 } else {
-                    llm["apiKey"] = llmApiKey
                     let effectiveModel = useCustomModel ? llmModelCustom : llmModel
                     if !effectiveModel.isEmpty {
                         llm["model"] = effectiveModel

@@ -82,7 +82,15 @@ export async function generateWeeklyReview(outputPath: string, days: number = 7)
     return entry;
   }).join('\n');
 
-  const prompt = `You are a reading digest assistant. Below is a list of ${articles.length} articles bookmarked in the past ${periodLabel}. Write a thematic ${reviewType} review (3-5 paragraphs) that identifies the main themes, notable findings, and interesting connections between articles. Group related articles together. Use a conversational but informative tone. Do not list every article — synthesize the key ideas.
+  const prompt = `You are a reading digest assistant. Below is a list of ${articles.length} articles bookmarked in the past ${periodLabel}.
+
+Write a thematic ${reviewType} review in two sections:
+
+**Review** (3-5 paragraphs): Identify the main themes, notable findings, and interesting connections between articles. Group related articles together. Use a conversational but informative tone. Do not list every article — synthesize the key ideas.
+
+**Open Questions** (3-5 questions): Based on these readings, what questions remain unanswered or deserve further exploration? Be Socratic — frame questions that challenge assumptions, probe implications, or connect ideas across domains. Each question should briefly reference the article(s) that prompted it.
+
+Format the output with ## Review and ## Open Questions headers.
 
 Articles:
 ${articleList}

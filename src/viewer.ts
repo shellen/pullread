@@ -2,7 +2,7 @@
 // ABOUTME: Serves viewer UI and provides API for listing/reading articles
 
 import { createServer, IncomingMessage, ServerResponse } from 'http';
-import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, mkdirSync } from 'fs';
+import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, mkdirSync, watch } from 'fs';
 import { join, extname, dirname } from 'path';
 import { exec } from 'child_process';
 import { homedir } from 'os';
@@ -12,7 +12,7 @@ import { autotagText, autotagBatch, saveMachineTags, hasMachineTags } from './au
 import { APP_ICON } from './app-icon';
 import { fetchAndExtract } from './extractor';
 import { generateMarkdown, ArticleData } from './writer';
-import { loadTTSConfig, saveTTSConfig, generateSpeech, getAudioContentType, getKokoroStatus, TTS_VOICES, TTS_MODELS } from './tts';
+import { loadTTSConfig, saveTTSConfig, generateSpeech, getAudioContentType, getKokoroStatus, preloadKokoro, TTS_VOICES, TTS_MODELS } from './tts';
 
 interface FileMeta {
   filename: string;
@@ -108,6 +108,7 @@ function listFiles(outputPath: string): FileMeta[] {
 const ANNOTATIONS_DIR = join(homedir(), '.config', 'pullread');
 const HIGHLIGHTS_PATH = join(ANNOTATIONS_DIR, 'highlights.json');
 const NOTES_PATH = join(ANNOTATIONS_DIR, 'notes.json');
+const NOTEBOOKS_PATH = join(ANNOTATIONS_DIR, 'notebooks.json');
 
 function loadJsonFile(path: string): Record<string, unknown> {
   if (!existsSync(path)) return {};
@@ -168,6 +169,16 @@ function writeSummaryToFile(filePath: string, summary: string, provider?: string
 }
 
 export function startViewer(outputPath: string, port = 7777): void {
+  // Watch output directory for .md file changes
+  let filesChangedAt = Date.now();
+  try {
+    watch(outputPath, (event, filename) => {
+      if (filename && filename.endsWith('.md')) {
+        filesChangedAt = Date.now();
+      }
+    });
+  } catch {}
+
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url || '/', `http://localhost:${port}`);
 
@@ -215,6 +226,47 @@ export function startViewer(outputPath: string, port = 7777): void {
 
     if (url.pathname === '/api/files') {
       sendJson(res, listFiles(outputPath));
+      return;
+    }
+
+    // Lightweight poll: returns timestamp of last .md file change
+    if (url.pathname === '/api/files-changed') {
+      sendJson(res, { changedAt: filesChangedAt });
+      return;
+    }
+
+    // Inbox API — for URL scheme, share extension, and services menu saved URLs
+    const inboxPath = join(homedir(), '.config', 'pullread', 'inbox.json');
+    if (url.pathname === '/api/inbox') {
+      if (req.method === 'GET') {
+        const inbox = existsSync(inboxPath) ? JSON.parse(readFileSync(inboxPath, 'utf-8')) : [];
+        sendJson(res, inbox);
+        return;
+      }
+      if (req.method === 'DELETE') {
+        writeFileSync(inboxPath, '[]');
+        sendJson(res, { ok: true });
+        return;
+      }
+    }
+    if (url.pathname === '/api/save' && req.method === 'POST') {
+      let body = '';
+      req.on('data', (c: Buffer) => { body += c.toString(); });
+      req.on('end', () => {
+        try {
+          const { url: articleUrl } = JSON.parse(body);
+          if (!articleUrl) { res.writeHead(400); res.end('{"error":"url required"}'); return; }
+          let inbox: { url: string; addedAt: string; title?: string }[] = [];
+          if (existsSync(inboxPath)) {
+            try { inbox = JSON.parse(readFileSync(inboxPath, 'utf-8')); } catch {}
+          }
+          inbox.push({ url: articleUrl, addedAt: new Date().toISOString() });
+          const dir = join(homedir(), '.config', 'pullread');
+          if (!existsSync(dir)) require('fs').mkdirSync(dir, { recursive: true });
+          writeFileSync(inboxPath, JSON.stringify(inbox, null, 2));
+          sendJson(res, { ok: true });
+        } catch { res.writeHead(400); res.end('{"error":"invalid json"}'); }
+      });
       return;
     }
 
@@ -304,6 +356,56 @@ export function startViewer(outputPath: string, port = 7777): void {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Invalid request body' }));
         }
+        return;
+      }
+    }
+
+    // Notebooks API
+    if (url.pathname === '/api/notebooks') {
+      if (req.method === 'GET') {
+        const id = url.searchParams.get('id');
+        const all = loadJsonFile(NOTEBOOKS_PATH) as Record<string, any>;
+        if (id) {
+          sendJson(res, all[id] || null);
+        } else {
+          sendJson(res, all);
+        }
+        return;
+      }
+      if (req.method === 'POST') {
+        try {
+          const body = JSON.parse(await readBody(req));
+          const all = loadJsonFile(NOTEBOOKS_PATH) as Record<string, any>;
+          const id = body.id || ('nb-' + Math.random().toString(36).slice(2, 8));
+          const existing = all[id] || {};
+          all[id] = {
+            id,
+            title: body.title ?? existing.title ?? '',
+            content: body.content ?? existing.content ?? '',
+            sources: body.sources ?? existing.sources ?? [],
+            tags: body.tags ?? existing.tags ?? [],
+            createdAt: existing.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          saveJsonFile(NOTEBOOKS_PATH, all);
+          sendJson(res, { ok: true, id });
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid request body' }));
+        }
+        return;
+      }
+      if (req.method === 'DELETE') {
+        const id = url.searchParams.get('id');
+        if (!id) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'id is required' }));
+          return;
+        }
+        const all = loadJsonFile(NOTEBOOKS_PATH) as Record<string, any>;
+        delete all[id];
+        saveJsonFile(NOTEBOOKS_PATH, all);
+        sendJson(res, { ok: true });
         return;
       }
     }
@@ -640,6 +742,12 @@ export function startViewer(outputPath: string, port = 7777): void {
       if (req.method === 'POST') {
         try {
           const body = JSON.parse(await readBody(req));
+          // Preserve existing API key if client sends preserveKey flag
+          if (body.preserveKey) {
+            const existing = loadTTSConfig();
+            if (existing.apiKey) body.apiKey = existing.apiKey;
+            delete body.preserveKey;
+          }
           saveTTSConfig(body);
           sendJson(res, { ok: true });
         } catch {
@@ -692,6 +800,15 @@ export function startViewer(outputPath: string, port = 7777): void {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: msg }));
       }
+      return;
+    }
+
+    // Kokoro preload API — trigger background model download
+    if (url.pathname === '/api/kokoro-preload' && req.method === 'POST') {
+      const config = loadTTSConfig();
+      const model = config.model || 'kokoro-v1-q8';
+      sendJson(res, { status: 'downloading' });
+      preloadKokoro(model).catch(() => {});
       return;
     }
 

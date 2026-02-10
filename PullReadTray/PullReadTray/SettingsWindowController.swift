@@ -44,7 +44,7 @@ class SettingsWindowController {
                 }
             )
             hostingController = NSHostingController(rootView: AnyView(onboardingView))
-            windowSize = NSRect(x: 0, y: 0, width: 520, height: 540)
+            windowSize = NSRect(x: 0, y: 0, width: 520, height: 580)
         } else {
             let settingsView = SettingsView(
                 isPresented: Binding(

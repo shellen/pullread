@@ -6,6 +6,7 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { createHash } from 'crypto';
 import { request as httpsRequest } from 'https';
+import { execSync } from 'child_process';
 
 const SETTINGS_PATH = join(homedir(), '.config', 'pullread', 'settings.json');
 const CACHE_DIR = join(homedir(), '.config', 'pullread', 'tts-cache');
@@ -75,7 +76,22 @@ export function loadTTSConfig(): TTSConfig {
   try {
     if (existsSync(SETTINGS_PATH)) {
       const settings = JSON.parse(readFileSync(SETTINGS_PATH, 'utf-8'));
-      if (settings.tts) return settings.tts;
+      if (settings.tts) {
+        const config = settings.tts as TTSConfig;
+        // If no API key in settings, try Keychain (macOS only)
+        if (!config.apiKey && (config.provider === 'openai' || config.provider === 'elevenlabs')) {
+          if (process.platform === 'darwin') {
+            try {
+              const key = execSync(
+                'security find-generic-password -w -s "com.pullread.api-keys" -a "tts-api-key"',
+                { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
+              ).trim();
+              if (key) config.apiKey = key;
+            } catch {}
+          }
+        }
+        return config;
+      }
     }
   } catch {}
   return { provider: 'browser' };
@@ -232,6 +248,20 @@ function httpsPost(url: string, headers: Record<string, string>, body: string | 
 export function getKokoroStatus(): { installed: boolean; modelPath: string } {
   const installed = existsSync(KOKORO_MODEL_DIR) && readdirSync(KOKORO_MODEL_DIR).length > 0;
   return { installed, modelPath: KOKORO_MODEL_DIR };
+}
+
+/**
+ * Pre-download the Kokoro model in the background.
+ * Returns a promise that resolves when the model is ready.
+ */
+export async function preloadKokoro(model: string = 'kokoro-v1-q8'): Promise<{ ready: boolean; error?: string }> {
+  try {
+    await getKokoroPipeline(model);
+    return { ready: true };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ready: false, error: msg };
+  }
 }
 
 /** Lazy-loaded Kokoro pipeline singleton */

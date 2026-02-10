@@ -3,6 +3,7 @@
 
 import Cocoa
 import Combine
+import CoreSpotlight
 import SwiftUI
 import UserNotifications
 import Sparkle
@@ -21,6 +22,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var reviewTimer: Timer?
     private var syncTimer: Timer?
     private var hasUnreadReview: Bool = false
+    private let spotlightIndexer = SpotlightIndexer()
 
     private var updaterController: SPUStandardUpdaterController?
     private var cancellables = Set<AnyCancellable>()
@@ -58,6 +60,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Force accessory mode (menu-bar-only) on launch.
+        // Prevents stale .regular policy from a previous crash while viewer was open.
+        NSApp.setActivationPolicy(.accessory)
+
         syncService = SyncService()
         settingsWindowController = SettingsWindowController()
 
@@ -73,6 +79,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         setupStatusBar()
         requestNotificationPermission()
+
+        // Register URL scheme handler (pullread://)
+        NSAppleEventManager.shared().setEventHandler(
+            self,
+            andSelector: #selector(handleURLEvent(_:withReply:)),
+            forEventClass: AEEventClass(kInternetEventClass),
+            andEventID: AEEventID(kAEGetURL)
+        )
+
+        // Register as Services menu provider
+        NSApp.servicesProvider = self
 
         // Check for bundled binary on launch
         if !syncService.isBinaryAvailable() {
@@ -125,19 +142,43 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupStatusBar() {
+        print("[PullRead] Setting up status bar item...")
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
-        if let button = statusItem.button {
-            // Use SF Symbol for the icon (available on macOS 11+)
-            if let image = NSImage(systemSymbolName: "doc.text.fill", accessibilityDescription: "PullRead") {
-                image.isTemplate = true
-                button.image = image
-            } else {
-                button.title = "PR"
+        if statusItem.button == nil {
+            // Retry once after a delay — system may be busy after fresh install
+            print("[PullRead] Status bar button nil, retrying in 2 seconds...")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                self?.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+                self?.configureStatusBarButton()
+                self?.buildStatusBarMenu()
+                print("[PullRead] Status bar retry complete")
             }
-            button.toolTip = "PullRead - Bookmark Reader & Markdown Library"
+            return
         }
 
+        configureStatusBarButton()
+        buildStatusBarMenu()
+    }
+
+    private func configureStatusBarButton() {
+        guard let button = statusItem.button else {
+            print("[PullRead] WARNING: Status bar button is nil — menu bar item may not be visible")
+            return
+        }
+
+        if let image = NSImage(systemSymbolName: "doc.text.fill", accessibilityDescription: "PullRead") {
+            image.isTemplate = true
+            button.image = image
+            print("[PullRead] Status bar icon set successfully")
+        } else {
+            button.title = "PR"
+            print("[PullRead] SF Symbol not available, using text fallback")
+        }
+        button.toolTip = "PullRead - Bookmark Reader & Markdown Library"
+    }
+
+    private func buildStatusBarMenu() {
         let menu = NSMenu()
 
         // Sync Now with status on same line
@@ -239,6 +280,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(quitMenuItem)
 
         statusItem.menu = menu
+        print("[PullRead] Status bar setup complete, menu has \(menu.items.count) items")
     }
 
     @objc private func syncNow() {
@@ -393,6 +435,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     self?.showNotification(title: "Sync Complete", body: self?.parseSyncSummary(output) ?? "Sync finished")
                     // Run auto-tagging in the background if enabled
                     self?.runAutotagIfEnabled()
+                    // Update Spotlight index with new/changed articles
+                    if let outputPath = self?.syncService.getOutputPath() {
+                        self?.spotlightIndexer.indexArticles(at: outputPath)
+                    }
                 case .failure(let error):
                     self?.showNotification(title: "Sync Failed", body: error.localizedDescription)
                 }
@@ -403,12 +449,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func runAutotagIfEnabled() {
         guard UserDefaults.standard.bool(forKey: "autotagAfterSync") else { return }
 
-        syncService.runAutotag { [weak self] result in
-            DispatchQueue.main.async {
-                if case .failure(let error) = result {
-                    // Log but don't notify — auto-tagging is a background task
-                    print("Auto-tag failed: \(error.localizedDescription)")
-                }
+        syncService.runAutotag { result in
+            if case .failure(let error) = result {
+                // Log but don't notify — auto-tagging is a background task
+                print("Auto-tag failed: \(error.localizedDescription)")
             }
         }
     }
@@ -592,6 +636,128 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         alert.alertStyle = .informational
         alert.addButton(withTitle: "OK")
         alert.runModal()
+    }
+
+    // MARK: - URL Scheme handling (pullread://)
+
+    @objc private func handleURLEvent(_ event: NSAppleEventDescriptor, withReply reply: NSAppleEventDescriptor) {
+        guard let urlString = event.paramDescriptor(forKeyword: AEKeyword(keyDirectObject))?.stringValue,
+              let url = URL(string: urlString),
+              url.scheme == "pullread" else { return }
+
+        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        let queryItems = components?.queryItems ?? []
+        func param(_ name: String) -> String? {
+            queryItems.first(where: { $0.name == name })?.value
+        }
+
+        switch url.host {
+        case "open":
+            if let filename = param("file") {
+                openArticle(filename: filename)
+            } else {
+                viewArticles()
+            }
+        case "save":
+            if let articleUrl = param("url") {
+                saveToInbox(url: articleUrl, title: param("title"))
+            }
+        case "notebook":
+            if let notebookId = param("id") {
+                openViewer(fragment: "notebook=\(notebookId)")
+            }
+        case "sync":
+            runSync(retryFailed: false)
+        default:
+            break
+        }
+    }
+
+    private func openArticle(filename: String) {
+        let encoded = filename.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? filename
+        openViewer(fragment: "article=\(encoded)")
+    }
+
+    private func openViewer(fragment: String) {
+        syncService.ensureViewerRunning { [weak self] result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let baseUrl):
+                    var urlComponents = URLComponents(url: baseUrl, resolvingAgainstBaseURL: false)!
+                    urlComponents.fragment = fragment
+                    guard let viewerUrl = urlComponents.url else { return }
+                    let mode = UserDefaults.standard.string(forKey: "viewerMode") ?? "window"
+                    if mode == "browser" {
+                        NSWorkspace.shared.open(viewerUrl)
+                    } else {
+                        if self?.articleViewerController == nil {
+                            self?.articleViewerController = ArticleViewerWindowController()
+                        }
+                        self?.articleViewerController?.showViewer(url: viewerUrl)
+                    }
+                case .failure(let error):
+                    self?.showAlert(title: "Viewer Error", message: error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    func saveToInbox(url: String, title: String?) {
+        let inboxPath = syncService.getConfigDir() + "/inbox.json"
+        var inbox: [[String: String]] = []
+        if let data = FileManager.default.contents(atPath: inboxPath),
+           let existing = try? JSONSerialization.jsonObject(with: data) as? [[String: String]] {
+            inbox = existing
+        }
+        var entry: [String: String] = [
+            "url": url,
+            "addedAt": ISO8601DateFormatter().string(from: Date())
+        ]
+        if let title = title { entry["title"] = title }
+        inbox.append(entry)
+        if let data = try? JSONSerialization.data(withJSONObject: inbox, options: .prettyPrinted) {
+            FileManager.default.createFile(atPath: inboxPath, contents: data)
+        }
+        showNotification(title: "Saved to PullRead", body: title ?? url)
+    }
+
+    // MARK: - Services Menu handler
+
+    @objc func saveURLFromService(_ pboard: NSPasteboard, userData: String, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
+        guard let items = pboard.pasteboardItems else { return }
+
+        var urlString: String?
+        for item in items {
+            if let url = item.string(forType: .URL) {
+                urlString = url
+                break
+            }
+            if let text = item.string(forType: .string) {
+                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") {
+                    urlString = trimmed
+                    break
+                }
+            }
+        }
+
+        guard let url = urlString else {
+            error.pointee = "No URL found in the selected text." as NSString
+            return
+        }
+
+        saveToInbox(url: url, title: nil)
+    }
+
+    // MARK: - Spotlight continuation
+
+    func application(_ application: NSApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([NSUserActivityRestoring]) -> Void) -> Bool {
+        if userActivity.activityType == CSSearchableItemActionType,
+           let identifier = userActivity.userInfo?[CSSearchableItemActivityIdentifier] as? String {
+            openArticle(filename: identifier)
+            return true
+        }
+        return false
     }
 
     @objc private func quit() {

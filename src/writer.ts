@@ -16,6 +16,7 @@ export interface ArticleData {
   enclosure?: Enclosure;
   author?: string;
   excerpt?: string;
+  thumbnail?: string;
 }
 
 export function generateFilename(title: string, bookmarkedAt: string): string {
@@ -55,6 +56,10 @@ domain: ${data.domain}`;
 
   if (data.excerpt) {
     frontmatter += `\nexcerpt: "${escapeQuotes(data.excerpt)}"`;
+  }
+
+  if (data.thumbnail) {
+    frontmatter += `\nthumbnail: ${data.thumbnail}`;
   }
 
   if (data.annotation) {

@@ -14,11 +14,28 @@ export interface ExtractedArticle {
   markdown: string;
   byline?: string;
   excerpt?: string;
+  thumbnail?: string;
 }
 
 const turndown = new TurndownService({
   headingStyle: 'atx',
   codeBlockStyle: 'fenced'
+});
+
+// When <a> wraps a single <img> (Substack lightbox, etc.), emit just the image.
+// The wrapping link produces [![alt](url)](url) which marked.js chokes on for long URLs.
+turndown.addRule('linkedImage', {
+  filter: function(node) {
+    return node.nodeName === 'A'
+      && node.childNodes.length === 1
+      && node.childNodes[0].nodeName === 'IMG';
+  },
+  replacement: function(_content, node) {
+    const img = node.childNodes[0] as any;
+    const alt = img.getAttribute?.('alt') || '';
+    const src = img.getAttribute?.('src') || '';
+    return `\n\n![${alt}](${src})\n\n`;
+  }
 });
 
 // URLs that are never articles (apps, login walls, product pages, etc.)
@@ -830,13 +847,11 @@ async function extractYouTube(url: string, videoId: string, options: FetchOption
   const channelMatch = html.match(/"ownerChannelName"\s*:\s*"([^"]+)"/);
   const channel = channelMatch ? channelMatch[1] : undefined;
 
-  // Build markdown with video thumbnail link and channel info
+  // Build markdown with video thumbnail link (viewer converts to embedded iframe)
   const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
 
   let markdown = `[![Watch on YouTube](${thumbnailUrl})](${url})\n\n`;
-  markdown += `**[Watch on YouTube](${url})**`;
-  if (channel) markdown += ` · ${channel}`;
-  markdown += '\n\n';
+  if (channel) markdown += `*${channel}*\n\n`;
 
   if (description) {
     markdown += `${description}\n\n`;
@@ -853,7 +868,8 @@ async function extractYouTube(url: string, videoId: string, options: FetchOption
     content: `<p>${description}</p>`,
     markdown,
     byline: channel || undefined,
-    excerpt: description.slice(0, 200) || undefined
+    excerpt: description.slice(0, 200) || undefined,
+    thumbnail: thumbnailUrl,
   };
 }
 

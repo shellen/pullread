@@ -1,7 +1,7 @@
 // ABOUTME: CLI entry point for PullRead
 // ABOUTME: Syncs RSS and Atom feeds to markdown files
 
-import { readFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { fetchFeed, FeedEntry } from './feed';
@@ -132,6 +132,7 @@ async function syncFeed(
       let title = entry.title;
       let author: string | undefined;
       let excerpt: string | undefined;
+      let thumbnail: string | undefined;
 
       if (entry.enclosure) {
         content = entry.annotation || 'No description available.';
@@ -149,6 +150,7 @@ async function syncFeed(
         title = article.title || entry.title;
         author = article.byline;
         excerpt = article.excerpt;
+        thumbnail = article.thumbnail;
       }
 
       const filename = writeArticle(outputPath, {
@@ -161,7 +163,8 @@ async function syncFeed(
         annotation: entry.annotation,
         enclosure: entry.enclosure,
         author,
-        excerpt
+        excerpt,
+        thumbnail
       });
 
       storage.markProcessed({
@@ -232,6 +235,51 @@ async function sync(feedFilter?: string, retryFailed = false): Promise<void> {
       const { success, failed } = await syncFeed(name, url, storage, config.outputPath, retryFailed, fetchOptions);
       totalSuccess += success;
       totalFailed += failed;
+    }
+
+    // Process inbox items (saved from URL scheme, share extension, services menu)
+    const inboxPath = join(homedir(), '.config', 'pullread', 'inbox.json');
+    if (existsSync(inboxPath)) {
+      try {
+        const inboxData = JSON.parse(readFileSync(inboxPath, 'utf-8'));
+        if (Array.isArray(inboxData) && inboxData.length > 0) {
+          console.log(`\nProcessing ${inboxData.length} inbox items...`);
+          for (const item of inboxData) {
+            if (!item.url) continue;
+            if (storage.isProcessed(item.url)) {
+              console.log(`  Skipping (already saved): ${item.url}`);
+              continue;
+            }
+            try {
+              const article = await fetchAndExtract(item.url, fetchOptions);
+              if (!article) {
+                console.log(`  Failed: ${item.url} (no content)`);
+                totalFailed++;
+                continue;
+              }
+              const domain = new URL(item.url).hostname.replace(/^www\./, '');
+              const filename = writeArticle(config.outputPath, {
+                title: article.title || item.title || item.url,
+                url: item.url,
+                bookmarkedAt: item.addedAt || new Date().toISOString(),
+                domain,
+                content: article.markdown,
+                feed: 'inbox',
+                author: article.byline,
+                excerpt: article.excerpt,
+              });
+              storage.markProcessed({ url: item.url, title: article.title || item.url, bookmarkedAt: item.addedAt, outputFile: filename });
+              console.log(`  Saved: ${filename}`);
+              totalSuccess++;
+            } catch (err) {
+              console.log(`  Failed: ${item.url} — ${err instanceof Error ? err.message : err}`);
+              totalFailed++;
+            }
+          }
+          // Clear inbox after processing
+          writeFileSync(inboxPath, '[]');
+        }
+      } catch {}
     }
 
     console.log(`\nDone: ${totalSuccess} saved, ${totalFailed} failed`);
