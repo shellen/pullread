@@ -4,7 +4,7 @@
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { summarizeText, loadLLMConfig, LLMConfig, Provider } from './summarizer';
+import { summarizeText, loadLLMConfig, LLMConfig, Provider, getDefaultModel } from './summarizer';
 
 const NOTES_PATH = join(homedir(), '.config', 'pullread', 'notes.json');
 
@@ -150,6 +150,9 @@ export async function autotagBatch(
   let tagged = 0;
   let skipped = 0;
   let failed = 0;
+
+  const activeModel = llmConfig.model || getDefaultModel(llmConfig.provider);
+  console.log(`  Using ${llmConfig.provider} / ${activeModel}`);
 
   for (const file of files) {
     // Skip if already has machine tags (unless force mode)

@@ -14,11 +14,17 @@ Pull Read is an open-source macOS menu bar app and CLI tool that connects to boo
 - Podcast episode archival with audio links
 - Markdown output with YAML frontmatter
 - Built-in two-pane article reader (localhost:7777)
+- Homepage dashboard with card-based landing page
 - Text highlighting in four colors (yellow, green, blue, pink)
 - Inline annotations and article-level notes
 - Article tagging and favorites
-- AI-powered article summaries (Anthropic Claude, OpenAI GPT)
+- Search operators: is:favorite, is:read, has:summary, tag:*, feed:*, domain:*, author:* with AND/OR logic
+- AI-powered article summaries (Anthropic Claude, OpenAI GPT, Google Gemini, OpenRouter, Apple Intelligence)
+- Summary provenance with provider/model badges saved to frontmatter
 - AI-generated weekly reading reviews
+- Text-to-speech with 4 providers: Browser (free), Kokoro local AI (free), OpenAI, ElevenLabs
+- Voice notes via Web Speech API microphone recording
+- Export articles as markdown with optional highlights, notes, summary, and tags
 - Smart deduplication and retry for failed extractions
 - Self-contained native macOS menu bar app (no dependencies)
 - Cloud-sync friendly (Dropbox, iCloud, Google Drive, or any folder)
@@ -32,7 +38,9 @@ Pull Read is an open-source macOS menu bar app and CLI tool that connects to boo
 - Distribution: Signed and notarized DMG via GitHub Releases
 - Auto-updates: Sparkle 2 with EdDSA signature verification
 - Configuration stored at ~/.config/pullread/
-- Articles saved as date-prefixed markdown files (e.g., 2026-02-08-article-title.md)
+- Articles saved as date-prefixed markdown files (e.g., 2026-02-10-article-title.md)
+- TTS audio cached locally in .tts-cache/ directory
+- Notes, highlights, and annotations stored in .notes/ directory
 
 ## Links
 

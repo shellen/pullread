@@ -15,14 +15,38 @@ export interface LLMConfig {
   model?: string;
 }
 
-// Known models per provider — used for dropdown guidance
+// Known models per provider — loaded from models.json (single source of truth)
 // Ordered cheapest-first within each provider for summarization tasks
+function loadModelsConfig(): Record<string, { models: string[]; default: string }> {
+  try {
+    const modelsPath = join(__dirname, '..', 'models.json');
+    const data = JSON.parse(readFileSync(modelsPath, 'utf-8'));
+    const result: Record<string, { models: string[]; default: string }> = {};
+    for (const [key, val] of Object.entries(data.providers || {})) {
+      const p = val as any;
+      result[key] = { models: p.models || [], default: p.default || p.models?.[0] || '' };
+    }
+    return result;
+  } catch {
+    // Fallback if models.json is missing (e.g. standalone binary)
+    return {
+      anthropic: { models: ['claude-haiku-4-5-20251001', 'claude-sonnet-4-5-20250929', 'claude-opus-4-6'], default: 'claude-haiku-4-5-20251001' },
+      openai: { models: ['gpt-4.1-nano', 'gpt-4.1-mini', 'gpt-5-nano', 'gpt-5-mini', 'gpt-5'], default: 'gpt-4.1-nano' },
+      gemini: { models: ['gemini-2.5-flash-lite-preview', 'gemini-2.5-flash', 'gemini-2.5-pro'], default: 'gemini-2.5-flash-lite-preview' },
+      openrouter: { models: ['anthropic/claude-haiku-4.5', 'google/gemini-2.5-flash', 'anthropic/claude-sonnet-4.5'], default: 'anthropic/claude-haiku-4.5' },
+      apple: { models: ['on-device'], default: 'on-device' }
+    };
+  }
+}
+
+const _modelsConfig = loadModelsConfig();
+
 export const KNOWN_MODELS: Record<Provider, string[]> = {
-  anthropic: ['claude-haiku-4-5-20251001', 'claude-sonnet-4-5-20250929', 'claude-opus-4-6'],
-  openai: ['gpt-4.1-nano', 'gpt-4.1-mini', 'gpt-4.1', 'gpt-5-nano', 'gpt-5-mini'],
-  gemini: ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3-flash-preview'],
-  openrouter: ['anthropic/claude-haiku-4.5', 'google/gemini-2.5-flash', 'openai/gpt-4.1-mini', 'anthropic/claude-sonnet-4.5', 'meta-llama/llama-4-scout:free'],
-  apple: ['on-device']
+  anthropic: _modelsConfig.anthropic?.models || [],
+  openai: _modelsConfig.openai?.models || [],
+  gemini: _modelsConfig.gemini?.models || [],
+  openrouter: _modelsConfig.openrouter?.models || [],
+  apple: _modelsConfig.apple?.models || ['on-device']
 };
 
 interface SummarizeResult {
@@ -227,6 +251,16 @@ function runApplePrompt(prompt: string): string {
   } catch (err: any) {
     const stderr = err.stderr || '';
     if (stderr.includes('No such module') || stderr.includes('FoundationModels')) {
+      // Check actual macOS version to give a better error message
+      try {
+        const ver = execFileSync('sw_vers', ['-productVersion'], { encoding: 'utf-8' }).trim();
+        const major = parseInt(ver.split('.')[0], 10);
+        if (major >= 26) {
+          throw new Error('Apple Intelligence failed — FoundationModels not found. Ensure Xcode command line tools are installed: xcode-select --install');
+        }
+      } catch (verErr: any) {
+        if (verErr.message?.includes('FoundationModels')) throw verErr;
+      }
       throw new Error('Apple Intelligence requires macOS 26 (Tahoe) with Xcode command line tools installed.');
     }
     if (stderr.includes('not eligible') || stderr.includes('not available')) {
@@ -344,6 +378,15 @@ function runAppleRLM(articleText: string): string {
   } catch (err: any) {
     const stderr = err.stderr || '';
     if (stderr.includes('No such module') || stderr.includes('FoundationModels')) {
+      try {
+        const ver = execFileSync('sw_vers', ['-productVersion'], { encoding: 'utf-8' }).trim();
+        const major = parseInt(ver.split('.')[0], 10);
+        if (major >= 26) {
+          throw new Error('Apple Intelligence failed — FoundationModels not found. Ensure Xcode command line tools are installed: xcode-select --install');
+        }
+      } catch (verErr: any) {
+        if (verErr.message?.includes('FoundationModels')) throw verErr;
+      }
       throw new Error('Apple Intelligence requires macOS 26 (Tahoe) with Xcode command line tools installed.');
     }
     if (stderr.includes('not eligible') || stderr.includes('not available')) {
@@ -391,12 +434,5 @@ export async function summarizeText(articleText: string, config?: LLMConfig): Pr
 }
 
 export function getDefaultModel(provider: string): string {
-  switch (provider) {
-    case 'anthropic': return 'claude-haiku-4-5-20251001';
-    case 'openai': return 'gpt-4.1-nano';
-    case 'gemini': return 'gemini-2.5-flash-lite';
-    case 'openrouter': return 'anthropic/claude-haiku-4.5';
-    case 'apple': return 'on-device';
-    default: return 'gpt-4.1-nano';
-  }
+  return _modelsConfig[provider]?.default || 'gpt-4.1-nano';
 }

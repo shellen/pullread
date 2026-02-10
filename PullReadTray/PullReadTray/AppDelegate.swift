@@ -140,65 +140,76 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let menu = NSMenu()
 
-        // Status indicator
-        statusMenuItem = NSMenuItem(title: "Status: Idle", action: nil, keyEquivalent: "")
-        statusMenuItem.isEnabled = false
-        menu.addItem(statusMenuItem)
+        // Sync Now with status on same line
+        syncMenuItem = NSMenuItem(title: "Sync Now", action: #selector(syncNow), keyEquivalent: "s")
+        syncMenuItem.target = self
+        syncMenuItem.image = NSImage(systemSymbolName: "arrow.triangle.2.circlepath", accessibilityDescription: nil)
+        menu.addItem(syncMenuItem)
 
-        // Last sync time
+        // Last sync / Next sync — compact status line
         lastSyncMenuItem = NSMenuItem(title: "Last sync: Never", action: nil, keyEquivalent: "")
         lastSyncMenuItem.isEnabled = false
+        lastSyncMenuItem.image = NSImage(systemSymbolName: "clock", accessibilityDescription: nil)
         menu.addItem(lastSyncMenuItem)
 
-        // Next sync time
+        // Next sync time (hidden until auto-sync is active)
         nextSyncMenuItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         nextSyncMenuItem.isEnabled = false
         nextSyncMenuItem.isHidden = true
         menu.addItem(nextSyncMenuItem)
 
+        // Status indicator (hidden when idle, shown during sync)
+        statusMenuItem = NSMenuItem(title: "Syncing...", action: nil, keyEquivalent: "")
+        statusMenuItem.isEnabled = false
+        statusMenuItem.isHidden = true
+        menu.addItem(statusMenuItem)
+
         menu.addItem(NSMenuItem.separator())
 
-        // Sync Now
-        syncMenuItem = NSMenuItem(title: "Sync Now", action: #selector(syncNow), keyEquivalent: "s")
-        syncMenuItem.target = self
-        menu.addItem(syncMenuItem)
+        // View Articles
+        let viewArticlesMenuItem = NSMenuItem(title: "View Articles", action: #selector(viewArticles), keyEquivalent: "d")
+        viewArticlesMenuItem.target = self
+        viewArticlesMenuItem.image = NSImage(systemSymbolName: "book.fill", accessibilityDescription: nil)
+        menu.addItem(viewArticlesMenuItem)
+
+        // Open Output Folder
+        let openFolderMenuItem = NSMenuItem(title: "Open Folder", action: #selector(openOutputFolder), keyEquivalent: "o")
+        openFolderMenuItem.target = self
+        openFolderMenuItem.image = NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil)
+        menu.addItem(openFolderMenuItem)
+
+        menu.addItem(NSMenuItem.separator())
 
         // Retry Failed
         let retryMenuItem = NSMenuItem(title: "Retry Failed", action: #selector(retryFailed), keyEquivalent: "r")
         retryMenuItem.target = self
+        retryMenuItem.image = NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: nil)
         menu.addItem(retryMenuItem)
 
         // Generate Review Now
-        let reviewMenuItem = NSMenuItem(title: "Generate Review Now", action: #selector(generateReviewNow), keyEquivalent: "")
+        let reviewMenuItem = NSMenuItem(title: "Generate Review", action: #selector(generateReviewNow), keyEquivalent: "")
         reviewMenuItem.target = self
+        reviewMenuItem.image = NSImage(systemSymbolName: "text.badge.star", accessibilityDescription: nil)
         menu.addItem(reviewMenuItem)
 
         menu.addItem(NSMenuItem.separator())
 
-        // Open Output Folder
-        let openFolderMenuItem = NSMenuItem(title: "Open Output Folder...", action: #selector(openOutputFolder), keyEquivalent: "o")
-        openFolderMenuItem.target = self
-        menu.addItem(openFolderMenuItem)
-
-        // View Articles
-        let viewArticlesMenuItem = NSMenuItem(title: "View Articles...", action: #selector(viewArticles), keyEquivalent: "d")
-        viewArticlesMenuItem.target = self
-        menu.addItem(viewArticlesMenuItem)
-
         // Settings
         let openConfigMenuItem = NSMenuItem(title: "Settings...", action: #selector(openConfig), keyEquivalent: ",")
         openConfigMenuItem.target = self
+        openConfigMenuItem.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: nil)
         menu.addItem(openConfigMenuItem)
 
         // View Logs
-        let logsMenuItem = NSMenuItem(title: "View Logs...", action: #selector(viewLogs), keyEquivalent: "l")
+        let logsMenuItem = NSMenuItem(title: "Logs", action: #selector(viewLogs), keyEquivalent: "l")
         logsMenuItem.target = self
+        logsMenuItem.image = NSImage(systemSymbolName: "doc.text.magnifyingglass", accessibilityDescription: nil)
         menu.addItem(logsMenuItem)
 
         // Check for Updates (Sparkle)
         checkForUpdatesMenuItem = NSMenuItem(title: "Check for Updates...", action: #selector(checkForUpdates), keyEquivalent: "")
         checkForUpdatesMenuItem.target = self
-        // Observe Sparkle's canCheckForUpdates to enable/disable the menu item
+        checkForUpdatesMenuItem.image = NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: nil)
         if let updater = updaterController?.updater {
             updater.publisher(for: \.canCheckForUpdates)
                 .receive(on: RunLoop.main)
@@ -212,8 +223,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem.separator())
 
         // Welcome Guide
-        let welcomeMenuItem = NSMenuItem(title: "Welcome Guide...", action: #selector(showWelcomeGuide), keyEquivalent: "")
+        let welcomeMenuItem = NSMenuItem(title: "Welcome Guide", action: #selector(showWelcomeGuide), keyEquivalent: "")
         welcomeMenuItem.target = self
+        welcomeMenuItem.image = NSImage(systemSymbolName: "questionmark.circle", accessibilityDescription: nil)
         menu.addItem(welcomeMenuItem)
 
         // About
@@ -403,7 +415,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func updateStatus(syncing: Bool) {
         if syncing {
-            statusMenuItem.title = "Status: Syncing..."
+            statusMenuItem.title = "Syncing..."
+            statusMenuItem.isHidden = false
             syncMenuItem.isEnabled = false
 
             // Animate the icon
@@ -414,7 +427,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         } else {
-            statusMenuItem.title = "Status: Idle"
+            statusMenuItem.isHidden = true
             syncMenuItem.isEnabled = true
 
             // Restore icon

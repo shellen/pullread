@@ -81,12 +81,29 @@ If a release build fails:
 - [ ] Version bumped in `Info.plist` (`CFBundleShortVersionString` + `CFBundleVersion`)
 - [ ] Version bumped in `package.json`
 - [ ] All three version values are in sync
+- [ ] LLM models checked — run `bun run sync:models` and review deprecation warnings
 - [ ] Changes merged to `main`
 - [ ] CI build passes on `main` (check Actions tab)
 - [ ] Run "Build and Release" workflow with the version number
 - [ ] Verify the release appears at https://github.com/shellen/pullread/releases
 - [ ] Verify the DMG downloads and opens correctly
 - [ ] Verify Sparkle appcast updated (check `site/appcast.xml` on `main`)
+
+## Keeping LLM Models Up to Date
+
+Models are defined in **`models.json`** at the repo root (single source of truth). Both the CLI (`summarizer.ts`) and the macOS app (`SettingsView.swift`) read from it.
+
+**Quarterly maintenance:**
+1. Check each provider's API docs for new models and deprecation notices
+2. Edit `models.json` — add new models, remove deprecated ones, update defaults
+3. Run `bun run sync:models` to update `SettingsView.swift` automatically
+4. The script warns about models approaching their deprecation date
+
+Provider docs:
+- [Anthropic](https://docs.anthropic.com/en/docs/about-claude/models)
+- [OpenAI](https://platform.openai.com/docs/models)
+- [Gemini](https://ai.google.dev/gemini-api/docs/models)
+- [OpenRouter](https://openrouter.ai/models)
 
 ## What Went Wrong with v1.1.0
 

@@ -12,6 +12,7 @@ import { autotagText, autotagBatch, saveMachineTags, hasMachineTags } from './au
 import { APP_ICON } from './app-icon';
 import { fetchAndExtract } from './extractor';
 import { generateMarkdown, ArticleData } from './writer';
+import { loadTTSConfig, saveTTSConfig, generateSpeech, getAudioContentType, getKokoroStatus, TTS_VOICES, TTS_MODELS } from './tts';
 
 interface FileMeta {
   filename: string;
@@ -23,6 +24,10 @@ interface FileMeta {
   author: string;
   mtime: string;
   hasSummary: boolean;
+  summaryProvider: string;
+  summaryModel: string;
+  excerpt: string;
+  image: string;
 }
 
 function parseFrontmatter(content: string): Record<string, string> {
@@ -52,13 +57,22 @@ function listFiles(outputPath: string): FileMeta[] {
     try {
       const stat = statSync(fullPath);
       if (!stat.isFile()) continue;
-      // Read only first 1KB for frontmatter
-      const buf = Buffer.alloc(1024);
+      // Read first 3KB for frontmatter + start of body (for image extraction)
+      const buf = Buffer.alloc(3072);
       const fd = require('fs').openSync(fullPath, 'r');
-      const bytesRead = require('fs').readSync(fd, buf, 0, 1024, 0);
+      const bytesRead = require('fs').readSync(fd, buf, 0, 3072, 0);
       require('fs').closeSync(fd);
       const head = buf.slice(0, bytesRead).toString('utf-8');
       const meta = parseFrontmatter(head);
+
+      // Extract first image URL from body
+      let image = '';
+      const fmEnd = head.indexOf('\n---\n');
+      if (fmEnd > 0) {
+        const bodyStart = head.slice(fmEnd + 5);
+        const imgMatch = bodyStart.match(/!\[.*?\]\((https?:\/\/[^)]+)\)/);
+        if (imgMatch) image = imgMatch[1];
+      }
 
       files.push({
         filename: name,
@@ -70,6 +84,10 @@ function listFiles(outputPath: string): FileMeta[] {
         author: meta.author || '',
         mtime: stat.mtime.toISOString(),
         hasSummary: !!meta.summary,
+        summaryProvider: meta.summaryProvider || '',
+        summaryModel: meta.summaryModel || '',
+        excerpt: meta.excerpt || '',
+        image,
       });
     } catch {
       // Skip unreadable files
@@ -127,20 +145,24 @@ function send404(res: ServerResponse) {
   res.end('Not found');
 }
 
-function writeSummaryToFile(filePath: string, summary: string): void {
+function writeSummaryToFile(filePath: string, summary: string, provider?: string, model?: string): void {
   if (!existsSync(filePath)) return;
   const content = readFileSync(filePath, 'utf-8');
   const match = content.match(/^(---\n)([\s\S]*?)(\n---)([\s\S]*)$/);
   if (!match) return;
 
   let frontmatter = match[2];
-  // Remove existing summary if present
+  // Remove existing summary fields if present
   frontmatter = frontmatter.replace(/\nsummary: ".*?"$/m, '');
   frontmatter = frontmatter.replace(/\nsummary: .*$/m, '');
+  frontmatter = frontmatter.replace(/\nsummaryProvider: .*$/m, '');
+  frontmatter = frontmatter.replace(/\nsummaryModel: .*$/m, '');
 
   // Add summary to frontmatter
   const escaped = summary.replace(/"/g, '\\"').replace(/\n/g, ' ');
   frontmatter += `\nsummary: "${escaped}"`;
+  if (provider) frontmatter += `\nsummaryProvider: ${provider}`;
+  if (model) frontmatter += `\nsummaryModel: ${model}`;
 
   writeFileSync(filePath, `${match[1]}${frontmatter}${match[3]}${match[4]}`);
 }
@@ -505,7 +527,7 @@ export function startViewer(outputPath: string, port = 7777): void {
 
         // If summarized by filename, write the summary into the markdown frontmatter
         if (name) {
-          writeSummaryToFile(join(outputPath, name), result.summary);
+          writeSummaryToFile(join(outputPath, name), result.summary, provider, result.model);
         }
 
         sendJson(res, { summary: result.summary, model: result.model, provider });
@@ -513,7 +535,9 @@ export function startViewer(outputPath: string, port = 7777): void {
         const msg = err instanceof Error ? err.message : 'Summarization failed';
         // Provide user-friendly error messages
         let userMsg = msg;
-        if (msg.includes('Apple Intelligence requires macOS 26')) {
+        if (msg.includes('FoundationModels not found')) {
+          userMsg = 'Apple Intelligence failed — FoundationModels not found. Run "xcode-select --install" in Terminal, or choose a different provider in Settings.';
+        } else if (msg.includes('Apple Intelligence requires macOS 26')) {
           userMsg = 'Apple Intelligence requires macOS 26 (Tahoe). Update macOS or choose a different provider in Settings.';
         } else if (msg.includes('Apple Intelligence is not available')) {
           userMsg = 'Apple Intelligence is not available on this Mac. Choose a cloud provider in Settings.';
@@ -597,10 +621,84 @@ export function startViewer(outputPath: string, port = 7777): void {
       return;
     }
 
+    // TTS Settings API
+    if (url.pathname === '/api/tts-settings') {
+      if (req.method === 'GET') {
+        const config = loadTTSConfig();
+        const kokoroStatus = getKokoroStatus();
+        sendJson(res, {
+          provider: config.provider,
+          voice: config.voice || '',
+          model: config.model || '',
+          hasKey: config.provider === 'browser' || config.provider === 'kokoro' || !!config.apiKey,
+          voices: TTS_VOICES,
+          models: TTS_MODELS,
+          kokoro: kokoroStatus,
+        });
+        return;
+      }
+      if (req.method === 'POST') {
+        try {
+          const body = JSON.parse(await readBody(req));
+          saveTTSConfig(body);
+          sendJson(res, { ok: true });
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid request body' }));
+        }
+        return;
+      }
+    }
+
+    // TTS Audio generation API
+    if (url.pathname === '/api/tts' && req.method === 'POST') {
+      try {
+        const body = JSON.parse(await readBody(req));
+        const { name } = body;
+        if (!name || name.includes('..') || name.includes('/')) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'valid name is required' }));
+          return;
+        }
+
+        const filePath = join(outputPath, name);
+        if (!existsSync(filePath)) {
+          send404(res);
+          return;
+        }
+
+        const config = loadTTSConfig();
+        if (config.provider === 'browser') {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Browser TTS is handled client-side' }));
+          return;
+        }
+
+        const content = readFileSync(filePath, 'utf-8');
+        // Strip frontmatter to get just the article body
+        const match = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
+        const articleText = match ? match[1] : content;
+
+        const audio = await generateSpeech(name, articleText, config);
+
+        res.writeHead(200, {
+          'Content-Type': getAudioContentType(config.provider),
+          'Content-Length': audio.length.toString(),
+          'Cache-Control': 'max-age=86400',
+        });
+        res.end(audio);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'TTS generation failed';
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: msg }));
+      }
+      return;
+    }
+
     send404(res);
   });
 
-  server.listen(port, () => {
+  server.listen(port, '127.0.0.1', () => {
     const url = `http://localhost:${port}`;
     console.log(`PullRead viewer running at ${url}`);
     console.log(`Reading from: ${outputPath}`);
