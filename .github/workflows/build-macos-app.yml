@@ -54,6 +54,18 @@ jobs:
           sudo rm -rf /usr/share/dotnet || true
           sudo rm -rf /Library/Developer/CoreSimulator/Volumes/* || true
           sudo rm -rf /Library/Developer/CoreSimulator/Caches/* || true
+          sudo rm -rf /Users/runner/Library/Developer/CoreSimulator || true
+          # Remove unused Homebrew cache and packages
+          brew cleanup --prune=all 2>/dev/null || true
+          sudo rm -rf "$(brew --cache)" 2>/dev/null || true
+          # Remove unused Xcode platforms (iOS, watchOS, tvOS, visionOS)
+          sudo rm -rf /Applications/Xcode_15.2.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs || true
+          sudo rm -rf /Applications/Xcode_15.2.app/Contents/Developer/Platforms/WatchOS.platform || true
+          sudo rm -rf /Applications/Xcode_15.2.app/Contents/Developer/Platforms/AppleTVOS.platform || true
+          sudo rm -rf /Applications/Xcode_15.2.app/Contents/Developer/Platforms/XROS.platform || true
+          # Remove other large pre-installed tools
+          sudo rm -rf /usr/local/share/powershell || true
+          sudo rm -rf /usr/local/lib/node_modules || true
           df -h .
 
       - name: Select Xcode version
@@ -248,6 +260,10 @@ jobs:
           # Free disk space: remove everything we no longer need
           rm -rf ../dist
           rm -rf build
+          rm -rf TestResults
+          # Remove Xcode module and SPM caches
+          rm -rf ~/Library/Developer/Xcode/DerivedData || true
+          rm -rf ~/Library/Caches/org.swift.swiftpm || true
           df -h .
 
       - name: Sign app bundle
@@ -280,9 +296,12 @@ jobs:
       - name: Create DMG
         working-directory: PullReadTray
         run: |
-          # Create a temporary directory for DMG contents
+          echo "Disk space before DMG creation:"
+          df -h .
+
+          # Move (not copy) the app to avoid having two copies at once
           mkdir -p dmg-contents
-          cp -R "artifacts/Pull Read.app" dmg-contents/
+          mv "artifacts/Pull Read.app" dmg-contents/
 
           # Create a symlink to Applications
           ln -s /Applications dmg-contents/Applications
@@ -293,7 +312,8 @@ jobs:
             -ov -format UDZO \
             artifacts/PullRead.dmg
 
-          # Clean up
+          # Move app back for artifact upload, then clean up staging
+          mv "dmg-contents/Pull Read.app" artifacts/
           rm -rf dmg-contents
 
       - name: Sign DMG
