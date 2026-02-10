@@ -134,7 +134,9 @@ bundle_cli() {
     IDENTITY="Developer ID Application"
 
     # Sign the bundled CLI binary (hardened runtime + timestamp required for notarization)
+    # Entitlements allow Kokoro's ONNX Runtime to load native libraries
     codesign --force --options runtime --timestamp \
+        --entitlements "$ROOT_DIR/PullReadTray/cli-entitlements.plist" \
         --sign "$IDENTITY" "$RESOURCES_PATH/pullread"
 
     # Sign the main app binary

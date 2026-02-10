@@ -4467,10 +4467,10 @@ function showTTSSettings() {
     overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
 
     const providers = [
-      { id: 'browser', label: 'Browser (free, built-in)' },
-      { id: 'kokoro', label: 'Kokoro (free, local AI)' },
-      { id: 'openai', label: 'OpenAI' },
-      { id: 'elevenlabs', label: 'ElevenLabs' },
+      { id: 'browser', label: 'Built-in Voice — free' },
+      { id: 'kokoro', label: 'Natural AI Voice — free & private' },
+      { id: 'openai', label: 'OpenAI — premium quality' },
+      { id: 'elevenlabs', label: 'ElevenLabs — premium quality' },
     ];
 
     function renderVoiceOptions(provider) {
@@ -4489,8 +4489,8 @@ function showTTSSettings() {
 
     overlay.innerHTML = `
       <div class="modal-card" onclick="event.stopPropagation()" style="max-width:440px">
-        <h2>Voice Playback Settings</h2>
-        <p>Choose how articles are read aloud. Browser voice is always free.</p>
+        <h2>Listen to Articles</h2>
+        <p>Have your articles read aloud while you do other things.</p>
         <div style="margin:12px 0">
           <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Provider</label>
           <select id="tts-provider-select" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px" onchange="ttsSettingsProviderChanged()">
@@ -4499,13 +4499,13 @@ function showTTSSettings() {
         </div>
         <div id="tts-kokoro-settings" style="display:${data.provider === 'kokoro' ? 'block' : 'none'}">
           <div style="background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin:10px 0;font-size:12px;line-height:1.6">
-            <strong style="color:var(--fg)">Local AI voice</strong><br>
-            <span style="color:var(--muted)">Kokoro runs entirely on your machine — no API key, no cost, no data sent anywhere.</span><br>
-            <span style="color:var(--muted)">The model (~86MB) downloads automatically on first use.</span>
+            <strong style="color:var(--fg)">Natural-sounding voice, completely free</strong><br>
+            <span style="color:var(--muted)">Sounds great and runs entirely on your Mac — your articles stay private and never leave your machine.</span><br>
+            <span style="color:var(--muted)">Sets itself up automatically the first time you listen.</span>
             <div id="kokoro-status" style="margin-top:6px">
               ${data.kokoro?.installed
-                ? '<span style="color:#22c55e">&#10003; Ready</span>'
-                : '<span style="color:var(--muted)">Model will download on first listen</span>'}
+                ? '<span style="color:#22c55e">&#10003; Ready to go</span>'
+                : '<span style="color:var(--muted)">Will set up automatically on first listen</span>'}
             </div>
           </div>
           <div style="margin:12px 0">
@@ -4528,9 +4528,9 @@ function showTTSSettings() {
         </div>
         <div id="tts-cloud-settings" style="display:${data.provider === 'openai' || data.provider === 'elevenlabs' ? 'block' : 'none'}">
           <div style="margin:12px 0">
-            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">API Key <span style="font-weight:400;color:var(--muted)">(separate from your Summaries key)</span></label>
-            <input type="password" id="tts-api-key" placeholder="Enter API key for TTS" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px" />
-            <div style="font-size:11px;color:var(--muted);margin-top:3px">This key is used <strong>only</strong> for audio generation, never for summaries.</div>
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">API Key</label>
+            <input type="password" id="tts-api-key" placeholder="Paste your key here" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px" />
+            <div style="font-size:11px;color:var(--muted);margin-top:3px">You can get a key from your provider's website. This key is only used for reading articles aloud.</div>
           </div>
           <div style="margin:12px 0" id="tts-voice-row">
             <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Voice</label>
@@ -4547,7 +4547,7 @@ function showTTSSettings() {
           <div style="margin:14px 0;padding:10px 12px;background:var(--code-bg);border:1px solid var(--border);border-radius:6px">
             <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;cursor:pointer;line-height:1.5">
               <input type="checkbox" id="tts-consent" style="margin-top:3px;width:16px;height:16px;accent-color:var(--link);flex-shrink:0" />
-              <span>I understand that using this provider will send article text to their API and incur charges on my API key. Audio is cached locally so each article is only generated once.</span>
+              <span>Articles will be sent to this provider to create audio. Your API key will be charged a small amount per article — audio is saved locally so you only pay once per article.</span>
             </label>
           </div>
         </div>
@@ -4581,14 +4581,15 @@ const TTS_AVG_ARTICLE_CHARS = 10000; // ~2000 words
 function ttsGetCostHtml(provider, model) {
   if (provider === 'browser') return '';
   const perK = TTS_COST_PER_1K[model];
-  if (!perK) return '<span style="color:var(--muted)">Cost varies by model</span>';
+  if (!perK) return '<span style="color:var(--muted)">Cost depends on model — typically a few cents per article.</span>';
   const perArticle = (perK * TTS_AVG_ARTICLE_CHARS / 1000);
-  const articlesPerFive = Math.floor(5 / perArticle);
-  let html = '<strong style="color:var(--fg)">Estimated cost</strong><br>';
-  html += '<span style="color:var(--muted)">~$' + perArticle.toFixed(2) + ' per article</span>';
-  html += '<span style="color:var(--muted)"> &middot; </span>';
-  html += '<span style="color:var(--muted)">~<strong>$5 per ' + articlesPerFive + ' articles</strong></span>';
-  html += '<br><span style="font-size:11px;color:var(--muted)">Based on a typical 2,000-word article. Cached after first listen.</span>';
+  let html = '<strong style="color:var(--fg)">What it costs</strong><br>';
+  if (perArticle < 0.05) {
+    html += '<span style="color:var(--muted)">Just a few cents per article — most people spend less than a dollar a week.</span>';
+  } else {
+    html += '<span style="color:var(--muted)">About $' + perArticle.toFixed(2) + ' per article.</span>';
+  }
+  html += '<br><span style="font-size:11px;color:var(--muted)">Audio is saved on your Mac so you only pay once per article, even if you listen again.</span>';
   return html;
 }
 
