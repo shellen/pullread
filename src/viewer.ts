@@ -12,7 +12,7 @@ import { autotagText, autotagBatch, saveMachineTags, hasMachineTags } from './au
 import { APP_ICON } from './app-icon';
 import { fetchAndExtract } from './extractor';
 import { generateMarkdown, ArticleData } from './writer';
-import { loadTTSConfig, saveTTSConfig, generateSpeech, getAudioContentType, getKokoroStatus, TTS_VOICES, TTS_MODELS } from './tts';
+import { loadTTSConfig, saveTTSConfig, generateSpeech, getAudioContentType, getKokoroStatus, preloadKokoro, TTS_VOICES, TTS_MODELS } from './tts';
 
 interface FileMeta {
   filename: string;
@@ -640,6 +640,12 @@ export function startViewer(outputPath: string, port = 7777): void {
       if (req.method === 'POST') {
         try {
           const body = JSON.parse(await readBody(req));
+          // Preserve existing API key if client sends preserveKey flag
+          if (body.preserveKey) {
+            const existing = loadTTSConfig();
+            if (existing.apiKey) body.apiKey = existing.apiKey;
+            delete body.preserveKey;
+          }
           saveTTSConfig(body);
           sendJson(res, { ok: true });
         } catch {
@@ -692,6 +698,15 @@ export function startViewer(outputPath: string, port = 7777): void {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: msg }));
       }
+      return;
+    }
+
+    // Kokoro preload API — trigger background model download
+    if (url.pathname === '/api/kokoro-preload' && req.method === 'POST') {
+      const config = loadTTSConfig();
+      const model = config.model || 'kokoro-v1-q8';
+      sendJson(res, { status: 'downloading' });
+      preloadKokoro(model).catch(() => {});
       return;
     }
 

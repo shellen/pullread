@@ -14,6 +14,7 @@ export interface ExtractedArticle {
   markdown: string;
   byline?: string;
   excerpt?: string;
+  thumbnail?: string;
 }
 
 const turndown = new TurndownService({
@@ -830,13 +831,11 @@ async function extractYouTube(url: string, videoId: string, options: FetchOption
   const channelMatch = html.match(/"ownerChannelName"\s*:\s*"([^"]+)"/);
   const channel = channelMatch ? channelMatch[1] : undefined;
 
-  // Build markdown with video thumbnail link and channel info
+  // Build markdown with video thumbnail link (viewer converts to embedded iframe)
   const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
 
   let markdown = `[![Watch on YouTube](${thumbnailUrl})](${url})\n\n`;
-  markdown += `**[Watch on YouTube](${url})**`;
-  if (channel) markdown += ` · ${channel}`;
-  markdown += '\n\n';
+  if (channel) markdown += `*${channel}*\n\n`;
 
   if (description) {
     markdown += `${description}\n\n`;
@@ -853,7 +852,8 @@ async function extractYouTube(url: string, videoId: string, options: FetchOption
     content: `<p>${description}</p>`,
     markdown,
     byline: channel || undefined,
-    excerpt: description.slice(0, 200) || undefined
+    excerpt: description.slice(0, 200) || undefined,
+    thumbnail: thumbnailUrl,
   };
 }
 

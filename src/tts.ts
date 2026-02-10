@@ -234,6 +234,20 @@ export function getKokoroStatus(): { installed: boolean; modelPath: string } {
   return { installed, modelPath: KOKORO_MODEL_DIR };
 }
 
+/**
+ * Pre-download the Kokoro model in the background.
+ * Returns a promise that resolves when the model is ready.
+ */
+export async function preloadKokoro(model: string = 'kokoro-v1-q8'): Promise<{ ready: boolean; error?: string }> {
+  try {
+    await getKokoroPipeline(model);
+    return { ready: true };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ready: false, error: msg };
+  }
+}
+
 /** Lazy-loaded Kokoro pipeline singleton */
 let kokoroPipeline: any = null;
 let kokoroLoading = false;

@@ -132,6 +132,7 @@ async function syncFeed(
       let title = entry.title;
       let author: string | undefined;
       let excerpt: string | undefined;
+      let thumbnail: string | undefined;
 
       if (entry.enclosure) {
         content = entry.annotation || 'No description available.';
@@ -149,6 +150,7 @@ async function syncFeed(
         title = article.title || entry.title;
         author = article.byline;
         excerpt = article.excerpt;
+        thumbnail = article.thumbnail;
       }
 
       const filename = writeArticle(outputPath, {
@@ -161,7 +163,8 @@ async function syncFeed(
         annotation: entry.annotation,
         enclosure: entry.enclosure,
         author,
-        excerpt
+        excerpt,
+        thumbnail
       });
 
       storage.markProcessed({
