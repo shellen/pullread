@@ -11,6 +11,7 @@
     "build": "bun build src/index.ts --compile --outfile dist/pullread",
     "build:macos-arm64": "bun build src/index.ts --compile --target=bun-darwin-arm64 --outfile dist/pullread-arm64",
     "build:macos-x64": "bun build src/index.ts --compile --target=bun-darwin-x64 --outfile dist/pullread-x64",
+    "sync:models": "bun scripts/sync-swift-models.ts",
     "test": "jest"
   },
   "keywords": [],

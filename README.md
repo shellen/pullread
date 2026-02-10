@@ -33,6 +33,7 @@ PullRead connects to bookmark services like Instapaper, Pinboard, Raindrop, and 
 - [Scheduling](#scheduling)
 - [Architecture](#architecture)
 - [Development](#development)
+- [LLM Models](#llm-models)
 - [Testing](#testing)
 - [Code Signing](#code-signing)
 - [Auto-Updates (Sparkle)](#auto-updates-sparkle)
@@ -706,6 +707,34 @@ node dist/index.js sync
 
 **Build tooling:**
 - **Bun** - Used to compile TypeScript to standalone binaries for the macOS app
+
+---
+
+## LLM Models
+
+PullRead supports five LLM providers for article summarization, auto-tagging, and reviews. Available models are defined in **`models.json`** (single source of truth) and used by both the CLI and the macOS app.
+
+| Provider | Default Model | Notes |
+|----------|---------------|-------|
+| **Anthropic** | claude-haiku-4-5 | Cheapest for batch tagging |
+| **OpenAI** | gpt-4.1-nano | GPT-4.1 series deprecated Feb 13 2026; migrate to GPT-5 |
+| **Gemini** | gemini-2.5-flash-lite | Gemini 2.0 deprecated Mar 31 2026 |
+| **OpenRouter** | anthropic/claude-haiku-4.5 | Aggregator; includes DeepSeek, Llama free tiers |
+| **Apple Intelligence** | on-device | Requires macOS 26 + Xcode CLT |
+
+### Updating Models
+
+Models change frequently. To update:
+
+1. Edit `models.json` — add/remove models, update defaults, note deprecation dates
+2. Run `bun run sync:models` — this updates `SettingsView.swift` from models.json and warns about upcoming deprecations
+3. The CLI (`summarizer.ts`) reads `models.json` at runtime, no code changes needed
+
+Provider API docs for checking latest models:
+- [Anthropic Models](https://docs.anthropic.com/en/docs/about-claude/models)
+- [OpenAI Models](https://platform.openai.com/docs/models)
+- [Gemini Models](https://ai.google.dev/gemini-api/docs/models)
+- [OpenRouter Models](https://openrouter.ai/models)
 
 ---
 

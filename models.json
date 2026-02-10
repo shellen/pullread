@@ -1,0 +1,78 @@
+{
+  "_description": "Single source of truth for LLM model dropdowns. Used by summarizer.ts (CLI) and SettingsView.swift (macOS app). Run `bun run sync:models` after editing to update Swift.",
+  "_updated": "2026-02-10",
+  "_note": "Order models cheapest-first within each provider. First model in each list is the default for batch tagging. Check provider docs quarterly for new models and deprecations.",
+  "providers": {
+    "anthropic": {
+      "label": "Anthropic",
+      "keyPlaceholder": "sk-ant-...",
+      "models": [
+        "claude-haiku-4-5-20251001",
+        "claude-sonnet-4-5-20250929",
+        "claude-opus-4-5-20251101",
+        "claude-opus-4-6"
+      ],
+      "default": "claude-haiku-4-5-20251001",
+      "docsUrl": "https://docs.anthropic.com/en/docs/about-claude/models"
+    },
+    "openai": {
+      "label": "OpenAI",
+      "keyPlaceholder": "sk-...",
+      "models": [
+        "gpt-4.1-nano",
+        "gpt-4.1-mini",
+        "gpt-4.1",
+        "gpt-5-nano",
+        "gpt-5-mini",
+        "gpt-5",
+        "o3-mini"
+      ],
+      "default": "gpt-4.1-nano",
+      "docsUrl": "https://platform.openai.com/docs/models",
+      "deprecations": {
+        "gpt-4.1-nano": "2026-02-13",
+        "gpt-4.1-mini": "2026-02-13",
+        "gpt-4.1": "2026-02-13"
+      }
+    },
+    "gemini": {
+      "label": "Gemini",
+      "keyPlaceholder": "AIza...",
+      "models": [
+        "gemini-2.5-flash-lite-preview",
+        "gemini-2.5-flash",
+        "gemini-2.5-pro",
+        "gemini-3-flash-preview"
+      ],
+      "default": "gemini-2.5-flash-lite-preview",
+      "docsUrl": "https://ai.google.dev/gemini-api/docs/models",
+      "deprecations": {
+        "gemini-2.0-flash": "2026-03-31",
+        "gemini-2.0-flash-lite": "2026-03-31"
+      }
+    },
+    "openrouter": {
+      "label": "OpenRouter",
+      "keyPlaceholder": "sk-or-...",
+      "models": [
+        "anthropic/claude-haiku-4.5",
+        "google/gemini-2.5-flash",
+        "deepseek/deepseek-v3.2",
+        "openai/gpt-5-mini",
+        "anthropic/claude-sonnet-4.5",
+        "meta-llama/llama-3.3-70b-instruct:free"
+      ],
+      "default": "anthropic/claude-haiku-4.5",
+      "docsUrl": "https://openrouter.ai/models"
+    },
+    "apple": {
+      "label": "Apple Intelligence",
+      "keyPlaceholder": "No key needed",
+      "models": [
+        "on-device"
+      ],
+      "default": "on-device",
+      "docsUrl": "https://developer.apple.com/documentation/foundationmodels"
+    }
+  }
+}

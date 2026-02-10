@@ -36,17 +36,17 @@ struct SettingsView: View {
     @State private var selectedTab: Int = 0
 
     private static let knownModels: [String: [String]] = [
-        "anthropic": ["claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250929", "claude-opus-4-6"],
-        "openai": ["gpt-4.1-nano", "gpt-4.1-mini", "gpt-4.1", "gpt-5-nano", "gpt-5-mini"],
-        "gemini": ["gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-2.5-pro", "gemini-3-flash-preview"],
-        "openrouter": ["anthropic/claude-haiku-4.5", "google/gemini-2.5-flash", "openai/gpt-4.1-mini", "anthropic/claude-sonnet-4.5", "meta-llama/llama-4-scout:free"],
+        "anthropic": ["claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250929", "claude-opus-4-5-20251101", "claude-opus-4-6"],
+        "openai": ["gpt-4.1-nano", "gpt-4.1-mini", "gpt-4.1", "gpt-5-nano", "gpt-5-mini", "gpt-5", "o3-mini"],
+        "gemini": ["gemini-2.5-flash-lite-preview", "gemini-2.5-flash", "gemini-2.5-pro", "gemini-3-flash-preview"],
+        "openrouter": ["anthropic/claude-haiku-4.5", "google/gemini-2.5-flash", "deepseek/deepseek-v3.2", "openai/gpt-5-mini", "anthropic/claude-sonnet-4.5", "meta-llama/llama-3.3-70b-instruct:free"],
         "apple": ["on-device"]
     ]
 
     private static let defaultModels: [String: String] = [
         "anthropic": "claude-haiku-4-5-20251001",
         "openai": "gpt-4.1-nano",
-        "gemini": "gemini-2.5-flash-lite",
+        "gemini": "gemini-2.5-flash-lite-preview",
         "openrouter": "anthropic/claude-haiku-4.5",
         "apple": "on-device"
     ]
