@@ -257,8 +257,9 @@ jobs:
 
           # Strip test artifacts from the release bundle — build-for-testing embeds
           # XCTest frameworks and test plugins which Apple notarization rejects
-          # (they lack secure timestamps since they're Apple-signed system binaries)
-          rm -rf "artifacts/Pull Read.app/Contents/PlugIns"
+          # (they lack secure timestamps since they're Apple-signed system binaries).
+          # Keep .appex bundles (Share Extension) but remove .xctest bundles.
+          find "artifacts/Pull Read.app/Contents/PlugIns" -name "*.xctest" -type d -exec rm -rf {} + 2>/dev/null || true
           rm -rf "artifacts/Pull Read.app/Contents/Frameworks"
 
           # Verify
@@ -289,6 +290,18 @@ jobs:
             codesign --force --options runtime --timestamp \
               --sign "$IDENTITY" "$dylib"
           done
+
+          # Sign embedded app extensions (Share Extension .appex) for notarization
+          if [ -d "$APP_PATH/Contents/PlugIns" ]; then
+            echo "Signing embedded extensions..."
+            find "$APP_PATH/Contents/PlugIns" -depth \
+              \( -name "*.appex" -o -name "*.xpc" \) \
+              -type d | while read -r ext; do
+              echo "  Signing extension: $ext"
+              codesign --force --options runtime --timestamp \
+                --sign "$IDENTITY" "$ext"
+            done
+          fi
 
           # Sign the bundled CLI binary (hardened runtime required for notarization)
           # disable-library-validation allows loading native addons (e.g. onnxruntime
