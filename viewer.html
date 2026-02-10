@@ -1842,6 +1842,111 @@
     font-style: normal;
   }
 
+  /* Notebook */
+  .notebook-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .notebook-header h1 { margin: 0; font-size: 22px; font-weight: 600; }
+  .notebook-cards {
+    display: flex; gap: 12px; overflow-x: auto; padding: 4px 0 16px;
+    scrollbar-width: none; -ms-overflow-style: none;
+  }
+  .notebook-cards::-webkit-scrollbar { display: none; }
+  .notebook-card {
+    flex: 0 0 200px; padding: 14px; border-radius: 10px;
+    background: var(--code-bg); cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    border: 1px solid transparent;
+  }
+  .notebook-card:hover { background: var(--sidebar-active); transform: translateY(-1px); }
+  .notebook-card.active { border-color: var(--link); }
+  .notebook-card-title {
+    font-size: 13px; font-weight: 600; margin-bottom: 6px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .notebook-card-snippet {
+    font-size: 11px; color: var(--muted); line-height: 1.4;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .notebook-card-date { font-size: 10px; color: var(--muted); margin-top: 8px; }
+  .notebook-empty {
+    text-align: center; padding: 40px 20px; color: var(--muted);
+  }
+  .notebook-empty p { margin: 8px 0; }
+  .notebook-title-input {
+    width: 100%; font-size: 20px; font-weight: 600;
+    border: none; border-bottom: 2px solid var(--border);
+    background: transparent; color: var(--fg);
+    padding: 8px 0; margin-bottom: 16px;
+    font-family: inherit; outline: none;
+  }
+  .notebook-title-input:focus { border-bottom-color: var(--link); }
+  .notebook-editor-wrap {
+    position: relative;
+  }
+  .notebook-editor textarea {
+    width: 100%; min-height: 400px;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 14px; line-height: 1.7;
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 16px; background: var(--bg); color: var(--fg);
+    resize: vertical; outline: none;
+    tab-size: 2;
+  }
+  .notebook-editor textarea:focus { border-color: var(--link); }
+  .notebook-preview {
+    min-height: 400px; padding: 16px;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg);
+  }
+  .notebook-toolbar {
+    display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center;
+  }
+  .notebook-toolbar button {
+    border: none; border-radius: 6px; background: var(--code-bg);
+    color: var(--fg); font-size: 12px; font-weight: 500;
+    padding: 5px 12px; cursor: pointer; transition: background 0.15s;
+    font-family: inherit;
+  }
+  .notebook-toolbar button:hover { background: var(--sidebar-active); }
+  .notebook-toolbar button.active { background: var(--link); color: #fff; }
+  .notebook-toolbar .save-hint {
+    font-size: 11px; color: var(--muted); margin-left: auto;
+  }
+  .notebook-sources {
+    display: flex; gap: 6px; flex-wrap: wrap; margin-top: 16px; align-items: center;
+  }
+  .notebook-sources-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .notebook-source-chip {
+    font-size: 11px; padding: 2px 8px;
+    border-radius: 12px; background: var(--code-bg);
+    color: var(--fg); cursor: pointer; transition: background 0.15s;
+  }
+  .notebook-source-chip:hover { background: var(--sidebar-active); }
+  .notebook-ref {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; color: var(--link); cursor: pointer;
+    padding: 2px 8px; border-radius: 12px; background: color-mix(in srgb, var(--link) 8%, transparent);
+    margin-left: 8px;
+  }
+  .notebook-ref:hover { background: color-mix(in srgb, var(--link) 15%, transparent); }
+  .hl-picker-group { margin-bottom: 16px; }
+  .hl-picker-group-title {
+    font-size: 12px; font-weight: 600; color: var(--fg);
+    margin-bottom: 6px; padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .hl-picker-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 6px 8px; border-radius: 6px; cursor: pointer;
+    transition: background 0.1s;
+  }
+  .hl-picker-item:hover { background: var(--code-bg); }
+  .hl-picker-item input[type="checkbox"] { margin-top: 3px; }
+  .hl-picker-item-text { font-size: 12px; color: var(--fg); line-height: 1.4; }
+
   /* Reading progress bar */
   .reading-progress {
     position: sticky;
@@ -2424,6 +2529,7 @@
       </div>
       <div class="sidebar-footer">
         <button class="sidebar-footer-btn" onclick="showShortcutsModal()" aria-label="Keyboard shortcuts"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-keyboard"/></svg> Shortcuts</button>
+        <button class="sidebar-footer-btn" onclick="showNotebook()" aria-label="Notebook"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-pen"/></svg> Notebook</button>
         <button class="sidebar-footer-btn" onclick="showTagCloud()" aria-label="Explore tags"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-tags"/></svg> Explore</button>
         <button class="sidebar-footer-btn" onclick="showGuideModal()" aria-label="Features guide"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-book"/></svg> Guide</button>
         <button class="sidebar-footer-btn" onclick="batchAutotagAll()" aria-label="Auto-tag all articles" id="batch-tag-btn"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-wand"/></svg> Tag All</button>
@@ -2967,6 +3073,15 @@ function renderArticle(text, filename) {
   }
   html += '<button onclick="markCurrentAsUnread()" aria-label="Mark as unread"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-eye-slash"/></svg> Unread</button>';
   html += '</div>';
+  // Show notebook back-references
+  var nbRefs = Object.values(_notebooks || {}).filter(function(nb) { return nb.sources && nb.sources.indexOf(filename) >= 0; });
+  if (nbRefs.length) {
+    html += '<div style="margin-top:6px">';
+    for (var nbi = 0; nbi < nbRefs.length; nbi++) {
+      html += '<span class="notebook-ref" onclick="openNotebookEditor(\'' + nbRefs[nbi].id + '\')"><svg class="icon icon-sm" style="vertical-align:-1px"><use href="#i-pen"/></svg> ' + escapeHtml(nbRefs[nbi].title || 'Untitled notebook') + '</span>';
+    }
+    html += '</div>';
+  }
   html += '</div>';
 
   // Show existing summary if present in frontmatter
@@ -4994,6 +5109,7 @@ function toggleShareDropdown(e) {
     <div class="share-group-label">Actions</div>
     <button onclick="copyArticleLink()"><svg class="share-icon" viewBox="0 0 640 512"><use href="#i-link"/></svg> Copy Link</button>
     <button onclick="showExportMarkdownModal()"><svg class="share-icon" viewBox="0 0 640 512"><use href="#i-cloud-download"/></svg> Export Markdown</button>
+    <button onclick="startNotebookFromArticle()"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-pen"/></svg> Write About This</button>
     <hr>
     <div class="share-group-label">Share to</div>
     <a href="https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}" target="_blank" rel="noopener"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-linkedin"/></svg> LinkedIn</a>
@@ -5612,6 +5728,328 @@ function showOnboardingIfNeeded() {
   if (!localStorage.getItem('pr-onboarded')) {
     document.getElementById('onboarding').style.display = 'flex';
   }
+}
+
+// ---- Notebook ---- (synthesis writing surface)
+let _notebooks = {};
+let _activeNotebook = null;
+let _notebookSaveTimeout = null;
+let _notebookPreviewMode = false;
+
+async function loadNotebooks() {
+  try {
+    const res = await fetch('/api/notebooks');
+    if (res.ok) _notebooks = await res.json();
+  } catch {}
+}
+
+async function saveNotebook(nb) {
+  try {
+    const res = await fetch('/api/notebooks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(nb)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (!nb.id) nb.id = data.id;
+      _notebooks[nb.id] = nb;
+    }
+  } catch {}
+}
+
+async function deleteNotebook(id) {
+  try {
+    await fetch('/api/notebooks?id=' + encodeURIComponent(id), { method: 'DELETE' });
+    delete _notebooks[id];
+    _activeNotebook = null;
+    showNotebook();
+  } catch {}
+}
+
+function showNotebook(openId) {
+  activeFile = null;
+  document.getElementById('margin-notes').innerHTML = '';
+  renderFileList();
+
+  const content = document.getElementById('content');
+  const empty = document.getElementById('empty-state');
+  empty.style.display = 'none';
+  content.style.display = 'block';
+  document.title = 'Notebook — PullRead';
+
+  loadNotebooks().then(() => {
+    const nbs = Object.values(_notebooks).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+    let cardsHtml = '';
+    if (nbs.length) {
+      cardsHtml = '<div class="notebook-cards">';
+      for (const nb of nbs) {
+        const snippet = (nb.content || '').replace(/[#>*_\[\]]/g, '').slice(0, 100);
+        const date = nb.updatedAt ? new Date(nb.updatedAt).toLocaleDateString() : '';
+        const active = (openId || (_activeNotebook && _activeNotebook.id)) === nb.id ? ' active' : '';
+        cardsHtml += '<div class="notebook-card' + active + '" onclick="openNotebookEditor(\'' + nb.id + '\')">'
+          + '<div class="notebook-card-title">' + escapeHtml(nb.title || 'Untitled') + '</div>'
+          + '<div class="notebook-card-snippet">' + escapeHtml(snippet) + '</div>'
+          + '<div class="notebook-card-date">' + date + '</div>'
+          + '</div>';
+      }
+      cardsHtml += '</div>';
+    }
+
+    let editorHtml = '';
+    const nb = openId ? _notebooks[openId] : _activeNotebook;
+    if (nb) {
+      _activeNotebook = nb;
+      editorHtml = buildNotebookEditor(nb);
+    } else if (!nbs.length) {
+      editorHtml = '<div class="notebook-empty">'
+        + '<svg class="icon" style="width:48px;height:48px;opacity:0.3;margin-bottom:12px" aria-hidden="true"><use href="#i-pen"/></svg>'
+        + '<p style="font-size:16px;font-weight:500;color:var(--fg)">Start writing</p>'
+        + '<p>Synthesize ideas from your reading. Highlights and notes<br>from articles become the building blocks of original thought.</p>'
+        + '<button class="btn-primary" onclick="createNewNotebook()" style="margin-top:16px">New Notebook</button>'
+        + '</div>';
+    }
+
+    content.innerHTML = '<div style="max-width:720px;margin:0 auto;padding:32px 20px">'
+      + '<div class="notebook-header">'
+      + '<h1>Notebook</h1>'
+      + '<button class="btn-primary" onclick="createNewNotebook()" style="font-size:13px;padding:6px 14px">+ New</button>'
+      + '</div>'
+      + cardsHtml
+      + editorHtml
+      + '</div>';
+
+    document.getElementById('content-pane').scrollTop = 0;
+
+    // Set up auto-grow and auto-save for textarea
+    const ta = content.querySelector('.notebook-editor textarea');
+    if (ta) {
+      autoGrowTextarea(ta);
+      ta.addEventListener('input', () => {
+        autoGrowTextarea(ta);
+        notebookDebounceSave();
+      });
+      ta.focus();
+    }
+  });
+}
+
+function buildNotebookEditor(nb) {
+  const previewActive = _notebookPreviewMode ? ' active' : '';
+  const sources = (nb.sources || []);
+  const sourcesHtml = sources.length
+    ? '<div class="notebook-sources"><span class="notebook-sources-label">Sources</span>'
+      + sources.map(s => {
+        const display = s.replace(/^\d{4}-\d{2}-\d{2}-/, '').replace(/\.md$/, '').replace(/-/g, ' ');
+        return '<span class="notebook-source-chip" onclick="loadArticle(\'' + escapeHtml(s) + '\')">' + escapeHtml(display) + '</span>';
+      }).join('')
+      + '</div>'
+    : '';
+
+  let bodyHtml;
+  if (_notebookPreviewMode) {
+    bodyHtml = '<div class="notebook-preview">' + marked.parse(nb.content || '*Start writing...*') + '</div>';
+  } else {
+    bodyHtml = '<div class="notebook-editor-wrap"><div class="notebook-editor">'
+      + '<textarea placeholder="Start writing... Use markdown for formatting.">' + escapeHtml(nb.content || '') + '</textarea>'
+      + '</div></div>';
+  }
+
+  return '<div class="notebook-toolbar">'
+    + '<button onclick="showHighlightPicker()"><svg class="icon icon-sm" style="vertical-align:-1px"><use href="#i-pen"/></svg> Insert Highlights</button>'
+    + '<button class="' + previewActive + '" onclick="toggleNotebookPreview()">Preview</button>'
+    + '<button onclick="exportNotebook()" style="margin-left:4px">Export .md</button>'
+    + '<button onclick="if(confirm(\'Delete this notebook?\')) deleteNotebook(\'' + nb.id + '\')" style="color:var(--muted)">Delete</button>'
+    + '<span class="save-hint" id="notebook-save-hint">Saved</span>'
+    + '</div>'
+    + '<input class="notebook-title-input" value="' + escapeHtml(nb.title || '') + '" placeholder="Untitled" oninput="notebookDebounceSave()">'
+    + bodyHtml
+    + sourcesHtml;
+}
+
+function autoGrowTextarea(ta) {
+  ta.style.height = 'auto';
+  ta.style.height = Math.max(400, ta.scrollHeight) + 'px';
+}
+
+function notebookDebounceSave() {
+  const hint = document.getElementById('notebook-save-hint');
+  if (hint) hint.textContent = 'Saving...';
+  clearTimeout(_notebookSaveTimeout);
+  _notebookSaveTimeout = setTimeout(() => {
+    if (!_activeNotebook) return;
+    const titleInput = document.querySelector('.notebook-title-input');
+    const ta = document.querySelector('.notebook-editor textarea');
+    if (titleInput) _activeNotebook.title = titleInput.value;
+    if (ta) _activeNotebook.content = ta.value;
+    _activeNotebook.updatedAt = new Date().toISOString();
+    saveNotebook(_activeNotebook).then(() => {
+      if (hint) hint.textContent = 'Saved';
+    });
+  }, 800);
+}
+
+function openNotebookEditor(id) {
+  _notebookPreviewMode = false;
+  showNotebook(id);
+}
+
+function createNewNotebook() {
+  const nb = {
+    title: '',
+    content: '',
+    sources: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  saveNotebook(nb).then(() => {
+    _activeNotebook = nb;
+    _notebookPreviewMode = false;
+    showNotebook(nb.id);
+  });
+}
+
+function toggleNotebookPreview() {
+  // Save current content before toggling
+  const ta = document.querySelector('.notebook-editor textarea');
+  if (ta && _activeNotebook) _activeNotebook.content = ta.value;
+  const titleInput = document.querySelector('.notebook-title-input');
+  if (titleInput && _activeNotebook) _activeNotebook.title = titleInput.value;
+
+  _notebookPreviewMode = !_notebookPreviewMode;
+  showNotebook(_activeNotebook ? _activeNotebook.id : null);
+}
+
+function exportNotebook() {
+  if (!_activeNotebook) return;
+  const nb = _activeNotebook;
+  let md = '';
+  if (nb.title) md += '# ' + nb.title + '\n\n';
+  md += (nb.content || '') + '\n';
+  if (nb.sources && nb.sources.length) {
+    md += '\n---\n\n**Sources:**\n';
+    for (const s of nb.sources) {
+      const f = allFiles.find(f => f.filename === s);
+      const title = f ? f.title : s;
+      md += '- ' + title + '\n';
+    }
+  }
+  const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (nb.title || 'notebook').replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '.md';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function showHighlightPicker() {
+  if (!_activeNotebook) return;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+  let groupsHtml = '';
+  const entries = Object.entries(allHighlightsIndex).filter(([, hls]) => hls && hls.length > 0);
+  if (!entries.length) {
+    groupsHtml = '<p style="color:var(--muted);text-align:center;padding:20px">No highlights yet. Select text in an article and press <kbd>h</kbd> to highlight.</p>';
+  } else {
+    for (const [filename, hls] of entries) {
+      const f = allFiles.find(f => f.filename === filename);
+      const title = f ? f.title : filename;
+      groupsHtml += '<div class="hl-picker-group">'
+        + '<div class="hl-picker-group-title">' + escapeHtml(title) + '</div>';
+      for (const hl of hls) {
+        groupsHtml += '<label class="hl-picker-item">'
+          + '<input type="checkbox" data-filename="' + escapeHtml(filename) + '" data-text="' + escapeHtml(hl.text) + '">'
+          + '<span class="hl-picker-item-text">' + escapeHtml(hl.text.slice(0, 200)) + '</span>'
+          + '</label>';
+      }
+      groupsHtml += '</div>';
+    }
+  }
+
+  overlay.innerHTML = '<div class="modal-card" onclick="event.stopPropagation()" style="max-width:520px;max-height:80vh;overflow-y:auto">'
+    + '<h2>Insert Highlights</h2>'
+    + '<p style="color:var(--muted);font-size:13px;margin-bottom:16px">Select highlights to insert as blockquotes into your notebook.</p>'
+    + groupsHtml
+    + '<div class="modal-actions">'
+    + '<button class="btn-secondary" onclick="this.closest(\'.modal-overlay\').remove()">Cancel</button>'
+    + '<button class="btn-primary" onclick="insertSelectedHighlights()">Insert Selected</button>'
+    + '</div></div>';
+  document.body.appendChild(overlay);
+}
+
+function insertSelectedHighlights() {
+  const overlay = document.querySelector('.modal-overlay');
+  if (!overlay) return;
+  const checked = overlay.querySelectorAll('input[type=checkbox]:checked');
+  if (!checked.length) { overlay.remove(); return; }
+
+  let insertText = '';
+  const newSources = new Set(_activeNotebook.sources || []);
+  for (const cb of checked) {
+    const text = cb.dataset.text;
+    const filename = cb.dataset.filename;
+    insertText += '\n> ' + text + '\n';
+    newSources.add(filename);
+  }
+
+  _activeNotebook.sources = Array.from(newSources);
+
+  const ta = document.querySelector('.notebook-editor textarea');
+  if (ta) {
+    const pos = ta.selectionStart;
+    const before = ta.value.slice(0, pos);
+    const after = ta.value.slice(pos);
+    ta.value = before + insertText + '\n' + after;
+    _activeNotebook.content = ta.value;
+    autoGrowTextarea(ta);
+  }
+
+  overlay.remove();
+  notebookDebounceSave();
+  // Refresh to show updated sources
+  setTimeout(() => showNotebook(_activeNotebook.id), 900);
+}
+
+function startNotebookFromArticle() {
+  // Close share dropdown
+  const panel = document.querySelector('.share-dropdown-panel');
+  if (panel) panel.remove();
+
+  if (!activeFile) return;
+
+  const file = allFiles.find(f => f.filename === activeFile);
+  const title = file ? file.title : activeFile;
+
+  let content = '# Notes on: ' + title + '\n\n';
+  if (articleHighlights.length) {
+    for (const hl of articleHighlights) {
+      content += '> ' + hl.text + '\n\n';
+      if (hl.note) content += '*' + hl.note + '*\n\n';
+    }
+  }
+  if (articleNotes.articleNote) {
+    content += '---\n\n' + articleNotes.articleNote + '\n\n';
+  }
+
+  const nb = {
+    title: 'Notes on: ' + title,
+    content: content,
+    sources: [activeFile],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  saveNotebook(nb).then(() => {
+    _activeNotebook = nb;
+    _notebookPreviewMode = false;
+    showNotebook(nb.id);
+  });
 }
 
 // ---- Tag Cloud / Explore ---- (renders as inline page like Guide)

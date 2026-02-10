@@ -58,6 +58,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Force accessory mode (menu-bar-only) on launch.
+        // Prevents stale .regular policy from a previous crash while viewer was open.
+        NSApp.setActivationPolicy(.accessory)
+
         syncService = SyncService()
         settingsWindowController = SettingsWindowController()
 
@@ -125,19 +129,43 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupStatusBar() {
+        print("[PullRead] Setting up status bar item...")
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
-        if let button = statusItem.button {
-            // Use SF Symbol for the icon (available on macOS 11+)
-            if let image = NSImage(systemSymbolName: "doc.text.fill", accessibilityDescription: "PullRead") {
-                image.isTemplate = true
-                button.image = image
-            } else {
-                button.title = "PR"
+        if statusItem.button == nil {
+            // Retry once after a delay — system may be busy after fresh install
+            print("[PullRead] Status bar button nil, retrying in 2 seconds...")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                self?.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+                self?.configureStatusBarButton()
+                self?.buildStatusBarMenu()
+                print("[PullRead] Status bar retry complete")
             }
-            button.toolTip = "PullRead - Bookmark Reader & Markdown Library"
+            return
         }
 
+        configureStatusBarButton()
+        buildStatusBarMenu()
+    }
+
+    private func configureStatusBarButton() {
+        guard let button = statusItem.button else {
+            print("[PullRead] WARNING: Status bar button is nil — menu bar item may not be visible")
+            return
+        }
+
+        if let image = NSImage(systemSymbolName: "doc.text.fill", accessibilityDescription: "PullRead") {
+            image.isTemplate = true
+            button.image = image
+            print("[PullRead] Status bar icon set successfully")
+        } else {
+            button.title = "PR"
+            print("[PullRead] SF Symbol not available, using text fallback")
+        }
+        button.toolTip = "PullRead - Bookmark Reader & Markdown Library"
+    }
+
+    private func buildStatusBarMenu() {
         let menu = NSMenu()
 
         // Sync Now with status on same line
@@ -239,6 +267,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(quitMenuItem)
 
         statusItem.menu = menu
+        print("[PullRead] Status bar setup complete, menu has \(menu.items.count) items")
     }
 
     @objc private func syncNow() {

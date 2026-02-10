@@ -108,6 +108,7 @@ function listFiles(outputPath: string): FileMeta[] {
 const ANNOTATIONS_DIR = join(homedir(), '.config', 'pullread');
 const HIGHLIGHTS_PATH = join(ANNOTATIONS_DIR, 'highlights.json');
 const NOTES_PATH = join(ANNOTATIONS_DIR, 'notes.json');
+const NOTEBOOKS_PATH = join(ANNOTATIONS_DIR, 'notebooks.json');
 
 function loadJsonFile(path: string): Record<string, unknown> {
   if (!existsSync(path)) return {};
@@ -320,6 +321,55 @@ export function startViewer(outputPath: string, port = 7777): void {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Invalid request body' }));
         }
+        return;
+      }
+    }
+
+    // Notebooks API
+    if (url.pathname === '/api/notebooks') {
+      if (req.method === 'GET') {
+        const id = url.searchParams.get('id');
+        const all = loadJsonFile(NOTEBOOKS_PATH) as Record<string, any>;
+        if (id) {
+          sendJson(res, all[id] || null);
+        } else {
+          sendJson(res, all);
+        }
+        return;
+      }
+      if (req.method === 'POST') {
+        try {
+          const body = JSON.parse(await readBody(req));
+          const all = loadJsonFile(NOTEBOOKS_PATH) as Record<string, any>;
+          const id = body.id || ('nb-' + Math.random().toString(36).slice(2, 8));
+          const existing = all[id] || {};
+          all[id] = {
+            id,
+            title: body.title ?? existing.title ?? '',
+            content: body.content ?? existing.content ?? '',
+            sources: body.sources ?? existing.sources ?? [],
+            createdAt: existing.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          saveJsonFile(NOTEBOOKS_PATH, all);
+          sendJson(res, { ok: true, id });
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid request body' }));
+        }
+        return;
+      }
+      if (req.method === 'DELETE') {
+        const id = url.searchParams.get('id');
+        if (!id) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'id is required' }));
+          return;
+        }
+        const all = loadJsonFile(NOTEBOOKS_PATH) as Record<string, any>;
+        delete all[id];
+        saveJsonFile(NOTEBOOKS_PATH, all);
+        sendJson(res, { ok: true });
         return;
       }
     }
