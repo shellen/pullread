@@ -16,7 +16,7 @@
 <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Literata:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Literata:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,wght@0,400;0,700;1,400&family=Work+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <link href="https://fonts.cdnfonts.com/css/opendyslexic" rel="stylesheet">
 <style>
   :root {
@@ -160,10 +160,12 @@
   }
 
   .brand {
+    font-family: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-weight: 600;
     font-size: 14px;
     color: var(--fg);
     cursor: pointer;
+    letter-spacing: -0.01em;
   }
 
   .toolbar-spacer { flex: 1; }
@@ -460,20 +462,208 @@
   }
 
   .empty-state {
+    height: 100%;
+    overflow-y: auto;
+    padding: 0;
+  }
+
+  /* Dashboard */
+  .dashboard {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 32px 24px;
+    font-family: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .dash-greeting {
+    margin-bottom: 28px;
+  }
+  .dash-greeting h1 {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--fg);
+    margin: 0 0 4px;
+    letter-spacing: -0.02em;
+  }
+  .dash-greeting p {
+    font-size: 14px;
+    color: var(--muted);
+    margin: 0;
+  }
+  .dash-section {
+    margin-bottom: 28px;
+  }
+  .dash-section-header {
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .dash-section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--fg);
+  }
+  .dash-section-title svg {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+    opacity: 0.5;
+  }
+  .dash-section-count {
+    font-weight: 400;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .dash-view-all {
+    font-size: 12px;
+    color: var(--link);
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-family: inherit;
+  }
+  .dash-view-all:hover { text-decoration: underline; }
+  .dash-cards {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+  }
+  .dash-cards::-webkit-scrollbar { height: 4px; }
+  .dash-cards::-webkit-scrollbar-track { background: transparent; }
+  .dash-cards::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .dash-card {
+    flex: 0 0 280px;
+    scroll-snap-align: start;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    background: var(--bg);
+    transition: box-shadow 0.15s, transform 0.15s;
+  }
+  .dash-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    transform: translateY(-2px);
+  }
+  .dash-card-img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    background: var(--code-bg);
+    display: block;
+  }
+  .dash-card-img-placeholder {
+    width: 100%;
+    height: 140px;
+    background: var(--code-bg);
+    display: flex;
     align-items: center;
     justify-content: center;
-    height: 100%;
+    font-size: 32px;
+    color: var(--border);
+  }
+  .dash-card-body {
+    padding: 12px 14px;
+  }
+  .dash-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
     color: var(--muted);
-    text-align: center;
-    gap: 12px;
+    margin-bottom: 6px;
   }
-  .empty-state .hint {
-    font-size: 18px;
+  .dash-card-meta img {
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
   }
-  .empty-state .subhint {
+  .dash-card-badge {
+    font-size: 10px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    color: var(--muted);
+  }
+  .dash-card-title {
     font-size: 14px;
+    font-weight: 600;
+    color: var(--fg);
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .dash-card-excerpt {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.4;
+  }
+  .dash-card-progress {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-top: 8px;
+    overflow: hidden;
+  }
+  .dash-card-progress-fill {
+    height: 100%;
+    background: var(--link);
+    border-radius: 2px;
+  }
+  .dash-review-card {
+    flex: 0 0 320px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    cursor: pointer;
+    background: var(--bg);
+    transition: box-shadow 0.15s, transform 0.15s;
+  }
+  .dash-review-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    transform: translateY(-2px);
+  }
+  .dash-review-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--fg);
+    margin-bottom: 6px;
+  }
+  .dash-review-meta {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .dash-review-excerpt {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .dash-empty-hint {
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+    padding: 48px 0;
+  }
+  .dash-empty-hint .subhint {
+    font-size: 13px;
   }
 
   /* Typography classes */
@@ -485,6 +675,7 @@
   .font-lora .content-wrap { font-family: "Lora", "Georgia", serif; }
   .font-literata .content-wrap { font-family: "Literata", "Georgia", serif; }
   .font-source-serif .content-wrap { font-family: "Source Serif 4", "Georgia", serif; }
+  .font-work-sans .content-wrap { font-family: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 
   .content-wrap {
     line-height: 1.7;
@@ -1859,7 +2050,7 @@
 
   <nav class="toolbar" aria-label="Reader toolbar">
     <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle sidebar" aria-expanded="true" id="sidebar-toggle-btn"><svg class="icon" aria-hidden="true"><use href="#i-bars"/></svg></button>
-    <span class="brand" onclick="toggleSidebar()" role="heading" aria-level="1">PullRead</span>
+    <span class="brand" onclick="goHome()" role="heading" aria-level="1">PullRead</span>
 
     <div class="toolbar-spacer"></div>
 
@@ -1921,8 +2112,7 @@
     <main class="content-pane" id="content-pane" aria-label="Article content">
       <div class="reading-progress" aria-hidden="true"><div class="reading-progress-bar" id="reading-progress-bar"></div></div>
       <div class="empty-state" id="empty-state">
-        <p class="hint">Select an article</p>
-        <p class="subhint">or drop a .md file here</p>
+        <div class="dashboard" id="dashboard"></div>
       </div>
       <article class="content-wrap" id="content" style="display:none;" aria-live="polite"></article>
       <div class="margin-notes" id="margin-notes" aria-hidden="true"></div>
@@ -2055,6 +2245,7 @@ function toggleSettingsDropdown() {
         <option value="lora" ${currentFont==='lora'?'selected':''}>Lora</option>
         <option value="literata" ${currentFont==='literata'?'selected':''}>Literata</option>
         <option value="source-serif" ${currentFont==='source-serif'?'selected':''}>Source Serif</option>
+        <option value="work-sans" ${currentFont==='work-sans'?'selected':''}>Work Sans</option>
         <option value="opendyslexic" ${currentFont==='opendyslexic'?'selected':''}>OpenDyslexic</option>
       </select>
     </div>
@@ -2202,6 +2393,171 @@ function cleanMarkdown(md) {
 }
 
 // Rendering
+function renderDashboard() {
+  const dash = document.getElementById('dashboard');
+  if (!dash) return;
+
+  const empty = document.getElementById('empty-state');
+  const content = document.getElementById('content');
+  empty.style.display = '';
+  if (content) content.style.display = 'none';
+
+  if (allFiles.length === 0) {
+    dash.innerHTML = '<div class="dash-empty-hint"><p class="hint">No articles yet</p><p class="subhint">Add RSS feeds in the tray app, or drop a .md file here</p></div>';
+    return;
+  }
+
+  let html = '';
+
+  // Greeting
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const totalArticles = allFiles.length;
+  const unreadCount = allFiles.filter(f => !readArticles.has(f.filename)).length;
+  html += '<div class="dash-greeting">';
+  html += '<h1>' + greeting + '</h1>';
+  html += '<p>' + totalArticles + ' articles' + (unreadCount > 0 ? ' &middot; ' + unreadCount + ' unread' : '') + '</p>';
+  html += '</div>';
+
+  // Continue Reading — articles with saved scroll position (partially read)
+  const positions = JSON.parse(localStorage.getItem('pr-scroll-positions') || '{}');
+  const continueReading = allFiles.filter(f => {
+    const pos = positions[f.filename];
+    return pos && pos.pct > 0.05 && pos.pct < 0.9; // partially read
+  }).sort((a, b) => (positions[b.filename].ts || 0) - (positions[a.filename].ts || 0)).slice(0, 10);
+
+  if (continueReading.length > 0) {
+    html += '<div class="dash-section">';
+    html += '<div class="dash-section-header">';
+    html += '<span class="dash-section-title"><svg viewBox="0 0 384 512"><use href="#i-book"/></svg> Continue Reading <span class="dash-section-count">(' + continueReading.length + ')</span></span>';
+    html += '</div>';
+    html += '<div class="dash-cards">';
+    for (const f of continueReading) {
+      html += dashCardHtml(f, positions[f.filename]?.pct);
+    }
+    html += '</div></div>';
+  }
+
+  // Latest Reviews
+  const reviews = allFiles.filter(f => f.feed === 'weekly-review' || f.feed === 'daily-review' || f.domain === 'pullread').slice(0, 5);
+  if (reviews.length > 0) {
+    html += '<div class="dash-section">';
+    html += '<div class="dash-section-header">';
+    html += '<span class="dash-section-title"><svg viewBox="0 0 512 512"><use href="#i-wand"/></svg> Reviews</span>';
+    html += '</div>';
+    html += '<div class="dash-cards">';
+    for (const f of reviews) {
+      const isWeekly = f.feed === 'weekly-review';
+      const typeLabel = isWeekly ? 'Weekly' : 'Daily';
+      const date = f.bookmarked ? f.bookmarked.slice(0, 10) : '';
+      html += '<div class="dash-review-card" onclick="dashLoadArticle(\'' + escapeHtml(f.filename) + '\')">';
+      html += '<div class="dash-review-title">' + escapeHtml(f.title) + '</div>';
+      html += '<div class="dash-review-meta">' + typeLabel + ' Review' + (date ? ' &middot; ' + date : '') + '</div>';
+      if (f.excerpt) html += '<div class="dash-review-excerpt">' + escapeHtml(f.excerpt) + '</div>';
+      html += '</div>';
+    }
+    html += '</div></div>';
+  }
+
+  // Favorites
+  const favorites = allFiles.filter(f => allNotesIndex[f.filename]?.isFavorite);
+  if (favorites.length > 0) {
+    html += '<div class="dash-section">';
+    html += '<div class="dash-section-header">';
+    html += '<span class="dash-section-title"><svg viewBox="0 0 512 512"><use href="#i-heart"/></svg> Favorites <span class="dash-section-count">(' + favorites.length + ')</span></span>';
+    html += '</div>';
+    html += '<div class="dash-cards">';
+    for (const f of favorites.slice(0, 10)) {
+      html += dashCardHtml(f);
+    }
+    html += '</div></div>';
+  }
+
+  // Recent — latest unread articles
+  const recent = allFiles.filter(f => !readArticles.has(f.filename) && f.feed !== 'weekly-review' && f.feed !== 'daily-review' && f.domain !== 'pullread').slice(0, 20);
+  if (recent.length > 0) {
+    html += '<div class="dash-section">';
+    html += '<div class="dash-section-header">';
+    html += '<span class="dash-section-title"><svg viewBox="0 0 448 512"><use href="#i-calendar"/></svg> Recent <span class="dash-section-count">(' + recent.length + ')</span></span>';
+    if (unreadCount > recent.length) {
+      html += '<button class="dash-view-all" onclick="document.getElementById(\'search\').focus()">View all ' + unreadCount + ' &rsaquo;</button>';
+    }
+    html += '</div>';
+    html += '<div class="dash-cards">';
+    for (const f of recent) {
+      html += dashCardHtml(f);
+    }
+    html += '</div></div>';
+  }
+
+  dash.innerHTML = html;
+}
+
+function dashCardHtml(f, progressPct) {
+  const idx = displayFiles.findIndex(d => d.filename === f.filename);
+  const onclick = idx >= 0 ? 'loadFile(' + idx + ')' : 'dashLoadArticle(\'' + escapeHtml(f.filename) + '\')';
+  const domain = f.domain || '';
+  const favicon = domain ? 'https://www.google.com/s2/favicons?domain=' + encodeURIComponent(domain) + '&sz=32' : '';
+  const date = f.bookmarked ? f.bookmarked.slice(0, 10) : '';
+
+  let html = '<div class="dash-card" onclick="' + onclick + '">';
+
+  // Image or placeholder
+  if (f.image) {
+    html += '<img class="dash-card-img" src="' + escapeHtml(f.image) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<div class=dash-card-img-placeholder><svg style=width:32px;height:32px;fill:currentColor viewBox=&quot;0 0 448 512&quot;><use href=&quot;#i-book&quot;/></svg></div>\'">';
+  } else {
+    html += '<div class="dash-card-img-placeholder"><svg style="width:32px;height:32px;fill:currentColor" viewBox="0 0 448 512"><use href="#i-book"/></svg></div>';
+  }
+
+  html += '<div class="dash-card-body">';
+
+  // Meta row: favicon, domain, feed badge
+  html += '<div class="dash-card-meta">';
+  if (favicon) html += '<img src="' + escapeHtml(favicon) + '" alt="" loading="lazy">';
+  if (domain) html += '<span>' + escapeHtml(domain) + '</span>';
+  if (f.feed && f.feed !== domain) html += '<span class="dash-card-badge">' + escapeHtml(f.feed) + '</span>';
+  html += '</div>';
+
+  // Title
+  html += '<div class="dash-card-title">' + escapeHtml(f.title) + '</div>';
+
+  // Excerpt
+  if (f.excerpt) {
+    html += '<div class="dash-card-excerpt">' + escapeHtml(f.excerpt) + '</div>';
+  }
+
+  // Progress bar for continue reading
+  if (progressPct !== undefined && progressPct > 0) {
+    html += '<div class="dash-card-progress"><div class="dash-card-progress-fill" style="width:' + Math.round(progressPct * 100) + '%"></div></div>';
+  }
+
+  html += '</div></div>';
+  return html;
+}
+
+function goHome() {
+  activeFile = null;
+  document.title = 'PullRead';
+  renderDashboard();
+}
+
+function dashLoadArticle(filename) {
+  const idx = displayFiles.findIndex(f => f.filename === filename);
+  if (idx >= 0) {
+    loadFile(idx);
+  } else {
+    // File might be filtered out — search all files
+    const allIdx = allFiles.findIndex(f => f.filename === filename);
+    if (allIdx >= 0) {
+      // Clear search and reload
+      document.getElementById('search').value = '';
+      filterFiles();
+      const newIdx = displayFiles.findIndex(f => f.filename === filename);
+      if (newIdx >= 0) loadFile(newIdx);
+    }
+  }
+}
+
 function renderArticle(text, filename) {
   const { meta, body } = parseFrontmatter(text);
   const content = document.getElementById('content');
@@ -5179,10 +5535,12 @@ async function refreshArticleList(silent) {
           });
         });
       }
-      // Reload current article if still in list
+      // Reload current article if still in list, or refresh dashboard
       if (activeFile) {
         const idx = displayFiles.findIndex(f => f.filename === activeFile);
         if (idx >= 0 && !silent) loadFile(idx);
+      } else if (!silent) {
+        renderDashboard();
       }
     }
   } catch {}
@@ -5255,10 +5613,8 @@ async function init() {
       migrateAnnotationsIfNeeded();
       loadSyncStatus();
 
-      // Auto-load first article
-      if (allFiles.length > 0) {
-        loadFile(0);
-      }
+      // Show dashboard instead of auto-loading first article
+      renderDashboard();
       showOnboardingIfNeeded();
       startAutoRefresh();
       return;

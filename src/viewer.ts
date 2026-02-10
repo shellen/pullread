@@ -24,6 +24,8 @@ interface FileMeta {
   author: string;
   mtime: string;
   hasSummary: boolean;
+  excerpt: string;
+  image: string;
 }
 
 function parseFrontmatter(content: string): Record<string, string> {
@@ -53,13 +55,22 @@ function listFiles(outputPath: string): FileMeta[] {
     try {
       const stat = statSync(fullPath);
       if (!stat.isFile()) continue;
-      // Read only first 1KB for frontmatter
-      const buf = Buffer.alloc(1024);
+      // Read first 3KB for frontmatter + start of body (for image extraction)
+      const buf = Buffer.alloc(3072);
       const fd = require('fs').openSync(fullPath, 'r');
-      const bytesRead = require('fs').readSync(fd, buf, 0, 1024, 0);
+      const bytesRead = require('fs').readSync(fd, buf, 0, 3072, 0);
       require('fs').closeSync(fd);
       const head = buf.slice(0, bytesRead).toString('utf-8');
       const meta = parseFrontmatter(head);
+
+      // Extract first image URL from body
+      let image = '';
+      const fmEnd = head.indexOf('\n---\n');
+      if (fmEnd > 0) {
+        const bodyStart = head.slice(fmEnd + 5);
+        const imgMatch = bodyStart.match(/!\[.*?\]\((https?:\/\/[^)]+)\)/);
+        if (imgMatch) image = imgMatch[1];
+      }
 
       files.push({
         filename: name,
@@ -71,6 +82,8 @@ function listFiles(outputPath: string): FileMeta[] {
         author: meta.author || '',
         mtime: stat.mtime.toISOString(),
         hasSummary: !!meta.summary,
+        excerpt: meta.excerpt || '',
+        image,
       });
     } catch {
       // Skip unreadable files
