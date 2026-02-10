@@ -106,6 +106,7 @@ jobs:
           VERSION="${{ steps.version.outputs.VERSION }}"
           # Compute build number: major*10000 + minor*100 + patch
           BUILD_NUMBER=$(echo "$VERSION" | awk -F. '{printf "%d", $1*10000+$2*100+$3}')
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
           cd PullReadTray
           xcodebuild -project PullReadTray.xcodeproj \
             -scheme PullReadTray \
@@ -238,10 +239,17 @@ jobs:
           # Create a symlink to Applications for drag-to-install
           ln -s /Applications dmg-contents/Applications
 
+          # Calculate source size with generous padding — hdiutil -srcfolder
+          # underestimates for large Bun-compiled binaries, causing
+          # "No space left on device" on the temp R/W volume
+          SIZE_MB=$(du -sm dmg-contents | awk '{print int($1 * 1.5 + 30)}')
+          echo "DMG source size with padding: ${SIZE_MB}MB"
+
           # Create the DMG (volume name shows as "Pull Read" to users)
           hdiutil create -volname "Pull Read" \
             -srcfolder dmg-contents \
             -ov -format UDZO \
+            -size ${SIZE_MB}m \
             PullRead.dmg
 
           # Clean up
@@ -325,7 +333,7 @@ jobs:
               <language>en</language>
               <item>
                 <title>Version ${VERSION}</title>
-                <sparkle:version>${VERSION}</sparkle:version>
+                <sparkle:version>${BUILD_NUMBER}</sparkle:version>
                 <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
                 <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
                 <pubDate>$(date -R)</pubDate>

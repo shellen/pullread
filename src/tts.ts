@@ -401,10 +401,10 @@ export async function generateSpeech(articleName: string, text: string, config: 
         const msg = e instanceof Error ? e.message : String(e);
         // Translate native library / code signing errors into user-friendly messages
         if (msg.includes('dlopen') || msg.includes('code signature') || msg.includes('not valid for use')) {
-          throw new Error('Kokoro voice engine could not load. This is a code signing issue — please update to the latest version of Pull Read.');
+          throw new Error('Kokoro voice engine could not load. This may be a code signing issue — try reinstalling Pull Read from the latest release. (Detail: ' + (msg.length > 200 ? msg.slice(0, 200) + '…' : msg) + ')');
         }
         if (msg.includes('kokoro-js') || msg.includes('Cannot find module') || msg.includes('Cannot find package')) {
-          throw new Error('Kokoro voice engine is not available in this build. Please update to the latest version of Pull Read.');
+          throw new Error('Kokoro voice engine is not available in this build — try reinstalling Pull Read from the latest release.');
         }
         throw new Error('Kokoro voice failed: ' + (msg.length > 120 ? msg.slice(0, 120) + '…' : msg));
       }
