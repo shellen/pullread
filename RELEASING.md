@@ -44,16 +44,12 @@ The workflow:
 
 The site and README link to:
 ```
-https://github.com/shellen/pullread/releases/download/latest/PullRead.dmg
+https://github.com/shellen/pullread/releases/latest/download/PullRead.dmg
 ```
 
-This downloads from the **`latest` tag** release — a prerelease that auto-updates on every push to `main` via the CI workflow (`build-macos-app.yml`). This is separate from versioned releases (v1.1.0, v1.2.0, etc.).
+This uses GitHub's built-in redirect — `/releases/latest/download/FILE` always resolves to the asset from the most recent **non-prerelease** release. So when you cut v1.3.5, the link automatically points to v1.3.5's `PullRead.dmg` with no tag management needed.
 
-- The CI workflow signs and notarizes when secrets are available (which they are for pushes to `main`)
-- GitHub's `/releases/latest` page always shows the newest non-prerelease release
-- The `latest` tag prerelease serves as a "nightly" for the direct DMG download link
-
-**If the latest download is broken:** Push a fix to `main` and the CI will rebuild and update the `latest` tag release automatically.
+**Note:** The URL path order matters. `releases/latest/download/` works; `releases/download/latest/` does not (that would require a literal `latest` tag release).
 
 ## Required GitHub Secrets
 
