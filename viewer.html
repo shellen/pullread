@@ -4637,6 +4637,8 @@ async function playCloudTTS(filename) {
 
     ttsAudio = new Audio(audioUrl);
     ttsAudio.playbackRate = ttsSpeed;
+    // Reset total time immediately; loadedmetadata will set the real value
+    document.getElementById('tts-time-total').textContent = '0:00';
 
     ttsAudio.addEventListener('loadedmetadata', () => {
       document.getElementById('tts-time-total').textContent = formatTime(ttsAudio.duration);
@@ -4689,6 +4691,7 @@ function stopTTS() {
   ttsGenerating = false;
   document.getElementById('tts-progress').style.width = '0%';
   document.getElementById('tts-time-current').textContent = '0:00';
+  document.getElementById('tts-time-total').textContent = '0:00';
 }
 
 function ttsTogglePlay() {
