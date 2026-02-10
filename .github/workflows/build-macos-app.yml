@@ -12,6 +12,7 @@ on:
       - 'viewer.html'
       - 'package.json'
       - 'package-lock.json'
+      - 'models.json'
       - '.github/workflows/build-macos-app.yml'
   pull_request:
     branches: [main]
@@ -21,6 +22,7 @@ on:
       - 'viewer.html'
       - 'package.json'
       - 'package-lock.json'
+      - 'models.json'
   workflow_dispatch:
     inputs:
       create_release:
@@ -70,6 +72,10 @@ jobs:
       - name: Build PullRead CLI binary
         run: |
           bun install
+
+          # Sync models.json → SettingsView.swift so model dropdowns stay current
+          bun scripts/sync-swift-models.ts
+
           bun scripts/embed-viewer.ts
 
           # Only build arm64 on CI (runner is arm64). Universal binary built in release workflow.

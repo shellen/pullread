@@ -95,6 +95,9 @@ jobs:
           # Clean up certificate file
           rm $RUNNER_TEMP/certificate.p12
 
+      - name: Sync models.json to Swift
+        run: bun scripts/sync-swift-models.ts
+
       - name: Build app
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
