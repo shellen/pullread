@@ -58,9 +58,14 @@ PullRead connects to bookmark services like Instapaper, Pinboard, Raindrop, and 
 - **Retry mechanism** - Failed extractions are tracked and can be retried later
 - **Podcast support** - Saves episode metadata with audio links (perfect for show notes)
 - **Built-in article reader** - Two-pane local web UI with full keyboard navigation, highlights, notes, and tags
+- **Homepage dashboard** - Card-based landing page with continue reading, reviews, favorites, and recent articles
+- **Search operators** - Filter articles with `is:favorite`, `tag:tech`, `has:summary`, AND/OR logic, and more
 - **Weekly reviews** - AI-generated summaries of your recent reading (daily/weekly schedule or on-demand)
 - **Self-contained macOS app** - Native Swift menu bar app with bundled CLI binary (no Node.js required)
-- **Article summaries** - On-demand summarization with your own API key (Anthropic or OpenAI)
+- **Article summaries** - On-demand summarization with 5 LLM providers, shown with provider/model badges
+- **Text-to-speech** - Listen to articles via browser TTS (free), Kokoro local AI, OpenAI, or ElevenLabs
+- **Voice notes** - Record article notes using your microphone via Web Speech API
+- **Export markdown** - Share articles as .md with optional highlights, notes, summary, and tags
 - **Cloud-sync friendly** - Output folder can be Dropbox, iCloud, Google Drive, etc.
 
 ---
@@ -431,25 +436,26 @@ Select any text in an article to see a floating toolbar with highlight color opt
 - **Highlights** are saved per-article at `~/.config/pullread/highlights.json` — each highlight can optionally carry a note
 - **Notes** are saved per-article at `~/.config/pullread/notes.json`
 - **Article-level notes** can be written in a collapsible "Notes" panel at the bottom of each article
+- **Voice notes** — click the microphone button to dictate notes hands-free via Web Speech API
 - **Inline annotations** attach a note to a specific text passage, shown with a marker icon
 - **Tags** can be added to any article via the Notes panel (press Enter or comma to add)
 - **Favorites** mark articles with a heart icon in the sidebar
-- Sidebar items show indicator dots for favorites (heart), highlights (yellow), notes (blue), and summaries (purple)
+- Sidebar items show indicator dots for favorites (heart), highlights (yellow), notes (blue), and summaries
 
 #### Summaries
 
-PullRead can generate article summaries using your own API key. Summaries are stored directly in each article's YAML frontmatter.
+PullRead can generate article summaries using your own API key. Summaries are stored directly in each article's YAML frontmatter along with which provider and model generated them.
 
 **Setup:**
 1. Click the gear icon in the viewer toolbar to open Summary Settings
-2. Choose a model provider (Anthropic or OpenAI)
+2. Choose a model provider (Anthropic, OpenAI, Gemini, OpenRouter, or Apple Intelligence)
 3. Enter your API key and optionally customize the model
 4. Click Save
 
 **Usage:**
 - Click the "Summarize" button on any article to generate a summary
-- Summaries appear at the top of the article with a purple accent
-- Articles with summaries show a purple dot in the sidebar
+- Summaries appear at the top of the article with flat badges showing the provider and model
+- Articles with summaries show an indicator dot in the sidebar
 - Use the CLI for batch summarization: `pullread summarize --batch`
 
 **CLI batch mode:**
@@ -472,7 +478,53 @@ pullread summarize --batch --min-size 1000
 }
 ```
 
-Supported model providers: **Anthropic** (Claude) and **OpenAI** (GPT). Default models are `claude-sonnet-4-5-20250929` and `gpt-4o-mini` respectively.
+Supported model providers: **Anthropic** (Claude), **OpenAI** (GPT), **Gemini**, **OpenRouter**, and **Apple Intelligence** (macOS 26+, on-device). See [LLM Models](#llm-models) for defaults and deprecation dates.
+
+#### Search Operators
+
+The search bar supports operators to narrow down your article list:
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `is:favorite` | Favorited articles | `is:fav` |
+| `is:read` / `is:unread` | Filter by read status | `is:unread` |
+| `has:summary` | Articles with AI summaries | `has:summary` |
+| `has:highlights` | Articles with highlights | `has:highlights` |
+| `has:notes` | Articles with notes | `has:notes` |
+| `has:tags` | Articles with any tags | `has:tags` |
+| `tag:value` | Filter by specific tag | `tag:technology` |
+| `feed:value` | Filter by feed name | `feed:instapaper` |
+| `domain:value` | Filter by domain | `domain:substack` |
+| `author:value` | Filter by author | `author:patrick` |
+
+**Combining operators:**
+- **AND** (default): `is:favorite tag:tech` — favorites tagged with "tech"
+- **OR**: `tag:ai OR tag:ml` — articles tagged "ai" or "ml"
+- **Quoted phrases**: `"machine learning"` — exact match
+
+#### Text-to-Speech
+
+Listen to articles read aloud with multiple TTS providers:
+
+| Provider | Cost | Notes |
+|----------|------|-------|
+| **Browser** (default) | Free | Built-in speech synthesis, works offline |
+| **Kokoro** | Free | Local AI voice (~86MB model, auto-downloads on first use) |
+| **OpenAI** | ~$0.15/article | Cloud API, bring your own key |
+| **ElevenLabs** | ~$1.20-2.40/article | Cloud API, bring your own key |
+
+- Queue multiple articles for continuous playback
+- Adjustable speed (0.5x–2x) with skip/previous controls
+- Audio is cached locally after first listen
+- Paid providers require a separate TTS API key (never shared with summaries)
+- Cost estimates shown in TTS Settings with consent gate before first paid use
+
+#### Export Markdown
+
+Share articles as markdown files with optional content:
+- Click **Share → Export Markdown** on any article
+- Choose what to include: summary, highlights, notes, tags
+- Download as `.md` file or copy to clipboard
 
 #### Keyboard Shortcuts
 
@@ -485,6 +537,8 @@ Supported model providers: **Anthropic** (Claude) and **OpenAI** (GPT). Default 
 | `[` | Toggle sidebar |
 | `h` | Highlight selected text (yellow) |
 | `n` | Toggle article notes panel |
+| `f` | Toggle focus mode |
+| `p` | Print article |
 | `Escape` | Clear search / dismiss popover |
 | `Enter` | Reload current article |
 
@@ -573,7 +627,9 @@ pullread/
 │   ├── writer.ts                  # Markdown generation with frontmatter
 │   ├── viewer.ts                  # Local article reader (HTTP server on port 7777)
 │   ├── storage.ts                 # JSON file storage operations
-│   ├── summarizer.ts              # Article summarization (Anthropic/OpenAI)
+│   ├── summarizer.ts              # Article summarization (5 LLM providers)
+│   ├── autotagger.ts              # Machine tagging using LLM providers
+│   ├── tts.ts                     # Text-to-speech (Kokoro, OpenAI, ElevenLabs)
 │   ├── review.ts                  # Weekly review generation
 │   └── *.test.ts                  # Unit tests (86 tests across 5 suites)
 │
@@ -599,9 +655,11 @@ pullread/
 ~/.config/pullread/                # User config directory (created by app)
 ├── feeds.json                     # User's feed configuration
 ├── pullread.json                  # Processed URL tracking database
-├── settings.json                  # Model provider and API key settings
+├── settings.json                  # LLM and TTS provider settings
 ├── highlights.json                # Article highlights
-└── notes.json                     # Article notes and annotations
+├── notes.json                     # Article notes, tags, and annotations
+├── tts-cache/                     # Cached TTS audio files (mp3/wav)
+└── kokoro-model/                  # Local Kokoro TTS model (~86MB, auto-downloaded)
 ```
 
 ### Data Flow
@@ -702,8 +760,9 @@ node dist/index.js sync
 |---------|---------|
 | `fast-xml-parser` | RSS/Atom feed parsing |
 | `@mozilla/readability` | Article content extraction |
-| `jsdom` | DOM simulation for Readability |
+| `linkedom` | DOM simulation for Readability |
 | `turndown` | HTML to Markdown conversion |
+| `kokoro-js` | Local TTS voice synthesis (optional) |
 
 **Build tooling:**
 - **Bun** - Used to compile TypeScript to standalone binaries for the macOS app
@@ -1076,20 +1135,13 @@ This project works well for its intended purpose, but there are several areas th
 
 Ideas that would extend PullRead's capabilities:
 
-### Read State
-
-Track which articles have been opened and how far the user scrolled, with unread indicators in the sidebar and a filter toggle.
-
-### Other Ideas
-
 - **Browser extension** - "Send to PullRead" button that adds URLs directly to a local feed
-- **Full-text search** - Index markdown content for quick searching
 - **Multi-platform tray app** - Electron or Tauri version for Windows/Linux
 - **Kindle/epub export** - Convert markdown collection to ebook format
 - **Webhook support** - Trigger sync via webhook for real-time updates
 - **Self-hosted option** - Run as a service with web interface
 - **Sync to Obsidian/Notion** - Direct integration with note-taking apps
-- **Recommendations** - Suggest similar articles based on reading history
+- **Recommendations** - Suggest similar articles based on reading history and tags
 - **iOS companion app** - View synced articles with iCloud sync
 - **Alfred/Raycast extension** - Quick actions for macOS power users
 
@@ -1135,6 +1187,7 @@ Contributions are welcome! Here's how to get started:
 - [Mozilla Readability](https://github.com/mozilla/readability) - The excellent article extraction algorithm
 - [Turndown](https://github.com/mixmark-io/turndown) - HTML to Markdown conversion
 - [fast-xml-parser](https://github.com/NaturalIntelligence/fast-xml-parser) - Fast and reliable XML parsing
+- [Kokoro](https://github.com/hexgrad/kokoro) - High-quality local text-to-speech model
 - [Bun](https://bun.sh) - Fast JavaScript runtime used to build standalone binaries
 
 ---
