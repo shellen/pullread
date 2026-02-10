@@ -333,7 +333,7 @@
     width: 300px;
     min-width: 300px;
     background: var(--sidebar-bg);
-    border-right: 1px solid var(--border);
+    border-right: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
     display: flex;
     flex-direction: column;
     transition: margin-left 0.2s ease, opacity 0.2s ease;
@@ -346,21 +346,22 @@
   }
 
   .sidebar-search {
-    padding: 10px;
-    border-bottom: 1px solid var(--border);
+    padding: 12px 12px 8px;
   }
   .sidebar-search input {
     width: 100%;
-    padding: 6px 10px;
-    border: 1px solid var(--border);
-    border-radius: 5px;
+    padding: 7px 12px;
+    border: none;
+    border-radius: 6px;
     background: var(--bg);
     color: var(--fg);
     font-size: 13px;
     outline: none;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--fg) 8%, transparent);
+    transition: box-shadow 0.15s;
   }
   .sidebar-search input:focus {
-    border-color: var(--link);
+    box-shadow: 0 0 0 2px var(--link);
   }
   .sidebar-search input::placeholder {
     color: var(--muted);
@@ -370,34 +371,36 @@
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
+    padding: 4px 8px;
   }
 
   .file-item {
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--border);
+    padding: 8px 10px;
+    border-radius: 7px;
     cursor: pointer;
-    transition: background 0.1s;
+    transition: background 0.12s;
+    margin-bottom: 1px;
   }
   .file-item:hover {
-    background: var(--sidebar-hover);
+    background: color-mix(in srgb, var(--fg) 5%, transparent);
   }
   .file-item.active {
-    background: var(--sidebar-active);
+    background: color-mix(in srgb, var(--fg) 10%, transparent);
   }
   .file-item.read .file-item-title {
-    opacity: 0.6;
+    opacity: 0.55;
   }
   .file-item-new {
     animation: fileNewFade 3s ease;
   }
   @keyframes fileNewFade {
-    0% { background: var(--link); opacity: 0.8; }
-    100% { background: transparent; opacity: 1; }
+    0% { background: color-mix(in srgb, var(--link) 25%, transparent); }
+    100% { background: transparent; }
   }
   .file-item-title {
     font-size: 13px;
     font-weight: 500;
-    line-height: 1.3;
+    line-height: 1.35;
     margin-bottom: 3px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -410,13 +413,21 @@
     color: var(--muted);
     display: flex;
     gap: 6px;
+    align-items: center;
+  }
+  .file-item-meta .meta-sep {
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background: var(--muted);
+    opacity: 0.5;
+    flex-shrink: 0;
   }
 
   .file-count {
-    padding: 8px 12px;
+    padding: 4px 12px 4px 20px;
     font-size: 11px;
     color: var(--muted);
-    border-bottom: 1px solid var(--border);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -440,10 +451,10 @@
   .file-item-favicon {
     width: 14px;
     height: 14px;
-    border-radius: 2px;
-    margin-right: 2px;
+    border-radius: 3px;
+    margin-right: 4px;
     vertical-align: -2px;
-    opacity: 0.7;
+    opacity: 0.8;
   }
 
   /* Content pane */
@@ -944,31 +955,31 @@
   /* Sidebar footer buttons */
   .sidebar-footer {
     display: flex;
-    gap: 4px;
-    padding: 8px 12px;
-    border-top: 1px solid var(--border);
+    gap: 2px;
+    padding: 6px 8px;
   }
   .sidebar-footer-btn {
     flex: 1;
-    padding: 4px 0;
+    padding: 5px 0;
     font-size: 11px;
     color: var(--muted);
-    background: var(--code-bg);
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
     cursor: pointer;
     font-family: inherit;
-    transition: color 0.15s, border-color 0.15s;
+    transition: color 0.12s, background 0.12s;
   }
   .sidebar-footer-btn:hover {
     color: var(--fg);
-    border-color: var(--muted);
+    background: color-mix(in srgb, var(--fg) 6%, transparent);
   }
 
   /* Audio player panel */
   .audio-player-panel {
-    border-top: 1px solid var(--border);
-    background: var(--sidebar-bg);
+    background: color-mix(in srgb, var(--fg) 3%, transparent);
+    margin: 4px 8px;
+    border-radius: 8px;
     padding: 10px 12px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-size: 12px;
@@ -1537,8 +1548,8 @@
   /* Highlight indicator dot on sidebar items */
   .file-item-indicators {
     display: flex;
-    gap: 3px;
-    margin-top: 2px;
+    gap: 4px;
+    margin-top: 3px;
   }
   .file-item-indicators .dot {
     width: 6px;
@@ -2811,12 +2822,14 @@ function renderFileItem(f, i) {
     ? '<img class="file-item-favicon" src="https://www.google.com/s2/favicons?domain=' + encodeURIComponent(f.domain) + '&sz=32" alt="" loading="lazy" onerror="this.style.display=\'none\'" aria-hidden="true">'
     : '';
 
+  const metaParts = [];
+  if (date) metaParts.push('<span>' + date + '</span>');
+  if (f.domain) metaParts.push('<span>' + escapeHtml(f.domain) + '</span>');
+  const metaHtml = metaParts.join('<span class="meta-sep"></span>');
+
   return '<div class="file-item' + isActive + (isRead && !isActive ? ' read' : '') + '" data-index="' + i + '" data-filename="' + escapeHtml(f.filename) + '" onclick="loadFile(' + i + ')" role="option" aria-selected="' + (activeFile === f.filename) + '" tabindex="0" onkeydown="if(event.key===\'Enter\')loadFile(' + i + ')">'
     + '<div class="file-item-title">' + favicon + escapeHtml(f.title) + '</div>'
-    + '<div class="file-item-meta">'
-    + (date ? '<span><svg class="icon icon-sm" style="opacity:0.5" aria-hidden="true"><use href="#i-calendar"/></svg> ' + date + '</span>' : '')
-    + (f.domain ? '<span>' + escapeHtml(f.domain) + '</span>' : '')
-    + '</div>'
+    + '<div class="file-item-meta">' + metaHtml + '</div>'
     + indicators
     + '</div>';
 }
@@ -3733,7 +3746,7 @@ async function addToTTSQueue(filename) {
       if (res.ok) {
         const cfg = await res.json();
         ttsProvider = cfg.provider || 'browser';
-        if (cfg.provider !== 'browser' && cfg.hasKey) {
+        if (cfg.provider !== 'browser' && cfg.provider !== 'kokoro' && cfg.hasKey) {
           // Show one-time session confirmation
           const model = cfg.model || '';
           const perK = TTS_COST_PER_1K[model];
@@ -4151,6 +4164,7 @@ function showTTSSettings() {
 
     const providers = [
       { id: 'browser', label: 'Browser (free, built-in)' },
+      { id: 'kokoro', label: 'Kokoro (free, local AI)' },
       { id: 'openai', label: 'OpenAI' },
       { id: 'elevenlabs', label: 'ElevenLabs' },
     ];
@@ -4179,12 +4193,39 @@ function showTTSSettings() {
             ${providers.map(p => '<option value="' + p.id + '"' + (data.provider === p.id ? ' selected' : '') + '>' + p.label + '</option>').join('')}
           </select>
         </div>
-        <div id="tts-cost-info" style="display:${data.provider === 'browser' ? 'none' : 'block'}">
+        <div id="tts-kokoro-settings" style="display:${data.provider === 'kokoro' ? 'block' : 'none'}">
+          <div style="background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin:10px 0;font-size:12px;line-height:1.6">
+            <strong style="color:var(--fg)">Local AI voice</strong><br>
+            <span style="color:var(--muted)">Kokoro runs entirely on your machine — no API key, no cost, no data sent anywhere.</span><br>
+            <span style="color:var(--muted)">The model (~86MB) downloads automatically on first use.</span>
+            <div id="kokoro-status" style="margin-top:6px">
+              ${data.kokoro?.installed
+                ? '<span style="color:#22c55e">&#10003; Model downloaded and ready</span>'
+                : '<span style="color:var(--muted)">Model will download on first listen</span>'}
+              ${!data.kokoro?.packageAvailable
+                ? '<br><span style="color:#f59e0b;font-size:11px">Note: kokoro-js package not yet installed. Run: npm install kokoro-js</span>'
+                : ''}
+            </div>
+          </div>
+          <div style="margin:12px 0">
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Voice</label>
+            <select id="tts-kokoro-voice" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px">
+              ${renderVoiceOptions('kokoro')}
+            </select>
+          </div>
+          <div style="margin:12px 0">
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Quality</label>
+            <select id="tts-kokoro-model" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px">
+              ${renderModelOptions('kokoro')}
+            </select>
+          </div>
+        </div>
+        <div id="tts-cost-info" style="display:${data.provider === 'openai' || data.provider === 'elevenlabs' ? 'block' : 'none'}">
           <div id="tts-cost-estimate" style="background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin:10px 0;font-size:12px;line-height:1.5">
             ${ttsGetCostHtml(data.provider, data.model)}
           </div>
         </div>
-        <div id="tts-cloud-settings" style="display:${data.provider === 'browser' ? 'none' : 'block'}">
+        <div id="tts-cloud-settings" style="display:${data.provider === 'openai' || data.provider === 'elevenlabs' ? 'block' : 'none'}">
           <div style="margin:12px 0">
             <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">API Key <span style="font-weight:400;color:var(--muted)">(separate from your Summaries key)</span></label>
             <input type="password" id="tts-api-key" placeholder="Enter API key for TTS" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px" />
@@ -4261,8 +4302,11 @@ function ttsSettingsProviderChanged() {
   const provider = document.getElementById('tts-provider-select').value;
   const cloudSettings = document.getElementById('tts-cloud-settings');
   const costInfo = document.getElementById('tts-cost-info');
-  cloudSettings.style.display = provider === 'browser' ? 'none' : 'block';
-  costInfo.style.display = provider === 'browser' ? 'none' : 'block';
+  const kokoroSettings = document.getElementById('tts-kokoro-settings');
+  const isCloud = provider === 'openai' || provider === 'elevenlabs';
+  cloudSettings.style.display = isCloud ? 'block' : 'none';
+  costInfo.style.display = isCloud ? 'block' : 'none';
+  if (kokoroSettings) kokoroSettings.style.display = provider === 'kokoro' ? 'block' : 'none';
 
   // Reset consent checkbox when changing providers
   const consent = document.getElementById('tts-consent');
@@ -4302,7 +4346,10 @@ function saveTTSSettings() {
   const provider = document.getElementById('tts-provider-select').value;
   const config = { provider };
 
-  if (provider !== 'browser') {
+  if (provider === 'kokoro') {
+    config.voice = document.getElementById('tts-kokoro-voice').value;
+    config.model = document.getElementById('tts-kokoro-model').value;
+  } else if (provider !== 'browser') {
     const consent = document.getElementById('tts-consent');
     if (!consent || !consent.checked) {
       // Briefly highlight the consent checkbox

@@ -12,7 +12,7 @@ import { autotagText, autotagBatch, saveMachineTags, hasMachineTags } from './au
 import { APP_ICON } from './app-icon';
 import { fetchAndExtract } from './extractor';
 import { generateMarkdown, ArticleData } from './writer';
-import { loadTTSConfig, saveTTSConfig, generateSpeech, TTS_VOICES, TTS_MODELS } from './tts';
+import { loadTTSConfig, saveTTSConfig, generateSpeech, getAudioContentType, getKokoroStatus, TTS_VOICES, TTS_MODELS } from './tts';
 
 interface FileMeta {
   filename: string;
@@ -617,13 +617,15 @@ export function startViewer(outputPath: string, port = 7777): void {
     if (url.pathname === '/api/tts-settings') {
       if (req.method === 'GET') {
         const config = loadTTSConfig();
+        const kokoroStatus = getKokoroStatus();
         sendJson(res, {
           provider: config.provider,
           voice: config.voice || '',
           model: config.model || '',
-          hasKey: config.provider === 'browser' || !!config.apiKey,
+          hasKey: config.provider === 'browser' || config.provider === 'kokoro' || !!config.apiKey,
           voices: TTS_VOICES,
           models: TTS_MODELS,
+          kokoro: kokoroStatus,
         });
         return;
       }
@@ -672,7 +674,7 @@ export function startViewer(outputPath: string, port = 7777): void {
         const audio = await generateSpeech(name, articleText, config);
 
         res.writeHead(200, {
-          'Content-Type': 'audio/mpeg',
+          'Content-Type': getAudioContentType(config.provider),
           'Content-Length': audio.length.toString(),
           'Cache-Control': 'max-age=86400',
         });
