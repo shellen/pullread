@@ -1,0 +1,81 @@
+Pull Read - Third-Party Software Notices
+
+This file lists the third-party open-source software used in Pull Read,
+along with their respective licenses.
+
+================================================================================
+
+@mozilla/readability
+License: Apache-2.0
+https://github.com/mozilla/readability
+
+Copyright (c) Mozilla and individual contributors.
+Licensed under the Apache License, Version 2.0.
+
+================================================================================
+
+turndown
+License: MIT
+https://github.com/mixmark-io/turndown
+
+Copyright (c) 2017 Dom Christie
+Licensed under the MIT License.
+
+================================================================================
+
+fast-xml-parser
+License: MIT
+https://github.com/NaturalIntelligence/fast-xml-parser
+
+Copyright (c) 2017 Amit Kumar Gupta
+Licensed under the MIT License.
+
+================================================================================
+
+linkedom
+License: ISC
+https://github.com/WebReflection/linkedom
+
+Copyright (c) Andrea Giammarchi
+Licensed under the ISC License.
+
+================================================================================
+
+unpdf
+License: MIT
+https://github.com/nicbarker/unpdf
+
+Licensed under the MIT License.
+
+================================================================================
+
+kokoro-js (optional)
+License: MIT
+https://github.com/hexgrad/kokoro
+
+Licensed under the MIT License.
+
+================================================================================
+
+Sparkle (macOS app only)
+License: MIT
+https://github.com/sparkle-project/Sparkle
+
+Copyright (c) 2006-2013 Andy Matuschak.
+Copyright (c) 2009-2013 Elgato Systems GmbH.
+Copyright (c) 2011-2014 Kornel Lesinski.
+Copyright (c) 2015-2024 Sparkle Project.
+Licensed under the MIT License.
+
+================================================================================
+
+Bun
+License: MIT
+https://github.com/oven-sh/bun
+
+Copyright (c) Jarred Sumner
+Licensed under the MIT License.
+
+================================================================================
+
+For full license texts, see the LICENSE files in each project's repository.

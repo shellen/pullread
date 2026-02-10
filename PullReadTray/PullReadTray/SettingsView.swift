@@ -548,6 +548,11 @@ struct SettingsView: View {
                             .cornerRadius(6)
                     }
 
+                    Text("Summaries, auto-tagging, and reviews will send article text to \(llmProvider.capitalized)'s API using your key.")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .padding(.leading, 68)
+
                     // Model selection
                     HStack(spacing: 8) {
                         Text("Model")

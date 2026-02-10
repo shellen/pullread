@@ -698,7 +698,7 @@ export function startViewer(outputPath: string, port = 7777): void {
     send404(res);
   });
 
-  server.listen(port, () => {
+  server.listen(port, '127.0.0.1', () => {
     const url = `http://localhost:${port}`;
     console.log(`PullRead viewer running at ${url}`);
     console.log(`Reading from: ${outputPath}`);

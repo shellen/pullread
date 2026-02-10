@@ -3,21 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pull Read - Keep What You Read</title>
-<meta name="description" content="Save articles from your bookmark services as clean, local markdown files. Connect Instapaper, Pinboard, Raindrop, and more.">
+<title>Pull Read — Keep What You Read</title>
+<meta name="description" content="Save articles from your bookmark services as clean, local markdown files. Read, highlight, summarize, and listen — all yours, all local.">
 
 <!-- Open Graph -->
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://pullread.com/">
-<meta property="og:title" content="Pull Read - Keep What You Read">
-<meta property="og:description" content="Save articles from your bookmark services as clean, local markdown files. A self-contained macOS menu bar app with highlights, notes, and AI summaries.">
+<meta property="og:title" content="Pull Read — Keep What You Read">
+<meta property="og:description" content="Save articles from your bookmark services as clean, local markdown files. A self-contained macOS menu bar app with highlights, notes, AI summaries, and text-to-speech.">
 <meta property="og:site_name" content="Pull Read">
 <meta property="og:locale" content="en_US">
 
 <!-- Twitter Card -->
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Pull Read - Keep What You Read">
-<meta name="twitter:description" content="Save articles from your bookmark services as clean, local markdown files. A self-contained macOS menu bar app with highlights, notes, and AI summaries.">
+<meta name="twitter:title" content="Pull Read — Keep What You Read">
+<meta name="twitter:description" content="Save articles from your bookmark services as clean, local markdown files. Read, highlight, summarize, and listen — all yours, all local.">
 
 <!-- Additional SEO -->
 <meta name="author" content="A Little Drive">
@@ -27,45 +27,48 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700;800&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 <style>
   :root {
     --teal: #2a9d8f;
     --teal-dark: #21867a;
-    --teal-light: #e8f5f3;
+    --teal-subtle: #f0faf8;
     --orange: #e76f51;
-    --fg: #1a1a1a;
-    --muted: #5a5a5a;
-    --light-muted: #888;
+    --fg: #111111;
+    --body: #374151;
+    --muted: #6b7280;
+    --light: #9ca3af;
     --bg: #fafaf9;
     --white: #ffffff;
-    --border: #e8e8e6;
-    --code-bg: #f3f3f1;
+    --border: #e5e7eb;
+    --border-light: #f3f4f6;
+    --code-bg: #f9fafb;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     color: var(--fg);
     background: var(--bg);
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Nav */
+  /* ── Nav ── */
   nav {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     z-index: 100;
-    background: rgba(250, 250, 249, 0.85);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border);
-    padding: 0 24px;
-    height: 56px;
+    background: rgba(250, 250, 249, 0.8);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    padding: 0 32px;
+    height: 60px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -76,9 +79,10 @@
     align-items: center;
     gap: 10px;
     font-weight: 700;
-    font-size: 18px;
+    font-size: 17px;
     color: var(--fg);
     text-decoration: none;
+    letter-spacing: -0.02em;
   }
 
   .nav-brand svg { flex-shrink: 0; }
@@ -86,7 +90,7 @@
   .nav-links {
     display: flex;
     align-items: center;
-    gap: 32px;
+    gap: 8px;
     list-style: none;
   }
 
@@ -96,6 +100,8 @@
     font-size: 14px;
     font-weight: 500;
     transition: color 0.15s;
+    padding: 6px 14px;
+    border-radius: 8px;
   }
 
   .nav-links a:hover { color: var(--fg); }
@@ -104,73 +110,107 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 10px 20px;
-    border-radius: 8px;
+    padding: 10px 22px;
+    border-radius: 10px;
     font-weight: 600;
     font-size: 15px;
+    font-family: inherit;
     text-decoration: none;
-    transition: all 0.15s;
+    transition: all 0.2s ease;
     border: none;
     cursor: pointer;
+    letter-spacing: -0.01em;
   }
 
   .btn-primary {
-    background: var(--teal);
+    background: var(--fg);
     color: var(--white);
   }
 
   .btn-primary:hover {
-    background: var(--teal-dark);
+    background: #333;
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(42, 157, 143, 0.3);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
   }
 
-  .btn-secondary {
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted);
+    padding: 10px 18px;
+  }
+
+  .btn-ghost:hover {
+    color: var(--fg);
+    background: rgba(0,0,0,0.04);
+  }
+
+  .btn-teal {
+    background: var(--teal);
+    color: var(--white);
+  }
+
+  .btn-teal:hover {
+    background: var(--teal-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(42, 157, 143, 0.3);
+  }
+
+  .btn-outline {
     background: var(--white);
     color: var(--fg);
     border: 1px solid var(--border);
   }
 
-  .btn-secondary:hover {
-    border-color: #ccc;
+  .btn-outline:hover {
+    border-color: #d1d5db;
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
   }
 
   .btn-sm {
-    padding: 8px 16px;
+    padding: 7px 14px;
     font-size: 13px;
-    border-radius: 6px;
+    border-radius: 8px;
   }
 
-  /* Hero */
+  /* ── Hero ── */
   .hero {
-    padding: 140px 24px 80px;
+    padding: 160px 32px 100px;
     text-align: center;
-    max-width: 800px;
+    max-width: 860px;
     margin: 0 auto;
   }
 
-  .hero-icon {
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: var(--teal-subtle);
+    color: var(--teal);
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
     margin-bottom: 32px;
+    letter-spacing: 0.01em;
   }
 
   .hero h1 {
-    font-size: clamp(36px, 6vw, 56px);
+    font-size: clamp(42px, 7vw, 72px);
     font-weight: 800;
-    line-height: 1.1;
-    letter-spacing: -0.03em;
-    margin-bottom: 20px;
+    line-height: 1.05;
+    letter-spacing: -0.04em;
+    margin-bottom: 24px;
+    color: var(--fg);
   }
 
-  .hero h1 .accent { color: var(--teal); }
-
   .hero p {
-    font-size: 19px;
+    font-size: 20px;
     color: var(--muted);
-    max-width: 560px;
-    margin: 0 auto 36px;
+    max-width: 520px;
+    margin: 0 auto 40px;
     line-height: 1.6;
+    font-weight: 400;
   }
 
   .hero-buttons {
@@ -181,18 +221,17 @@
   }
 
   .hero-note {
-    margin-top: 16px;
+    margin-top: 20px;
     font-size: 13px;
-    color: var(--light-muted);
+    color: var(--light);
+    font-weight: 400;
   }
 
-  /* Section layout */
-  section {
-    padding: 80px 24px;
-  }
+  /* ── Sections ── */
+  section { padding: 100px 32px; }
 
   .container {
-    max-width: 1080px;
+    max-width: 1100px;
     margin: 0 auto;
   }
 
@@ -200,100 +239,97 @@
     font-size: 13px;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
     color: var(--teal);
-    margin-bottom: 12px;
+    margin-bottom: 14px;
   }
 
   .section-title {
-    font-size: clamp(28px, 4vw, 40px);
+    font-size: clamp(30px, 4vw, 44px);
     font-weight: 800;
-    letter-spacing: -0.02em;
-    line-height: 1.15;
+    letter-spacing: -0.035em;
+    line-height: 1.1;
     margin-bottom: 16px;
+    color: var(--fg);
   }
 
   .section-subtitle {
-    font-size: 17px;
+    font-size: 18px;
     color: var(--muted);
-    max-width: 560px;
-    line-height: 1.6;
+    max-width: 540px;
+    line-height: 1.65;
+    font-weight: 400;
   }
 
-  /* How it works */
-  .how-it-works {
+  .section-alt {
     background: var(--white);
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
+    border-top: 1px solid var(--border-light);
+    border-bottom: 1px solid var(--border-light);
   }
 
+  /* ── How it works ── */
   .steps {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 40px;
-    margin-top: 48px;
+    gap: 48px;
+    margin-top: 56px;
   }
 
-  .step {
-    text-align: center;
-  }
+  .step { text-align: center; }
 
   .step-num {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: var(--teal-light);
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: var(--teal-subtle);
     color: var(--teal);
     font-weight: 700;
-    font-size: 16px;
-    margin-bottom: 16px;
+    font-size: 18px;
+    margin-bottom: 20px;
   }
 
   .step h3 {
     font-size: 18px;
     font-weight: 700;
     margin-bottom: 8px;
+    letter-spacing: -0.02em;
   }
 
   .step p {
     font-size: 15px;
     color: var(--muted);
-    line-height: 1.55;
+    line-height: 1.6;
   }
 
-  .flow-arrow {
-    display: none;
-  }
-
-  /* Features grid */
+  /* ── Features grid ── */
   .features-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 24px;
-    margin-top: 48px;
+    gap: 20px;
+    margin-top: 56px;
   }
 
   .feature-card {
     background: var(--white);
-    border: 1px solid var(--border);
-    border-radius: 12px;
+    border: 1px solid var(--border-light);
+    border-radius: 14px;
     padding: 28px;
-    transition: box-shadow 0.2s, transform 0.2s;
+    transition: box-shadow 0.25s ease, transform 0.25s ease;
   }
 
   .feature-card:hover {
-    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
     transform: translateY(-2px);
   }
 
   .feature-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    background: var(--teal-light);
+    width: 42px;
+    height: 42px;
+    border-radius: 11px;
+    background: var(--teal-subtle);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -304,62 +340,179 @@
   .feature-card h3 {
     font-size: 16px;
     font-weight: 700;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
+    letter-spacing: -0.01em;
   }
 
   .feature-card p {
     font-size: 14px;
     color: var(--muted);
-    line-height: 1.55;
+    line-height: 1.6;
   }
 
-  /* Services strip */
-  .services {
-    background: var(--white);
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
+  /* ── AI showcase ── */
+  .ai-section {
+    background: var(--fg);
+    color: var(--white);
+    border-top: none;
+    border-bottom: none;
   }
 
-  .service-logos {
+  .ai-section .section-label { color: rgba(42, 157, 143, 0.9); }
+  .ai-section .section-title { color: var(--white); }
+  .ai-section .section-subtitle { color: rgba(255,255,255,0.6); }
+
+  .ai-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-top: 48px;
+  }
+
+  .ai-card {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 32px;
+  }
+
+  .ai-card h3 {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    letter-spacing: -0.02em;
+  }
+
+  .ai-card p {
+    font-size: 15px;
+    color: rgba(255,255,255,0.55);
+    line-height: 1.6;
+    margin-bottom: 20px;
+  }
+
+  /* Badge preview */
+  .badge-row {
     display: flex;
+    gap: 6px;
     flex-wrap: wrap;
-    gap: 16px;
-    margin-top: 36px;
-    justify-content: center;
   }
 
-  .service-tag {
+  .badge {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 16px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--muted);
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
   }
 
-  /* Reader preview */
+  .badge-gray { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.5); }
+  .badge-amber { background: rgba(217, 119, 6, 0.15); color: #f59e0b; }
+  .badge-green { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+  .badge-blue { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+  .badge-indigo { background: rgba(99, 102, 241, 0.15); color: #818cf8; }
+  .badge-purple { background: rgba(168, 85, 247, 0.15); color: #a855f7; }
+
+  /* Search operators demo */
+  .search-demo {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 14px;
+    color: rgba(255,255,255,0.7);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .search-demo svg { flex-shrink: 0; opacity: 0.4; }
+
+  .op-tags {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .op-tag {
+    padding: 5px 12px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    color: rgba(255,255,255,0.55);
+  }
+
+  /* ── TTS section ── */
+  .tts-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-top: 48px;
+  }
+
+  .tts-card {
+    background: var(--white);
+    border: 1px solid var(--border-light);
+    border-radius: 14px;
+    padding: 24px;
+    text-align: center;
+  }
+
+  .tts-card .tts-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 14px;
+    font-size: 22px;
+  }
+
+  .tts-card h3 {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    letter-spacing: -0.01em;
+  }
+
+  .tts-card p {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  .tts-card .tts-price {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--teal);
+    margin-top: 8px;
+  }
+
+  /* ── Reader preview ── */
   .reader-section { text-align: center; }
 
   .reader-preview {
-    margin-top: 48px;
+    margin-top: 56px;
     background: var(--white);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 14px;
     overflow: hidden;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.08);
-    max-width: 900px;
+    box-shadow: 0 12px 48px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04);
+    max-width: 960px;
     margin-left: auto;
     margin-right: auto;
   }
 
   .reader-chrome {
-    background: #f5f5f5;
-    border-bottom: 1px solid var(--border);
-    padding: 10px 16px;
+    background: #f8f8f8;
+    border-bottom: 1px solid var(--border-light);
+    padding: 12px 16px;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -369,125 +522,199 @@
     width: 12px;
     height: 12px;
     border-radius: 50%;
-    background: #e0e0e0;
+    background: #e5e5e5;
   }
 
   .reader-body {
     display: grid;
-    grid-template-columns: 240px 1fr;
-    min-height: 360px;
+    grid-template-columns: 260px 1fr;
+    min-height: 400px;
   }
 
   .reader-sidebar {
-    background: #f7f7f7;
-    border-right: 1px solid var(--border);
-    padding: 16px 0;
+    background: #f9f9f8;
+    border-right: 1px solid var(--border-light);
+    padding: 12px 8px;
+  }
+
+  .reader-sidebar-search {
+    margin: 0 4px 8px;
+    padding: 7px 10px;
+    background: rgba(0,0,0,0.03);
+    border: none;
+    border-radius: 7px;
+    font-size: 12px;
+    color: var(--light);
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
 
   .reader-sidebar-item {
-    padding: 10px 16px;
-    font-size: 12px;
+    padding: 9px 12px;
+    font-size: 12.5px;
     color: var(--muted);
-    border-left: 3px solid transparent;
-    font-family: 'Inter', sans-serif;
+    border-radius: 7px;
+    font-family: 'Work Sans', sans-serif;
+    margin-bottom: 1px;
+    line-height: 1.4;
   }
 
   .reader-sidebar-item.active {
-    background: #e8e8e8;
-    border-left-color: var(--teal);
+    background: rgba(0,0,0,0.06);
     color: var(--fg);
     font-weight: 600;
   }
 
-  .reader-sidebar-item .date {
-    font-size: 10px;
-    color: var(--light-muted);
-    display: block;
+  .reader-sidebar-item:not(.active):hover {
+    background: rgba(0,0,0,0.03);
+  }
+
+  .reader-sidebar-item .meta {
+    font-size: 11px;
+    color: var(--light);
+    display: flex;
+    align-items: center;
+    gap: 4px;
     margin-top: 2px;
   }
 
+  .reader-sidebar-item .meta .dot-sep {
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background: var(--light);
+    display: inline-block;
+  }
+
+  .reader-sidebar-item .summary-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--muted);
+    opacity: 0.5;
+    display: inline-block;
+    margin-left: 4px;
+  }
+
   .reader-content {
-    padding: 32px 40px;
+    padding: 36px 44px;
     text-align: left;
   }
 
   .reader-content h2 {
     font-family: 'Source Serif 4', Georgia, serif;
-    font-size: 24px;
+    font-size: 26px;
     font-weight: 600;
     margin-bottom: 6px;
     color: var(--fg);
+    line-height: 1.25;
   }
 
   .reader-content .byline {
     font-size: 12px;
-    color: var(--light-muted);
-    margin-bottom: 16px;
+    color: var(--light);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
 
-  .reader-content .mock-text {
-    height: 10px;
-    background: #eee;
+  .reader-content .byline .dot-sep {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--light);
+    display: inline-block;
+  }
+
+  /* Summary card in reader preview */
+  .reader-summary {
+    background: rgba(0,0,0,0.025);
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 20px;
+  }
+
+  .reader-summary-badges {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 8px;
+  }
+
+  .reader-summary-badges .badge {
+    font-size: 10px;
+    padding: 2px 7px;
     border-radius: 4px;
-    margin-bottom: 10px;
   }
 
-  .reader-content .mock-text:nth-child(odd) { width: 100%; }
-  .reader-content .mock-text:nth-child(even) { width: 85%; }
-  .reader-content .mock-text:last-child { width: 60%; }
+  .badge-gray-light { background: rgba(0,0,0,0.06); color: var(--muted); }
+  .badge-amber-light { background: rgba(217, 119, 6, 0.08); color: #b45309; }
 
-  .reader-content .highlight {
-    background: rgba(255, 235, 59, 0.35);
-    border-radius: 2px;
-    display: inline;
-    padding: 1px 0;
+  .reader-summary p {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.55;
   }
 
   .reader-content .mock-paragraph {
     font-family: 'Source Serif 4', Georgia, serif;
-    font-size: 15px;
-    line-height: 1.7;
-    color: var(--muted);
-    margin-bottom: 14px;
+    font-size: 15.5px;
+    line-height: 1.75;
+    color: var(--body);
+    margin-bottom: 16px;
   }
 
-  /* Markdown preview */
-  .markdown-section {
-    background: var(--white);
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
+  .reader-content .highlight {
+    background: rgba(255, 235, 59, 0.3);
+    border-radius: 2px;
+    padding: 1px 0;
   }
 
+  .mock-text {
+    height: 11px;
+    background: #f0f0ee;
+    border-radius: 4px;
+    margin-bottom: 10px;
+  }
+
+  .mock-text:nth-child(odd) { width: 100%; }
+  .mock-text:nth-child(even) { width: 88%; }
+  .mock-text:last-child { width: 55%; }
+
+  /* ── Markdown preview ── */
   .markdown-split {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 40px;
-    margin-top: 48px;
+    gap: 24px;
+    margin-top: 56px;
     align-items: start;
   }
 
   .markdown-block {
-    background: var(--bg);
+    background: var(--white);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: 12px;
     overflow: hidden;
   }
 
   .markdown-block-header {
     background: var(--code-bg);
     padding: 10px 16px;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
-    color: var(--light-muted);
-    border-bottom: 1px solid var(--border);
+    color: var(--light);
+    border-bottom: 1px solid var(--border-light);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
   }
 
   .markdown-block pre {
     padding: 20px;
     font-size: 13px;
-    line-height: 1.6;
+    line-height: 1.65;
     font-family: 'SF Mono', 'Fira Code', monospace;
     overflow-x: auto;
     color: var(--muted);
@@ -497,26 +724,55 @@
   .markdown-block pre .val { color: var(--orange); }
   .markdown-block pre .heading { color: var(--fg); font-weight: 600; }
 
-  /* CTA */
+  /* ── Services ── */
+  .service-logos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 40px;
+    justify-content: center;
+  }
+
+  .service-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--muted);
+    transition: border-color 0.15s, color 0.15s;
+  }
+
+  .service-tag:hover {
+    border-color: var(--teal);
+    color: var(--teal);
+  }
+
+  /* ── CTA ── */
   .cta {
     text-align: center;
-    padding: 100px 24px;
+    padding: 120px 32px;
   }
 
   .cta h2 {
-    font-size: clamp(28px, 4vw, 40px);
+    font-size: clamp(30px, 4vw, 44px);
     font-weight: 800;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.035em;
     margin-bottom: 16px;
   }
 
   .cta p {
-    font-size: 17px;
+    font-size: 18px;
     color: var(--muted);
-    margin-bottom: 32px;
-    max-width: 480px;
+    margin-bottom: 36px;
+    max-width: 440px;
     margin-left: auto;
     margin-right: auto;
+    line-height: 1.6;
   }
 
   .cta-buttons {
@@ -526,37 +782,58 @@
     flex-wrap: wrap;
   }
 
-  /* Footer */
+  /* ── Footer ── */
   footer {
-    border-top: 1px solid var(--border);
-    padding: 32px 24px;
-    text-align: center;
+    border-top: 1px solid var(--border-light);
+    padding: 36px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 1100px;
+    margin: 0 auto;
     font-size: 13px;
-    color: var(--light-muted);
+    color: var(--light);
   }
 
   footer a {
     color: var(--muted);
     text-decoration: none;
+    transition: color 0.15s;
   }
 
   footer a:hover { color: var(--fg); }
 
-  .footer-brand {
-    margin-bottom: 10px;
-  }
-  .footer-logo {
-    font-weight: 600;
-    font-size: 14px;
-    color: var(--muted) !important;
-    letter-spacing: -0.01em;
-  }
-  .footer-logo:hover {
-    color: var(--fg) !important;
+  .footer-links {
+    display: flex;
+    gap: 20px;
+    list-style: none;
   }
 
-  /* Responsive */
+  /* ── Scroll animations ── */
+  .reveal {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* ── Responsive ── */
   @media (max-width: 768px) {
+    nav { padding: 0 20px; }
+    .nav-links { display: none; }
+
+    .hero {
+      padding: 120px 20px 60px;
+    }
+
+    .hero h1 { font-size: 38px; }
+
+    section { padding: 64px 20px; }
+
     .steps {
       grid-template-columns: 1fr;
       gap: 32px;
@@ -564,33 +841,44 @@
 
     .features-grid {
       grid-template-columns: 1fr;
-      gap: 16px;
+      gap: 12px;
+    }
+
+    .ai-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .tts-grid {
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
     }
 
     .reader-body {
       grid-template-columns: 1fr;
     }
 
-    .reader-sidebar {
-      display: none;
-    }
+    .reader-sidebar { display: none; }
 
     .markdown-split {
       grid-template-columns: 1fr;
-      gap: 16px;
+      gap: 12px;
     }
 
-    .nav-links { display: none; }
-
-    .hero { padding: 100px 24px 60px; }
-
-    section { padding: 60px 24px; }
+    footer {
+      flex-direction: column;
+      gap: 12px;
+      text-align: center;
+    }
   }
 
   @media (max-width: 480px) {
     .hero-buttons {
       flex-direction: column;
       align-items: center;
+    }
+
+    .tts-grid {
+      grid-template-columns: 1fr;
     }
   }
 </style>
@@ -612,59 +900,53 @@
   </a>
   <ul class="nav-links">
     <li><a href="#features">Features</a></li>
+    <li><a href="#intelligence">Intelligence</a></li>
     <li><a href="#reader">Reader</a></li>
-    <li><a href="#format">Format</a></li>
-    <li><a href="https://github.com/shellen/pullread" class="btn btn-sm btn-secondary">GitHub</a></li>
+    <li><a href="https://github.com/shellen/pullread" class="btn btn-sm btn-ghost">GitHub</a></li>
     <li><a href="https://github.com/shellen/pullread/releases/download/latest/PullRead.dmg" class="btn btn-sm btn-primary">Download</a></li>
   </ul>
 </nav>
 
 <!-- Hero -->
 <section class="hero">
-  <div class="hero-icon">
-    <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-      <rect x="2" y="2" width="76" height="76" rx="18" fill="#2a9d8f"/>
-      <rect x="14" y="12" width="52" height="58" rx="4" fill="#fff"/>
-      <rect x="22" y="28" width="36" height="5" rx="2.5" fill="#444"/>
-      <rect x="22" y="38" width="36" height="5" rx="2.5" fill="#444"/>
-      <rect x="22" y="48" width="24" height="5" rx="2.5" fill="#444"/>
-      <path d="M49 6v18l6-4.5L61 24V6z" fill="#e76f51"/>
-    </svg>
+  <div class="hero-badge">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 1v12M1 7h12"/></svg>
+    Version 1.3.3
   </div>
-  <h1>Keep what <span class="accent">you read</span></h1>
-  <p>Pull Read saves articles from your bookmark services as clean markdown files. Your reading archive, in a folder you control.</p>
+  <h1>Keep what<br>you read.</h1>
+  <p>Save articles from your bookmarks as clean markdown. Read, highlight, summarize, and listen&mdash;all yours, all local.</p>
   <div class="hero-buttons">
     <a href="https://github.com/shellen/pullread/releases/download/latest/PullRead.dmg" class="btn btn-primary">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12V2M4 8l4 4 4-4M2 14h12"/></svg>
       Download for macOS
     </a>
-    <a href="https://github.com/shellen/pullread" class="btn btn-secondary">View on GitHub</a>
+    <a href="https://github.com/shellen/pullread" class="btn btn-outline">View on GitHub</a>
   </div>
-  <p class="hero-note">Self-contained menu bar app. Nothing else to install.</p>
+  <p class="hero-note">Self-contained menu bar app. No dependencies.</p>
 </section>
 
 <!-- How it works -->
-<section class="how-it-works" id="how">
+<section class="section-alt" id="how">
   <div class="container">
-    <div style="text-align: center;">
+    <div class="reveal" style="text-align: center;">
       <div class="section-label">How it works</div>
-      <h2 class="section-title">Three steps to keeping your articles</h2>
+      <h2 class="section-title">Three steps to your reading archive</h2>
     </div>
-    <div class="steps">
+    <div class="steps reveal">
       <div class="step">
         <div class="step-num">1</div>
         <h3>Connect your feeds</h3>
-        <p>Add RSS feeds from Instapaper, Pinboard, Raindrop, or any bookmark service. Paste a blog URL and Pull Read auto-discovers the feed.</p>
+        <p>Add RSS feeds from Instapaper, Pinboard, Raindrop, or any source. Paste a blog URL and Pull Read auto-discovers the feed.</p>
       </div>
       <div class="step">
         <div class="step-num">2</div>
         <h3>Pull Read syncs</h3>
-        <p>Articles are fetched, cleaned with Mozilla's Readability algorithm, and converted to markdown with rich metadata.</p>
+        <p>Articles are fetched, cleaned with Mozilla's Readability, and saved as markdown with rich metadata in YAML frontmatter.</p>
       </div>
       <div class="step">
         <div class="step-num">3</div>
         <h3>Read and annotate</h3>
-        <p>Browse in the built-in reader with highlights, notes, and AI summaries. Or open files in Obsidian, VS Code, or any editor.</p>
+        <p>Browse in the built-in reader with highlights, notes, AI summaries, and text-to-speech. Or open files in Obsidian or any editor.</p>
       </div>
     </div>
   </div>
@@ -673,24 +955,26 @@
 <!-- Features -->
 <section id="features">
   <div class="container">
-    <div class="section-label">Features</div>
-    <h2 class="section-title">Everything you need to<br>archive what you read</h2>
-    <p class="section-subtitle">Pull Read handles articles, podcasts, YouTube videos, PDFs, and tweets with specialized extractors for each.</p>
+    <div class="reveal">
+      <div class="section-label">Features</div>
+      <h2 class="section-title">Everything you need to<br>archive what you read</h2>
+      <p class="section-subtitle">Articles, podcasts, YouTube videos, PDFs, and tweets — each with a specialized extractor.</p>
+    </div>
 
-    <div class="features-grid">
+    <div class="features-grid reveal">
       <div class="feature-card">
         <div class="feature-icon">
           <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h12M4 8h12M4 12h8"/></svg>
         </div>
         <h3>Clean extraction</h3>
-        <p>Mozilla's Readability strips ads, nav, and clutter. What's left is the article, converted to beautiful markdown.</p>
+        <p>Mozilla's Readability strips ads, nav, and clutter. What's left is the article, saved as beautiful markdown.</p>
       </div>
 
       <div class="feature-card">
         <div class="feature-icon">
           <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="10 2 12.5 7 18 7.5 14 11.5 15 17 10 14 5 17 6 11.5 2 7.5 7.5 7"/></svg>
         </div>
-        <h3>Highlights and notes</h3>
+        <h3>Highlights &amp; notes</h3>
         <p>Select text to highlight in four colors. Add inline annotations, article-level notes, and tags to organize your thinking.</p>
       </div>
 
@@ -699,7 +983,23 @@
           <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8"/><path d="M10 6v4l3 3"/></svg>
         </div>
         <h3>AI summaries</h3>
-        <p>Summarize articles on demand or in batch with Claude, GPT, Gemini, or Apple Intelligence. Summaries live in the file.</p>
+        <p>Summarize articles with Claude, GPT, Gemini, OpenRouter, or Apple Intelligence. Shown with provider and model badges.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8"/><path d="M6 10h8M10 6v8"/></svg>
+        </div>
+        <h3>Search operators</h3>
+        <p>Filter with <code style="font-size:12px;background:rgba(0,0,0,.05);padding:1px 4px;border-radius:3px">is:favorite</code>, <code style="font-size:12px;background:rgba(0,0,0,.05);padding:1px 4px;border-radius:3px">tag:design</code>, <code style="font-size:12px;background:rgba(0,0,0,.05);padding:1px 4px;border-radius:3px">has:summary</code>, AND/OR logic, and more.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10a7 7 0 0114 0"/><path d="M6 10a4 4 0 018 0"/><circle cx="10" cy="10" r="1"/><path d="M10 11v5M8 16h4"/></svg>
+        </div>
+        <h3>Text-to-speech</h3>
+        <p>Listen to articles via browser TTS, Kokoro local AI, OpenAI, or ElevenLabs. Consent gates and cost estimates for paid providers.</p>
       </div>
 
       <div class="feature-card">
@@ -712,26 +1012,10 @@
 
       <div class="feature-card">
         <div class="feature-icon">
-          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10a7 7 0 0114 0"/><path d="M6 10a4 4 0 018 0"/><circle cx="10" cy="10" r="1"/><path d="M10 11v5"/><path d="M8 16h4"/></svg>
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v6l3-2 3 2V3M3 18V5a2 2 0 012-2h6"/><path d="M3 18l7-4 8 4"/></svg>
         </div>
-        <h3>Podcast archival</h3>
-        <p>Episode metadata, show notes, and audio links are preserved. Perfect for referencing past episodes.</p>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">
-          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V4a2 2 0 00-2-2z"/><path d="M8 1v2M12 1v2M4 7h12"/></svg>
-        </div>
-        <h3>Weekly reviews</h3>
-        <p>AI-generated digests of your recent reading. See themes and connections across what you've saved.</p>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">
-          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 13l10 5 10-5"/></svg>
-        </div>
-        <h3>Smart deduplication</h3>
-        <p>Pull Read remembers what it's already processed. Failed extractions are tracked for easy retry.</p>
+        <h3>Dashboard</h3>
+        <p>Card-based homepage with continue reading, weekly reviews, favorites, and recent articles at a glance.</p>
       </div>
 
       <div class="feature-card">
@@ -744,22 +1028,278 @@
 
       <div class="feature-card">
         <div class="feature-icon">
-          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2 2 0 012 2v10a2 2 0 01-2 2H7l-4 3V5a2 2 0 012-2h12z"/></svg>
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V4a2 2 0 00-2-2z"/><path d="M8 12l2 2 4-4"/></svg>
         </div>
-        <h3>Cloud sync friendly</h3>
-        <p>Output to Dropbox, iCloud, Google Drive, or any folder. Your archive goes wherever your files go.</p>
+        <h3>Export &amp; share</h3>
+        <p>Export articles as markdown with optional highlights, notes, summary, and tags. Share or archive however you want.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- AI & Intelligence -->
+<section class="ai-section" id="intelligence">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-label">Intelligence</div>
+      <h2 class="section-title">AI that works<br>for your reading</h2>
+      <p class="section-subtitle">Five providers, searchable summaries, and smart filtering — all optional, all on demand.</p>
+    </div>
+
+    <div class="ai-grid reveal">
+      <div class="ai-card">
+        <h3>Summaries with provenance</h3>
+        <p>Every summary shows which model generated it. Provider and model badges are saved to the file so you always know the source.</p>
+        <div style="margin-bottom:12px;">
+          <div class="badge-row" style="margin-bottom:8px;">
+            <span class="badge badge-gray">Summary</span>
+            <span class="badge badge-amber">Anthropic</span>
+            <span class="badge badge-gray">claude-sonnet-4-5-20250929</span>
+          </div>
+          <div class="badge-row" style="margin-bottom:8px;">
+            <span class="badge badge-gray">Summary</span>
+            <span class="badge badge-green">OpenAI</span>
+            <span class="badge badge-gray">gpt-4o</span>
+          </div>
+          <div class="badge-row" style="margin-bottom:8px;">
+            <span class="badge badge-gray">Summary</span>
+            <span class="badge badge-blue">Gemini</span>
+            <span class="badge badge-gray">gemini-2.5-flash</span>
+          </div>
+          <div class="badge-row" style="margin-bottom:8px;">
+            <span class="badge badge-gray">Summary</span>
+            <span class="badge badge-indigo">Apple Intelligence</span>
+          </div>
+          <div class="badge-row">
+            <span class="badge badge-gray">Summary</span>
+            <span class="badge badge-purple">OpenRouter</span>
+            <span class="badge badge-gray">deepseek/deepseek-r1</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="ai-card">
+        <h3>Search operators</h3>
+        <p>Power-user filtering with structured operators, AND/OR groups, and quoted phrases.</p>
+        <div class="search-demo">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg>
+          is:favorite tag:design has:summary
+        </div>
+        <div class="op-tags">
+          <span class="op-tag">is:favorite</span>
+          <span class="op-tag">is:read</span>
+          <span class="op-tag">has:summary</span>
+          <span class="op-tag">tag:*</span>
+          <span class="op-tag">feed:*</span>
+          <span class="op-tag">domain:*</span>
+          <span class="op-tag">author:*</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TTS -->
+<section id="tts">
+  <div class="container" style="text-align: center;">
+    <div class="reveal">
+      <div class="section-label">Text-to-speech</div>
+      <h2 class="section-title">Listen to your articles</h2>
+      <p class="section-subtitle" style="margin: 0 auto;">Four providers ranging from free built-in voices to studio-quality AI narration. Cost estimates and consent gates keep you in control.</p>
+    </div>
+
+    <div class="tts-grid reveal">
+      <div class="tts-card">
+        <div class="tts-icon" style="background: #f0fdf4; color: #16a34a;">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M8 8v8M16 6v12M4 11v2M20 10v4"/></svg>
+        </div>
+        <h3>Browser</h3>
+        <p>Built-in Web Speech API with system voices</p>
+        <div class="tts-price">Free</div>
+      </div>
+      <div class="tts-card">
+        <div class="tts-icon" style="background: #faf5ff; color: #9333ea;">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M8 8v8M16 6v12M4 11v2M20 10v4"/></svg>
+        </div>
+        <h3>Kokoro</h3>
+        <p>Local AI model, 11 voices, runs on your machine</p>
+        <div class="tts-price">Free &amp; local</div>
+      </div>
+      <div class="tts-card">
+        <div class="tts-icon" style="background: #f0fdf4; color: #16a34a;">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M8 8v8M16 6v12M4 11v2M20 10v4"/></svg>
+        </div>
+        <h3>OpenAI</h3>
+        <p>High-quality TTS with natural-sounding voices</p>
+        <div class="tts-price">~$0.015 / 1K chars</div>
+      </div>
+      <div class="tts-card">
+        <div class="tts-icon" style="background: #eff6ff; color: #2563eb;">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M8 8v8M16 6v12M4 11v2M20 10v4"/></svg>
+        </div>
+        <h3>ElevenLabs</h3>
+        <p>Premium studio-quality voice clones</p>
+        <div class="tts-price">~$0.30 / 1K chars</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Reader -->
+<section class="section-alt reader-section" id="reader">
+  <div class="container">
+    <div class="reveal" style="text-align: center;">
+      <div class="section-label">Built-in reader</div>
+      <h2 class="section-title">A reading experience you'll enjoy</h2>
+      <p class="section-subtitle" style="margin: 0 auto;">Four themes. Multiple fonts including Work Sans. Keyboard shortcuts. Highlights in four colors. Notes, tags, and voice recording.</p>
+    </div>
+
+    <div class="reader-preview reveal">
+      <div class="reader-chrome">
+        <div class="reader-dot"></div>
+        <div class="reader-dot"></div>
+        <div class="reader-dot"></div>
+      </div>
+      <div class="reader-body">
+        <div class="reader-sidebar">
+          <div class="reader-sidebar-search">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="5" r="4"/><path d="M8 8l3 3"/></svg>
+            Search articles...
+          </div>
+          <div class="reader-sidebar-item">
+            How to Write Better Code
+            <div class="meta">
+              <span>Feb 8</span>
+              <span class="dot-sep"></span>
+              <span>blog.example.com</span>
+            </div>
+          </div>
+          <div class="reader-sidebar-item active">
+            The Case for Local-First
+            <div class="meta">
+              <span>Feb 7</span>
+              <span class="dot-sep"></span>
+              <span>inkandswitch.com</span>
+              <span class="summary-dot"></span>
+            </div>
+          </div>
+          <div class="reader-sidebar-item">
+            Understanding WebAssembly
+            <div class="meta">
+              <span>Feb 6</span>
+              <span class="dot-sep"></span>
+              <span>hacks.mozilla.org</span>
+              <span class="summary-dot"></span>
+            </div>
+          </div>
+          <div class="reader-sidebar-item">
+            Why RSS Still Matters
+            <div class="meta">
+              <span>Feb 5</span>
+              <span class="dot-sep"></span>
+              <span>atthispoint.net</span>
+            </div>
+          </div>
+          <div class="reader-sidebar-item">
+            Building CLI Tools in Bun
+            <div class="meta">
+              <span>Feb 4</span>
+              <span class="dot-sep"></span>
+              <span>bun.sh</span>
+            </div>
+          </div>
+        </div>
+        <div class="reader-content">
+          <h2>The Case for Local-First</h2>
+          <div class="byline">
+            Martin Kleppmann
+            <span class="dot-sep"></span>
+            inkandswitch.com
+            <span class="dot-sep"></span>
+            Feb 7, 2026
+          </div>
+          <div class="reader-summary">
+            <div class="reader-summary-badges">
+              <span class="badge badge-gray-light">Summary</span>
+              <span class="badge badge-amber-light">Anthropic</span>
+              <span class="badge badge-gray-light">claude-sonnet-4-5-20250929</span>
+            </div>
+            <p>Explores why local-first software — keeping data on the device while enabling collaboration — offers better ownership, speed, and privacy than cloud-only apps.</p>
+          </div>
+          <div class="mock-paragraph">
+            Cloud apps have become the default, but they come with trade-offs that most people accept without question: latency, lock-in, and the assumption that your data lives on someone else's server.
+          </div>
+          <div class="mock-paragraph">
+            <span class="highlight">Local-first software keeps your data on your device while still enabling collaboration.</span> The idea is simple: you shouldn't need a server to use your own files.
+          </div>
+          <div class="mock-text"></div>
+          <div class="mock-text"></div>
+          <div class="mock-text"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Markdown format -->
+<section id="format">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-label">Your data, your format</div>
+      <h2 class="section-title">Plain markdown with<br>rich metadata</h2>
+      <p class="section-subtitle">Every article is a <code style="font-size:14px;background:rgba(0,0,0,.05);padding:2px 6px;border-radius:4px">.md</code> file with YAML frontmatter. Open them in Obsidian, Logseq, VS Code, or any text editor.</p>
+    </div>
+
+    <div class="markdown-split reveal">
+      <div class="markdown-block">
+        <div class="markdown-block-header">Article file</div>
+        <pre><span class="key">---</span>
+<span class="key">title:</span> <span class="val">"The Case for Local-First"</span>
+<span class="key">url:</span> https://inkandswitch.com/local-first
+<span class="key">bookmarked:</span> 2026-02-07T14:30:00Z
+<span class="key">domain:</span> inkandswitch.com
+<span class="key">author:</span> <span class="val">"Martin Kleppmann"</span>
+<span class="key">feed:</span> instapaper
+<span class="key">summary:</span> <span class="val">"Explores the benefits of..."</span>
+<span class="key">summaryProvider:</span> anthropic
+<span class="key">summaryModel:</span> claude-sonnet-4-5-20250929
+<span class="key">---</span>
+
+Cloud apps have become the default,
+but they come with trade-offs...
+</pre>
+      </div>
+      <div class="markdown-block">
+        <div class="markdown-block-header">File structure</div>
+        <pre>~/Dropbox/Articles/
+<span class="val">  2026-02-08-how-to-write-better-code.md</span>
+<span class="val">  2026-02-07-the-case-for-local-first.md</span>
+<span class="val">  2026-02-06-understanding-webassembly.md</span>
+<span class="val">  2026-02-05-why-rss-still-matters.md</span>
+<span class="val">  2026-02-04-building-cli-tools-in-bun.md</span>
+<span class="val">  .notes/</span>
+<span class="val">    highlights-and-annotations.json</span>
+<span class="val">  .tts-cache/</span>
+<span class="val">    the-case-for-local-first.mp3</span>
+
+Date-prefixed, slugified filenames.
+Compatible with Obsidian, VS Code,
+or any tool that reads markdown.
+</pre>
       </div>
     </div>
   </div>
 </section>
 
 <!-- Services -->
-<section class="services">
+<section class="section-alt">
   <div class="container" style="text-align: center;">
-    <div class="section-label">Integrations</div>
-    <h2 class="section-title">Connect your favorite services</h2>
-    <p class="section-subtitle" style="margin: 0 auto;">Pull Read works with any service that offers an RSS feed, plus direct bookmark import from browsers and services.</p>
-    <div class="service-logos">
+    <div class="reveal">
+      <div class="section-label">Integrations</div>
+      <h2 class="section-title">Connect your favorite services</h2>
+      <p class="section-subtitle" style="margin: 0 auto;">Pull Read works with any service that offers an RSS feed, plus direct bookmark import from browsers.</p>
+    </div>
+    <div class="service-logos reveal">
       <span class="service-tag">Instapaper</span>
       <span class="service-tag">Pinboard</span>
       <span class="service-tag">Raindrop.io</span>
@@ -773,126 +1313,44 @@
   </div>
 </section>
 
-<!-- Reader -->
-<section class="reader-section" id="reader">
-  <div class="container">
-    <div class="section-label">Built-in reader</div>
-    <h2 class="section-title">A reading experience you'll enjoy</h2>
-    <p class="section-subtitle" style="margin: 0 auto;">Light, dark, and sepia themes. Multiple fonts. Keyboard shortcuts. Highlights in four colors. Notes and tags.</p>
-
-    <div class="reader-preview">
-      <div class="reader-chrome">
-        <div class="reader-dot"></div>
-        <div class="reader-dot"></div>
-        <div class="reader-dot"></div>
-      </div>
-      <div class="reader-body">
-        <div class="reader-sidebar">
-          <div class="reader-sidebar-item">
-            How to Write Better Code
-            <span class="date">2026-02-06</span>
-          </div>
-          <div class="reader-sidebar-item active">
-            The Case for Local-First
-            <span class="date">2026-02-05</span>
-          </div>
-          <div class="reader-sidebar-item">
-            Understanding WebAssembly
-            <span class="date">2026-02-04</span>
-          </div>
-          <div class="reader-sidebar-item">
-            Why RSS Still Matters
-            <span class="date">2026-02-03</span>
-          </div>
-          <div class="reader-sidebar-item">
-            Building CLI Tools in Bun
-            <span class="date">2026-02-02</span>
-          </div>
-        </div>
-        <div class="reader-content">
-          <h2>The Case for Local-First</h2>
-          <div class="byline">Martin Kleppmann &middot; inkandswitch.com &middot; 2026-02-05</div>
-          <div class="mock-paragraph">
-            Cloud apps have become the default, but they come with trade-offs that most people accept without question: latency, lock-in, and the assumption that your data lives on someone else's server.
-          </div>
-          <div class="mock-paragraph">
-            <span class="highlight">Local-first software keeps your data on your device while still enabling collaboration.</span> The idea is simple: you shouldn't need a server to use your own files.
-          </div>
-          <div class="mock-text"></div>
-          <div class="mock-text"></div>
-          <div class="mock-text"></div>
-          <div class="mock-text"></div>
-          <div class="mock-text"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- Markdown format -->
-<section class="markdown-section" id="format">
-  <div class="container">
-    <div class="section-label">Your data, your format</div>
-    <h2 class="section-title">Plain markdown with rich metadata</h2>
-    <p class="section-subtitle">Every article is a <code>.md</code> file with YAML frontmatter. Open them in Obsidian, Logseq, VS Code, or any text editor. No database, no vendor lock-in.</p>
-
-    <div class="markdown-split">
-      <div class="markdown-block">
-        <div class="markdown-block-header">Article file</div>
-        <pre><span class="key">---</span>
-<span class="key">title:</span> <span class="val">"The Case for Local-First"</span>
-<span class="key">url:</span> https://inkandswitch.com/local-first
-<span class="key">bookmarked:</span> 2026-02-05T14:30:00Z
-<span class="key">domain:</span> inkandswitch.com
-<span class="key">author:</span> <span class="val">"Martin Kleppmann"</span>
-<span class="key">feed:</span> instapaper
-<span class="key">summary:</span> <span class="val">"Explores the benefits of..."</span>
-<span class="key">---</span>
-
-Cloud apps have become the default,
-but they come with trade-offs...
-</pre>
-      </div>
-      <div class="markdown-block">
-        <div class="markdown-block-header">File structure</div>
-        <pre>~/Dropbox/Articles/
-<span class="val">  2026-02-06-how-to-write-better-code.md</span>
-<span class="val">  2026-02-05-the-case-for-local-first.md</span>
-<span class="val">  2026-02-04-understanding-webassembly.md</span>
-<span class="val">  2026-02-03-why-rss-still-matters.md</span>
-<span class="val">  2026-02-02-building-cli-tools-in-bun.md</span>
-<span class="val">  2026-02-01-episode-42-the-answer.md</span>
-<span class="val">  2026-01-31-react-server-components.md</span>
-<span class="val">  ...</span>
-
-Date-prefixed, slugified filenames.
-Sorted chronologically by default.
-Compatible with any tool.</pre>
-      </div>
-    </div>
-  </div>
-</section>
-
 <!-- CTA -->
 <section class="cta">
-  <h2>Start keeping what you read</h2>
-  <p>Free and open source. Download the macOS app or clone the repo to get started in minutes.</p>
-  <div class="cta-buttons">
-    <a href="https://github.com/shellen/pullread/releases/download/latest/PullRead.dmg" class="btn btn-primary">
-      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12V2M4 8l4 4 4-4M2 14h12"/></svg>
-      Download for macOS
-    </a>
-    <a href="https://github.com/shellen/pullread" class="btn btn-secondary">View on GitHub</a>
+  <div class="reveal">
+    <h2>Start keeping<br>what you read.</h2>
+    <p>Free, open source, and built for readers who care about their data.</p>
+    <div class="cta-buttons">
+      <a href="https://github.com/shellen/pullread/releases/download/latest/PullRead.dmg" class="btn btn-teal">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12V2M4 8l4 4 4-4M2 14h12"/></svg>
+        Download for macOS
+      </a>
+      <a href="https://github.com/shellen/pullread" class="btn btn-outline">View on GitHub</a>
+    </div>
   </div>
 </section>
 
 <!-- Footer -->
 <footer>
-  <div class="footer-brand">
-    <a href="https://alittledrive.com" class="footer-logo">A Little Drive</a>
-  </div>
-  <p>Pull Read is open source under the <a href="https://github.com/shellen/pullread/blob/main/LICENSE">MIT License</a>. <a href="https://github.com/shellen/pullread">GitHub</a></p>
+  <a href="https://alittledrive.com" style="font-weight: 600; letter-spacing: -0.01em;">A Little Drive</a>
+  <ul class="footer-links">
+    <li><a href="https://github.com/shellen/pullread">GitHub</a></li>
+    <li><a href="/privacy">Privacy</a></li>
+    <li><a href="/terms">Terms</a></li>
+    <li><a href="https://github.com/shellen/pullread/blob/main/LICENSE">MIT License</a></li>
+  </ul>
 </footer>
 
+<script>
+// Scroll reveal
+const revealEls = document.querySelectorAll('.reveal');
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+      observer.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+revealEls.forEach(el => observer.observe(el));
+</script>
 </body>
 </html>

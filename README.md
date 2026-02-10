@@ -41,6 +41,7 @@ PullRead connects to bookmark services like Instapaper, Pinboard, Raindrop, and 
 - [Room for Improvement](#room-for-improvement)
 - [Future Ideas](#future-ideas)
 - [Contributing](#contributing)
+- [Legal](#legal)
 - [License](#license)
 
 ---
@@ -1025,7 +1026,7 @@ These values are set in `PullReadTray/PullReadTray/Info.plist`:
 
 | Key | Value | Purpose |
 |-----|-------|---------|
-| `SUFeedURL` | `https://shellen.github.io/pullread/appcast.xml` | URL of the Sparkle appcast feed |
+| `SUFeedURL` | `https://pullread.com/appcast.xml` | URL of the Sparkle appcast feed |
 | `SUPublicEDKey` | *(base64 Ed25519 public key)* | Verifies update signatures |
 | `SUEnableAutomaticChecks` | `true` | Check for updates on launch |
 | `SUScheduledCheckInterval` | `86400` | Check interval in seconds (24 hours) |
@@ -1173,6 +1174,26 @@ Contributions are welcome! Here's how to get started:
 - Site-specific extraction rules
 - Documentation improvements
 - Test coverage expansion
+
+---
+
+## Legal
+
+### Content and copyright
+
+Pull Read is a tool that fetches, extracts, and saves web content at your direction. **You are responsible for ensuring that your use complies with applicable copyright laws and the terms of service of any websites or services you access.** Only sync content you are authorized to copy or that is available under terms permitting personal archival. Do not use Pull Read to redistribute or commercially exploit content you do not have rights to.
+
+### Privacy
+
+Pull Read is local-first by design. Articles, highlights, notes, and reading history stay on your Mac. Data is only sent to third parties when you explicitly use optional AI features (summaries, auto-tagging, reviews, cloud TTS), at which point article text is transmitted to your selected provider using your own API key. Browser TTS, Kokoro local TTS, and all reading features work entirely on-device. See [Privacy Policy](https://pullread.com/privacy) for details.
+
+### Third-party services
+
+Pull Read is **not affiliated with, endorsed by, or sponsored by** Instapaper, Pinboard, Raindrop, Omnivore, Feedbin, YouTube, X (Twitter), Anthropic, OpenAI, Google, ElevenLabs, OpenRouter, or any other third-party service. All trademarks belong to their respective owners.
+
+### Third-party notices
+
+See [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES) for open-source license attributions for bundled dependencies.
 
 ---
 

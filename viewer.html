@@ -5095,6 +5095,12 @@ function showGuideModal() {
 
     <h3>Can I use PullRead without the macOS app?</h3>
     <p>Yes. The CLI works standalone on any platform with Node.js/Bun. Run <code>pullread view</code> to launch the article reader in your browser.</p>
+
+    <h3>Am I allowed to save articles?</h3>
+    <p>Pull Read is intended for personal reading and archival. You are responsible for ensuring your use complies with applicable copyright laws and the terms of service of any websites you access. Only sync content you are authorized to copy. Do not use Pull Read to redistribute or commercially exploit content you do not have rights to.</p>
+
+    <h3>What happens when I use AI summaries?</h3>
+    <p>When you click Summarize, article text is sent to your selected LLM provider (Anthropic, OpenAI, Gemini, or OpenRouter) using your own API key. Apple Intelligence processes entirely on-device. Summaries are saved locally in the article's frontmatter. The same applies to auto-tagging and weekly reviews.</p>
   `;
   document.title = 'PullRead Guide';
   document.getElementById('content-pane').scrollTop = 0;
