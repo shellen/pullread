@@ -49,6 +49,14 @@ class SyncService {
             if FileManager.default.fileExists(atPath: kokoroJsPath) {
                 env["PULLREAD_KOKORO_JS_PATH"] = kokoroJsPath
             }
+
+            // PULLREAD_ORT_WASM_DIR: directory containing ort.mjs and WASM files.
+            // The web build needs a separately-loaded onnxruntime-web because the
+            // copy bundled inside kokoro.web.js fails to self-initialize in Bun.
+            let ortWasmPath = "\(resourcePath)/ort-wasm"
+            if FileManager.default.fileExists(atPath: "\(ortWasmPath)/ort.mjs") {
+                env["PULLREAD_ORT_WASM_DIR"] = ortWasmPath
+            }
         }
         return env
     }

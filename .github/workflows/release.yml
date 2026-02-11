@@ -140,6 +140,19 @@ jobs:
             echo "WARNING: kokoro.web.js not found — Kokoro TTS may not work"
           fi
 
+          # Bundle onnxruntime-web WASM files — the bundled ORT inside kokoro.web.js
+          # fails to self-initialize in Bun, so we load ort.mjs separately.
+          ORT_DIST="node_modules/onnxruntime-web/dist"
+          if [ -f "$ORT_DIST/ort.mjs" ]; then
+            echo "Bundling onnxruntime-web WASM files..."
+            mkdir -p "$RESOURCES_PATH/ort-wasm"
+            cp "$ORT_DIST/ort.mjs" "$RESOURCES_PATH/ort-wasm/"
+            cp "$ORT_DIST/ort-wasm-simd-threaded.jsep.wasm" "$RESOURCES_PATH/ort-wasm/" 2>/dev/null || true
+            cp "$ORT_DIST/ort-wasm-simd-threaded.wasm" "$RESOURCES_PATH/ort-wasm/" 2>/dev/null || true
+          else
+            echo "WARNING: ort.mjs not found — Kokoro TTS WASM backend may not work"
+          fi
+
           # Download and bundle Kokoro model files
           bash scripts/download-kokoro-model.sh
           if [ -d "dist/kokoro-model" ]; then
