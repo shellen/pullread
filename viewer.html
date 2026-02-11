@@ -3145,7 +3145,7 @@ function showSettingsPage() {
 
   // ---- Feeds & Sync section (placeholder, loaded async) ----
   html += '<div class="settings-section" id="settings-feeds">';
-  html += '<h2>Feeds &amp; Sync</h2>';
+  html += '<h2>Bookmarks &amp; Sync</h2>';
   html += '<p style="color:var(--muted);font-size:13px">Loading feed configuration...</p>';
   html += '</div>';
 
@@ -3183,8 +3183,8 @@ function showSettingsPage() {
       var feeds = cfg.feeds || {};
       var feedNames = Object.keys(feeds);
 
-      var h = '<h2>Feeds &amp; Sync</h2>';
-      h += '<p style="font-size:13px;color:var(--muted);margin-bottom:16px">Manage your RSS feeds, output folder, and sync options.</p>';
+      var h = '<h2>Bookmarks &amp; Sync</h2>';
+      h += '<p style="font-size:13px;color:var(--muted);margin-bottom:16px">Manage your bookmark feeds, newsletter subscriptions, output folder, and sync options.</p>';
 
       // Output path
       h += '<div class="settings-row"><div><label>Output Folder</label><div class="settings-desc">Where articles are saved as markdown</div></div>';
@@ -3219,28 +3219,28 @@ function showSettingsPage() {
         h += '</div>';
       }
       h += '<div style="display:flex;gap:8px;margin-top:10px">'
-        + '<input type="text" id="sp-new-feed" placeholder="e.g. newsletter.example.com or feed URL\u2026" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;font-family:inherit" onkeydown="if(event.key===\'Enter\')settingsAddFeed()">'
+        + '<input type="text" id="sp-new-feed" placeholder="Paste bookmark feed URL or web address\u2026" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;font-family:inherit" onkeydown="if(event.key===\'Enter\')settingsAddFeed()">'
         + '<button class="btn-primary" onclick="settingsAddFeed()" id="sp-add-feed-btn" style="font-size:13px;padding:6px 14px">Add</button>'
         + '</div>';
       h += '<div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6">'
-        + 'Works with Substack, Ghost, Buttondown, WordPress, and any site with an RSS feed. '
-        + 'Just paste the web address \u2014 PullRead will find the feed automatically.'
+        + 'Paste a bookmark feed URL from Instapaper, Pinboard, Raindrop, or Pocket. '
+        + 'You can also subscribe to newsletters (Substack, Ghost, Buttondown) and blogs \u2014 just paste the web address.'
         + '</div>';
       h += '<div style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;padding:8px 10px;background:color-mix(in srgb, var(--fg) 4%, transparent);border-radius:6px;font-size:11px;color:var(--muted)">'
         + '<span style="flex-shrink:0">&#128196;</span>'
-        + '<span>Each new post from a feed is saved as a separate markdown file. High-volume feeds will create more files.</span>'
+        + '<span>Bookmark services only sync articles you save. Newsletter feeds save every post as a separate file.</span>'
         + '</div>';
       h += '</div>';
 
       h += '<div class="settings-row" style="justify-content:flex-end;padding-top:12px">';
-      h += '<button class="btn-primary" onclick="settingsPageSaveConfig()" style="font-size:13px;padding:6px 16px">Save Feed Settings</button>';
+      h += '<button class="btn-primary" onclick="settingsPageSaveConfig()" style="font-size:13px;padding:6px 16px">Save Bookmark Settings</button>';
       h += '</div>';
 
       sec.innerHTML = h;
       sec._configData = cfg;
     }).catch(function() {
       var sec = document.getElementById('settings-feeds');
-      if (sec) sec.innerHTML = '<h2>Feeds &amp; Sync</h2><p style="color:var(--muted);font-size:13px">Could not load feed configuration.</p>';
+      if (sec) sec.innerHTML = '<h2>Bookmarks &amp; Sync</h2><p style="color:var(--muted);font-size:13px">Could not load feed configuration.</p>';
     });
   }
 
@@ -6750,12 +6750,12 @@ function renderOnboardingStep() {
     html += '<div style="text-align:center;padding:12px 0">'
       + '<div style="font-size:48px;margin-bottom:12px">&#128218;</div>'
       + '<h2>Welcome to PullRead</h2>'
-      + '<p class="ob-subtitle">Save articles from your bookmark services as clean, local markdown files. Connect Instapaper, Pinboard, Raindrop, or any RSS feed.</p>'
+      + '<p class="ob-subtitle">Turn your bookmarked articles into clean, local markdown files you can read anywhere. Connect Instapaper, Pinboard, Raindrop, Pocket \u2014 or subscribe to newsletters and blogs too.</p>'
       + '<div class="ob-features">'
       + '<span class="ob-feature-pill">&#128278; Bookmark sync</span>'
-      + '<span class="ob-feature-pill">&#128228; Share Extension</span>'
       + '<span class="ob-feature-pill">&#128196; Markdown files</span>'
       + '<span class="ob-feature-pill">&#10024; AI summaries</span>'
+      + '<span class="ob-feature-pill">&#128228; Share Extension</span>'
       + '</div>'
       + '</div>';
   } else if (_obStep === 1) {
@@ -6768,8 +6768,8 @@ function renderOnboardingStep() {
       + '</div>';
   } else if (_obStep === 2) {
     var feedNames = Object.keys(_obFeeds);
-    html += '<h2>Connect Your Feeds</h2>'
-      + '<p class="ob-subtitle">Add your favorite newsletters, blogs, and bookmark services. Just paste a web address \u2014 PullRead will find the feed automatically.</p>'
+    html += '<h2>Connect Your Bookmarks</h2>'
+      + '<p class="ob-subtitle">Paste the RSS feed URL from your bookmark service. PullRead syncs your saved articles and converts them to markdown.</p>'
       + '<div class="ob-glass-card">';
     if (feedNames.length > 0) {
       html += '<ul class="ob-feed-list">';
@@ -6781,32 +6781,38 @@ function renderOnboardingStep() {
       html += '</ul>';
     }
     html += '<div class="ob-feed-add">'
-      + '<input type="text" id="ob-feed-url" placeholder="e.g. newsletter.example.com or feed URL\u2026" onkeydown="if(event.key===\'Enter\')obAddFeed()">'
+      + '<input type="text" id="ob-feed-url" placeholder="Paste bookmark feed URL or web address\u2026" onkeydown="if(event.key===\'Enter\')obAddFeed()">'
       + '<button onclick="obAddFeed()" id="ob-add-btn"' + (_obFeedLoading ? ' disabled' : '') + '>' + (_obFeedLoading ? 'Finding feed\u2026' : 'Add') + '</button>'
       + '</div>'
       + '</div>'
       + '<div class="ob-hint-list">'
-      + '<div style="margin-bottom:8px;color:var(--fg);font-size:12px;font-weight:500">Works with newsletters and bookmark services:</div>'
-      + '<div><strong>Substack</strong> Paste the newsletter URL, e.g. example.substack.com</div>'
-      + '<div><strong>Ghost</strong> Paste the publication URL</div>'
-      + '<div><strong>Buttondown</strong> Paste the newsletter URL</div>'
-      + '<div><strong>WordPress</strong> Paste any WordPress blog URL</div>'
+      + '<div style="margin-bottom:8px;color:var(--fg);font-size:12px;font-weight:500">Where to find your feed URL:</div>'
       + '<div><strong>Instapaper</strong> Settings &rarr; Export &rarr; RSS Feed URL</div>'
       + '<div><strong>Pinboard</strong> pinboard.in/feeds/u:USERNAME/</div>'
       + '<div><strong>Raindrop</strong> Collection &rarr; Share &rarr; RSS Feed</div>'
+      + '<div><strong>Pocket</strong> getpocket.com/users/USERNAME/feed/all</div>'
+      + '</div>'
+      + '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">'
+      + '<div class="ob-hint-list">'
+      + '<div style="margin-bottom:6px;color:var(--fg);font-size:12px;font-weight:500">You can also subscribe to newsletters and blogs:</div>'
+      + '<div><strong>Substack</strong> Paste the newsletter URL, e.g. example.substack.com</div>'
+      + '<div><strong>Ghost</strong> Paste the publication URL</div>'
+      + '<div><strong>Buttondown</strong> Paste the newsletter URL</div>'
+      + '<div><strong>WordPress</strong> Paste any blog URL \u2014 PullRead finds the feed</div>'
+      + '</div>'
       + '</div>'
       + '<div style="display:flex;gap:8px;align-items:flex-start;margin-top:12px;padding:10px 12px;background:color-mix(in srgb, var(--fg) 4%, transparent);border-radius:8px;font-size:12px;color:var(--muted)">'
       + '<span style="flex-shrink:0;font-size:14px">&#128196;</span>'
-      + '<span>Each new post from a feed is saved as a separate markdown file in your output folder. High-volume feeds will create more files.</span>'
+      + '<span>Each new post from a feed is saved as a separate file. Bookmark services only sync articles you save; newsletters sync every post.</span>'
       + '</div>';
   } else if (_obStep === 3) {
-    html += '<h2>Saving Articles</h2>'
-      + '<p class="ob-subtitle">There are several ways to get articles into PullRead.</p>'
+    html += '<h2>More Ways to Save</h2>'
+      + '<p class="ob-subtitle">Beyond bookmark sync, there are other ways to get articles into PullRead.</p>'
       + '<div class="ob-glass-card">'
-      + '<div class="ob-method"><div class="ob-method-icon">&#128225;</div><div><div class="ob-method-title">RSS Feeds</div><div class="ob-method-desc">Your primary source. Feeds sync automatically on a schedule you set in Settings.</div></div></div>'
-      + '<div class="ob-method"><div class="ob-method-icon">&#128228;</div><div><div class="ob-method-title">Share Extension</div><div class="ob-method-desc">In Safari or any app, tap Share &rarr; Save to PullRead. Queued for next sync.</div></div></div>'
+      + '<div class="ob-method"><div class="ob-method-icon">&#128278;</div><div><div class="ob-method-title">Bookmark Sync</div><div class="ob-method-desc">Your primary source. Bookmarks from Instapaper, Pinboard, Raindrop, and Pocket sync automatically on a schedule.</div></div></div>'
+      + '<div class="ob-method"><div class="ob-method-icon">&#128228;</div><div><div class="ob-method-title">Share Extension</div><div class="ob-method-desc">In Safari or any app, tap Share &rarr; Save to PullRead. The article is fetched on next sync.</div></div></div>'
       + '<div class="ob-method"><div class="ob-method-icon">&#128433;</div><div><div class="ob-method-title">Services Menu</div><div class="ob-method-desc">Select any URL, then right-click &rarr; Services &rarr; Save to PullRead.</div></div></div>'
-      + '<div class="ob-method"><div class="ob-method-icon">&#9000;</div><div><div class="ob-method-title">Keyboard Shortcuts</div><div class="ob-method-desc">Navigate, highlight, and listen to articles without a mouse.</div></div></div>'
+      + '<div class="ob-method"><div class="ob-method-icon">&#128225;</div><div><div class="ob-method-title">Newsletters &amp; Blogs</div><div class="ob-method-desc">Subscribe to any RSS feed \u2014 Substack, Ghost, Buttondown, WordPress, and more.</div></div></div>'
       + '</div>'
       + '<div class="ob-glass-card">'
       + '<div class="ob-toggle-row">'
