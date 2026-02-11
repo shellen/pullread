@@ -1,0 +1,46 @@
+[package]
+name = "pullread"
+version = "2.0.0"
+description = "Sync articles from RSS feeds, bookmarks, and newsletters to searchable markdown files"
+authors = ["PullRead"]
+edition = "2021"
+rust-version = "1.77.2"
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-autostart = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-deep-link = "2"
+tauri-plugin-window-state = "2"
+tauri-plugin-process = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+portpicker = "0.1"
+chrono = "0.4"
+log = "0.4"
+env_logger = "0.11"
+dirs = "6"
+open = "5"
+reqwest = { version = "0.12", features = ["rustls-tls"], default-features = false }
+url = "2"
+urlencoding = "2"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[lib]
+name = "pullread_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "pullread-tauri"
+path = "src/main.rs"
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1

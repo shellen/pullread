@@ -1,0 +1,42 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicholasrice/tauri/refs/heads/master/crates/tauri-utils/schema.json",
+  "productName": "PullRead",
+  "version": "2.0.0",
+  "identifier": "com.pullread.app",
+  "build": {
+    "beforeBuildCommand": "",
+    "beforeDevCommand": "",
+    "frontendDist": "../viewer-dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "targets": "all",
+    "externalBin": [
+      "binaries/pullread-cli"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "13.0"
+    }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["pullread"]
+      }
+    }
+  }
+}
