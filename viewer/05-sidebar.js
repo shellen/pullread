@@ -35,10 +35,26 @@ function renderFileList() {
 
   let html = '';
   if (isNotebooksTab) {
-    // Single notebook — show just the shared notebook item
-    if (_notebooks[SINGLE_NOTEBOOK_ID]) {
-      html += renderNotebookItem(_notebooks[SINGLE_NOTEBOOK_ID]);
+    // Notebook tab: + New Note button, notebook item, note previews, annotated articles
+    html += '<div class="sidebar-new-note"><button class="new-note-btn" onclick="createNote()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-plus"/></svg> New Note</button></div>';
+    var nbObj = _notebooks[SINGLE_NOTEBOOK_ID];
+    if (nbObj) {
+      html += renderNotebookItem(nbObj);
+      // Individual note previews
+      var notes = nbObj.notes || [];
+      for (var ni = 0; ni < notes.length; ni++) {
+        html += renderNotePreviewItem(notes[ni]);
+      }
     }
+    const annotatedFiles = displayFiles.filter(f => {
+      const { hasHl, hasNote } = hasAnnotations(f.filename);
+      return hasHl || hasNote;
+    });
+    displayedCount = Math.min(annotatedFiles.length, PAGE_SIZE);
+    html += annotatedFiles.slice(0, displayedCount).map((f, i) => renderFileItem(f, i)).join('');
+    var noteCount = nbObj ? (nbObj.notes || []).length : 0;
+    countStr = 'Notebook \u00b7 ' + noteCount + ' note' + (noteCount !== 1 ? 's' : '');
+    countText.textContent = countStr;
   } else {
     // Library / Explore: show articles only
     displayedCount = Math.min(displayFiles.length, PAGE_SIZE);
@@ -84,9 +100,20 @@ function renderFileItem(f, i) {
 function renderNotebookItem(nb) {
   const isActive = _activeNotebook && _activeNotebook.id === nb.id && !activeFile ? ' active' : '';
   const date = nb.updatedAt ? new Date(nb.updatedAt).toLocaleDateString() : '';
+  var noteCount = (nb.notes || []).length;
   return '<div class="file-item notebook-item' + isActive + '" data-notebook-id="' + escapeHtml(nb.id) + '" onclick="openNotebookInPane(\'' + escapeHtml(nb.id) + '\')" role="option" tabindex="0" onkeydown="if(event.key===\'Enter\')openNotebookInPane(\'' + escapeHtml(nb.id) + '\')">'
     + '<div class="file-item-title"><svg class="nb-icon" aria-hidden="true"><use href="#i-book"/></svg>' + escapeHtml(nb.title || 'Untitled') + '</div>'
-    + '<div class="file-item-meta"><span>' + date + '</span><span class="meta-sep"></span><span>notebook</span></div>'
+    + '<div class="file-item-meta"><span>' + date + '</span><span class="meta-sep"></span><span>' + noteCount + ' note' + (noteCount !== 1 ? 's' : '') + '</span></div>'
+    + '</div>';
+}
+
+function renderNotePreviewItem(note) {
+  var firstLine = (note.content || '').split('\n')[0].replace(/^#+\s*/, '').trim() || 'Empty note';
+  var dateStr = note.updatedAt ? new Date(note.updatedAt).toLocaleDateString() : '';
+  var isExpanded = _expandedNoteId === note.id ? ' active' : '';
+  return '<div class="file-item note-preview-item' + isExpanded + '" onclick="expandNoteFromSidebar(\'' + escapeHtml(note.id) + '\')" role="option" tabindex="0" onkeydown="if(event.key===\'Enter\')expandNoteFromSidebar(\'' + escapeHtml(note.id) + '\')">'
+    + '<div class="file-item-title note-preview-title">' + escapeHtml(firstLine.slice(0, 80)) + '</div>'
+    + '<div class="file-item-meta"><span>' + dateStr + '</span></div>'
     + '</div>';
 }
 
@@ -379,8 +406,11 @@ function toggleWritingFocus() {
   overlay.className = 'writing-focus-overlay';
   overlay.id = 'writing-focus-overlay';
 
+  if (!_expandedNoteId) return;
+  var note = (_activeNotebook.notes || []).find(function(n) { return n.id === _expandedNoteId; });
+  if (!note) return;
   var title = _activeNotebook.title || 'Untitled';
-  var content = _activeNotebook.content || '';
+  var content = note.content || '';
   var wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
 
   overlay.innerHTML = '<div class="wf-toolbar">'
@@ -426,10 +456,14 @@ function toggleWritingFocus() {
 function exitWritingFocus() {
   _writingFocusActive = false;
 
-  // Sync content back from overlay textarea
+  // Sync content back from overlay textarea to the expanded note
   var ta = document.getElementById('wf-textarea');
-  if (ta && _activeNotebook) {
-    _activeNotebook.content = ta.value;
+  if (ta && _activeNotebook && _expandedNoteId) {
+    var note = (_activeNotebook.notes || []).find(function(n) { return n.id === _expandedNoteId; });
+    if (note) {
+      note.content = ta.value;
+      note.updatedAt = new Date().toISOString();
+    }
     notebookDebounceSave();
   }
 
@@ -449,7 +483,7 @@ function updateWritingFocusLine() {
   var line = document.getElementById('wf-focus-line');
   if (!ta || !line) {
     // Fallback to inline mode
-    ta = document.querySelector('.notebook-editor textarea');
+    ta = document.querySelector('.note-card.expanded .notebook-editor textarea');
     line = document.querySelector('.notebook-focus-line');
   }
   if (!ta || !line) return;
