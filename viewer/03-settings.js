@@ -417,44 +417,39 @@ function showSettingsPage() {
       ];
 
       var h = '<h2>AI Summaries &amp; Tagging</h2>';
-      h += '<p style="font-size:13px;color:var(--muted);margin-bottom:16px">Configure API keys for one or more providers. The default provider is used for summaries and auto-tagging.</p>';
+      h += '<p style="font-size:13px;color:var(--muted);margin-bottom:16px">Choose a provider for article summaries and auto-tagging.</p>';
 
       // Default provider selector
-      h += '<div class="settings-row"><div><label>Default Provider</label>';
+      h += '<div class="settings-row"><div><label>Provider</label>';
       h += '<div class="settings-desc">Used for summaries and auto-tagging</div></div>';
-      h += '<select id="sp-llm-default">';
+      h += '<select id="sp-llm-default" onchange="settingsPageLLMProviderChanged()">';
       for (var i = 0; i < providerList.length; i++) {
         var p = providerList[i];
         h += '<option value="' + p.id + '"' + (defaultProv === p.id ? ' selected' : '') + '>' + p.label + '</option>';
       }
       h += '</select></div>';
 
-      // Apple Intelligence note
-      h += '<div style="padding:6px 0 4px;font-size:12px;color:var(--muted)">';
+      // Apple Intelligence section
+      h += '<div id="sp-llm-apple-info" style="display:' + (defaultProv === 'apple' ? 'block' : 'none') + ';padding:10px 12px;margin-top:8px;background:color-mix(in srgb, var(--fg) 4%, transparent);border-radius:8px;font-size:12px;color:var(--muted);line-height:1.6">';
       if (appleAvailable) {
-        h += '<span class="settings-status ok">Apple Intelligence available</span> Runs on-device, no API key needed. Used as fallback when the default provider has no key.';
+        h += '<span class="settings-status ok">Apple Intelligence available</span> Runs on-device, no API key needed.';
       } else {
-        h += 'Apple Intelligence requires macOS 26+ with Apple Silicon. Cloud providers need an API key below.';
+        h += 'Apple Intelligence requires macOS 26+ with Apple Silicon.';
       }
       h += '</div>';
 
-      h += '<hr style="border:none;border-top:1px solid var(--border);margin:14px 0 12px">';
-
-      // Per-provider API key + model sections
-      h += '<label style="font-size:13px;font-weight:500;display:block;margin-bottom:10px">Provider API Keys</label>';
-
+      // One section per cloud provider — only the selected one is visible
       for (var ci = 0; ci < cloudProviders.length; ci++) {
         var cp = cloudProviders[ci];
         var pConfig = provs[cp.id] || {};
         var hasKey = pConfig.hasKey || false;
-        var isDefault = defaultProv === cp.id;
+        var visible = defaultProv === cp.id;
 
-        h += '<div style="padding:10px 12px;margin-bottom:8px;background:color-mix(in srgb, var(--fg) ' + (isDefault ? '6' : '3') + '%, transparent);border-radius:8px;border:1px solid ' + (isDefault ? 'var(--link)' : 'transparent') + '">';
-        h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
-        h += '<strong style="font-size:13px">' + cp.label + '</strong>';
-        if (isDefault) h += '<span style="font-size:10px;background:var(--link);color:#fff;padding:1px 6px;border-radius:3px">DEFAULT</span>';
-        if (hasKey) h += '<span class="settings-status ok" style="font-size:11px">Key saved</span>';
-        h += '</div>';
+        h += '<div id="sp-llm-section-' + cp.id + '" style="display:' + (visible ? 'block' : 'none') + ';margin-top:8px">';
+
+        if (hasKey) {
+          h += '<div style="font-size:12px;margin-bottom:8px"><span class="settings-status ok">Key saved</span></div>';
+        }
 
         h += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">';
         h += '<label style="font-size:12px;min-width:55px;color:var(--muted)">API Key</label>';
@@ -465,11 +460,12 @@ function showSettingsPage() {
         h += '<label style="font-size:12px;min-width:55px;color:var(--muted)">Model</label>';
         h += '<input type="text" id="sp-llm-model-' + cp.id + '" value="' + escapeHtml(pConfig.model || '') + '" placeholder="default" style="flex:1;min-width:0;font-size:12px">';
         h += '</div>';
+
         h += '</div>';
       }
 
-      h += '<div class="settings-row" style="justify-content:flex-end;padding-top:8px">';
-      h += '<button class="btn-primary" onclick="settingsPageSaveLLM()" style="font-size:13px;padding:6px 16px">Save AI Settings</button>';
+      h += '<div class="settings-row" style="justify-content:flex-end;padding-top:12px">';
+      h += '<button class="btn-primary" onclick="settingsPageSaveLLM()" style="font-size:13px;padding:6px 16px">Save</button>';
       h += '</div>';
 
       sec.innerHTML = h;
@@ -477,6 +473,17 @@ function showSettingsPage() {
       var sec = document.getElementById('settings-ai');
       if (sec) sec.innerHTML = '<h2>AI Summaries &amp; Tagging</h2><p style="color:var(--muted);font-size:13px">Could not load AI settings. Configure in the menu bar app.</p>';
     });
+  }
+}
+
+function settingsPageLLMProviderChanged() {
+  var selected = document.getElementById('sp-llm-default').value;
+  var cloudProviders = ['anthropic', 'openai', 'gemini', 'openrouter'];
+  var appleInfo = document.getElementById('sp-llm-apple-info');
+  if (appleInfo) appleInfo.style.display = selected === 'apple' ? 'block' : 'none';
+  for (var i = 0; i < cloudProviders.length; i++) {
+    var sec = document.getElementById('sp-llm-section-' + cloudProviders[i]);
+    if (sec) sec.style.display = cloudProviders[i] === selected ? 'block' : 'none';
   }
 }
 

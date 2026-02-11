@@ -6,7 +6,6 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { createHash } from 'crypto';
 import { request as httpsRequest } from 'https';
-import { execSync } from 'child_process';
 
 const SETTINGS_PATH = join(homedir(), '.config', 'pullread', 'settings.json');
 const CACHE_DIR = join(homedir(), '.config', 'pullread', 'tts-cache');
@@ -108,20 +107,7 @@ export function loadTTSConfig(): TTSConfig {
     if (existsSync(SETTINGS_PATH)) {
       const settings = JSON.parse(readFileSync(SETTINGS_PATH, 'utf-8'));
       if (settings.tts) {
-        const config = settings.tts as TTSConfig;
-        // If no API key in settings, try Keychain (macOS only)
-        if (!config.apiKey && (config.provider === 'openai' || config.provider === 'elevenlabs')) {
-          if (process.platform === 'darwin') {
-            try {
-              const key = execSync(
-                'security find-generic-password -w -s "com.pullread.api-keys" -a "tts-api-key"',
-                { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
-              ).trim();
-              if (key) config.apiKey = key;
-            } catch {}
-          }
-        }
-        return config;
+        return settings.tts as TTSConfig;
       }
     }
   } catch {}

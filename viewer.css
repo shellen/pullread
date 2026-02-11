@@ -2264,17 +2264,6 @@
   .sidebar-new-note {
     padding: 6px 12px;
   }
-  .note-preview-item {
-    padding-left: 24px !important;
-  }
-  .note-preview-title {
-    font-size: 12px !important;
-    color: var(--muted);
-  }
-  .note-preview-item.active .note-preview-title {
-    color: var(--fg);
-  }
-
   /* AI tag suggestions */
   .nb-tag-suggestions {
     display: flex; align-items: center; gap: 6px; flex-wrap: wrap;

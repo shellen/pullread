@@ -40,11 +40,6 @@ function renderFileList() {
     var nbObj = _notebooks[SINGLE_NOTEBOOK_ID];
     if (nbObj) {
       html += renderNotebookItem(nbObj);
-      // Individual note previews
-      var notes = nbObj.notes || [];
-      for (var ni = 0; ni < notes.length; ni++) {
-        html += renderNotePreviewItem(notes[ni]);
-      }
     }
     const annotatedFiles = displayFiles.filter(f => {
       const { hasHl, hasNote } = hasAnnotations(f.filename);
@@ -104,16 +99,6 @@ function renderNotebookItem(nb) {
   return '<div class="file-item notebook-item' + isActive + '" data-notebook-id="' + escapeHtml(nb.id) + '" onclick="openNotebookInPane(\'' + escapeHtml(nb.id) + '\')" role="option" tabindex="0" onkeydown="if(event.key===\'Enter\')openNotebookInPane(\'' + escapeHtml(nb.id) + '\')">'
     + '<div class="file-item-title"><svg class="nb-icon" aria-hidden="true"><use href="#i-book"/></svg>' + escapeHtml(nb.title || 'Untitled') + '</div>'
     + '<div class="file-item-meta"><span>' + date + '</span><span class="meta-sep"></span><span>' + noteCount + ' note' + (noteCount !== 1 ? 's' : '') + '</span></div>'
-    + '</div>';
-}
-
-function renderNotePreviewItem(note) {
-  var firstLine = (note.content || '').split('\n')[0].replace(/^#+\s*/, '').trim() || 'Empty note';
-  var dateStr = note.updatedAt ? new Date(note.updatedAt).toLocaleDateString() : '';
-  var isExpanded = _expandedNoteId === note.id ? ' active' : '';
-  return '<div class="file-item note-preview-item' + isExpanded + '" onclick="expandNoteFromSidebar(\'' + escapeHtml(note.id) + '\')" role="option" tabindex="0" onkeydown="if(event.key===\'Enter\')expandNoteFromSidebar(\'' + escapeHtml(note.id) + '\')">'
-    + '<div class="file-item-title note-preview-title">' + escapeHtml(firstLine.slice(0, 80)) + '</div>'
-    + '<div class="file-item-meta"><span>' + dateStr + '</span></div>'
     + '</div>';
 }
 

@@ -273,15 +273,6 @@ function confirmDeleteNote(noteId) {
   if (confirm('Delete this note?')) deleteNote(noteId);
 }
 
-function expandNoteFromSidebar(noteId) {
-  saveExpandedNoteContent();
-  _expandedNoteId = noteId;
-  _notebookPreviewMode = false;
-  getOrCreateSingleNotebook().then(function(nb) {
-    openNotebookInPane(nb.id, noteId);
-  });
-}
-
 // Save textarea content back to the expanded note's slot in the array
 function saveExpandedNoteContent() {
   if (!_activeNotebook || !_expandedNoteId) return;
