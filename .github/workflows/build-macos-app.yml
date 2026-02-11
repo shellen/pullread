@@ -259,6 +259,11 @@ jobs:
           # Bundle CLI binary into app resources
           cp ../dist/pullread "$RESOURCES/"
 
+          # Bundle third-party license notices
+          if [ -d "../Licenses" ]; then
+            cp -R ../Licenses "$RESOURCES/Licenses"
+          fi
+
           # Bundle Kokoro TTS model so it works from first launch (no downloads needed)
           if [ -d "../dist/kokoro-model" ]; then
             echo "Bundling Kokoro TTS model..."

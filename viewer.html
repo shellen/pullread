@@ -2991,6 +2991,16 @@ function showSettingsPage() {
   html += '<p style="color:var(--muted);font-size:13px">Loading AI settings...</p>';
   html += '</div>';
 
+  // ---- Backup & Restore section ----
+  html += '<div class="settings-section">';
+  html += '<h2>Backup &amp; Restore</h2>';
+  html += '<p style="font-size:13px;color:var(--muted);margin-bottom:16px">Export your settings, highlights, notes, notebooks, and feed configuration to a single file. Use Restore to import a previous backup.</p>';
+  html += '<div class="settings-row" style="gap:12px">';
+  html += '<button class="btn-primary" onclick="settingsBackup()" style="font-size:13px;padding:6px 16px">Download Backup</button>';
+  html += '<button style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer" onclick="settingsRestore()">Restore from File\u2026</button>';
+  html += '</div>';
+  html += '<div id="backup-status" style="font-size:12px;color:var(--muted);padding-top:8px"></div>';
+  html += '</div>';
 
   content.innerHTML = html;
   document.getElementById('content-pane').scrollTop = 0;
@@ -3222,6 +3232,67 @@ function settingsPageSaveLLM() {
       alert('Failed to save AI settings.');
     }
   });
+}
+
+function settingsBackup() {
+  var status = document.getElementById('backup-status');
+  if (status) status.textContent = 'Preparing backup...';
+  fetch('/api/backup').then(function(r) {
+    if (!r.ok) throw new Error('Backup failed');
+    var disp = r.headers.get('Content-Disposition') || '';
+    var match = disp.match(/filename="([^"]+)"/);
+    var filename = match ? match[1] : 'pullread-backup.json';
+    return r.blob().then(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      if (status) status.textContent = 'Backup downloaded: ' + filename;
+    });
+  }).catch(function(e) {
+    if (status) status.textContent = 'Backup failed: ' + e.message;
+  });
+}
+
+function settingsRestore() {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = function() {
+    if (!input.files || !input.files[0]) return;
+    var status = document.getElementById('backup-status');
+    if (status) status.textContent = 'Restoring...';
+    var reader = new FileReader();
+    reader.onload = function() {
+      try {
+        var data = JSON.parse(reader.result);
+        if (!data._pullread_backup) {
+          if (status) status.textContent = 'Not a valid PullRead backup file.';
+          return;
+        }
+      } catch(e) {
+        if (status) status.textContent = 'Could not read file: ' + e.message;
+        return;
+      }
+      fetch('/api/restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: reader.result,
+      }).then(function(r) { return r.json(); }).then(function(result) {
+        if (result.ok) {
+          if (status) status.textContent = 'Restored ' + result.restored + ' data files. Reload to see changes.';
+        } else {
+          if (status) status.textContent = 'Restore failed: ' + (result.error || 'unknown error');
+        }
+      }).catch(function(e) {
+        if (status) status.textContent = 'Restore failed: ' + e.message;
+      });
+    };
+    reader.readAsText(input.files[0]);
+  };
+  input.click();
 }
 
 // Frontmatter
@@ -6101,6 +6172,9 @@ function showGuideModal() {
 
     <h3>What happens when I use AI summaries?</h3>
     <p>When you click Summarize, article text is sent to your selected LLM provider (Anthropic, OpenAI, Gemini, or OpenRouter) using your own API key. Apple Intelligence processes entirely on-device. Summaries are saved locally in the article's frontmatter. The same applies to auto-tagging and weekly reviews.</p>
+
+    <h2>Open Source Licenses</h2>
+    <p>PullRead uses open-source software including <strong>Kokoro TTS</strong> (Apache 2.0, by hexgrad), <strong>ONNX Runtime</strong> (MIT, by Microsoft), <strong>Mozilla Readability</strong> (Apache 2.0), <strong>Turndown</strong> (MIT), <strong>marked</strong> (MIT), and <strong>highlight.js</strong> (BSD 3-Clause). Kokoro was trained on audio data including Koniwa (CC BY 3.0) and SIWIS (CC BY 4.0). Full license texts are included in the app bundle at <code>Contents/Resources/Licenses/</code>.</p>
   `;
   document.title = 'PullRead Guide';
   document.getElementById('content-pane').scrollTop = 0;

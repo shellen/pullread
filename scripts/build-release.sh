@@ -134,6 +134,11 @@ bundle_cli() {
     # Copy binary (viewer.html is embedded in the binary at compile time)
     cp "$ROOT_DIR/dist/pullread" "$RESOURCES_PATH/"
 
+    # Bundle third-party license notices
+    if [ -d "$ROOT_DIR/Licenses" ]; then
+        cp -R "$ROOT_DIR/Licenses" "$RESOURCES_PATH/Licenses"
+    fi
+
     # Bundle Kokoro TTS model so it works from first launch without downloads
     if [ -d "$ROOT_DIR/dist/kokoro-model" ]; then
         echo "  Bundling Kokoro TTS model..."

@@ -821,6 +821,60 @@ export function startViewer(outputPath: string, port = 7777): void {
       return;
     }
 
+    // Backup API — export all user data as a single JSON download
+    if (url.pathname === '/api/backup' && req.method === 'GET') {
+      const backupFiles = ['feeds.json', 'settings.json', 'highlights.json', 'notes.json', 'notebooks.json', 'inbox.json'];
+      const backup: Record<string, unknown> = {
+        _pullread_backup: true,
+        _version: '1',
+        _createdAt: new Date().toISOString(),
+      };
+      for (const f of backupFiles) {
+        const p = join(ANNOTATIONS_DIR, f);
+        if (existsSync(p)) {
+          try { backup[f] = JSON.parse(readFileSync(p, 'utf-8')); } catch {}
+        }
+      }
+      // Include sync database if it exists
+      const dbPath = join(ANNOTATIONS_DIR, 'pullread.json');
+      if (existsSync(dbPath)) {
+        try { backup['pullread.json'] = JSON.parse(readFileSync(dbPath, 'utf-8')); } catch {}
+      }
+      const body = JSON.stringify(backup, null, 2);
+      const dateStr = new Date().toISOString().slice(0, 10);
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Content-Disposition': `attachment; filename="pullread-backup-${dateStr}.json"`,
+      });
+      res.end(body);
+      return;
+    }
+
+    // Restore API — import a backup JSON file
+    if (url.pathname === '/api/restore' && req.method === 'POST') {
+      try {
+        const body = JSON.parse(await readBody(req));
+        if (!body._pullread_backup) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Not a valid PullRead backup file' }));
+          return;
+        }
+        const restorableFiles = ['feeds.json', 'settings.json', 'highlights.json', 'notes.json', 'notebooks.json', 'inbox.json', 'pullread.json'];
+        let restored = 0;
+        for (const f of restorableFiles) {
+          if (body[f] && typeof body[f] === 'object') {
+            saveJsonFile(join(ANNOTATIONS_DIR, f), body[f]);
+            restored++;
+          }
+        }
+        sendJson(res, { ok: true, restored });
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid backup file' }));
+      }
+      return;
+    }
+
     send404(res);
   });
 
