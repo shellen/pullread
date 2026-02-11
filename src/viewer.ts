@@ -608,10 +608,18 @@ export function startViewer(outputPath: string, port = 7777): void {
     if (url.pathname === '/api/autotag' && req.method === 'POST') {
       try {
         const body = JSON.parse(await readBody(req));
-        const { name } = body;
+        const { name, text } = body;
+
+        // Direct text mode (e.g. notebook content) — no caching, just tag and return
+        if (text) {
+          const result = await autotagText(text);
+          sendJson(res, { machineTags: result.machineTags, model: result.model });
+          return;
+        }
+
         if (!name) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'name is required' }));
+          res.end(JSON.stringify({ error: 'name or text is required' }));
           return;
         }
 
