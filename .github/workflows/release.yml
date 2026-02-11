@@ -130,6 +130,21 @@ jobs:
           # Copy binary to app resources
           cp dist/pullread "$RESOURCES_PATH/"
 
+          # Bundle the ONNX Runtime dylib so Kokoro TTS works at runtime.
+          # Bun extracts the .node addon but not the companion dylib; we place
+          # it in Resources/ and set DYLD_LIBRARY_PATH at launch (see Swift).
+          ONNX_DYLIB=$(find node_modules -name 'libonnxruntime*.dylib' -print -quit 2>/dev/null || true)
+          if [ -n "$ONNX_DYLIB" ]; then
+            echo "Bundling ONNX Runtime dylib: $ONNX_DYLIB"
+            cp "$ONNX_DYLIB" "$RESOURCES_PATH/"
+            # Sign the dylib for notarization
+            codesign --force --options runtime --timestamp \
+              --sign "$IDENTITY" \
+              "$RESOURCES_PATH/$(basename "$ONNX_DYLIB")"
+          else
+            echo "WARNING: ONNX Runtime dylib not found in node_modules"
+          fi
+
           # Re-sign all embedded frameworks for notarization.
           # Sparkle (via SPM) includes nested executables (Autoupdate, Updater.app,
           # Installer.xpc) that all need hardened runtime + secure timestamps.
@@ -155,6 +170,18 @@ jobs:
               echo "  Signing bundle: $bundle"
               codesign --force --options runtime --timestamp \
                 --sign "$IDENTITY" "$bundle"
+            done
+          fi
+
+          # Re-sign embedded app extensions (Share Extension .appex) for notarization
+          if [ -d "$APP_PATH/Contents/PlugIns" ]; then
+            echo "Signing embedded extensions..."
+            find "$APP_PATH/Contents/PlugIns" -depth \
+              \( -name "*.appex" -o -name "*.xpc" \) \
+              -type d | while read -r ext; do
+              echo "  Signing extension: $ext"
+              codesign --force --options runtime --timestamp \
+                --sign "$IDENTITY" "$ext"
             done
           fi
 

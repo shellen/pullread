@@ -246,10 +246,20 @@ jobs:
           # Bundle CLI binary into app resources
           cp ../dist/pullread "artifacts/Pull Read.app/Contents/Resources/"
 
+          # Bundle the ONNX Runtime dylib so Kokoro TTS works at runtime.
+          ONNX_DYLIB=$(find ../node_modules -name 'libonnxruntime*.dylib' -print -quit 2>/dev/null || true)
+          if [ -n "$ONNX_DYLIB" ]; then
+            echo "Bundling ONNX Runtime dylib: $ONNX_DYLIB"
+            cp "$ONNX_DYLIB" "artifacts/Pull Read.app/Contents/Resources/"
+          else
+            echo "WARNING: ONNX Runtime dylib not found in node_modules"
+          fi
+
           # Strip test artifacts from the release bundle — build-for-testing embeds
           # XCTest frameworks and test plugins which Apple notarization rejects
-          # (they lack secure timestamps since they're Apple-signed system binaries)
-          rm -rf "artifacts/Pull Read.app/Contents/PlugIns"
+          # (they lack secure timestamps since they're Apple-signed system binaries).
+          # Keep .appex bundles (Share Extension) but remove .xctest bundles.
+          find "artifacts/Pull Read.app/Contents/PlugIns" -name "*.xctest" -type d -exec rm -rf {} + 2>/dev/null || true
           rm -rf "artifacts/Pull Read.app/Contents/Frameworks"
 
           # Verify
@@ -272,6 +282,26 @@ jobs:
         run: |
           APP_PATH="artifacts/Pull Read.app"
           IDENTITY="Developer ID Application"
+
+          # Sign the bundled ONNX Runtime dylib (if present) for notarization
+          for dylib in "$APP_PATH/Contents/Resources"/libonnxruntime*.dylib; do
+            [ -f "$dylib" ] || continue
+            echo "Signing ONNX Runtime dylib: $dylib"
+            codesign --force --options runtime --timestamp \
+              --sign "$IDENTITY" "$dylib"
+          done
+
+          # Sign embedded app extensions (Share Extension .appex) for notarization
+          if [ -d "$APP_PATH/Contents/PlugIns" ]; then
+            echo "Signing embedded extensions..."
+            find "$APP_PATH/Contents/PlugIns" -depth \
+              \( -name "*.appex" -o -name "*.xpc" \) \
+              -type d | while read -r ext; do
+              echo "  Signing extension: $ext"
+              codesign --force --options runtime --timestamp \
+                --sign "$IDENTITY" "$ext"
+            done
+          fi
 
           # Sign the bundled CLI binary (hardened runtime required for notarization)
           # disable-library-validation allows loading native addons (e.g. onnxruntime

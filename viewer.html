@@ -442,6 +442,21 @@
     justify-content: space-between;
     align-items: center;
   }
+  .new-notebook-btn {
+    border: none; background: none; color: var(--link);
+    font-size: 10px; font-weight: 600; cursor: pointer;
+    padding: 1px 6px; border-radius: 4px;
+    font-family: inherit;
+  }
+  .new-notebook-btn:hover { background: var(--sidebar-active); }
+  .file-item.notebook-item .file-item-title {
+    color: var(--fg);
+  }
+  .file-item.notebook-item .nb-icon {
+    width: 12px; height: 12px; opacity: 0.45;
+    vertical-align: -1px; margin-right: 4px; flex-shrink: 0;
+    fill: currentColor;
+  }
   .hide-read-toggle {
     display: flex;
     align-items: center;
@@ -1932,6 +1947,19 @@
     margin-left: 8px;
   }
   .notebook-ref:hover { background: color-mix(in srgb, var(--link) 15%, transparent); }
+  .hl-picker-date-group { margin-bottom: 8px; }
+  .hl-picker-date-header {
+    font-size: 11px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    padding: 6px 4px; cursor: pointer; user-select: none;
+  }
+  .hl-picker-date-header:hover { color: var(--fg); }
+  .hl-caret { display: inline-block; transition: transform 0.15s; font-size: 10px; }
+  .hl-caret.collapsed { transform: rotate(-90deg); }
+  .hl-color-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    flex-shrink: 0; margin-top: 4px;
+  }
   .hl-picker-group { margin-bottom: 16px; }
   .hl-picker-group-title {
     font-size: 12px; font-weight: 600; color: var(--fg);
@@ -2314,6 +2342,47 @@
   [data-theme="dark"] .tag-pill-pink { color: #f472b6; }
 
   /* Explore stats bar */
+  /* Settings page */
+  .settings-section {
+    margin-bottom: 32px;
+  }
+  .settings-section h2 {
+    font-size: 16px; font-weight: 600; margin: 0 0 16px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  }
+  .settings-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 0; gap: 12px;
+  }
+  .settings-row label {
+    font-size: 13px; font-weight: 500; color: var(--fg);
+    flex-shrink: 0;
+  }
+  .settings-row .settings-desc {
+    font-size: 11px; color: var(--muted); margin-top: 2px;
+  }
+  .settings-row select, .settings-row input[type="text"], .settings-row input[type="password"] {
+    padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--bg); color: var(--fg); font-size: 13px;
+    font-family: inherit; min-width: 160px;
+  }
+  .settings-btn-group {
+    display: flex; gap: 4px;
+  }
+  .settings-btn-group button {
+    border: 1px solid var(--border); border-radius: 6px;
+    background: var(--bg); color: var(--fg);
+    font-size: 12px; padding: 4px 10px; cursor: pointer;
+    font-family: inherit; transition: background 0.15s;
+  }
+  .settings-btn-group button:hover { background: var(--sidebar-active); }
+  .settings-btn-group button.active { background: var(--link); color: #fff; border-color: var(--link); }
+  .settings-status {
+    font-size: 11px; padding: 2px 8px; border-radius: 4px;
+  }
+  .settings-status.ok { color: #22c55e; background: color-mix(in srgb, #22c55e 10%, transparent); }
+  .settings-status.warn { color: #f59e0b; background: color-mix(in srgb, #f59e0b 10%, transparent); }
+
   .explore-stats {
     display: flex;
     gap: 24px;
@@ -2568,7 +2637,7 @@
   <symbol id="i-cloud-download" viewBox="0 0 640 512"><path d="M144 480C64.5 480 0 415.5 0 336c0-62.8 40.2-116.2 96.2-135.9c-.1-2.7-.2-5.4-.2-8.1c0-88.4 71.6-160 160-160c59.3 0 111 32.2 138.7 80.2C409.9 102 428.3 96 448 96c53 0 96 43 96 96c0 12.2-2.3 23.8-6.4 34.6C596 238.4 640 290.1 640 352c0 70.7-57.3 128-128 128l-368 0zm79-167l80 80c9.4 9.4 24.6 9.4 33.9 0l80-80c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0l-39 39L344 184c0-13.3-10.7-24-24-24s-24 10.7-24 24l0 134.1-39-39c-9.4-9.4-24.6-9.4-33.9 0s-9.4 24.6 0 33.9z"/></symbol>
   <symbol id="i-mic" viewBox="0 0 384 512"><path d="M192 0C139 0 96 43 96 96v160c0 53 43 96 96 96s96-43 96-96V96c0-53-43-96-96-96zM64 216c0-13.3-10.7-24-24-24s-24 10.7-24 24v40c0 89.1 66.2 162.7 152 174.4V464H120c-13.3 0-24 10.7-24 24s10.7 24 24 24h144c13.3 0 24-10.7 24-24s-10.7-24-24-24H216V430.4c85.8-11.7 152-85.3 152-174.4V216c0-13.3-10.7-24-24-24s-24 10.7-24 24v40c0 70.7-57.3 128-128 128s-128-57.3-128-128V216z"/></symbol>
   <symbol id="i-stop" viewBox="0 0 384 512"><path d="M0 128C0 92.7 28.7 64 64 64h256c35.3 0 64 28.7 64 64v256c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64V128z"/></symbol>
-  <symbol id="i-headphones" viewBox="0 0 512 512"><path d="M256 80C141.1 80 48 173.1 48 288v104c0 13.3 10.7 24 24 24h24c26.5 0 48-21.5 48-48V272c0-26.5-21.5-48-48-48H72.5C90.3 140.3 166.6 80 256 80s165.7 60.3 183.5 144H416c-26.5 0-48 21.5-48 48v96c0 26.5 21.5 48 48 48h24c13.3 0 24-10.7 24-24V288c0-114.9-93.1-208-208-208z"/></symbol>
+  <symbol id="i-volume" viewBox="0 0 640 512"><path d="M533.6 32.5C598.5 85.2 640 165.8 640 256s-41.5 170.7-106.4 223.5c-10.3 8.4-25.4 6.8-33.8-3.5s-6.8-25.4 3.5-33.8C557.5 398.2 592 331.2 592 256s-34.5-142.2-88.7-186.3c-10.3-8.4-11.8-23.5-3.5-33.8s23.5-11.8 33.8-3.5zM473.1 107c43.2 35.2 70.9 88.9 70.9 149s-27.7 113.8-70.9 149c-10.3 8.4-25.4 6.8-33.8-3.5s-6.8-25.4 3.5-33.8C475.3 341.3 496 301.1 496 256s-20.7-85.3-53.2-111.8c-10.3-8.4-11.8-23.5-3.5-33.8s23.5-11.8 33.8-3.5zm-60.5 74.5C434.1 199.1 448 225.9 448 256s-13.9 56.9-35.4 74.5c-10.3 8.4-25.4 6.8-33.8-3.5s-6.8-25.4 3.5-33.8C393.1 284.4 400 271 400 256s-6.9-28.4-17.7-37.3c-10.3-8.4-11.8-23.5-3.5-33.8s23.5-11.8 33.8-3.5zM301.1 34.8C312.6 40 320 51.4 320 64l0 384c0 12.6-7.4 24-18.9 29.2s-25 3.1-34.4-5.3L131.8 352 64 352c-35.3 0-64-28.7-64-64l0-64c0-35.3 28.7-64 64-64l67.8 0L266.7 40.1c9.4-8.4 22.9-10.4 34.4-5.3z"/></symbol>
   <symbol id="i-eye-slash" viewBox="0 0 640 512"><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L223.1 149.5zM135.3 367.8c-17.4-15.2-33-32.4-46.7-51.2C75.1 297.7 64 277.1 64 256s11.1-41.7 24.6-60.6c13.4-18.7 30.5-36.4 49.8-52c39.2-31.6 89.8-55.4 150.2-55.4L135.3 367.8zM320 400c-79.5 0-144-64.5-144-144c0-20.7 4.4-40.4 12.2-58.2L93.5 125.4C53.4 165.1 25.1 212.9 12.4 244.3c-3.3 7.9-3.3 16.7 0 24.6C27.2 304.6 58.6 356.6 105.3 400C152.2 443.2 216.9 480 320 480c55.4 0 104.6-15.1 145.4-39L416.5 403c-28.2 10.3-60.3 17-96.5 17z"/></symbol>
   <symbol id="i-play" viewBox="0 0 384 512"><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.8 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></symbol>
   <symbol id="i-pause" viewBox="0 0 320 512"><path d="M48 64C21.5 64 0 85.5 0 112V400c0 26.5 21.5 48 48 48h32c26.5 0 48-21.5 48-48V112c0-26.5-21.5-48-48-48H48zm192 0c-26.5 0-48 21.5-48 48V400c0 26.5 21.5 48 48 48h32c26.5 0 48-21.5 48-48V112c0-26.5-21.5-48-48-48H240z"/></symbol>
@@ -2596,7 +2665,6 @@
       <div class="sidebar-nav" id="sidebar-nav">
         <button class="sidebar-nav-tab active" data-view="library" onclick="switchSidebarView('library')">Library</button>
         <button class="sidebar-nav-tab" data-view="explore" onclick="switchSidebarView('explore')">Explore</button>
-        <button class="sidebar-nav-tab" data-view="notebook" onclick="switchSidebarView('notebook')">Notebook</button>
       </div>
       <div class="sidebar-search" role="search">
         <label for="search" class="sr-only">Search articles</label>
@@ -2604,6 +2672,7 @@
       </div>
       <div class="file-count" id="file-count" aria-live="polite" aria-atomic="true">
         <span id="file-count-text"></span>
+        <button class="new-notebook-btn" onclick="createNewNotebook()" title="New notebook">+ Notebook</button>
         <label class="hide-read-toggle" title="Hide viewed articles">
           <input type="checkbox" id="hide-read-toggle" onchange="toggleHideRead()" />
           <span class="hide-read-label">Hide read</span>
@@ -2612,7 +2681,7 @@
       <div class="file-list" id="file-list" role="listbox" aria-label="Articles"></div>
       <div class="audio-player-panel hidden" id="audio-player">
         <div class="audio-now-playing">
-          <svg style="width:12px;height:12px;fill:currentColor;flex-shrink:0;opacity:0.5"><use href="#i-headphones"/></svg>
+          <svg style="width:12px;height:12px;fill:currentColor;flex-shrink:0;opacity:0.5"><use href="#i-volume"/></svg>
           <span class="audio-now-label" id="audio-now-label">No article queued</span>
           <span class="audio-now-status" id="audio-now-status"></span>
         </div>
@@ -2639,6 +2708,7 @@
       <div class="sidebar-footer">
         <button class="sidebar-footer-btn" onclick="showShortcutsModal()" aria-label="Keyboard shortcuts"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-keyboard"/></svg> Shortcuts</button>
         <button class="sidebar-footer-btn" onclick="showGuideModal()" aria-label="Features guide"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-book"/></svg> Guide</button>
+        <button class="sidebar-footer-btn" onclick="showSettingsPage()" aria-label="Settings"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-gear"/></svg> Settings</button>
       </div>
     </aside>
 
@@ -2898,6 +2968,301 @@ document.addEventListener('click', function(e) {
     panel.remove();
   }
 });
+
+// ---- Full Settings Page ----
+function showSettingsPage() {
+  activeFile = null;
+  _activeNotebook = null;
+  const content = document.getElementById('content');
+  const empty = document.getElementById('empty-state');
+  empty.style.display = 'none';
+  content.style.display = 'block';
+  document.title = 'Settings — PullRead';
+  document.getElementById('margin-notes').innerHTML = '';
+  renderFileList();
+
+  var currentTheme = document.body.getAttribute('data-theme') || 'light';
+  var currentFont = localStorage.getItem('pr-font') || 'serif';
+  var currentSize = localStorage.getItem('pr-size') || 'medium';
+  var currentLeading = localStorage.getItem('pr-leading') || 'default';
+  var currentSpacing = localStorage.getItem('pr-spacing') || 'default';
+  var currentWidth = localStorage.getItem('pr-width') || 'default';
+  var currentEditor = localStorage.getItem('pr-integration-editor') || 'none';
+
+  function themeBtn(val, label) {
+    return '<button class="' + (currentTheme === val ? 'active' : '') + '" onclick="setTheme(\'' + val + '\');showSettingsPage()">' + label + '</button>';
+  }
+  function sizeBtn(val, label, style) {
+    return '<button class="' + (currentSize === val ? 'active' : '') + '" onclick="setSize(\'' + val + '\');showSettingsPage()"' + (style ? ' style="' + style + '"' : '') + '>' + label + '</button>';
+  }
+  function opt(val, label, current) {
+    return '<option value="' + val + '"' + (current === val ? ' selected' : '') + '>' + label + '</option>';
+  }
+
+  var html = '<div class="article-header"><h1>Settings</h1></div>';
+
+  // ---- Display section ----
+  html += '<div class="settings-section">';
+  html += '<h2>Display</h2>';
+  html += '<div class="settings-row"><label>Theme</label><div class="settings-btn-group">'
+    + themeBtn('light', 'Light') + themeBtn('dark', 'Dark') + themeBtn('sepia', 'Sepia') + themeBtn('high-contrast', 'Hi-Con')
+    + '</div></div>';
+  html += '<div class="settings-row"><label>Font</label><select onchange="setFont(this.value);showSettingsPage()">'
+    + opt('serif','Serif',currentFont) + opt('sans','Sans-serif',currentFont) + opt('system','Charter',currentFont)
+    + opt('mono','Monospace',currentFont) + opt('inter','Inter',currentFont) + opt('lora','Lora',currentFont)
+    + opt('literata','Literata',currentFont) + opt('source-serif','Source Serif',currentFont)
+    + opt('work-sans','Work Sans',currentFont) + opt('opendyslexic','OpenDyslexic',currentFont)
+    + '</select></div>';
+  html += '<div class="settings-row"><label>Text size</label><div class="settings-btn-group">'
+    + sizeBtn('small','A','font-size:12px') + sizeBtn('medium','A','font-size:14px') + sizeBtn('large','A','font-size:17px')
+    + '</div></div>';
+  html += '<div class="settings-row"><label>Line height</label><select onchange="setLineHeight(this.value)">'
+    + opt('default','Default',currentLeading) + opt('compact','Compact',currentLeading)
+    + opt('relaxed','Relaxed',currentLeading) + opt('loose','Loose',currentLeading)
+    + '</select></div>';
+  html += '<div class="settings-row"><label>Letter spacing</label><select onchange="setSpacing(this.value)">'
+    + opt('default','Default',currentSpacing) + opt('wide','Wide',currentSpacing) + opt('wider','Wider',currentSpacing)
+    + '</select></div>';
+  html += '<div class="settings-row"><label>Content width</label><select onchange="setWidth(this.value)">'
+    + opt('narrow','Narrow',currentWidth) + opt('default','Default',currentWidth) + opt('wide','Wide',currentWidth)
+    + '</select></div>';
+  html += '</div>';
+
+  // ---- Voice Playback section (placeholder, loaded async) ----
+  html += '<div class="settings-section" id="settings-voice">';
+  html += '<h2>Voice Playback</h2>';
+  html += '<p style="color:var(--muted);font-size:13px">Loading voice settings...</p>';
+  html += '</div>';
+
+  // ---- AI Summaries section (placeholder, loaded async) ----
+  html += '<div class="settings-section" id="settings-ai">';
+  html += '<h2>AI Summaries &amp; Tagging</h2>';
+  html += '<p style="color:var(--muted);font-size:13px">Loading AI settings...</p>';
+  html += '</div>';
+
+  // ---- Integrations section ----
+  html += '<div class="settings-section">';
+  html += '<h2>Integrations</h2>';
+  html += '<div class="settings-row"><div><label>External editor</label><div class="settings-desc">Open notebooks and exports in your preferred writing app</div></div>'
+    + '<select onchange="setIntegrationEditor(this.value)">'
+    + opt('none','None (built-in)',currentEditor)
+    + opt('obsidian','Obsidian',currentEditor) + opt('ia-writer','iA Writer',currentEditor)
+    + opt('bear','Bear',currentEditor) + opt('ulysses','Ulysses',currentEditor) + opt('typora','Typora',currentEditor)
+    + '</select></div>';
+  html += '</div>';
+
+  content.innerHTML = html;
+  document.getElementById('content-pane').scrollTop = 0;
+
+  // Load TTS settings async
+  if (serverMode) {
+    fetch('/api/tts-settings').then(function(r) { return r.json(); }).then(function(data) {
+      var sec = document.getElementById('settings-voice');
+      if (!sec) return;
+      var providers = [
+        { id: 'browser', label: 'Built-in Voice — free' },
+        { id: 'kokoro', label: 'Kokoro — free, on-device' },
+        { id: 'openai', label: 'OpenAI — premium' },
+        { id: 'elevenlabs', label: 'ElevenLabs — premium' },
+      ];
+      var h = '<h2>Voice Playback</h2>';
+      h += '<div class="settings-row"><div><label>Provider</label><div class="settings-desc">Choose how articles are read aloud</div></div>';
+      h += '<select id="sp-tts-provider" onchange="settingsPageTTSChanged()">';
+      for (var i = 0; i < providers.length; i++) {
+        h += '<option value="' + providers[i].id + '"' + (data.provider === providers[i].id ? ' selected' : '') + '>' + providers[i].label + '</option>';
+      }
+      h += '</select></div>';
+
+      // Voice select
+      if (data.voices) {
+        h += '<div class="settings-row" id="sp-tts-voice-row"><label>Voice</label>';
+        h += '<select id="sp-tts-voice">';
+        var prov = data.provider || 'browser';
+        var voices = data.voices[prov] || [];
+        for (var vi = 0; vi < voices.length; vi++) {
+          h += '<option value="' + voices[vi].id + '"' + (data.voice === voices[vi].id ? ' selected' : '') + '>' + escapeHtml(voices[vi].label) + '</option>';
+        }
+        h += '</select></div>';
+      }
+
+      // Model select
+      if (data.models) {
+        h += '<div class="settings-row" id="sp-tts-model-row"><label>Model</label>';
+        h += '<select id="sp-tts-model">';
+        var models = data.models[data.provider] || [];
+        for (var mi = 0; mi < models.length; mi++) {
+          h += '<option value="' + models[mi].id + '"' + (data.model === models[mi].id ? ' selected' : '') + '>' + escapeHtml(models[mi].label) + '</option>';
+        }
+        h += '</select></div>';
+      }
+
+      // API key for cloud providers
+      var isCloud = data.provider === 'openai' || data.provider === 'elevenlabs';
+      h += '<div class="settings-row" id="sp-tts-key-row" style="display:' + (isCloud ? 'flex' : 'none') + '"><div><label>API Key</label>';
+      h += '<div class="settings-desc">' + (data.hasKey && isCloud ? '<span class="settings-status ok">Key saved</span>' : 'Required for cloud TTS') + '</div></div>';
+      h += '<input type="password" id="sp-tts-key" placeholder="' + (data.hasKey && isCloud ? '••••••••' : 'Paste API key') + '" style="min-width:200px">';
+      h += '</div>';
+
+      // Kokoro status
+      h += '<div id="sp-kokoro-status" style="display:' + (data.provider === 'kokoro' ? 'block' : 'none') + ';padding:8px 0">';
+      h += '<div style="font-size:12px;color:var(--muted)">' + (data.kokoro && data.kokoro.installed ? '<span class="settings-status ok">Kokoro ready</span> Runs on-device, no API key needed' : 'Will set up automatically on first listen (~86MB)') + '</div>';
+      h += '</div>';
+
+      h += '<div class="settings-row" style="justify-content:flex-end;padding-top:8px">';
+      h += '<button class="btn-primary" onclick="settingsPageSaveTTS()" style="font-size:13px;padding:6px 16px">Save Voice Settings</button>';
+      h += '</div>';
+
+      sec.innerHTML = h;
+      sec._ttsData = data;
+    }).catch(function() {
+      var sec = document.getElementById('settings-voice');
+      if (sec) sec.innerHTML = '<h2>Voice Playback</h2><p style="color:var(--muted);font-size:13px">Could not load voice settings.</p>';
+    });
+
+    // Load LLM settings async
+    fetch('/api/settings').then(function(r) { return r.json(); }).then(function(data) {
+      var sec = document.getElementById('settings-ai');
+      if (!sec) return;
+      var llm = data.llm || {};
+      var providers = [
+        { id: 'apple', label: 'Apple Intelligence (on-device)' },
+        { id: 'anthropic', label: 'Anthropic (Claude)' },
+        { id: 'openai', label: 'OpenAI' },
+        { id: 'gemini', label: 'Google Gemini' },
+        { id: 'openrouter', label: 'OpenRouter' },
+      ];
+      var h = '<h2>AI Summaries &amp; Tagging</h2>';
+      h += '<p style="font-size:13px;color:var(--muted);margin-bottom:16px">Used for article summarization and auto-tagging. Configure your provider and API key.</p>';
+      h += '<div class="settings-row"><div><label>Provider</label><div class="settings-desc">LLM provider for summaries and tags</div></div>';
+      h += '<select id="sp-llm-provider" onchange="settingsPageLLMProviderChanged()">';
+      for (var i = 0; i < providers.length; i++) {
+        h += '<option value="' + providers[i].id + '"' + (llm.provider === providers[i].id ? ' selected' : '') + '>' + providers[i].label + '</option>';
+      }
+      h += '</select></div>';
+
+      // Model
+      h += '<div class="settings-row"><label>Model</label>';
+      h += '<input type="text" id="sp-llm-model" value="' + escapeHtml(llm.model || '') + '" placeholder="e.g. claude-haiku-4-5-20251001" style="min-width:240px">';
+      h += '</div>';
+
+      // API key
+      var needsKey = llm.provider !== 'apple';
+      h += '<div class="settings-row" id="sp-llm-key-row" style="display:' + (needsKey ? 'flex' : 'none') + '"><div><label>API Key</label>';
+      h += '<div class="settings-desc">' + (llm.hasKey ? '<span class="settings-status ok">Key saved</span>' : 'Required for this provider') + '</div></div>';
+      h += '<input type="password" id="sp-llm-key" placeholder="' + (llm.hasKey ? '••••••••' : 'Paste API key') + '" style="min-width:200px">';
+      h += '</div>';
+
+      // Apple Intelligence note
+      h += '<div id="sp-apple-note" style="display:' + (llm.provider === 'apple' ? 'block' : 'none') + ';padding:8px 0">';
+      h += '<div style="font-size:12px;color:var(--muted)">Apple Intelligence runs on-device. No API key or cloud service needed.</div>';
+      h += '</div>';
+
+      h += '<div class="settings-row" style="justify-content:flex-end;padding-top:8px">';
+      h += '<button class="btn-primary" onclick="settingsPageSaveLLM()" style="font-size:13px;padding:6px 16px">Save AI Settings</button>';
+      h += '</div>';
+
+      sec.innerHTML = h;
+    }).catch(function() {
+      var sec = document.getElementById('settings-ai');
+      if (sec) sec.innerHTML = '<h2>AI Summaries &amp; Tagging</h2><p style="color:var(--muted);font-size:13px">Could not load AI settings. Configure in the menu bar app.</p>';
+    });
+  }
+}
+
+function settingsPageTTSChanged() {
+  var provider = document.getElementById('sp-tts-provider').value;
+  var sec = document.getElementById('settings-voice');
+  var data = sec ? sec._ttsData : null;
+  var keyRow = document.getElementById('sp-tts-key-row');
+  var kokoroStatus = document.getElementById('sp-kokoro-status');
+  var isCloud = provider === 'openai' || provider === 'elevenlabs';
+  if (keyRow) keyRow.style.display = isCloud ? 'flex' : 'none';
+  if (kokoroStatus) kokoroStatus.style.display = provider === 'kokoro' ? 'block' : 'none';
+
+  // Update voice/model dropdowns
+  if (data) {
+    var voiceSelect = document.getElementById('sp-tts-voice');
+    var modelSelect = document.getElementById('sp-tts-model');
+    if (voiceSelect && data.voices && data.voices[provider]) {
+      voiceSelect.innerHTML = data.voices[provider].map(function(v) {
+        return '<option value="' + v.id + '">' + escapeHtml(v.label) + '</option>';
+      }).join('');
+    } else if (voiceSelect) { voiceSelect.innerHTML = ''; }
+    if (modelSelect && data.models && data.models[provider]) {
+      modelSelect.innerHTML = data.models[provider].map(function(m) {
+        return '<option value="' + m.id + '">' + escapeHtml(m.label) + '</option>';
+      }).join('');
+    } else if (modelSelect) { modelSelect.innerHTML = ''; }
+  }
+}
+
+function settingsPageSaveTTS() {
+  var provider = document.getElementById('sp-tts-provider').value;
+  var config = { provider: provider };
+
+  if (provider === 'kokoro') {
+    var kVoice = document.getElementById('sp-tts-voice');
+    var kModel = document.getElementById('sp-tts-model');
+    if (kVoice) config.voice = kVoice.value;
+    if (kModel) config.model = kModel.value;
+  } else if (provider !== 'browser') {
+    var apiKey = document.getElementById('sp-tts-key').value;
+    if (apiKey) { config.apiKey = apiKey; } else { config.preserveKey = true; }
+    var voice = document.getElementById('sp-tts-voice');
+    var model = document.getElementById('sp-tts-model');
+    if (voice) config.voice = voice.value;
+    if (model) config.model = model.value;
+  }
+
+  fetch('/api/tts-settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  }).then(function(r) {
+    if (r.ok) {
+      ttsProvider = provider;
+      ttsQueue = [];
+      ttsCurrentIndex = -1;
+      if (ttsAudio) { ttsAudio.pause(); ttsAudio.src = ''; ttsAudio = null; }
+      renderAudioPlayer();
+      showSettingsPage(); // Refresh to show updated state
+    } else {
+      alert('Failed to save voice settings.');
+    }
+  });
+}
+
+function settingsPageLLMProviderChanged() {
+  var provider = document.getElementById('sp-llm-provider').value;
+  var keyRow = document.getElementById('sp-llm-key-row');
+  var appleNote = document.getElementById('sp-apple-note');
+  if (keyRow) keyRow.style.display = provider === 'apple' ? 'none' : 'flex';
+  if (appleNote) appleNote.style.display = provider === 'apple' ? 'block' : 'none';
+}
+
+function settingsPageSaveLLM() {
+  var provider = document.getElementById('sp-llm-provider').value;
+  var model = document.getElementById('sp-llm-model').value;
+  var apiKey = document.getElementById('sp-llm-key').value;
+
+  var body = { provider: provider, model: model };
+  if (apiKey) body.apiKey = apiKey;
+
+  fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(function(r) {
+    if (r.ok) {
+      llmProvider = provider;
+      llmModel = model;
+      llmConfigured = true;
+      showSettingsPage(); // Refresh to show updated state
+    } else {
+      alert('Failed to save AI settings.');
+    }
+  });
+}
 
 // Frontmatter
 function parseFrontmatter(text) {
@@ -3227,7 +3592,7 @@ function renderArticle(text, filename) {
   if (!isReviewArticle) {
     html += '<button onclick="summarizeArticle()" id="summarize-btn" aria-label="Summarize article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Summarize</button>';
   }
-  html += '<button onclick="addCurrentToTTSQueue()" aria-label="Listen to article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-headphones"/></svg> Listen</button>';
+  html += '<button onclick="addCurrentToTTSQueue()" aria-label="Listen to article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> Listen</button>';
   if (meta && meta.url) {
     html += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg> Share</button></div>';
   }
@@ -3254,6 +3619,22 @@ function renderArticle(text, filename) {
       + escapeHtml(meta.summary) + '</div>';
   }
 
+  // YouTube embed: detect from frontmatter and inject responsive iframe
+  const isYouTube = meta && meta.domain && /youtube\.com|youtu\.be|m\.youtube\.com/.test(meta.domain);
+  if (isYouTube && meta.url) {
+    var ytId = null;
+    try {
+      var ytUrl = new URL(meta.url);
+      if (ytUrl.hostname === 'youtu.be') ytId = ytUrl.pathname.slice(1).split('/')[0];
+      else if (ytUrl.searchParams.get('v')) ytId = ytUrl.searchParams.get('v');
+      else { var em = ytUrl.pathname.match(/\/(embed|v)\/([^/?]+)/); if (em) ytId = em[2]; }
+    } catch {}
+    if (ytId) {
+      html += '<div class="yt-embed"><iframe src="https://www.youtube.com/embed/' + encodeURIComponent(ytId)
+        + '" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy" title="Embedded video"></iframe></div>';
+    }
+  }
+
   // Strip the leading H1 from markdown body if it matches the title (avoid duplication)
   let articleBody = cleanMarkdown(body);
   if (meta && meta.title) {
@@ -3265,6 +3646,11 @@ function renderArticle(text, filename) {
         articleBody = articleBody.slice(h1Match[0].length);
       }
     }
+  }
+
+  // Strip the YouTube thumbnail link from body when we already injected an embed
+  if (isYouTube) {
+    articleBody = articleBody.replace(/\[!\[.*?\]\(https:\/\/img\.youtube\.com\/vi\/[^)]*\)\]\([^)]*\)\s*/g, '');
   }
 
   html += marked.parse(articleBody);
@@ -3296,13 +3682,13 @@ function renderArticle(text, filename) {
     return div.innerHTML;
   })(html);
 
-  // Convert YouTube thumbnail links into embedded video iframes
+  // Convert YouTube thumbnail links into embedded video iframes (fallback for inline links)
   html = html.replace(
-    /<a[^>]*href="(https?:\/\/(www\.)?youtube\.com\/watch\?v=([^"&]+)[^"]*|https?:\/\/youtu\.be\/([^"/?]+)[^"]*)"[^>]*>\s*<img[^>]*src="https:\/\/img\.youtube\.com\/vi\/[^"]*"[^>]*>\s*<\/a>/gi,
-    function(match, url, _yt, id1, id2) {
+    /<a[^>]*href="(https?:\/\/(?:www\.|m\.)?youtube\.com\/watch\?v=([^"&]+)[^"]*|https?:\/\/youtu\.be\/([^"/?]+)[^"]*)"[^>]*>\s*<img[^>]*src="https:\/\/img\.youtube\.com\/vi\/[^"]*"[^>]*\/?>\s*<\/a>/gi,
+    function(match, url, id1, id2) {
       var videoId = id1 || id2;
       if (!videoId) return match;
-      return '<div class="yt-embed"><iframe src="https://www.youtube.com/embed/' + videoId + '" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen title="Embedded video"></iframe></div>';
+      return '<div class="yt-embed"><iframe src="https://www.youtube.com/embed/' + encodeURIComponent(videoId) + '" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy" title="Embedded video"></iframe></div>';
     }
   );
 
@@ -3426,14 +3812,34 @@ function renderFileList() {
     displayFiles = filteredFiles;
   }
 
+  // Build notebook items from loaded notebooks, filtered by search
+  const nbs = Object.values(_notebooks).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+  const searchTerm = (document.getElementById('search').value || '').trim().toLowerCase();
+  const nbItems = nbs.filter(function(nb) {
+    if (!searchTerm) return true;
+    const title = (nb.title || '').toLowerCase();
+    const tags = (nb.tags || []).join(' ').toLowerCase();
+    return title.includes(searchTerm) || tags.includes(searchTerm);
+  });
+
   const total = filteredFiles.length;
   const shown = displayFiles.length;
-  countText.textContent = shown + ' article' + (shown !== 1 ? 's' : '') + (hideRead && shown < total ? ' (' + (total - shown) + ' hidden)' : '');
+  let countStr = shown + ' article' + (shown !== 1 ? 's' : '');
+  if (nbItems.length > 0) countStr += ', ' + nbItems.length + ' notebook' + (nbItems.length !== 1 ? 's' : '');
+  if (hideRead && shown < total) countStr += ' (' + (total - shown) + ' hidden)';
+  countText.textContent = countStr;
+
+  // Render notebooks first, then articles
+  let html = '';
+  for (const nb of nbItems) {
+    html += renderNotebookItem(nb);
+  }
 
   // Paginate: render in chunks for performance with large lists
   displayedCount = Math.min(displayFiles.length, PAGE_SIZE);
+  html += displayFiles.slice(0, displayedCount).map((f, i) => renderFileItem(f, i)).join('');
 
-  list.innerHTML = displayFiles.slice(0, displayedCount).map((f, i) => renderFileItem(f, i)).join('');
+  list.innerHTML = html;
 }
 
 function renderFileItem(f, i) {
@@ -3466,6 +3872,15 @@ function renderFileItem(f, i) {
     + '<div class="file-item-title">' + escapeHtml(f.title) + '</div>'
     + '<div class="file-item-meta">' + metaHtml + favicon + '</div>'
     + indicators
+    + '</div>';
+}
+
+function renderNotebookItem(nb) {
+  const isActive = _activeNotebook && _activeNotebook.id === nb.id && !activeFile ? ' active' : '';
+  const date = nb.updatedAt ? new Date(nb.updatedAt).toLocaleDateString() : '';
+  return '<div class="file-item notebook-item' + isActive + '" data-notebook-id="' + escapeHtml(nb.id) + '" onclick="openNotebookInPane(\'' + escapeHtml(nb.id) + '\')" role="option" tabindex="0" onkeydown="if(event.key===\'Enter\')openNotebookInPane(\'' + escapeHtml(nb.id) + '\')">'
+    + '<div class="file-item-title"><svg class="nb-icon" aria-hidden="true"><use href="#i-book"/></svg>' + escapeHtml(nb.title || 'Untitled') + '</div>'
+    + '<div class="file-item-meta"><span>' + date + '</span><span class="meta-sep"></span><span>notebook</span></div>'
     + '</div>';
 }
 
@@ -4619,6 +5034,13 @@ async function playCloudTTS(filename) {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: 'TTS failed' }));
+      // If Kokoro native engine failed, fall back to browser TTS silently
+      if (err.fallback === 'browser') {
+        console.warn('Kokoro unavailable, falling back to browser TTS:', err.error);
+        ttsGenerating = false;
+        await playBrowserTTS(filename);
+        return;
+      }
       alert('TTS Error: ' + (err.error || 'Unknown error'));
       ttsPlaying = false;
       renderAudioPlayer();
@@ -4630,6 +5052,8 @@ async function playCloudTTS(filename) {
 
     ttsAudio = new Audio(audioUrl);
     ttsAudio.playbackRate = ttsSpeed;
+    // Reset total time immediately; loadedmetadata will set the real value
+    document.getElementById('tts-time-total').textContent = '0:00';
 
     ttsAudio.addEventListener('loadedmetadata', () => {
       document.getElementById('tts-time-total').textContent = formatTime(ttsAudio.duration);
@@ -4682,6 +5106,7 @@ function stopTTS() {
   ttsGenerating = false;
   document.getElementById('tts-progress').style.width = '0%';
   document.getElementById('tts-time-current').textContent = '0:00';
+  document.getElementById('tts-time-total').textContent = '0:00';
 }
 
 function ttsTogglePlay() {
@@ -5941,131 +6366,112 @@ async function deleteNotebook(id) {
     await fetch('/api/notebooks?id=' + encodeURIComponent(id), { method: 'DELETE' });
     delete _notebooks[id];
     _activeNotebook = null;
-    showNotebook();
+    renderFileList();
+    goHome();
   } catch {}
 }
 
+// Thin wrapper — kept for backward compatibility with callers
 function showNotebook(openId) {
-  _sidebarView = 'notebook'; syncSidebarTabs();
+  loadNotebooks().then(function() {
+    if (openId && _notebooks[openId]) {
+      openNotebookInPane(openId);
+    } else if (_activeNotebook && _notebooks[_activeNotebook.id]) {
+      openNotebookInPane(_activeNotebook.id);
+    } else {
+      goHome();
+    }
+  });
+}
+
+// Render a notebook in the content pane using article-like layout
+function openNotebookInPane(id) {
+  const nb = _notebooks[id];
+  if (!nb) return;
   activeFile = null;
-  document.getElementById('margin-notes').innerHTML = '';
-  renderFileList();
+  _activeNotebook = nb;
 
   const content = document.getElementById('content');
   const empty = document.getElementById('empty-state');
   empty.style.display = 'none';
   content.style.display = 'block';
-  document.title = 'Notebook — PullRead';
+  document.title = (nb.title || 'Untitled') + ' — PullRead';
+  document.getElementById('margin-notes').innerHTML = '';
+  renderFileList();
 
-  loadNotebooks().then(() => {
-    const nbs = Object.values(_notebooks).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+  let html = '';
 
-    let cardsHtml = '';
-    if (nbs.length) {
-      cardsHtml = '<div class="notebook-cards">';
-      for (const nb of nbs) {
-        const snippet = (nb.content || '').replace(/[#>*_\[\]]/g, '').slice(0, 100);
-        const date = nb.updatedAt ? new Date(nb.updatedAt).toLocaleDateString() : '';
-        const active = (openId || (_activeNotebook && _activeNotebook.id)) === nb.id ? ' active' : '';
-        cardsHtml += '<div class="notebook-card' + active + '" onclick="openNotebookEditor(\'' + nb.id + '\')">'
-          + '<div class="notebook-card-title">' + escapeHtml(nb.title || 'Untitled') + '</div>'
-          + '<div class="notebook-card-snippet">' + escapeHtml(snippet) + '</div>'
-          + '<div class="notebook-card-date">' + date + '</div>'
-          + '</div>';
-      }
-      cardsHtml += '</div>';
-    }
+  // Article-style header
+  html += '<div class="article-header">';
+  html += '<input class="notebook-title-input" value="' + escapeHtml(nb.title || '') + '" placeholder="Untitled notebook" oninput="notebookDebounceSave()">';
+  html += '<div class="article-byline">';
+  var bylineParts = [];
+  bylineParts.push('<span>Notebook</span>');
+  if (nb.updatedAt) bylineParts.push('<span>Updated ' + new Date(nb.updatedAt).toLocaleDateString() + '</span>');
+  if (nb.createdAt) bylineParts.push('<span>Created ' + new Date(nb.createdAt).toLocaleDateString() + '</span>');
+  html += bylineParts.join('<span class="sep">&middot;</span>');
+  html += '</div>';
 
-    let editorHtml = '';
-    const nb = openId ? _notebooks[openId] : _activeNotebook;
-    if (nb) {
-      _activeNotebook = nb;
-      editorHtml = buildNotebookEditor(nb);
-    } else if (!nbs.length) {
-      editorHtml = '<div class="notebook-empty">'
-        + '<svg class="icon" style="width:48px;height:48px;opacity:0.3;margin-bottom:12px" aria-hidden="true"><use href="#i-pen"/></svg>'
-        + '<p style="font-size:16px;font-weight:500;color:var(--fg)">Start writing</p>'
-        + '<p>Synthesize ideas from your reading. Highlights and notes<br>from articles become the building blocks of original thought.</p>'
-        + '<button class="btn-primary" onclick="createNewNotebook()" style="margin-top:16px">New Notebook</button>'
-        + '</div>';
-    }
+  // Action buttons — same row style as articles
+  html += '<div class="article-actions">';
+  var previewLabel = _notebookPreviewMode ? 'Edit' : 'Preview';
+  html += '<button onclick="toggleNotebookPreview()" class="' + (_notebookPreviewMode ? 'active-fav' : '') + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-pen"/></svg> ' + previewLabel + '</button>';
+  html += '<button onclick="toggleWritingFocus()" class="' + (_writingFocusActive ? 'active-fav' : '') + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-focus"/></svg> Focus</button>';
+  html += '<button onclick="showHighlightPicker()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-pen"/></svg> Insert Highlights</button>';
+  html += '<div class="share-dropdown" style="display:inline-block"><button onclick="toggleNotebookExportDropdown(event)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg> Export\u2026</button></div>';
+  html += '<button onclick="if(confirm(\'Delete this notebook?\')) deleteNotebook(\'' + escapeHtml(nb.id) + '\')" style="color:var(--muted)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-xmark"/></svg> Delete</button>';
+  html += '<span class="save-hint" id="notebook-save-hint" style="font-size:11px;color:var(--muted);margin-left:auto">Saved</span>';
+  html += '</div>';
+  html += '</div>';
 
-    content.innerHTML = '<div style="max-width:720px;margin:0 auto;padding:32px 20px">'
-      + '<div class="notebook-header">'
-      + '<h1>Notebook</h1>'
-      + '<button class="btn-primary" onclick="createNewNotebook()" style="font-size:13px;padding:6px 14px">+ New</button>'
-      + '</div>'
-      + cardsHtml
-      + editorHtml
-      + '</div>';
-
-    document.getElementById('content-pane').scrollTop = 0;
-
-    // Set up auto-grow, auto-save, and focus tracking for textarea
-    const ta = content.querySelector('.notebook-editor textarea');
-    if (ta) {
-      autoGrowTextarea(ta);
-      ta.addEventListener('input', () => {
-        autoGrowTextarea(ta);
-        notebookDebounceSave();
-        updateWritingFocusLine();
-      });
-      ta.addEventListener('click', updateWritingFocusLine);
-      ta.addEventListener('keyup', updateWritingFocusLine);
-      ta.addEventListener('scroll', updateWritingFocusLine);
-      ta.focus();
-    }
-  });
-}
-
-function buildNotebookEditor(nb) {
-  const previewActive = _notebookPreviewMode ? ' active' : '';
-  const focusActive = _writingFocusActive ? ' active' : '';
-  const sources = (nb.sources || []);
-  const sourcesHtml = sources.length
-    ? '<div class="notebook-sources"><span class="notebook-sources-label">Sources</span>'
-      + sources.map(s => {
-        const display = s.replace(/^\d{4}-\d{2}-\d{2}-/, '').replace(/\.md$/, '').replace(/-/g, ' ');
-        return '<span class="notebook-source-chip" onclick="loadArticle(\'' + escapeHtml(s) + '\')">' + escapeHtml(display) + '</span>';
-      }).join('')
-      + '</div>'
-    : '';
-
-  // Tags row (reuse .tags-row pattern from notes panel)
-  const nbTags = (nb.tags || []);
-  const tagsHtml = '<div class="tags-row" style="margin-top:12px">'
-    + nbTags.map(function(t) { return '<span class="tag">' + escapeHtml(t)
-      + '<span class="tag-remove" onclick="removeNotebookTag(\'' + escapeHtml(t.replace(/'/g, "\\'")) + '\')">&times;</span></span>'; }).join('')
-    + '<input type="text" placeholder="Add tag..." onkeydown="handleNotebookTagKey(event)" style="flex:1;min-width:80px">'
-    + '</div>';
-
-  let bodyHtml;
+  // Content body
   if (_notebookPreviewMode) {
-    bodyHtml = '<div class="notebook-preview">' + marked.parse(nb.content || '*Start writing...*') + '</div>';
+    html += '<div class="notebook-preview">' + marked.parse(nb.content || '*Start writing...*') + '</div>';
   } else {
-    bodyHtml = '<div class="notebook-editor-wrap"><div class="notebook-editor">'
+    html += '<div class="notebook-editor-wrap"><div class="notebook-editor">'
       + '<textarea placeholder="Start writing... Use markdown for formatting.">' + escapeHtml(nb.content || '') + '</textarea>'
       + '</div></div>';
   }
 
-  var editorIntegration = getIntegrationEditor();
-  var openInBtn = editorIntegration !== 'none'
-    ? '<button onclick="openInExternalEditor(_activeNotebook.content, _activeNotebook.title)" style="margin-left:4px"><svg class="icon icon-sm" style="vertical-align:-1px"><use href="#i-share"/></svg> Open in ' + escapeHtml(editorIntegration.replace(/-/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); })) + '</button>'
-    : '';
+  // Sources chips
+  var sources = (nb.sources || []);
+  if (sources.length) {
+    html += '<div class="notebook-sources"><span class="notebook-sources-label">Sources</span>';
+    for (var si = 0; si < sources.length; si++) {
+      var s = sources[si];
+      var display = s.replace(/^\d{4}-\d{2}-\d{2}-/, '').replace(/\.md$/, '').replace(/-/g, ' ');
+      html += '<span class="notebook-source-chip" onclick="jumpToArticle(\'' + escapeHtml(s) + '\')">' + escapeHtml(display) + '</span>';
+    }
+    html += '</div>';
+  }
 
-  return '<div class="notebook-toolbar">'
-    + '<button onclick="showHighlightPicker()"><svg class="icon icon-sm" style="vertical-align:-1px"><use href="#i-pen"/></svg> Insert Highlights</button>'
-    + '<button class="' + previewActive + '" onclick="toggleNotebookPreview()">Preview</button>'
-    + '<button class="' + focusActive + '" onclick="toggleWritingFocus()"><svg class="icon icon-sm" style="vertical-align:-1px"><use href="#i-focus"/></svg> Focus</button>'
-    + '<button onclick="exportNotebook()" style="margin-left:4px">Export .md</button>'
-    + openInBtn
-    + '<button onclick="if(confirm(\'Delete this notebook?\')) deleteNotebook(\'' + nb.id + '\')" style="color:var(--muted)">Delete</button>'
-    + '<span class="save-hint" id="notebook-save-hint">Saved</span>'
-    + '</div>'
-    + '<input class="notebook-title-input" value="' + escapeHtml(nb.title || '') + '" placeholder="Untitled" oninput="notebookDebounceSave()">'
-    + bodyHtml
-    + sourcesHtml
-    + tagsHtml;
+  // Tags
+  var nbTags = (nb.tags || []);
+  html += '<div class="tags-row" style="margin-top:12px">';
+  for (var ti = 0; ti < nbTags.length; ti++) {
+    var t = nbTags[ti];
+    html += '<span class="tag">' + escapeHtml(t) + '<span class="tag-remove" onclick="removeNotebookTag(\'' + escapeHtml(t.replace(/'/g, "\\'")) + '\')">&times;</span></span>';
+  }
+  html += '<input type="text" placeholder="Add tag..." onkeydown="handleNotebookTagKey(event)" style="flex:1;min-width:80px">';
+  html += '</div>';
+
+  content.innerHTML = html;
+  document.getElementById('content-pane').scrollTop = 0;
+
+  // Set up auto-grow, auto-save, and focus tracking for textarea
+  var ta = content.querySelector('.notebook-editor textarea');
+  if (ta) {
+    autoGrowTextarea(ta);
+    ta.addEventListener('input', function() {
+      autoGrowTextarea(ta);
+      notebookDebounceSave();
+      updateWritingFocusLine();
+    });
+    ta.addEventListener('click', updateWritingFocusLine);
+    ta.addEventListener('keyup', updateWritingFocusLine);
+    ta.addEventListener('scroll', updateWritingFocusLine);
+    ta.focus();
+  }
 }
 
 function autoGrowTextarea(ta) {
@@ -6126,17 +6532,31 @@ function toggleNotebookPreview() {
 function exportNotebook() {
   if (!_activeNotebook) return;
   const nb = _activeNotebook;
-  let md = '';
-  if (nb.title) md += '# ' + nb.title + '\n\n';
-  md += (nb.content || '') + '\n';
+
+  // Build YAML frontmatter matching article format
+  let fm = '---\n';
+  fm += 'title: "' + (nb.title || 'Untitled').replace(/"/g, '\\"') + '"\n';
+  fm += 'type: notebook\n';
+  if (nb.createdAt) fm += 'created: ' + nb.createdAt.slice(0, 10) + '\n';
+  if (nb.updatedAt) fm += 'updated: ' + nb.updatedAt.slice(0, 10) + '\n';
+  if (nb.tags && nb.tags.length) {
+    fm += 'tags:\n';
+    for (const t of nb.tags) fm += '  - ' + t + '\n';
+  }
   if (nb.sources && nb.sources.length) {
-    md += '\n---\n\n**Sources:**\n';
+    fm += 'sources:\n';
     for (const s of nb.sources) {
-      const f = allFiles.find(f => f.filename === s);
+      const f = allFiles.find(function(f) { return f.filename === s; });
       const title = f ? f.title : s;
-      md += '- ' + title + '\n';
+      fm += '  - "' + title.replace(/"/g, '\\"') + '"\n';
     }
   }
+  fm += '---\n\n';
+
+  let md = fm;
+  if (nb.title) md += '# ' + nb.title + '\n\n';
+  md += (nb.content || '') + '\n';
+
   const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -6148,6 +6568,69 @@ function exportNotebook() {
   URL.revokeObjectURL(url);
 }
 
+function toggleNotebookExportDropdown(e) {
+  e.stopPropagation();
+  var existing = document.querySelector('.nb-export-panel');
+  if (existing) { existing.remove(); return; }
+  var btn = e.currentTarget;
+  var panel = document.createElement('div');
+  panel.className = 'share-dropdown-panel nb-export-panel';
+  panel.onclick = function(ev) { ev.stopPropagation(); };
+  var items = '';
+  items += '<button onclick="exportNotebook();this.closest(\'.nb-export-panel\').remove()">Export .md</button>';
+  items += '<button onclick="exportNotebookPdf();this.closest(\'.nb-export-panel\').remove()">Export .pdf</button>';
+  var editorIntegration = getIntegrationEditor();
+  if (editorIntegration !== 'none') {
+    var edLabel = escapeHtml(editorIntegration.replace(/-/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); }));
+    items += '<button onclick="openInExternalEditor(_activeNotebook.content, _activeNotebook.title);this.closest(\'.nb-export-panel\').remove()">Open in ' + edLabel + '</button>';
+  }
+  panel.innerHTML = items;
+  btn.closest('.share-dropdown').appendChild(panel);
+  // Close when clicking elsewhere
+  setTimeout(function() {
+    document.addEventListener('click', function close() {
+      panel.remove();
+      document.removeEventListener('click', close);
+    }, { once: true });
+  }, 0);
+}
+
+function exportNotebookPdf() {
+  if (!_activeNotebook) return;
+  var nb = _activeNotebook;
+  // Render the notebook as a clean printable page and trigger print-to-PDF
+  var win = window.open('', '_blank');
+  if (!win) { alert('Please allow popups to export as PDF.'); return; }
+  var bodyHtml = marked.parse(nb.content || '');
+  var sources = (nb.sources || []);
+  var sourcesHtml = '';
+  if (sources.length) {
+    sourcesHtml = '<hr><p><strong>Sources:</strong></p><ul>';
+    for (var i = 0; i < sources.length; i++) {
+      var f = allFiles.find(function(ff) { return ff.filename === sources[i]; });
+      var title = f ? f.title : sources[i];
+      sourcesHtml += '<li>' + escapeHtml(title) + '</li>';
+    }
+    sourcesHtml += '</ul>';
+  }
+  var tags = (nb.tags || []);
+  var tagsHtml = tags.length ? '<p><strong>Tags:</strong> ' + tags.map(function(t) { return escapeHtml(t); }).join(', ') + '</p>' : '';
+  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + escapeHtml(nb.title || 'Notebook') + '</title>'
+    + '<style>body{font-family:Georgia,serif;max-width:700px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}'
+    + 'h1{font-size:28px;margin-bottom:4px}h2,h3{margin-top:1.5em}'
+    + 'blockquote{border-left:3px solid #ccc;margin:1em 0;padding:0.5em 1em;color:#555}'
+    + 'code{background:#f5f5f5;padding:2px 4px;border-radius:3px;font-size:0.9em}'
+    + 'pre{background:#f5f5f5;padding:12px;border-radius:6px;overflow-x:auto}'
+    + '.meta{font-size:13px;color:#888;margin-bottom:24px}'
+    + '@media print{body{margin:0;max-width:none}}</style></head><body>'
+    + '<h1>' + escapeHtml(nb.title || 'Untitled') + '</h1>'
+    + '<div class="meta">Notebook' + (nb.updatedAt ? ' &middot; Updated ' + new Date(nb.updatedAt).toLocaleDateString() : '') + '</div>'
+    + bodyHtml + sourcesHtml + tagsHtml
+    + '<script>window.onload=function(){window.print();}<\/script>'
+    + '</body></html>');
+  win.document.close();
+}
+
 function showHighlightPicker() {
   if (!_activeNotebook) return;
 
@@ -6155,35 +6638,97 @@ function showHighlightPicker() {
   overlay.className = 'modal-overlay';
   overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
 
-  let groupsHtml = '';
-  const entries = Object.entries(allHighlightsIndex).filter(([, hls]) => hls && hls.length > 0);
-  if (!entries.length) {
+  // Collect all highlights with article metadata, sorted recent-first
+  const entries = Object.entries(allHighlightsIndex).filter(function(e) { return e[1] && e[1].length > 0; });
+  var allHlItems = [];
+  for (var ei = 0; ei < entries.length; ei++) {
+    var filename = entries[ei][0];
+    var hls = entries[ei][1];
+    var f = allFiles.find(function(ff) { return ff.filename === filename; });
+    var title = f ? f.title : filename;
+    var dateStr = f && f.bookmarked ? f.bookmarked.slice(0, 10) : '';
+    for (var hi = 0; hi < hls.length; hi++) {
+      allHlItems.push({ filename: filename, title: title, date: dateStr, color: hls[hi].color || '', text: hls[hi].text });
+    }
+  }
+  // Sort by date descending (recent first)
+  allHlItems.sort(function(a, b) { return b.date.localeCompare(a.date); });
+
+  // Group by date then article
+  var dateGroups = {};
+  var dateOrder = [];
+  for (var di = 0; di < allHlItems.length; di++) {
+    var item = allHlItems[di];
+    var dk = item.date || 'Undated';
+    if (!dateGroups[dk]) { dateGroups[dk] = {}; dateOrder.push(dk); }
+    if (!dateGroups[dk][item.filename]) dateGroups[dk][item.filename] = { title: item.title, items: [] };
+    dateGroups[dk][item.filename].items.push(item);
+  }
+
+  var groupsHtml = '';
+  if (!allHlItems.length) {
     groupsHtml = '<p style="color:var(--muted);text-align:center;padding:20px">No highlights yet. Select text in an article and press <kbd>h</kbd> to highlight.</p>';
   } else {
-    for (const [filename, hls] of entries) {
-      const f = allFiles.find(f => f.filename === filename);
-      const title = f ? f.title : filename;
-      groupsHtml += '<div class="hl-picker-group">'
-        + '<div class="hl-picker-group-title">' + escapeHtml(title) + '</div>';
-      for (const hl of hls) {
-        groupsHtml += '<label class="hl-picker-item">'
-          + '<input type="checkbox" data-filename="' + escapeHtml(filename) + '" data-text="' + escapeHtml(hl.text) + '">'
-          + '<span class="hl-picker-item-text">' + escapeHtml(hl.text.slice(0, 200)) + '</span>'
-          + '</label>';
-      }
+    for (var gi = 0; gi < dateOrder.length; gi++) {
+      var dateKey = dateOrder[gi];
+      var articles = dateGroups[dateKey];
+      groupsHtml += '<div class="hl-picker-date-group">';
+      groupsHtml += '<div class="hl-picker-date-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';this.querySelector(\'.hl-caret\').classList.toggle(\'collapsed\')">';
+      groupsHtml += '<span class="hl-caret">&#9662;</span> ' + escapeHtml(dateKey);
       groupsHtml += '</div>';
+      groupsHtml += '<div class="hl-picker-date-content">';
+      var fns = Object.keys(articles);
+      for (var fi = 0; fi < fns.length; fi++) {
+        var art = articles[fns[fi]];
+        groupsHtml += '<div class="hl-picker-group">';
+        groupsHtml += '<div class="hl-picker-group-title">' + escapeHtml(art.title) + '</div>';
+        for (var ii = 0; ii < art.items.length; ii++) {
+          var hl = art.items[ii];
+          var colorDot = hl.color ? '<span class="hl-color-dot" style="background:' + escapeHtml(hl.color) + '"></span>' : '';
+          groupsHtml += '<label class="hl-picker-item">'
+            + '<input type="checkbox" data-filename="' + escapeHtml(hl.filename) + '" data-text="' + escapeHtml(hl.text) + '">'
+            + colorDot
+            + '<span class="hl-picker-item-text">' + escapeHtml(hl.text.slice(0, 200)) + '</span>'
+            + '</label>';
+        }
+        groupsHtml += '</div>';
+      }
+      groupsHtml += '</div></div>';
     }
   }
 
-  overlay.innerHTML = '<div class="modal-card" onclick="event.stopPropagation()" style="max-width:520px;max-height:80vh;overflow-y:auto">'
+  overlay.innerHTML = '<div class="modal-card" onclick="event.stopPropagation()" style="max-width:580px;max-height:80vh;display:flex;flex-direction:column">'
     + '<h2>Insert Highlights</h2>'
-    + '<p style="color:var(--muted);font-size:13px;margin-bottom:16px">Select highlights to insert as blockquotes into your notebook.</p>'
-    + groupsHtml
+    + '<p style="color:var(--muted);font-size:13px;margin-bottom:12px">Select highlights to insert as blockquotes into your notebook.</p>'
+    + '<input type="text" id="hl-picker-search" placeholder="Search highlights..." oninput="filterHighlightPicker(this.value)" style="width:100%;padding:6px 10px;font-size:13px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);margin-bottom:12px;font-family:inherit">'
+    + '<div id="hl-picker-groups" style="overflow-y:auto;flex:1">' + groupsHtml + '</div>'
     + '<div class="modal-actions">'
     + '<button class="btn-secondary" onclick="this.closest(\'.modal-overlay\').remove()">Cancel</button>'
     + '<button class="btn-primary" onclick="insertSelectedHighlights()">Insert Selected</button>'
     + '</div></div>';
   document.body.appendChild(overlay);
+  overlay.querySelector('#hl-picker-search').focus();
+}
+
+function filterHighlightPicker(query) {
+  var q = query.toLowerCase();
+  var items = document.querySelectorAll('.hl-picker-item');
+  for (var i = 0; i < items.length; i++) {
+    var text = items[i].textContent.toLowerCase();
+    items[i].style.display = !q || text.includes(q) ? '' : 'none';
+  }
+  // Show/hide groups based on visible items
+  var groups = document.querySelectorAll('.hl-picker-group');
+  for (var g = 0; g < groups.length; g++) {
+    var visible = groups[g].querySelectorAll('.hl-picker-item:not([style*="display: none"])');
+    groups[g].style.display = visible.length ? '' : 'none';
+  }
+  // Show/hide date groups
+  var dateGroups = document.querySelectorAll('.hl-picker-date-group');
+  for (var d = 0; d < dateGroups.length; d++) {
+    var visibleGroups = dateGroups[d].querySelectorAll('.hl-picker-group:not([style*="display: none"])');
+    dateGroups[d].style.display = visibleGroups.length ? '' : 'none';
+  }
 }
 
 function insertSelectedHighlights() {
@@ -6287,7 +6832,6 @@ function switchSidebarView(view) {
 
   // Trigger the appropriate view in the content area
   if (view === 'explore') showTagCloud();
-  else if (view === 'notebook') showNotebook();
   else if (view === 'library') goHome();
 }
 
@@ -6295,17 +6839,17 @@ function syncSidebarTabs() {
   document.querySelectorAll('.sidebar-nav-tab').forEach(function(t) {
     t.classList.toggle('active', t.dataset.view === _sidebarView);
   });
+  // Always show file list and count — articles + notebooks visible on all tabs
   var fileCount = document.getElementById('file-count');
   var fileList = document.getElementById('file-list');
-  if (fileCount) fileCount.style.display = _sidebarView === 'library' ? '' : 'none';
-  if (fileList) fileList.style.display = _sidebarView === 'library' ? '' : 'none';
+  if (fileCount) fileCount.style.display = '';
+  if (fileList) fileList.style.display = '';
 
   // Update search placeholder contextually
   var search = document.getElementById('search');
   if (search) {
-    if (_sidebarView === 'library') search.placeholder = 'Search... try is:favorite or tag:tech';
-    else if (_sidebarView === 'explore') search.placeholder = 'Search tags, sources, highlights...';
-    else if (_sidebarView === 'notebook') search.placeholder = 'Search notebooks...';
+    if (_sidebarView === 'explore') search.placeholder = 'Search articles, tags, sources...';
+    else search.placeholder = 'Search... try is:favorite or tag:tech';
   }
 }
 
@@ -6973,7 +7517,7 @@ async function refreshArticleList(silent) {
       const prevFilenames = new Set(allFiles.map(f => f.filename));
       allFiles = await res.json();
       filteredFiles = allFiles;
-      await loadAnnotationsIndex();
+      await Promise.all([loadAnnotationsIndex(), loadNotebooks()]);
       filterFiles();
       // Highlight new articles with a fade-in effect
       if (silent && allFiles.length > prevCount) {
@@ -7067,8 +7611,8 @@ async function init() {
       serverMode = true;
       filteredFiles = allFiles;
 
-      // Load annotations index and LLM config
-      await Promise.all([loadAnnotationsIndex(), checkLLMConfig()]);
+      // Load annotations index, LLM config, and notebooks
+      await Promise.all([loadAnnotationsIndex(), checkLLMConfig(), loadNotebooks()]);
 
       renderFileList();
 

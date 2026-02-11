@@ -2,13 +2,14 @@
 // ABOUTME: Propagates the version from package.json to site/index.html and the Xcode project
 // ABOUTME: Run via `bun scripts/bump-version.ts` (or `bun scripts/bump-version.ts 1.4.0` to set a new version)
 
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
 const ROOT = join(import.meta.dir, '..');
 const PKG_PATH = join(ROOT, 'package.json');
 const SITE_PATH = join(ROOT, 'site', 'index.html');
 const XCPROJ_PATH = join(ROOT, 'PullReadTray', 'PullReadTray.xcodeproj', 'project.pbxproj');
+const SHARE_EXT_PLIST_PATH = join(ROOT, 'PullReadTray', 'PullReadShareExtension', 'Info.plist');
 
 // If a version argument is provided, update package.json first
 const newVersion = process.argv[2];
@@ -37,6 +38,21 @@ if (!siteHasVersion) {
 } else {
   writeFileSync(SITE_PATH, siteUpdated);
   console.log(`site/index.html → ${version}`);
+}
+
+// Update Share Extension Info.plist version
+if (existsSync(SHARE_EXT_PLIST_PATH)) {
+  const extPlist = readFileSync(SHARE_EXT_PLIST_PATH, 'utf-8');
+  const extUpdated = extPlist.replace(
+    /(<key>CFBundleShortVersionString<\/key>\s*<string>)\d+\.\d+\.\d+(<\/string>)/,
+    `$1${version}$2`
+  );
+  if (extPlist === extUpdated) {
+    console.log(`PullReadShareExtension/Info.plist — already ${version}`);
+  } else {
+    writeFileSync(SHARE_EXT_PLIST_PATH, extUpdated);
+    console.log(`PullReadShareExtension/Info.plist → ${version}`);
+  }
 }
 
 // Update Xcode project: all MARKETING_VERSION entries

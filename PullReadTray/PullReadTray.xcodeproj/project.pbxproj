@@ -28,6 +28,8 @@
 		E1000006200000010000000A /* UnreadCountIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000006100000010000000A /* UnreadCountIntent.swift */; };
 		E1000007200000010000000A /* PullReadShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000007100000010000000A /* PullReadShortcuts.swift */; };
 		D1000001200000010000000A /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = D1000003100000010000000A /* Sparkle */; };
+		F1000001200000010000000A /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000001100000010000000A /* ShareViewController.swift */; };
+		F1000004200000010000000A /* PullReadShareExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = F1000003100000010000000A /* PullReadShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -44,6 +46,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = A100000C500000010000000A;
 			remoteInfo = PullReadTray;
+		};
+		F1000001330000010000000A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A1000010700000010000000A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F1000001500000010000000A;
+			remoteInfo = PullReadShareExtension;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -73,6 +82,9 @@
 		C1000001100000010000000A /* PullReadTrayUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PullReadTrayUITests.swift; sourceTree = "<group>"; };
 		C1000002100000010000000A /* PullReadTrayUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PullReadTrayUITestsLaunchTests.swift; sourceTree = "<group>"; };
 		C1000004100000010000000A /* PullReadTrayUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PullReadTrayUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F1000001100000010000000A /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
+		F1000002100000010000000A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F1000003100000010000000A /* PullReadShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PullReadShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -98,13 +110,35 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F1000002300000010000000A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		F1000005300000010000000A /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				F1000004200000010000000A /* PullReadShareExtension.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXGroup section */
 		A1000009400000010000000A = {
 			isa = PBXGroup;
 			children = (
 				A100000A400000010000000A /* PullReadTray */,
+				F1000001400000010000000A /* PullReadShareExtension */,
 				B1000006400000010000000A /* PullReadTrayTests */,
 				C1000006400000010000000A /* PullReadTrayUITests */,
 				A100000B400000010000000A /* Products */,
@@ -148,6 +182,7 @@
 			isa = PBXGroup;
 			children = (
 				A1000007100000010000000A /* Pull Read.app */,
+				F1000003100000010000000A /* PullReadShareExtension.appex */,
 				B1000004100000010000000A /* PullReadTrayTests.xctest */,
 				C1000004100000010000000A /* PullReadTrayUITests.xctest */,
 			);
@@ -172,6 +207,15 @@
 			path = PullReadTrayUITests;
 			sourceTree = "<group>";
 		};
+		F1000001400000010000000A /* PullReadShareExtension */ = {
+			isa = PBXGroup;
+			children = (
+				F1000001100000010000000A /* ShareViewController.swift */,
+				F1000002100000010000000A /* Info.plist */,
+			);
+			path = PullReadShareExtension;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -182,10 +226,12 @@
 				A100000E300000010000000A /* Sources */,
 				A1000008300000010000000A /* Frameworks */,
 				A100000F300000010000000A /* Resources */,
+				F1000005300000010000000A /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				F1000001340000010000000A /* PBXTargetDependency */,
 			);
 			name = PullReadTray;
 			packageProductDependencies = (
@@ -231,6 +277,23 @@
 			productReference = C1000004100000010000000A /* PullReadTrayUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		F1000001500000010000000A /* PullReadShareExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F1000001600000010000000A /* Build configuration list for PBXNativeTarget "PullReadShareExtension" */;
+			buildPhases = (
+				F1000001300000010000000A /* Sources */,
+				F1000002300000010000000A /* Frameworks */,
+				F1000003300000010000000A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PullReadShareExtension;
+			productName = PullReadShareExtension;
+			productReference = F1000003100000010000000A /* PullReadShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -242,6 +305,9 @@
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
 					A100000C500000010000000A = {
+						CreatedOnToolsVersion = 15.0;
+					};
+					F1000001500000010000000A = {
 						CreatedOnToolsVersion = 15.0;
 					};
 					B1000007500000010000000A = {
@@ -271,6 +337,7 @@
 			projectRoot = "";
 			targets = (
 				A100000C500000010000000A /* PullReadTray */,
+				F1000001500000010000000A /* PullReadShareExtension */,
 				B1000007500000010000000A /* PullReadTrayTests */,
 				C1000007500000010000000A /* PullReadTrayUITests */,
 			);
@@ -294,6 +361,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		C100000A300000010000000A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F1000003300000010000000A /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -343,6 +417,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F1000001300000010000000A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F1000001200000010000000A /* ShareViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -355,6 +437,11 @@
 			isa = PBXTargetDependency;
 			target = A100000C500000010000000A /* PullReadTray */;
 			targetProxy = C1000003300000010000000A /* PBXContainerItemProxy */;
+		};
+		F1000001340000010000000A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F1000001500000010000000A /* PullReadShareExtension */;
+			targetProxy = F1000001330000010000000A /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -495,7 +582,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.3.6;
+				MARKETING_VERSION = 1.3.7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.pullread.tray;
 				PRODUCT_MODULE_NAME = PullReadTray;
 				PRODUCT_NAME = "Pull Read";
@@ -524,7 +611,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.3.6;
+				MARKETING_VERSION = 1.3.7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.pullread.tray;
 				PRODUCT_MODULE_NAME = PullReadTray;
 				PRODUCT_NAME = "Pull Read";
@@ -542,7 +629,7 @@
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.3.6;
+				MARKETING_VERSION = 1.3.7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.pullread.tray.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -560,7 +647,7 @@
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.3.6;
+				MARKETING_VERSION = 1.3.7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.pullread.tray.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -577,7 +664,7 @@
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.3.6;
+				MARKETING_VERSION = 1.3.7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.pullread.tray.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -594,12 +681,60 @@
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.3.6;
+				MARKETING_VERSION = 1.3.7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.pullread.tray.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TEST_TARGET_NAME = PullReadTray;
+			};
+			name = Release;
+		};
+		F1000001800000010000000A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 7;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PullReadShareExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.3.7;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.pullread.tray.share-extension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		F1000002800000010000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 7;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PullReadShareExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.3.7;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.pullread.tray.share-extension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
 		};
@@ -638,6 +773,15 @@
 			buildConfigurations = (
 				C100000C800000010000000A /* Debug */,
 				C100000D800000010000000A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F1000001600000010000000A /* Build configuration list for PBXNativeTarget "PullReadShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F1000001800000010000000A /* Debug */,
+				F1000002800000010000000A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

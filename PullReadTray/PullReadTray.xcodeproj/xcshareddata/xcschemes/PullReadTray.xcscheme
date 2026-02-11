@@ -20,6 +20,20 @@
                ReferencedContainer = "container:PullReadTray.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "F1000001500000010000000A"
+               BuildableName = "PullReadShareExtension.appex"
+               BlueprintName = "PullReadShareExtension"
+               ReferencedContainer = "container:PullReadTray.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction

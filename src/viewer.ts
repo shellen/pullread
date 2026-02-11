@@ -797,8 +797,12 @@ export function startViewer(outputPath: string, port = 7777): void {
         res.end(audio);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'TTS generation failed';
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: msg }));
+        // When Kokoro fails due to native library issues, tell the client to
+        // fall back to browser TTS so the user still hears something.
+        const isNativeLoadError = msg.includes('Kokoro voice engine could not load') || msg.includes('not available in this build');
+        const status = isNativeLoadError ? 503 : 500;
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: msg, ...(isNativeLoadError && { fallback: 'browser' }) }));
       }
       return;
     }
