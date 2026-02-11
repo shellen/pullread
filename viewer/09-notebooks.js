@@ -259,33 +259,38 @@ function acceptNotebookTagSuggestion(tag, btn) {
   }
 }
 
-// ---- Grammar Checking (LanguageTool) ----
-// Uses the open LanguageTool API for grammar/spelling suggestions
+// ---- Grammar Checking (macOS NSSpellChecker — fully on-device) ----
 
 async function checkNotebookGrammar() {
   var ta = document.querySelector('.notebook-editor textarea');
   if (!ta || !ta.value.trim()) return;
-
-  // First-use consent: LanguageTool sends text to an external API
-  if (!localStorage.getItem('pr-grammar-consent')) {
-    var ok = confirm('Grammar checking sends your notebook text to the LanguageTool API (languagetool.org) for analysis.\n\nYour text is processed but not stored. Continue?');
-    if (!ok) return;
-    localStorage.setItem('pr-grammar-consent', '1');
-  }
-
   var btn = document.getElementById('grammar-check-btn');
-  if (btn) btn.textContent = 'Checking...';
+  if (btn) btn.textContent = 'Checking\u2026';
 
   var text = ta.value;
   try {
-    var res = await fetch('https://api.languagetool.org/v2/check', {
+    var res = await fetch('/api/grammar', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'text=' + encodeURIComponent(text) + '&language=auto'
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text })
     });
-    if (!res.ok) throw new Error('LanguageTool API error');
+    if (!res.ok) {
+      var err = await res.json().catch(function() { return {}; });
+      throw new Error(err.error || 'Grammar check unavailable');
+    }
     var data = await res.json();
-    var matches = data.matches || [];
+    var raw = data.matches || [];
+
+    // Normalize to the shape showGrammarResults expects
+    var matches = raw.map(function(m) {
+      return {
+        offset: m.offset,
+        length: m.length,
+        message: m.message || '',
+        context: { text: text, offset: m.offset, length: m.length },
+        replacements: (m.replacements || []).map(function(r) { return { value: r }; })
+      };
+    });
     showGrammarResults(matches, ta);
   } catch (err) {
     alert('Grammar check failed: ' + err.message);
@@ -328,7 +333,7 @@ function showGrammarResults(matches, textarea) {
     if (replacements.length) {
       html += '<div class="grammar-fixes">';
       for (var j = 0; j < replacements.length; j++) {
-        html += '<button class="grammar-fix-btn" onclick="applyGrammarFix(' + m.offset + ',' + m.length + ',\'' + replacements[j].replace(/'/g, "\\'") + '\')">' + replacements[j] + '</button>';
+        html += '<button class="grammar-fix-btn" onclick="applyGrammarFix(' + m.offset + ',' + m.length + ',\'' + escapeJsStr(replacements[j]) + '\')">' + replacements[j] + '</button>';
       }
       html += '</div>';
     }

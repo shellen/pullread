@@ -994,6 +994,113 @@ export function startViewer(outputPath: string, port = 7777): void {
       return;
     }
 
+    // Grammar check API — uses macOS NSSpellChecker (on-device, no cloud)
+    if (url.pathname === '/api/grammar' && req.method === 'POST') {
+      if (process.platform !== 'darwin') {
+        res.writeHead(501, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Grammar checking requires macOS', matches: [] }));
+        return;
+      }
+      try {
+        const body = JSON.parse(await readBody(req));
+        const { text } = body;
+        if (!text || typeof text !== 'string') {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'text is required' }));
+          return;
+        }
+
+        const configDir = join(homedir(), '.config', 'pullread');
+        const tmpText = join(configDir, '.grammar-input.txt');
+        const swiftScript = join(configDir, '.grammar-check.swift');
+
+        writeFileSync(tmpText, text);
+
+        // Swift script that uses NSSpellChecker for grammar + spelling
+        const scriptContent = [
+          'import Cocoa',
+          'import Foundation',
+          '',
+          'let path = CommandLine.arguments[1]',
+          'let text = try String(contentsOfFile: path, encoding: .utf8)',
+          'let checker = NSSpellChecker.shared',
+          'var results: [[String: Any]] = []',
+          '',
+          '// Grammar check',
+          'var offset = 0',
+          'while offset < text.count {',
+          '    var detailsPtr: NSArray?',
+          '    let range = checker.checkGrammar(of: text, startingAt: offset, language: nil, wrap: false, inSpellDocumentWithTag: 0, details: &detailsPtr)',
+          '    if range.location == NSNotFound || range.length == 0 { break }',
+          '    if let details = detailsPtr as? [[String: Any]] {',
+          '        for detail in details {',
+          '            let dRange = (detail["NSGrammarRange"] as? NSValue)?.rangeValue ?? range',
+          '            let startIdx = text.index(text.startIndex, offsetBy: dRange.location)',
+          '            let endIdx = text.index(startIdx, offsetBy: min(dRange.length, text.count - dRange.location))',
+          '            let snippet = String(text[startIdx..<endIdx])',
+          '            var entry: [String: Any] = [',
+          '                "offset": dRange.location,',
+          '                "length": dRange.length,',
+          '                "context": snippet',
+          '            ]',
+          '            if let msg = detail["NSGrammarUserDescription"] as? String {',
+          '                entry["message"] = msg',
+          '            }',
+          '            if let corrections = detail["NSGrammarCorrections"] as? [String] {',
+          '                entry["replacements"] = corrections',
+          '            }',
+          '            results.append(entry)',
+          '        }',
+          '    }',
+          '    offset = range.location + range.length',
+          '}',
+          '',
+          '// Spelling check',
+          'var spellOffset = 0',
+          'while spellOffset < text.count {',
+          '    let range = checker.checkSpelling(of: text, startingAt: spellOffset)',
+          '    if range.location == NSNotFound { break }',
+          '    let startIdx = text.index(text.startIndex, offsetBy: range.location)',
+          '    let endIdx = text.index(startIdx, offsetBy: min(range.length, text.count - range.location))',
+          '    let word = String(text[startIdx..<endIdx])',
+          '    let guesses = checker.guesses(forWordRange: range, in: text, language: nil) ?? []',
+          '    results.append([',
+          '        "offset": range.location,',
+          '        "length": range.length,',
+          '        "context": word,',
+          '        "message": "Possible misspelling: \\(word)",',
+          '        "replacements": guesses.prefix(5).map { $0 }',
+          '    ])',
+          '    spellOffset = range.location + range.length',
+          '}',
+          '',
+          '// Sort by offset and output JSON',
+          'results.sort { ($0["offset"] as? Int ?? 0) < ($1["offset"] as? Int ?? 0) }',
+          'let json = try JSONSerialization.data(withJSONObject: ["matches": results], options: .prettyPrinted)',
+          'print(String(data: json, encoding: .utf8)!)',
+        ].join('\n');
+
+        writeFileSync(swiftScript, scriptContent);
+
+        const { execFileSync } = require('child_process');
+        const result = execFileSync('swift', [swiftScript, tmpText], {
+          encoding: 'utf-8',
+          timeout: 30_000,
+          stdio: ['pipe', 'pipe', 'pipe']
+        });
+
+        try { require('fs').unlinkSync(tmpText); } catch {}
+
+        const data = JSON.parse(result.trim());
+        sendJson(res, data);
+      } catch (err: any) {
+        const msg = err instanceof Error ? err.message : 'Grammar check failed';
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: msg, matches: [] }));
+      }
+      return;
+    }
+
     send404(res);
   });
 
