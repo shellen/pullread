@@ -249,3 +249,24 @@ This gets you cross-platform shell support, smaller GUI overhead, a unified buil
 | Extraction quality | Gold standard (Mozilla) | Risk of regression | Gold standard (unchanged) |
 | Maintenance | Two apps, two languages | One app, one language | One app, two runtimes |
 | Migration effort | N/A | Large (full rewrite) | Medium (shell replacement) |
+
+---
+
+## Update: 2026-02-11
+
+Recent changes significantly affect the migration calculus. See
+[`docs/plans/2026-02-11-tauri-hybrid-migration-plan.md`](docs/plans/2026-02-11-tauri-hybrid-migration-plan.md)
+for a full implementation plan accounting for these changes:
+
+- **Viewer modularized** into 13 JS modules (easier to adapt for Tauri)
+- **Onboarding moved to web** (eliminates ~490 lines of SwiftUI to port)
+- **Settings consolidated to web** (SettingsView.swift now redundant)
+- **Folder picker abstracted** behind `/api/pick-folder` (trivial Tauri swap)
+- **Kokoro TTS bundled portably** (no macOS-specific code in TTS path)
+- **Five new macOS-native integrations** added (Keychain, Share Extension,
+  Spotlight, Shortcuts, NSSpellChecker) — these make the Swift shell thicker
+  but are all optional/graceful-degradation features
+
+**Net effect:** The hybrid approach (Tauri shell + Bun sidecar) is now *more*
+attractive because the web UI covers onboarding and settings. The remaining
+Swift-only features are all optional macOS integrations that can be deferred.
