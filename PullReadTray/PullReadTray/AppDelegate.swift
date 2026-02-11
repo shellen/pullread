@@ -485,7 +485,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
-        content.sound = .default
+        if UserDefaults.standard.bool(forKey: "notificationSounds") {
+            content.sound = .default
+        }
 
         let request = UNNotificationRequest(
             identifier: UUID().uuidString,

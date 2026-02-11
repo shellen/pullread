@@ -138,12 +138,13 @@ struct SettingsView: View {
                         }
                         .padding(20)
                     }
-                    .tabItem { Label("Feeds", systemImage: "bookmark.fill") }
+                    .tabItem { Label("Bookmarks", systemImage: "bookmark.fill") }
                     .tag(0)
 
                     ScrollView {
                         VStack(alignment: .leading, spacing: 20) {
                             browserCookiesSection
+                            notificationHintSection
                         }
                         .padding(20)
                     }
@@ -488,6 +489,35 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
+            }
+        }
+    }
+
+    // MARK: - Notification Hint
+
+    private var notificationHintSection: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Notifications", systemImage: "bell.fill")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+
+                Text("PullRead sends notifications when syncs complete and reviews are ready. Sounds are off by default.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                Button(action: {
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "gear")
+                        Text("Open Notification Settings")
+                    }
+                    .font(.caption)
+                }
+                .buttonStyle(.borderless)
             }
         }
     }

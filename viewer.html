@@ -3161,6 +3161,16 @@ function showSettingsPage() {
   html += '<p style="color:var(--muted);font-size:13px">Loading AI settings...</p>';
   html += '</div>';
 
+  // ---- Notifications section ----
+  html += '<div class="settings-section">';
+  html += '<h2>Notifications</h2>';
+  html += '<p style="font-size:13px;color:var(--muted);margin-bottom:12px">PullRead sends notifications when syncs complete, articles are saved, and reviews are ready. Notification sounds are off by default.</p>';
+  html += '<div style="display:flex;gap:8px;align-items:flex-start;padding:10px 12px;background:color-mix(in srgb, var(--fg) 4%, transparent);border-radius:8px;font-size:12px;color:var(--muted)">'
+    + '<span style="flex-shrink:0;font-size:14px">&#9881;</span>'
+    + '<span>To change notification preferences, go to <strong style="color:var(--fg)">System Settings &rarr; Notifications &rarr; PullRead</strong>. You can enable or disable alerts, banners, and sounds there.</span>'
+    + '</div>';
+  html += '</div>';
+
   // ---- Backup & Restore section ----
   html += '<div class="settings-section">';
   html += '<h2>Backup &amp; Restore</h2>';
@@ -6750,7 +6760,7 @@ function renderOnboardingStep() {
     html += '<div style="text-align:center;padding:12px 0">'
       + '<div style="font-size:48px;margin-bottom:12px">&#128218;</div>'
       + '<h2>Welcome to PullRead</h2>'
-      + '<p class="ob-subtitle">Turn your bookmarked articles into clean, local markdown files you can read anywhere. Connect Instapaper, Pinboard, Raindrop, Pocket \u2014 or subscribe to newsletters and blogs too.</p>'
+      + '<p class="ob-subtitle">Install our bookmarking shortcut or use PullRead with your favorite service. Articles are saved as clean, local markdown you can read anywhere.</p>'
       + '<div class="ob-features">'
       + '<span class="ob-feature-pill">&#128278; Bookmark sync</span>'
       + '<span class="ob-feature-pill">&#128196; Markdown files</span>'
