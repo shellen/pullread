@@ -9,6 +9,7 @@ const ROOT = join(import.meta.dir, '..');
 const PKG_PATH = join(ROOT, 'package.json');
 const SITE_PATH = join(ROOT, 'site', 'index.html');
 const XCPROJ_PATH = join(ROOT, 'PullReadTray', 'PullReadTray.xcodeproj', 'project.pbxproj');
+const APP_PLIST_PATH = join(ROOT, 'PullReadTray', 'PullReadTray', 'Info.plist');
 const SHARE_EXT_PLIST_PATH = join(ROOT, 'PullReadTray', 'PullReadShareExtension', 'Info.plist');
 
 // If a version argument is provided, update package.json first
@@ -38,6 +39,21 @@ if (!siteHasVersion) {
 } else {
   writeFileSync(SITE_PATH, siteUpdated);
   console.log(`site/index.html → ${version}`);
+}
+
+// Update main app Info.plist version
+if (existsSync(APP_PLIST_PATH)) {
+  const appPlist = readFileSync(APP_PLIST_PATH, 'utf-8');
+  const appUpdated = appPlist.replace(
+    /(<key>CFBundleShortVersionString<\/key>\s*<string>)\d+\.\d+\.\d+(<\/string>)/,
+    `$1${version}$2`
+  );
+  if (appPlist === appUpdated) {
+    console.log(`PullReadTray/Info.plist — already ${version}`);
+  } else {
+    writeFileSync(APP_PLIST_PATH, appUpdated);
+    console.log(`PullReadTray/Info.plist → ${version}`);
+  }
 }
 
 // Update Share Extension Info.plist version
