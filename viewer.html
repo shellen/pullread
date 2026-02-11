@@ -3046,7 +3046,13 @@ function showSettingsPage() {
 
       // Kokoro status
       h += '<div id="sp-kokoro-status" style="display:' + (data.provider === 'kokoro' ? 'block' : 'none') + ';padding:8px 0">';
-      h += '<div style="font-size:12px;color:var(--muted)">' + (data.kokoro && data.kokoro.installed ? '<span class="settings-status ok">Kokoro ready</span> Runs on-device, no API key needed' : 'Will set up automatically on first listen (~86MB)') + '</div>';
+      if (data.kokoro && data.kokoro.bundled) {
+        h += '<div style="font-size:12px;color:var(--muted)"><span class="settings-status ok">Kokoro bundled</span> Runs on-device, no API key or download needed</div>';
+      } else if (data.kokoro && data.kokoro.installed) {
+        h += '<div style="font-size:12px;color:var(--muted)"><span class="settings-status ok">Kokoro ready</span> Runs on-device, no API key needed</div>';
+      } else {
+        h += '<div style="font-size:12px;color:var(--muted)">Will download on first listen (~86MB). Runs on-device after that.</div>';
+      }
       h += '</div>';
 
       h += '<div class="settings-row" style="justify-content:flex-end;padding-top:8px">';

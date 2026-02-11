@@ -835,7 +835,12 @@ export function startViewer(outputPath: string, port = 7777): void {
     const ttsConfig = loadTTSConfig();
     if (ttsConfig.provider === 'kokoro') {
       const model = ttsConfig.model || 'kokoro-v1-q8';
-      console.log(`[TTS] Kokoro is configured — preloading ${model} in background...`);
+      const status = getKokoroStatus();
+      if (status.bundled) {
+        console.log(`[TTS] Kokoro model bundled with app — loading ${model}...`);
+      } else {
+        console.log(`[TTS] Kokoro is configured — preloading ${model} (may download on first run)...`);
+      }
       preloadKokoro(model).then(result => {
         if (result.ready) {
           console.log('[TTS] Kokoro model loaded and ready');
