@@ -101,6 +101,29 @@ build_cli() {
 
     # Download Kokoro TTS model for bundling
     bash "$ROOT_DIR/scripts/download-kokoro-model.sh"
+
+    # Copy kokoro.web.js and onnxruntime-web WASM files for the compiled binary.
+    # Bun's bundler breaks @huggingface/transformers' webpack internals, so the
+    # compiled binary loads kokoro.web.js + ort.mjs (WASM) at runtime instead.
+    KOKORO_WEB="$ROOT_DIR/node_modules/kokoro-js/dist/kokoro.web.js"
+    if [ -f "$KOKORO_WEB" ]; then
+        cp "$KOKORO_WEB" "$ROOT_DIR/dist/kokoro.web.js"
+        echo "  Copied kokoro.web.js for runtime loading"
+    else
+        echo_warning "kokoro.web.js not found — Kokoro TTS may not work in the app"
+    fi
+
+    # Bundle onnxruntime-web WASM files (ort.mjs + .wasm binary)
+    ORT_DIST="$ROOT_DIR/node_modules/onnxruntime-web/dist"
+    mkdir -p "$ROOT_DIR/dist/ort-wasm"
+    if [ -f "$ORT_DIST/ort.mjs" ]; then
+        cp "$ORT_DIST/ort.mjs" "$ROOT_DIR/dist/ort-wasm/"
+        cp "$ORT_DIST/ort-wasm-simd-threaded.jsep.wasm" "$ROOT_DIR/dist/ort-wasm/" 2>/dev/null || true
+        cp "$ORT_DIST/ort-wasm-simd-threaded.wasm" "$ROOT_DIR/dist/ort-wasm/" 2>/dev/null || true
+        echo "  Copied onnxruntime-web WASM files for runtime loading"
+    else
+        echo_warning "ort.mjs not found — Kokoro TTS WASM backend may not work"
+    fi
 }
 
 # Build the app
@@ -148,13 +171,29 @@ bundle_cli() {
         exit 1
     fi
 
-    # Bundle the ONNX Runtime dylib (required for Kokoro TTS)
+    # Bundle kokoro.web.js (the web build of kokoro-js)
+    if [ -f "$ROOT_DIR/dist/kokoro.web.js" ]; then
+        echo "  Bundling kokoro.web.js..."
+        cp "$ROOT_DIR/dist/kokoro.web.js" "$RESOURCES_PATH/"
+    else
+        echo_warning "kokoro.web.js not found — Kokoro TTS may not work"
+    fi
+
+    # Bundle onnxruntime-web WASM files (ort.mjs + .wasm binary)
+    if [ -d "$ROOT_DIR/dist/ort-wasm" ]; then
+        echo "  Bundling onnxruntime-web WASM files..."
+        cp -R "$ROOT_DIR/dist/ort-wasm" "$RESOURCES_PATH/ort-wasm"
+    else
+        echo_warning "ort-wasm directory not found — Kokoro TTS WASM backend may not work"
+    fi
+
+    # Bundle the ONNX Runtime dylib as a fallback (kept for compatibility)
     ONNX_DYLIB=$(find "$ROOT_DIR/node_modules" -name 'libonnxruntime*.dylib' -print -quit 2>/dev/null || true)
     if [ -n "$ONNX_DYLIB" ]; then
         echo "  Bundling ONNX Runtime dylib: $ONNX_DYLIB"
         cp "$ONNX_DYLIB" "$RESOURCES_PATH/"
     else
-        echo_warning "ONNX Runtime dylib not found in node_modules — Kokoro may not work"
+        echo "  Note: ONNX Runtime dylib not found (not required with web build)"
     fi
 
     IDENTITY="Developer ID Application"

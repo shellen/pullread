@@ -27,11 +27,11 @@ class SyncService {
     }
 
     /// Build process environment with paths pointing to bundled Resources
-    /// so the ONNX Runtime dylib and Kokoro model are found at runtime.
+    /// so the Kokoro TTS model and runtime are found at launch.
     private func processEnvironment() -> [String: String] {
         var env = ProcessInfo.processInfo.environment
         if let resourcePath = Bundle.main.resourcePath {
-            // DYLD_LIBRARY_PATH: lets the ONNX Runtime dylib load from the app bundle
+            // DYLD_LIBRARY_PATH: lets the ONNX Runtime dylib load from the app bundle (fallback)
             let existing = env["DYLD_LIBRARY_PATH"] ?? ""
             env["DYLD_LIBRARY_PATH"] = existing.isEmpty ? resourcePath : "\(resourcePath):\(existing)"
 
@@ -40,6 +40,22 @@ class SyncService {
             let kokoroModelPath = "\(resourcePath)/kokoro-model"
             if FileManager.default.fileExists(atPath: kokoroModelPath) {
                 env["PULLREAD_KOKORO_MODEL_DIR"] = kokoroModelPath
+            }
+
+            // PULLREAD_KOKORO_JS_PATH: path to the self-contained kokoro.web.js bundle.
+            // The compiled Bun binary loads this at runtime instead of the bundled kokoro-js
+            // package, which avoids webpack re-bundling and native ONNX addon issues.
+            let kokoroJsPath = "\(resourcePath)/kokoro.web.js"
+            if FileManager.default.fileExists(atPath: kokoroJsPath) {
+                env["PULLREAD_KOKORO_JS_PATH"] = kokoroJsPath
+            }
+
+            // PULLREAD_ORT_WASM_DIR: directory containing ort.mjs and WASM files.
+            // The web build needs a separately-loaded onnxruntime-web because the
+            // copy bundled inside kokoro.web.js fails to self-initialize in Bun.
+            let ortWasmPath = "\(resourcePath)/ort-wasm"
+            if FileManager.default.fileExists(atPath: "\(ortWasmPath)/ort.mjs") {
+                env["PULLREAD_ORT_WASM_DIR"] = ortWasmPath
             }
         }
         return env

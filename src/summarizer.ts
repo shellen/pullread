@@ -15,6 +15,12 @@ export interface LLMConfig {
   model?: string;
 }
 
+// Multi-provider settings: stores keys for ALL providers, with a default
+export interface LLMSettings {
+  defaultProvider: Provider;
+  providers: Partial<Record<Provider, { apiKey?: string; model?: string }>>;
+}
+
 // Known models per provider — loaded from models.json (single source of truth)
 // Ordered cheapest-first within each provider for summarization tasks
 function loadModelsConfig(): Record<string, { models: string[]; default: string }> {
@@ -73,39 +79,145 @@ function loadKeyFromKeychain(account: string): string | null {
   }
 }
 
-export function loadLLMConfig(): LLMConfig | null {
-  if (!existsSync(SETTINGS_PATH)) return null;
+// Cache macOS version check
+let _appleAvailable: boolean | null = null;
+
+export function isAppleAvailable(): boolean {
+  if (_appleAvailable !== null) return _appleAvailable;
+  if (process.platform !== 'darwin') { _appleAvailable = false; return false; }
+  try {
+    const ver = execFileSync('sw_vers', ['-productVersion'], { encoding: 'utf-8' }).trim();
+    _appleAvailable = parseInt(ver.split('.')[0], 10) >= 26;
+  } catch {
+    _appleAvailable = false;
+  }
+  return _appleAvailable;
+}
+
+/**
+ * Load full multi-provider settings. Handles migration from old single-provider format.
+ */
+export function loadLLMSettings(): LLMSettings {
+  if (!existsSync(SETTINGS_PATH)) {
+    return { defaultProvider: 'apple', providers: {} };
+  }
   try {
     const settings = JSON.parse(readFileSync(SETTINGS_PATH, 'utf-8'));
-    if (!settings.llm || !settings.llm.provider) return null;
-    // Apple Intelligence doesn't need an API key
-    if (settings.llm.provider === 'apple') return settings.llm;
+    const llm = settings.llm;
+    if (!llm) return { defaultProvider: 'apple', providers: {} };
 
-    // Try plaintext key first (backward compat), then Keychain
-    let apiKey = settings.llm.apiKey;
-    if (!apiKey) {
-      apiKey = loadKeyFromKeychain(`llm-${settings.llm.provider}`);
+    // New format: has defaultProvider and providers map
+    if (llm.defaultProvider && llm.providers) {
+      const result: LLMSettings = {
+        defaultProvider: llm.defaultProvider,
+        providers: {}
+      };
+      for (const [p, config] of Object.entries(llm.providers as Record<string, any>)) {
+        let apiKey = config?.apiKey || '';
+        if (!apiKey && p !== 'apple') {
+          apiKey = loadKeyFromKeychain(`llm-${p}`) || '';
+        }
+        result.providers[p as Provider] = { apiKey, model: config?.model || '' };
+      }
+      return result;
     }
-    if (!apiKey) return null;
-    return { ...settings.llm, apiKey };
+
+    // Old format: migrate { provider, apiKey, model } → new structure
+    if (llm.provider) {
+      let apiKey = llm.apiKey || '';
+      if (!apiKey && llm.provider !== 'apple') {
+        apiKey = loadKeyFromKeychain(`llm-${llm.provider}`) || '';
+      }
+      return {
+        defaultProvider: llm.provider,
+        providers: {
+          [llm.provider]: { apiKey, model: llm.model || '' }
+        }
+      };
+    }
+
+    return { defaultProvider: 'apple', providers: {} };
   } catch {
-    return null;
+    return { defaultProvider: 'apple', providers: {} };
   }
 }
 
-export function saveLLMConfig(config: LLMConfig): void {
+/**
+ * Load the active LLM config for the default provider.
+ * Falls back to Apple Intelligence on macOS 26+ if the default provider has no key.
+ */
+export function loadLLMConfig(): LLMConfig | null {
+  const settings = loadLLMSettings();
+  const provider = settings.defaultProvider || 'apple';
+
+  if (provider === 'apple') {
+    return { provider: 'apple', apiKey: '', model: 'on-device' };
+  }
+
+  const provConfig = settings.providers[provider];
+  const apiKey = provConfig?.apiKey || '';
+
+  if (apiKey) {
+    return {
+      provider,
+      apiKey,
+      model: provConfig?.model || getDefaultModel(provider)
+    };
+  }
+
+  // Default provider has no key — fall back to Apple on macOS 26+
+  if (isAppleAvailable()) {
+    return { provider: 'apple', apiKey: '', model: 'on-device' };
+  }
+
+  return null;
+}
+
+/**
+ * Save full multi-provider settings.
+ */
+export function saveLLMSettings(newSettings: LLMSettings): void {
   let settings: Record<string, unknown> = {};
   if (existsSync(SETTINGS_PATH)) {
     try {
       settings = JSON.parse(readFileSync(SETTINGS_PATH, 'utf-8'));
     } catch {}
   }
-  settings.llm = config;
+
+  const cleaned: Partial<Record<string, { apiKey?: string; model?: string }>> = {};
+  for (const [p, config] of Object.entries(newSettings.providers)) {
+    if (config) {
+      const entry: { apiKey?: string; model?: string } = {};
+      if (config.apiKey) entry.apiKey = config.apiKey;
+      if (config.model) entry.model = config.model;
+      if (Object.keys(entry).length > 0 || p === 'apple') cleaned[p] = entry;
+    }
+  }
+
+  settings.llm = {
+    defaultProvider: newSettings.defaultProvider,
+    providers: cleaned
+  };
+
   const dir = join(homedir(), '.config', 'pullread');
   if (!existsSync(dir)) {
     require('fs').mkdirSync(dir, { recursive: true });
   }
   writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2));
+}
+
+/**
+ * Save a single provider config. Updates the multi-provider structure and sets it as default.
+ */
+export function saveLLMConfig(config: LLMConfig): void {
+  const current = loadLLMSettings();
+  current.defaultProvider = config.provider;
+  if (!current.providers[config.provider]) {
+    current.providers[config.provider] = {};
+  }
+  current.providers[config.provider]!.apiKey = config.apiKey;
+  current.providers[config.provider]!.model = config.model;
+  saveLLMSettings(current);
 }
 
 function httpPostOnce(url: string, headers: Record<string, string>, body: string): Promise<{ status: number; body: string; retryAfter?: number }> {

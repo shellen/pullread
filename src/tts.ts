@@ -2,7 +2,7 @@
 // ABOUTME: Supports Kokoro (local), OpenAI TTS, and ElevenLabs; browser speech synthesis is handled client-side
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { createHash } from 'crypto';
 import { request as httpsRequest } from 'https';
@@ -281,6 +281,114 @@ export async function preloadKokoro(model: string = 'kokoro-v1-q8'): Promise<{ r
 let kokoroPipeline: any = null;
 let kokoroLoading = false;
 
+/**
+ * Find the kokoro.web.js self-contained bundle on the filesystem.
+ * This is used as a fallback when the normal `import('kokoro-js')` fails
+ * (e.g. in Bun compiled binaries where module resolution is broken).
+ */
+function resolveKokoroWebBuild(): string | null {
+  // 1. Explicit env var (set by SyncService.swift in the macOS app)
+  const explicit = process.env.PULLREAD_KOKORO_JS_PATH;
+  if (explicit && existsSync(explicit)) return explicit;
+
+  // 2. Adjacent to the bundled model directory (app Resources/)
+  const modelDir = process.env.PULLREAD_KOKORO_MODEL_DIR;
+  if (modelDir) {
+    const adjacent = join(dirname(modelDir), 'kokoro.web.js');
+    if (existsSync(adjacent)) return adjacent;
+  }
+
+  // 3. In node_modules (dev / non-bundled installs)
+  let dir = __dirname;
+  for (let i = 0; i < 5; i++) {
+    const candidate = join(dir, 'node_modules', 'kokoro-js', 'dist', 'kokoro.web.js');
+    if (existsSync(candidate)) return candidate;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+
+  return null;
+}
+
+/**
+ * Find the onnxruntime-web directory containing ort.mjs and WASM files.
+ * Required for the web build fallback — the bundled ORT inside kokoro.web.js
+ * fails to self-initialize in Bun, so we load ort.mjs separately and
+ * register it on globalThis for kokoro.web.js to discover.
+ */
+function resolveOrtWasmDir(): string | null {
+  // 1. Explicit env var (set by SyncService.swift or build scripts)
+  const explicit = process.env.PULLREAD_ORT_WASM_DIR;
+  if (explicit && existsSync(join(explicit, 'ort.mjs'))) return explicit;
+
+  // 2. Adjacent to kokoro.web.js in app Resources/
+  const modelDir = process.env.PULLREAD_KOKORO_MODEL_DIR;
+  if (modelDir) {
+    const adjacent = join(dirname(modelDir), 'ort-wasm');
+    if (existsSync(join(adjacent, 'ort.mjs'))) return adjacent;
+  }
+
+  // 3. In node_modules (dev / non-bundled installs)
+  let dir = __dirname;
+  for (let i = 0; i < 5; i++) {
+    const candidate = join(dir, 'node_modules', 'onnxruntime-web', 'dist');
+    if (existsSync(join(candidate, 'ort.mjs'))) return candidate;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+
+  return null;
+}
+
+/**
+ * Patch kokoro.web.js source to work with externally-registered ORT.
+ *
+ * kokoro.web.js bundles its own onnxruntime-web internally, but that bundled
+ * copy fails to initialize in Bun (the WASM backend never registers properly).
+ * When we pre-register a working ORT on globalThis[Symbol.for("onnxruntime")],
+ * kokoro.web.js finds it but skips device setup. These patches fix that:
+ *
+ * 1. Populate the WASM device list when using the globalThis ORT path
+ * 2. Map "cpu" device requests to "wasm" (the model config defaults to "cpu")
+ */
+function patchKokoroWebSource(src: string): string {
+  // Patch 1: Add device setup for globalThis ORT path
+  const p1_find = 'if(u in globalThis)g=globalThis[u];else';
+  const p1_replace = 'if(u in globalThis){g=globalThis[u];l.push("wasm"),c=["wasm"]}else';
+  if (src.includes(p1_find)) {
+    src = src.replace(p1_find, p1_replace);
+  }
+
+  // Patch 2: Map "cpu" device to "wasm" in the device resolver
+  const p2_find = 'if(l.includes(e))return[o[e]??e];throw';
+  const p2_replace = 'if(l.includes(e))return[o[e]??e];if(e==="cpu"&&l.includes("wasm"))return["wasm"];throw';
+  if (src.includes(p2_find)) {
+    src = src.replace(p2_find, p2_replace);
+  }
+
+  return src;
+}
+
+/**
+ * Pre-register onnxruntime-web on globalThis so kokoro.web.js can find it.
+ * Also configures WASM for single-threaded, no-proxy mode (Bun compatible).
+ */
+async function preRegisterOrt(ortWasmDir: string): Promise<void> {
+  const ortSymbol = Symbol.for('onnxruntime');
+  if (ortSymbol in globalThis) return; // Already registered
+
+  const ortPath = join(ortWasmDir, 'ort.mjs');
+  const ort = await import(ortPath);
+
+  ort.env.wasm.numThreads = 1;
+  ort.env.wasm.proxy = false;
+  ort.env.wasm.wasmPaths = ortWasmDir + '/';
+
+  (globalThis as any)[ortSymbol] = ort;
+}
+
 async function getKokoroPipeline(model: string): Promise<any> {
   if (kokoroPipeline) return kokoroPipeline;
   if (kokoroLoading) {
@@ -291,20 +399,80 @@ async function getKokoroPipeline(model: string): Promise<any> {
 
   kokoroLoading = true;
   try {
-    const { KokoroTTS } = await import('kokoro-js');
+    let KokoroTTS: any;
+    let usingWebBuild = false;
+
+    // Strategy 1: normal import — works in dev mode (ts-node / unbundled bun)
+    // where node_modules is available on the filesystem.
+    try {
+      const mod = await import('kokoro-js');
+      KokoroTTS = mod.KokoroTTS;
+    } catch {
+      // Strategy 2: load the patched kokoro.web.js with external ORT.
+      //
+      // In Bun compiled binaries, `import('kokoro-js')` fails because:
+      //   (a) Bun's bundler corrupts @huggingface/transformers' webpack internals
+      //   (b) onnxruntime-node's native .node addon can't dlopen from Bun's virtual FS
+      //
+      // The fix uses three pieces:
+      //   1. onnxruntime-web (ort.mjs) — loaded separately and registered on
+      //      globalThis[Symbol.for("onnxruntime")] so kokoro.web.js discovers it
+      //   2. kokoro.web.js — runtime-patched to set up WASM device list and
+      //      map "cpu" device requests to "wasm"
+      //   3. ort-wasm-simd-threaded.jsep.wasm — the WASM binary for ONNX inference
+      const webBuildPath = resolveKokoroWebBuild();
+      if (!webBuildPath) {
+        throw new Error(
+          'Kokoro voice engine not found — neither the kokoro-js package nor ' +
+          'the bundled kokoro.web.js could be located.'
+        );
+      }
+
+      const ortWasmDir = resolveOrtWasmDir();
+      if (!ortWasmDir) {
+        throw new Error(
+          'Kokoro WASM runtime not found — the onnxruntime-web dist directory ' +
+          'could not be located. Ensure ort.mjs and ort-wasm-simd-threaded.jsep.wasm ' +
+          'are bundled in the app Resources/ort-wasm/ directory.'
+        );
+      }
+
+      // Pre-register ORT on globalThis before loading kokoro.web.js
+      await preRegisterOrt(ortWasmDir);
+
+      // Patch kokoro.web.js and load from a temp file
+      const { readFileSync: readFS, writeFileSync: writeFS } = await import('fs');
+      const src = readFS(webBuildPath, 'utf-8');
+      const patched = patchKokoroWebSource(src);
+      const tmpDir = join((await import('os')).tmpdir(), 'pullread-kokoro');
+      if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
+      const patchedPath = join(tmpDir, 'kokoro.web.patched.js');
+      writeFS(patchedPath, patched);
+
+      const mod = await import(patchedPath);
+      KokoroTTS = mod.KokoroTTS;
+      usingWebBuild = true;
+    }
+
     const dtype = model === 'kokoro-v1-q4' ? 'q4' : 'q8';
     const modelDir = resolveKokoroModelDir();
 
     // If the model is bundled inside the app, use that path directly.
     // Otherwise fall back to downloading from HuggingFace Hub.
     const bundled = process.env.PULLREAD_KOKORO_MODEL_DIR && existsSync(process.env.PULLREAD_KOKORO_MODEL_DIR);
-    const modelSource = bundled
-      ? modelDir  // Local path to bundled model — no download needed
-      : 'onnx-community/Kokoro-82M-v1.0-ONNX';  // HuggingFace Hub model ID
+
+    let modelSource: string;
+    if (bundled) {
+      // The web build uses fetch() for file I/O, so it needs file:// URLs
+      // to access the local filesystem. The node build uses fs directly.
+      modelSource = usingWebBuild ? 'file://' + modelDir : modelDir;
+    } else {
+      modelSource = 'onnx-community/Kokoro-82M-v1.0-ONNX';
+    }
 
     kokoroPipeline = await KokoroTTS.from_pretrained(
       modelSource,
-      { dtype, cache_dir: modelDir }
+      { dtype, cache_dir: usingWebBuild ? undefined : modelDir }
     );
     return kokoroPipeline;
   } finally {

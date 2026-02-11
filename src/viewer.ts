@@ -7,7 +7,7 @@ import { join, extname, dirname } from 'path';
 import { exec } from 'child_process';
 import { homedir } from 'os';
 import { VIEWER_HTML } from './viewer-html';
-import { summarizeText, loadLLMConfig, saveLLMConfig, getDefaultModel, KNOWN_MODELS, LLMConfig } from './summarizer';
+import { summarizeText, loadLLMConfig, saveLLMConfig, loadLLMSettings, saveLLMSettings, getDefaultModel, isAppleAvailable, KNOWN_MODELS, LLMConfig, LLMSettings } from './summarizer';
 import { autotagText, autotagBatch, saveMachineTags, hasMachineTags } from './autotagger';
 import { APP_ICON } from './app-icon';
 import { fetchAndExtract } from './extractor';
@@ -518,32 +518,101 @@ export function startViewer(outputPath: string, port = 7777): void {
       }
     }
 
-    // Settings API (LLM config)
+    // Folder picker API — opens native macOS folder dialog via osascript
+    if (url.pathname === '/api/pick-folder' && req.method === 'POST') {
+      const defaultPath = homedir() + '/Documents';
+      exec(
+        `osascript -e 'set p to POSIX path of (choose folder with prompt "Choose output folder" default location POSIX file "${defaultPath}")' 2>/dev/null`,
+        { timeout: 60000 },
+        (err, stdout) => {
+          if (err) {
+            // User cancelled or osascript not available
+            sendJson(res, { cancelled: true });
+          } else {
+            const folder = stdout.trim().replace(/\/$/, '');
+            // Convert absolute path back to ~/... for display
+            const home = homedir();
+            const display = folder.startsWith(home) ? '~' + folder.slice(home.length) : folder;
+            sendJson(res, { path: display });
+          }
+        }
+      );
+      return;
+    }
+
+    // Settings API (LLM config — multi-provider)
+    const ALL_PROVIDERS = ['anthropic', 'openai', 'gemini', 'openrouter', 'apple'] as const;
     if (url.pathname === '/api/settings') {
       if (req.method === 'GET') {
-        const config = loadLLMConfig();
+        const settings = loadLLMSettings();
+        const providers: Record<string, { hasKey: boolean; model: string }> = {};
+        for (const p of ALL_PROVIDERS) {
+          const config = settings.providers[p];
+          providers[p] = {
+            hasKey: p === 'apple' || !!(config?.apiKey),
+            model: config?.model || getDefaultModel(p)
+          };
+        }
         sendJson(res, {
-          llm: config ? {
-            provider: config.provider,
-            model: config.model || getDefaultModel(config.provider),
-            hasKey: config.provider === 'apple' || !!config.apiKey
-          } : { provider: 'apple', model: 'on-device', hasKey: true }
+          llm: {
+            defaultProvider: settings.defaultProvider,
+            providers,
+            appleAvailable: isAppleAvailable()
+          }
         });
         return;
       }
       if (req.method === 'POST') {
         try {
           const body = JSON.parse(await readBody(req));
+
+          // New multi-provider format: { defaultProvider, providers: { ... } }
+          if (body.defaultProvider) {
+            const validSet = new Set<string>(ALL_PROVIDERS);
+            if (!validSet.has(body.defaultProvider)) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'Unknown provider: ' + body.defaultProvider }));
+              return;
+            }
+
+            const current = loadLLMSettings();
+            const newSettings: LLMSettings = {
+              defaultProvider: body.defaultProvider,
+              providers: { ...current.providers }
+            };
+
+            if (body.providers) {
+              for (const [p, config] of Object.entries(body.providers as Record<string, any>)) {
+                if (!validSet.has(p)) continue; // skip unknown providers
+                const key = p as import('./summarizer').Provider;
+                const existing = current.providers[key] || {};
+                newSettings.providers[key] = {
+                  // Only update apiKey if a non-empty value was sent
+                  apiKey: config.apiKey || existing.apiKey || '',
+                  model: config.model || existing.model || getDefaultModel(p)
+                };
+              }
+            }
+
+            saveLLMSettings(newSettings);
+            sendJson(res, { ok: true });
+            return;
+          }
+
+          // Legacy single-provider format: { provider, apiKey, model }
           const { provider, apiKey, model } = body;
           if (!provider) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'provider is required' }));
+            res.end(JSON.stringify({ error: 'provider or defaultProvider is required' }));
             return;
           }
           if (provider !== 'apple' && !apiKey) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'apiKey is required for this provider' }));
-            return;
+            const current = loadLLMSettings();
+            if (!current.providers[provider as import('./summarizer').Provider]?.apiKey) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'apiKey is required for this provider' }));
+              return;
+            }
           }
           saveLLMConfig({ provider, apiKey: apiKey || '', model: model || getDefaultModel(provider) });
           sendJson(res, { ok: true });
@@ -586,10 +655,18 @@ export function startViewer(outputPath: string, port = 7777): void {
     if (url.pathname === '/api/autotag' && req.method === 'POST') {
       try {
         const body = JSON.parse(await readBody(req));
-        const { name } = body;
+        const { name, text } = body;
+
+        // Direct text mode (e.g. notebook content) — no caching, just tag and return
+        if (text) {
+          const result = await autotagText(text);
+          sendJson(res, { machineTags: result.machineTags, model: result.model });
+          return;
+        }
+
         if (!name) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'name is required' }));
+          res.end(JSON.stringify({ error: 'name or text is required' }));
           return;
         }
 
@@ -913,6 +990,113 @@ export function startViewer(outputPath: string, port = 7777): void {
       } catch {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Invalid backup file' }));
+      }
+      return;
+    }
+
+    // Grammar check API — uses macOS NSSpellChecker (on-device, no cloud)
+    if (url.pathname === '/api/grammar' && req.method === 'POST') {
+      if (process.platform !== 'darwin') {
+        res.writeHead(501, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Grammar checking requires macOS', matches: [] }));
+        return;
+      }
+      try {
+        const body = JSON.parse(await readBody(req));
+        const { text } = body;
+        if (!text || typeof text !== 'string') {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'text is required' }));
+          return;
+        }
+
+        const configDir = join(homedir(), '.config', 'pullread');
+        const tmpText = join(configDir, '.grammar-input.txt');
+        const swiftScript = join(configDir, '.grammar-check.swift');
+
+        writeFileSync(tmpText, text);
+
+        // Swift script that uses NSSpellChecker for grammar + spelling
+        const scriptContent = [
+          'import Cocoa',
+          'import Foundation',
+          '',
+          'let path = CommandLine.arguments[1]',
+          'let text = try String(contentsOfFile: path, encoding: .utf8)',
+          'let checker = NSSpellChecker.shared',
+          'var results: [[String: Any]] = []',
+          '',
+          '// Grammar check',
+          'var offset = 0',
+          'while offset < text.count {',
+          '    var detailsPtr: NSArray?',
+          '    let range = checker.checkGrammar(of: text, startingAt: offset, language: nil, wrap: false, inSpellDocumentWithTag: 0, details: &detailsPtr)',
+          '    if range.location == NSNotFound || range.length == 0 { break }',
+          '    if let details = detailsPtr as? [[String: Any]] {',
+          '        for detail in details {',
+          '            let dRange = (detail["NSGrammarRange"] as? NSValue)?.rangeValue ?? range',
+          '            let startIdx = text.index(text.startIndex, offsetBy: dRange.location)',
+          '            let endIdx = text.index(startIdx, offsetBy: min(dRange.length, text.count - dRange.location))',
+          '            let snippet = String(text[startIdx..<endIdx])',
+          '            var entry: [String: Any] = [',
+          '                "offset": dRange.location,',
+          '                "length": dRange.length,',
+          '                "context": snippet',
+          '            ]',
+          '            if let msg = detail["NSGrammarUserDescription"] as? String {',
+          '                entry["message"] = msg',
+          '            }',
+          '            if let corrections = detail["NSGrammarCorrections"] as? [String] {',
+          '                entry["replacements"] = corrections',
+          '            }',
+          '            results.append(entry)',
+          '        }',
+          '    }',
+          '    offset = range.location + range.length',
+          '}',
+          '',
+          '// Spelling check',
+          'var spellOffset = 0',
+          'while spellOffset < text.count {',
+          '    let range = checker.checkSpelling(of: text, startingAt: spellOffset)',
+          '    if range.location == NSNotFound { break }',
+          '    let startIdx = text.index(text.startIndex, offsetBy: range.location)',
+          '    let endIdx = text.index(startIdx, offsetBy: min(range.length, text.count - range.location))',
+          '    let word = String(text[startIdx..<endIdx])',
+          '    let guesses = checker.guesses(forWordRange: range, in: text, language: nil) ?? []',
+          '    results.append([',
+          '        "offset": range.location,',
+          '        "length": range.length,',
+          '        "context": word,',
+          '        "message": "Possible misspelling: \\(word)",',
+          '        "replacements": guesses.prefix(5).map { $0 }',
+          '    ])',
+          '    spellOffset = range.location + range.length',
+          '}',
+          '',
+          '// Sort by offset and output JSON',
+          'results.sort { ($0["offset"] as? Int ?? 0) < ($1["offset"] as? Int ?? 0) }',
+          'let json = try JSONSerialization.data(withJSONObject: ["matches": results], options: .prettyPrinted)',
+          'print(String(data: json, encoding: .utf8)!)',
+        ].join('\n');
+
+        writeFileSync(swiftScript, scriptContent);
+
+        const { execFileSync } = require('child_process');
+        const result = execFileSync('swift', [swiftScript, tmpText], {
+          encoding: 'utf-8',
+          timeout: 30_000,
+          stdio: ['pipe', 'pipe', 'pipe']
+        });
+
+        try { require('fs').unlinkSync(tmpText); } catch {}
+
+        const data = JSON.parse(result.trim());
+        sendJson(res, data);
+      } catch (err: any) {
+        const msg = err instanceof Error ? err.message : 'Grammar check failed';
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: msg, matches: [] }));
       }
       return;
     }

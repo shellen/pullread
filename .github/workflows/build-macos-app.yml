@@ -99,13 +99,37 @@ jobs:
           # Download Kokoro TTS model for bundling into the app
           bash scripts/download-kokoro-model.sh
 
-          # Copy ONNX Runtime dylib to dist before cleaning node_modules
+          # Copy kokoro.web.js (self-contained WASM build) before cleaning node_modules.
+          # The compiled binary loads this at runtime to avoid Bun bundler issues with
+          # @huggingface/transformers' webpack internals and onnxruntime-node native addons.
+          if [ -f "node_modules/kokoro-js/dist/kokoro.web.js" ]; then
+            cp node_modules/kokoro-js/dist/kokoro.web.js dist/
+            echo "Preserved kokoro.web.js for runtime loading"
+          else
+            echo "WARNING: kokoro.web.js not found in node_modules"
+          fi
+
+          # Copy onnxruntime-web WASM files before cleaning node_modules.
+          # The bundled ORT inside kokoro.web.js fails to self-initialize in Bun,
+          # so we load ort.mjs separately and register it on globalThis.
+          mkdir -p dist/ort-wasm
+          ORT_DIST="node_modules/onnxruntime-web/dist"
+          if [ -f "$ORT_DIST/ort.mjs" ]; then
+            cp "$ORT_DIST/ort.mjs" dist/ort-wasm/
+            cp "$ORT_DIST/ort-wasm-simd-threaded.jsep.wasm" dist/ort-wasm/ 2>/dev/null || true
+            cp "$ORT_DIST/ort-wasm-simd-threaded.wasm" dist/ort-wasm/ 2>/dev/null || true
+            echo "Preserved onnxruntime-web WASM files for runtime loading"
+          else
+            echo "WARNING: ort.mjs not found in node_modules"
+          fi
+
+          # Copy ONNX Runtime dylib to dist before cleaning node_modules (fallback)
           ONNX_DYLIB=$(find node_modules -name 'libonnxruntime*.dylib' -print -quit 2>/dev/null || true)
           if [ -n "$ONNX_DYLIB" ]; then
             echo "Preserving ONNX Runtime dylib: $ONNX_DYLIB"
             cp "$ONNX_DYLIB" dist/
           else
-            echo "WARNING: ONNX Runtime dylib not found in node_modules"
+            echo "Note: ONNX Runtime dylib not found (not required with web build)"
           fi
 
           # Free space: remove node_modules and bun cache
@@ -273,13 +297,29 @@ jobs:
             echo "ERROR: Kokoro model not found — TTS will require download on first use"
           fi
 
-          # Bundle the ONNX Runtime dylib (preserved in dist/ before node_modules cleanup)
+          # Bundle kokoro.web.js — self-contained WASM build that bypasses native ONNX issues
+          if [ -f "../dist/kokoro.web.js" ]; then
+            echo "Bundling kokoro.web.js..."
+            cp ../dist/kokoro.web.js "$RESOURCES/"
+          else
+            echo "WARNING: kokoro.web.js not found — Kokoro TTS may not work"
+          fi
+
+          # Bundle onnxruntime-web WASM files (loaded separately since bundled ORT fails in Bun)
+          if [ -d "../dist/ort-wasm" ]; then
+            echo "Bundling onnxruntime-web WASM files..."
+            cp -R ../dist/ort-wasm "$RESOURCES/ort-wasm"
+          else
+            echo "WARNING: ort-wasm directory not found — Kokoro TTS WASM backend may not work"
+          fi
+
+          # Bundle the ONNX Runtime dylib as fallback (preserved in dist/ before node_modules cleanup)
           ONNX_DYLIB=$(find ../dist -name 'libonnxruntime*.dylib' -print -quit 2>/dev/null || true)
           if [ -n "$ONNX_DYLIB" ]; then
             echo "Bundling ONNX Runtime dylib: $ONNX_DYLIB"
             cp "$ONNX_DYLIB" "$RESOURCES/"
           else
-            echo "WARNING: ONNX Runtime dylib not found"
+            echo "Note: ONNX Runtime dylib not found (not required with web build)"
           fi
 
           # Strip test artifacts from the release bundle — build-for-testing embeds
