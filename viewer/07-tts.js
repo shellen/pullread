@@ -8,8 +8,9 @@ let ttsSpeed = 1.0;
 let ttsProvider = 'browser';
 let ttsGenerating = false;
 let ttsProgressTimer = null;
+let _ttsChunkSession = null; // { id, totalChunks, currentChunk, elapsedTime, prefetched }
 
-const TTS_SPEEDS = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+const TTS_SPEEDS = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.5, 1.75, 2.0];
 
 function addCurrentToTTSQueue() {
   if (!activeFile) return;
@@ -64,6 +65,8 @@ function renderAudioPlayer() {
 
   if (ttsGenerating) {
     status.textContent = 'Generating...';
+  } else if (ttsPlaying && _ttsChunkSession) {
+    status.textContent = (_ttsChunkSession.currentChunk + 1) + '/' + _ttsChunkSession.totalChunks;
   } else if (ttsPlaying) {
     status.textContent = 'Playing';
   } else if (ttsCurrentIndex >= 0) {
@@ -234,7 +237,8 @@ async function playCloudTTS(filename) {
   } catch {}
 
   try {
-    const res = await fetch('/api/tts', {
+    // Start a chunked TTS session
+    const startRes = await fetch('/api/tts/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: filename }),
@@ -242,12 +246,62 @@ async function playCloudTTS(filename) {
 
     ttsGenerating = false;
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: 'TTS failed' }));
-      // If Kokoro native engine failed, fall back to browser TTS silently
+    if (!startRes.ok) {
+      const err = await startRes.json().catch(function() { return { error: 'TTS failed' }; });
       if (err.fallback === 'browser') {
         console.warn('Kokoro unavailable, falling back to browser TTS:', err.error);
-        ttsGenerating = false;
+        await playBrowserTTS(filename);
+        return;
+      }
+      alert('TTS Error: ' + (err.error || 'Unknown error'));
+      ttsPlaying = false;
+      renderAudioPlayer();
+      return;
+    }
+
+    const session = await startRes.json();
+
+    if (session.cached) {
+      // Already cached on disk — use the full-file endpoint for instant playback
+      await playCloudTTSCached(filename, _cloudParaOffsets);
+      return;
+    }
+
+    // Progressive chunk-based playback
+    _ttsChunkSession = {
+      id: session.id,
+      totalChunks: session.totalChunks,
+      currentChunk: 0,
+      elapsedTime: 0,
+      prefetched: null,
+      estimatedTotalDuration: 0,
+    };
+
+    ttsPlaying = true;
+    renderAudioPlayer();
+    ttsPlayNextChunk(0, _cloudParaOffsets);
+  } catch (err) {
+    ttsGenerating = false;
+    ttsPlaying = false;
+    _ttsChunkSession = null;
+    renderAudioPlayer();
+    alert('TTS Error: ' + err.message);
+  }
+}
+
+/** Play a full cached audio file via the existing /api/tts endpoint */
+async function playCloudTTSCached(filename, paraOffsets) {
+  try {
+    const res = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: filename }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(function() { return { error: 'TTS failed' }; });
+      if (err.fallback === 'browser') {
+        console.warn('Kokoro unavailable, falling back to browser TTS:', err.error);
         await playBrowserTTS(filename);
         return;
       }
@@ -262,33 +316,30 @@ async function playCloudTTS(filename) {
 
     ttsAudio = new Audio(audioUrl);
     ttsAudio.playbackRate = ttsSpeed;
-    // Reset total time immediately; loadedmetadata will set the real value
     document.getElementById('tts-time-total').textContent = '0:00';
 
-    ttsAudio.addEventListener('loadedmetadata', () => {
+    ttsAudio.addEventListener('loadedmetadata', function() {
       document.getElementById('tts-time-total').textContent = formatTime(ttsAudio.duration);
     });
 
-    ttsAudio.addEventListener('timeupdate', () => {
+    ttsAudio.addEventListener('timeupdate', function() {
       if (!ttsAudio) return;
-      const pct = ttsAudio.duration ? (ttsAudio.currentTime / ttsAudio.duration) * 100 : 0;
+      var pct = ttsAudio.duration ? (ttsAudio.currentTime / ttsAudio.duration) * 100 : 0;
       document.getElementById('tts-progress').style.width = pct + '%';
       document.getElementById('tts-time-current').textContent = formatTime(ttsAudio.currentTime);
-      // Reading highlight based on playback progress
-      ttsHighlightByProgress(pct / 100, _cloudParaOffsets);
+      ttsHighlightByProgress(pct / 100, paraOffsets);
     });
 
-    ttsAudio.addEventListener('ended', () => {
+    ttsAudio.addEventListener('ended', function() {
       ttsPlaying = false;
       ttsClearHighlight();
       renderAudioPlayer();
-      // Auto-play next
       if (ttsCurrentIndex + 1 < ttsQueue.length) {
-        setTimeout(() => playTTSItem(ttsCurrentIndex + 1), 500);
+        setTimeout(function() { playTTSItem(ttsCurrentIndex + 1); }, 500);
       }
     });
 
-    ttsAudio.addEventListener('error', () => {
+    ttsAudio.addEventListener('error', function() {
       ttsPlaying = false;
       ttsClearHighlight();
       renderAudioPlayer();
@@ -298,8 +349,110 @@ async function playCloudTTS(filename) {
     ttsPlaying = true;
     renderAudioPlayer();
   } catch (err) {
-    ttsGenerating = false;
     ttsPlaying = false;
+    renderAudioPlayer();
+    alert('TTS Error: ' + err.message);
+  }
+}
+
+/** Fetch and play a single TTS chunk, then chain to the next */
+async function ttsPlayNextChunk(index, paraOffsets) {
+  var session = _ttsChunkSession;
+  if (!session || session !== _ttsChunkSession) return;
+
+  if (index >= session.totalChunks) {
+    // All chunks played — done
+    ttsPlaying = false;
+    _ttsChunkSession = null;
+    ttsClearHighlight();
+    document.getElementById('tts-progress').style.width = '100%';
+    renderAudioPlayer();
+    if (ttsCurrentIndex + 1 < ttsQueue.length) {
+      setTimeout(function() { playTTSItem(ttsCurrentIndex + 1); }, 500);
+    }
+    return;
+  }
+
+  session.currentChunk = index;
+  renderAudioPlayer();
+
+  try {
+    // Use prefetched blob if available, otherwise fetch
+    var blob;
+    if (session.prefetched && session.prefetched.index === index) {
+      blob = await session.prefetched.promise;
+      session.prefetched = null;
+    } else {
+      var chunkRes = await fetch('/api/tts/chunk/' + session.id + '/' + index);
+      if (!chunkRes.ok) {
+        var err = await chunkRes.json().catch(function() { return { error: 'Chunk failed' }; });
+        if (err.fallback === 'browser') {
+          console.warn('Kokoro unavailable, falling back to browser TTS:', err.error);
+          _ttsChunkSession = null;
+          await playBrowserTTS(ttsQueue[ttsCurrentIndex].filename);
+          return;
+        }
+        throw new Error(err.error || 'Chunk generation failed');
+      }
+      blob = await chunkRes.blob();
+    }
+
+    // Bail out if session was cancelled while we were fetching
+    if (session !== _ttsChunkSession) return;
+
+    // Start prefetching the next chunk immediately
+    if (index + 1 < session.totalChunks) {
+      var nextIndex = index + 1;
+      session.prefetched = {
+        index: nextIndex,
+        promise: fetch('/api/tts/chunk/' + session.id + '/' + nextIndex)
+          .then(function(r) { return r.ok ? r.blob() : null; })
+          .catch(function() { return null; }),
+      };
+    }
+
+    var audioUrl = URL.createObjectURL(blob);
+    ttsAudio = new Audio(audioUrl);
+    ttsAudio.playbackRate = ttsSpeed;
+
+    ttsAudio.addEventListener('loadedmetadata', function() {
+      if (index === 0 && session === _ttsChunkSession) {
+        // Estimate total duration from first chunk
+        session.estimatedTotalDuration = ttsAudio.duration * session.totalChunks;
+        document.getElementById('tts-time-total').textContent = '~' + formatTime(session.estimatedTotalDuration);
+      }
+    });
+
+    ttsAudio.addEventListener('timeupdate', function() {
+      if (!ttsAudio || session !== _ttsChunkSession) return;
+      var chunkProgress = ttsAudio.duration ? ttsAudio.currentTime / ttsAudio.duration : 0;
+      var overallPct = ((index + chunkProgress) / session.totalChunks) * 100;
+      document.getElementById('tts-progress').style.width = overallPct + '%';
+      var currentTime = session.elapsedTime + ttsAudio.currentTime;
+      document.getElementById('tts-time-current').textContent = formatTime(currentTime);
+      // Reading highlight based on overall progress
+      ttsHighlightByProgress(overallPct / 100, paraOffsets);
+    });
+
+    ttsAudio.addEventListener('ended', function() {
+      if (session !== _ttsChunkSession) return;
+      session.elapsedTime += ttsAudio.duration || 0;
+      ttsPlayNextChunk(index + 1, paraOffsets);
+    });
+
+    ttsAudio.addEventListener('error', function() {
+      ttsPlaying = false;
+      _ttsChunkSession = null;
+      ttsClearHighlight();
+      renderAudioPlayer();
+    });
+
+    ttsAudio.play();
+    ttsPlaying = true;
+    renderAudioPlayer();
+  } catch (err) {
+    ttsPlaying = false;
+    _ttsChunkSession = null;
     renderAudioPlayer();
     alert('TTS Error: ' + err.message);
   }
@@ -307,6 +460,7 @@ async function playCloudTTS(filename) {
 
 function stopTTS() {
   clearInterval(ttsProgressTimer);
+  _ttsChunkSession = null;
   if (ttsAudio) {
     ttsAudio.pause();
     ttsAudio.src = '';
@@ -383,6 +537,9 @@ function ttsSkipPrev() {
 }
 
 function ttsSeek(event) {
+  // Seeking across chunks isn't supported during progressive playback
+  if (_ttsChunkSession) return;
+
   const wrap = event.currentTarget;
   const rect = wrap.getBoundingClientRect();
   const pct = (event.clientX - rect.left) / rect.width;
@@ -393,19 +550,137 @@ function ttsSeek(event) {
   // Browser TTS doesn't support seeking
 }
 
-function ttsCycleSpeed() {
-  const currentIdx = TTS_SPEEDS.indexOf(ttsSpeed);
-  const nextIdx = (currentIdx + 1) % TTS_SPEEDS.length;
-  ttsSpeed = TTS_SPEEDS[nextIdx];
+let _ttsSpeedPopup = null;
 
-  document.getElementById('tts-speed-btn').textContent = ttsSpeed + 'x';
+function ttsToggleSpeedSlider() {
+  if (_ttsSpeedPopup) { ttsCloseSpeedSlider(); return; }
+
+  var btn = document.getElementById('tts-speed-btn');
+  var rect = btn.getBoundingClientRect();
+  var count = TTS_SPEEDS.length;
+
+  var popup = document.createElement('div');
+  popup.className = 'tts-speed-popup';
+
+  // Build tick labels — show value for major speeds, dot for minor ones
+  var majorSpeeds = [0.5, 1.0, 1.5, 2.0];
+  var ticksHtml = '';
+  for (var i = count - 1; i >= 0; i--) {
+    var s = TTS_SPEEDS[i];
+    if (majorSpeeds.indexOf(s) >= 0) {
+      ticksHtml += '<div class="tts-speed-tick">' + s + 'x</div>';
+    } else {
+      ticksHtml += '<div class="tts-speed-tick-dot">\u00b7</div>';
+    }
+  }
+
+  popup.innerHTML =
+    '<div class="tts-speed-popup-value" id="tts-speed-popup-val">' + ttsSpeed + 'x</div>' +
+    '<div class="tts-speed-track-wrap" id="tts-speed-track-wrap">' +
+      '<div class="tts-speed-track" id="tts-speed-track">' +
+        '<div class="tts-speed-thumb" id="tts-speed-thumb"></div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="tts-speed-ticks">' + ticksHtml + '</div>';
+
+  document.body.appendChild(popup);
+
+  // Position above the button, centered horizontally
+  var popW = popup.offsetWidth;
+  var popH = popup.offsetHeight;
+  var left = rect.left + rect.width / 2 - popW / 2;
+  var top = rect.top - popH - 6;
+  // Keep on screen
+  if (left < 4) left = 4;
+  if (top < 4) { top = rect.bottom + 6; }
+  popup.style.left = left + 'px';
+  popup.style.top = top + 'px';
+
+  // Set thumb position for current speed
+  ttsPositionThumb();
+  _ttsSpeedPopup = popup;
+
+  // Drag handling
+  var trackWrap = document.getElementById('tts-speed-track-wrap');
+
+  function onDrag(clientY) {
+    var trackRect = trackWrap.getBoundingClientRect();
+    var pct = (clientY - trackRect.top) / trackRect.height;
+    pct = Math.max(0, Math.min(1, pct));
+    // Top = fastest (last index), bottom = slowest (first index)
+    var idx = Math.round((1 - pct) * (count - 1));
+    idx = Math.max(0, Math.min(count - 1, idx));
+    ttsSetSpeed(TTS_SPEEDS[idx]);
+    ttsPositionThumb();
+  }
+
+  trackWrap.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    onDrag(e.clientY);
+    function onMove(ev) { onDrag(ev.clientY); }
+    function onUp() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  trackWrap.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    onDrag(e.touches[0].clientY);
+    function onTouchMove(ev) { ev.preventDefault(); onDrag(ev.touches[0].clientY); }
+    function onTouchEnd() {
+      document.removeEventListener('touchmove', onTouchMove);
+      document.removeEventListener('touchend', onTouchEnd);
+    }
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
+    document.addEventListener('touchend', onTouchEnd);
+  }, { passive: false });
+
+  // Close on click outside (delay to avoid catching the opening click)
+  setTimeout(function() {
+    document.addEventListener('mousedown', ttsSpeedOutsideClick);
+    document.addEventListener('touchstart', ttsSpeedOutsideClick);
+  }, 0);
+}
+
+function ttsSpeedOutsideClick(e) {
+  if (_ttsSpeedPopup && !_ttsSpeedPopup.contains(e.target) && e.target.id !== 'tts-speed-btn') {
+    ttsCloseSpeedSlider();
+  }
+}
+
+function ttsCloseSpeedSlider() {
+  if (_ttsSpeedPopup) {
+    _ttsSpeedPopup.remove();
+    _ttsSpeedPopup = null;
+  }
+  document.removeEventListener('mousedown', ttsSpeedOutsideClick);
+  document.removeEventListener('touchstart', ttsSpeedOutsideClick);
+}
+
+function ttsPositionThumb() {
+  var thumb = document.getElementById('tts-speed-thumb');
+  if (!thumb) return;
+  var idx = TTS_SPEEDS.indexOf(ttsSpeed);
+  if (idx < 0) idx = TTS_SPEEDS.indexOf(1.0);
+  // Top = fastest (last index), bottom = slowest (first index)
+  var pct = 1 - idx / (TTS_SPEEDS.length - 1);
+  thumb.style.top = (pct * 100) + '%';
+}
+
+function ttsSetSpeed(speed) {
+  ttsSpeed = speed;
+  document.getElementById('tts-speed-btn').textContent = speed + 'x';
+  var popupVal = document.getElementById('tts-speed-popup-val');
+  if (popupVal) popupVal.textContent = speed + 'x';
 
   if (ttsAudio) {
-    ttsAudio.playbackRate = ttsSpeed;
+    ttsAudio.playbackRate = speed;
   }
   if (ttsSynthUtterance && window.speechSynthesis.speaking) {
-    // Browser TTS doesn't support live rate change — note for user
-    ttsSynthUtterance.rate = ttsSpeed;
+    ttsSynthUtterance.rate = speed;
   }
 }
 
@@ -496,7 +771,6 @@ function ttsHighlightParagraph(paraIndex) {
   var blocks = content.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote, pre');
   if (paraIndex >= 0 && paraIndex < blocks.length) {
     blocks[paraIndex].classList.add('tts-reading-hl');
-    blocks[paraIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 }
 
@@ -756,6 +1030,7 @@ function saveTTSSettings() {
       // Clear TTS queue so new voice/model takes effect
       ttsQueue = [];
       ttsCurrentIndex = -1;
+      _ttsChunkSession = null;
       if (ttsAudio) { ttsAudio.pause(); ttsAudio.src = ''; ttsAudio = null; }
       renderAudioPlayer();
       const overlay = document.querySelector('.modal-overlay');
