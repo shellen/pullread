@@ -10,15 +10,15 @@ const SINGLE_NOTEBOOK_ID = 'nb-shared';
 async function getOrCreateSingleNotebook() {
   await loadNotebooks();
   if (_notebooks[SINGLE_NOTEBOOK_ID]) {
-    var nb = _notebooks[SINGLE_NOTEBOOK_ID];
+    let found = _notebooks[SINGLE_NOTEBOOK_ID];
     // Migrate legacy content blob into discrete notes
-    if (nb.content && (!nb.notes || !nb.notes.length)) {
-      nb.notes = migrateContentToNotes(nb.content, nb.createdAt || new Date().toISOString());
-      nb.content = '';
-      await saveNotebook(nb);
+    if (found.content && (!found.notes || !found.notes.length)) {
+      found.notes = migrateContentToNotes(found.content, found.createdAt || new Date().toISOString());
+      found.content = '';
+      await saveNotebook(found);
     }
-    if (!nb.notes) nb.notes = [];
-    return nb;
+    if (!found.notes) found.notes = [];
+    return found;
   }
   // Migrate: if there are existing notebooks, merge them into the single notebook
   const existing = Object.values(_notebooks).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
