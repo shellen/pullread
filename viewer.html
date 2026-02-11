@@ -443,12 +443,26 @@
     align-items: center;
   }
   .new-notebook-btn {
-    border: none; background: none; color: var(--link);
-    font-size: 10px; font-weight: 600; cursor: pointer;
-    padding: 1px 6px; border-radius: 4px;
+    display: block;
+    width: 100%;
+    border: 1px dashed var(--border);
+    background: none;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 6px;
     font-family: inherit;
+    text-align: left;
+    margin: 4px 0 8px;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
   }
-  .new-notebook-btn:hover { background: var(--sidebar-active); }
+  .new-notebook-btn:hover {
+    color: var(--link);
+    border-color: var(--link);
+    background: var(--sidebar-active);
+  }
   .file-item.notebook-item .file-item-title {
     color: var(--fg);
   }
@@ -2057,12 +2071,12 @@
   /* Sidebar nav tabs */
   .sidebar-nav {
     display: flex;
-    align-items: center;
     padding: 8px 8px 0;
     gap: 2px;
   }
   .sidebar-nav-tab {
-    padding: 7px 12px;
+    flex: 1;
+    padding: 7px 0;
     font-size: 12px;
     font-weight: 500;
     color: var(--muted);
@@ -2077,10 +2091,6 @@
   .sidebar-nav-tab.active {
     color: var(--fg);
     border-bottom-color: var(--link);
-  }
-  .sidebar-nav .new-notebook-btn {
-    margin-left: auto;
-    border-bottom: 2px solid transparent;
   }
 
   /* Reading progress bar */
@@ -2669,7 +2679,6 @@
       <div class="sidebar-nav" id="sidebar-nav">
         <button class="sidebar-nav-tab active" data-view="library" onclick="switchSidebarView('library')">Library</button>
         <button class="sidebar-nav-tab" data-view="explore" onclick="switchSidebarView('explore')">Explore</button>
-        <button class="new-notebook-btn" onclick="createNewNotebook()" title="New notebook">+ Notebook</button>
       </div>
       <div class="sidebar-search" role="search">
         <label for="search" class="sr-only">Search articles</label>
@@ -3860,11 +3869,12 @@ function renderFileList() {
   if (hideRead && shown < total) countStr += ' (' + (total - shown) + ' hidden)';
   countText.textContent = countStr;
 
-  // Render notebooks first, then articles
+  // Render notebooks first, then a "Create new..." button, then articles
   let html = '';
   for (const nb of nbItems) {
     html += renderNotebookItem(nb);
   }
+  html += '<button class="new-notebook-btn" onclick="createNewNotebook()" title="New notebook">+ Create new notebook\u2026</button>';
 
   // Paginate: render in chunks for performance with large lists
   displayedCount = Math.min(displayFiles.length, PAGE_SIZE);
