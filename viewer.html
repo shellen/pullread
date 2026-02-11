@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/styles/github.min.css" media="(prefers-color-scheme: light)" id="hljs-light">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/styles/github-dark.min.css" media="(prefers-color-scheme: dark)" id="hljs-dark">
 <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Literata:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,wght@0,400;0,700;1,400&family=Work+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
@@ -2254,6 +2255,36 @@
     background: var(--code-bg);
   }
 
+  /* Diagram rendering (mermaid, d2) */
+  .diagram-container {
+    margin: 16px 0;
+    padding: 16px;
+    border-radius: 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    overflow-x: auto;
+    text-align: center;
+  }
+  .diagram-container svg {
+    max-width: 100%;
+    height: auto;
+  }
+  .diagram-loading {
+    color: var(--muted);
+    font-size: 13px;
+    font-style: italic;
+  }
+  .diagram-error-msg {
+    color: #d32f2f;
+    font-size: 12px;
+    margin-top: 8px;
+  }
+  /* D2 diagrams rendered by kroki always use light theme — invert for dark mode */
+  [data-theme="dark"] .diagram-d2 svg,
+  [data-theme="high-contrast"] .diagram-d2 svg {
+    filter: invert(0.88) hue-rotate(180deg);
+  }
+
   /* Code block language label */
   .content-wrap pre {
     position: relative;
@@ -3816,6 +3847,9 @@ function renderArticle(text, filename) {
     statsSpan.innerHTML = minutes + ' min read<span class="stat-divider">&middot;</span>' + (words >= 1000 ? (words / 1000).toFixed(1) + 'k' : words) + ' words';
     bylineEl.appendChild(statsSpan);
   }
+
+  // Render diagrams (mermaid, d2) before highlighting
+  renderDiagrams();
 
   // Apply syntax highlighting to code blocks
   applySyntaxHighlighting();
@@ -6556,6 +6590,12 @@ function openNotebookInPane(id) {
   content.innerHTML = html;
   document.getElementById('content-pane').scrollTop = 0;
 
+  // Render diagrams in notebook preview
+  if (_notebookPreviewMode) {
+    renderDiagrams();
+    applySyntaxHighlighting();
+  }
+
   // Set up auto-grow, auto-save, and focus tracking for textarea
   var ta = content.querySelector('.notebook-editor textarea');
   if (ta) {
@@ -7378,6 +7418,8 @@ function updateFocusMode() {
 }
 
 // ---- Code Syntax Highlighting ----
+const DIAGRAM_LANGUAGES = new Set(['mermaid', 'd2']);
+
 function applySyntaxHighlighting() {
   if (typeof hljs === 'undefined') return;
   const content = document.getElementById('content');
@@ -7389,18 +7431,67 @@ function applySyntaxHighlighting() {
   content.querySelectorAll('pre code').forEach(block => {
     // Skip if already highlighted
     if (block.classList.contains('hljs')) return;
+    // Skip diagram languages — they get rendered by renderDiagrams()
+    const langMatch = block.className.match(/language-(\w+)/);
+    if (langMatch && DIAGRAM_LANGUAGES.has(langMatch[1])) return;
+
     hljs.highlightElement(block);
 
     // Add language label if detected
-    const lang = block.className.match(/language-(\w+)/);
     const detected = block.result && block.result.language;
-    const langName = (lang && lang[1]) || detected;
+    const langName = (langMatch && langMatch[1]) || detected;
     if (langName && langName !== 'undefined') {
       const label = document.createElement('span');
       label.className = 'code-lang-label';
       label.textContent = langName;
       block.closest('pre').appendChild(label);
     }
+  });
+}
+
+// ---- Diagram Rendering (Mermaid + D2) ----
+function renderDiagrams() {
+  const content = document.getElementById('content');
+  if (!content) return;
+
+  // Mermaid: client-side rendering
+  const mermaidBlocks = content.querySelectorAll('pre code.language-mermaid');
+  if (mermaidBlocks.length > 0 && typeof mermaid !== 'undefined') {
+    mermaidBlocks.forEach((block, i) => {
+      const source = block.textContent;
+      const pre = block.closest('pre');
+      const container = document.createElement('div');
+      container.className = 'diagram-container mermaid';
+      container.id = 'mermaid-diagram-' + Date.now() + '-' + i;
+      container.textContent = source;
+      pre.replaceWith(container);
+    });
+    const theme = document.body.getAttribute('data-theme');
+    const isDark = theme === 'dark' || theme === 'high-contrast';
+    mermaid.initialize({ startOnLoad: false, theme: isDark ? 'dark' : 'default' });
+    mermaid.run();
+  }
+
+  // D2: server-side via kroki.io (no client-side renderer exists)
+  content.querySelectorAll('pre code.language-d2').forEach(block => {
+    const source = block.textContent;
+    const pre = block.closest('pre');
+    const container = document.createElement('div');
+    container.className = 'diagram-container diagram-d2';
+    container.innerHTML = '<span class="diagram-loading">Rendering d2 diagram\u2026</span>';
+    pre.replaceWith(container);
+
+    fetch('https://kroki.io/d2/svg', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: source
+    })
+    .then(function(r) { return r.ok ? r.text() : Promise.reject(r.status + ' ' + r.statusText); })
+    .then(function(svg) { container.innerHTML = svg; })
+    .catch(function(err) {
+      container.innerHTML = '<pre style="text-align:left"><code>' + escapeHtml(source) + '</code></pre>'
+        + '<p class="diagram-error-msg">D2 rendering unavailable: ' + escapeHtml(String(err)) + '</p>';
+    });
   });
 }
 
