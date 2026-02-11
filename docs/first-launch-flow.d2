@@ -1,0 +1,251 @@
+# ABOUTME: Architecture diagram showing PullRead first-launch flow
+# ABOUTME: Render with: d2 docs/first-launch-flow.d2 docs/first-launch-flow.svg
+
+direction: down
+
+title: {
+  label: PullRead — First Launch Flow
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+# ──────────────────────────────────────────
+# App Bundle (what ships in the DMG)
+# ──────────────────────────────────────────
+
+app_bundle: "Pull Read.app" {
+  style.fill: "#e8f4fd"
+
+  macos_binary: "Contents/MacOS/Pull Read" {
+    shape: hexagon
+    style.fill: "#4a90d9"
+    style.font-color: white
+    label: SwiftUI App\n(AppDelegate)
+  }
+
+  resources: "Contents/Resources/" {
+    style.fill: "#d4e8f7"
+
+    cli: "pullread" {
+      shape: hexagon
+      style.fill: "#2d6da3"
+      style.font-color: white
+      label: CLI Binary\n(Bun-compiled)
+    }
+
+    kokoro_model: "kokoro-model/" {
+      style.fill: "#c8e6c9"
+      label: |md
+        Kokoro ONNX Model
+        - config.json
+        - tokenizer.json
+        - model_q8.onnx (86MB)
+        - voices.bin
+      |
+    }
+
+    onnx_dylib: "libonnxruntime.dylib" {
+      shape: hexagon
+      style.fill: "#81c784"
+      style.font-color: white
+    }
+
+    viewer_html: "viewer.html\n(embedded in CLI)" {
+      shape: page
+      style.fill: "#fff9c4"
+    }
+
+    share_ext: "PullReadShareExtension.appex" {
+      shape: hexagon
+      style.fill: "#b39ddb"
+      style.font-color: white
+    }
+  }
+}
+
+# ──────────────────────────────────────────
+# First Launch Sequence
+# ──────────────────────────────────────────
+
+step1: "1. User opens Pull Read.app" {
+  shape: step
+  style.fill: "#fff3e0"
+}
+
+step2: "2. AppDelegate starts" {
+  shape: step
+  style.fill: "#fff3e0"
+}
+
+step2_detail: {
+  label: |md
+    - Creates menu bar icon (tray)
+    - Checks onboardingCompleted flag
+    - Shows Onboarding wizard (first run)
+  |
+  shape: page
+  style.fill: "#fff8e1"
+}
+
+step3: "3. Onboarding Wizard (6 steps)" {
+  shape: step
+  style.fill: "#e8f5e9"
+}
+
+onboarding: {
+  style.fill: "#f1f8e9"
+  s1: "Welcome" {shape: step; style.fill: "#c8e6c9"}
+  s2: "Pick Output Folder" {shape: step; style.fill: "#c8e6c9"}
+  s3: "Add Feed URLs" {shape: step; style.fill: "#c8e6c9"}
+  s4: "Options\n(cookies, sync freq)" {shape: step; style.fill: "#c8e6c9"}
+  s5: "Saving Articles\n(URL bar, Share Ext)" {shape: step; style.fill: "#c8e6c9"}
+  s6: "Ready!" {shape: step; style.fill: "#a5d6a7"}
+  s1 -> s2 -> s3 -> s4 -> s5 -> s6
+}
+
+step4: "4. First Sync" {
+  shape: step
+  style.fill: "#e3f2fd"
+}
+
+sync_detail: {
+  label: |md
+    SyncService spawns CLI binary:
+    ```
+    pullread sync --config-path ...
+    ```
+    Environment:
+    - DYLD_LIBRARY_PATH → Resources/
+    - PULLREAD_KOKORO_MODEL_DIR → Resources/kokoro-model/
+  |
+  shape: page
+  style.fill: "#e8eaf6"
+}
+
+step5: "5. CLI processes feeds" {
+  shape: step
+  style.fill: "#e3f2fd"
+}
+
+cli_detail: {
+  style.fill: "#e8eaf6"
+  fetch: "Fetch RSS/Atom feeds" {shape: step}
+  extract: "Extract articles\n(Readability)" {shape: step}
+  write: "Write .md files\nw/ YAML frontmatter" {shape: step}
+  db: "Update SQLite DB" {shape: step}
+  fetch -> extract -> write -> db
+}
+
+step6: "6. Viewer Server starts" {
+  shape: step
+  style.fill: "#fce4ec"
+}
+
+viewer_detail: {
+  label: |md
+    SyncService spawns:
+    ```
+    pullread view --config-path ...
+    ```
+    - HTTP server on localhost:7777
+    - Serves embedded viewer.html
+    - Kokoro pipeline preloaded from
+      bundled model (no download!)
+  |
+  shape: page
+  style.fill: "#fce4ec"
+}
+
+step7: "7. Article Viewer opens" {
+  shape: step
+  style.fill: "#f3e5f5"
+}
+
+viewer_ui: {
+  style.fill: "#f8f0fc"
+  sidebar: "Sidebar" {
+    style.fill: "#e1bee7"
+    tabs: "Library | Explore | + Notebook"
+    search: "Search bar"
+    list: "Article list"
+    footer: "Shortcuts | Guide | Settings"
+  }
+  content: "Content Pane" {
+    style.fill: "#e1bee7"
+    article: "Article reader"
+    tts: "Audio player (Kokoro ready)"
+    highlights: "Highlights & Notes"
+  }
+  sidebar -> content: "select article"
+}
+
+step8: "8. Ready to read!" {
+  shape: step
+  style.fill: "#e8f5e9"
+  style.bold: true
+}
+
+# ──────────────────────────────────────────
+# Data Flow
+# ──────────────────────────────────────────
+
+user_data: "User Data (~/.config/pullread/)" {
+  style.fill: "#f5f5f5"
+  style.stroke-dash: 3
+
+  feeds_json: "feeds.json" {shape: page}
+  settings_json: "settings.json" {shape: page}
+  db: "pullread.db" {shape: cylinder}
+  notes: "notes.json" {shape: page}
+  highlights: "highlights.json" {shape: page}
+  notebooks: "notebooks.json" {shape: page}
+  tts_cache: "tts-cache/" {shape: folder}
+}
+
+output_folder: "Output Folder (user-chosen)" {
+  style.fill: "#f5f5f5"
+  style.stroke-dash: 3
+  articles: "*.md articles" {shape: page}
+}
+
+keychain: "macOS Keychain" {
+  shape: cylinder
+  style.fill: "#ffcdd2"
+  label: |md
+    macOS Keychain
+    - API keys (LLM, TTS)
+    - Service: com.pullread.api-keys
+  |
+}
+
+# ──────────────────────────────────────────
+# Connections
+# ──────────────────────────────────────────
+
+step1 -> step2: "launch"
+step2 -> step2_detail
+step2 -> step3: "first run detected"
+step3 -> onboarding
+onboarding -> step4: "Get Started"
+step4 -> sync_detail
+step4 -> step5
+step5 -> cli_detail
+cli_detail -> output_folder: "writes articles"
+cli_detail -> user_data: "writes metadata"
+step5 -> step6: "sync complete"
+step6 -> viewer_detail
+step6 -> step7
+step7 -> viewer_ui
+step7 -> step8
+
+app_bundle.macos_binary -> step2: "launches"
+app_bundle.resources.cli -> step5: "SyncService spawns"
+app_bundle.resources.cli -> step6: "SyncService spawns"
+app_bundle.resources.kokoro_model -> viewer_detail: "model loaded\nfrom bundle"
+app_bundle.resources.onnx_dylib -> viewer_detail: "native lib\nvia DYLD_LIBRARY_PATH"
+app_bundle.resources.viewer_html -> viewer_detail: "served at\nlocalhost:7777"
+
+onboarding -> user_data.feeds_json: "saves config"
+onboarding -> keychain: "saves API keys"
