@@ -175,18 +175,19 @@ async function init() {
       loadSyncStatus();
 
       // Preload Kokoro TTS model if it's the selected provider
-      fetch('/api/tts-settings').then(r => r.json()).then(cfg => {
+      fetch('/api/tts-settings').then(function(r) { return r.ok ? r.json() : null; }).then(function(cfg) {
+        if (!cfg) return;
         ttsProvider = cfg.provider || 'browser';
         if (cfg.provider === 'kokoro') {
-          fetch('/api/kokoro-preload', { method: 'POST' }).catch(() => {});
+          fetch('/api/kokoro-preload', { method: 'POST' }).catch(function() {});
         }
-      }).catch(() => {});
+      }).catch(function() {});
 
       // Show dashboard instead of auto-loading first article
       renderDashboard();
       showOnboardingIfNeeded();
       // Seed the change tracker so first poll doesn't false-trigger
-      fetch('/api/files-changed').then(r => r.json()).then(d => { _lastKnownChangeAt = d.changedAt; }).catch(() => {});
+      fetch('/api/files-changed').then(function(r) { return r.ok ? r.json() : null; }).then(function(d) { if (d) _lastKnownChangeAt = d.changedAt; }).catch(function() {});
       startAutoRefresh();
       return;
     }

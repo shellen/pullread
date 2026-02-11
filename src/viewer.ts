@@ -541,10 +541,10 @@ export function startViewer(outputPath: string, port = 7777): void {
     }
 
     // Settings API (LLM config — multi-provider)
+    const ALL_PROVIDERS = ['anthropic', 'openai', 'gemini', 'openrouter', 'apple'] as const;
     if (url.pathname === '/api/settings') {
       if (req.method === 'GET') {
         const settings = loadLLMSettings();
-        const ALL_PROVIDERS = ['anthropic', 'openai', 'gemini', 'openrouter', 'apple'] as const;
         const providers: Record<string, { hasKey: boolean; model: string }> = {};
         for (const p of ALL_PROVIDERS) {
           const config = settings.providers[p];
@@ -568,6 +568,13 @@ export function startViewer(outputPath: string, port = 7777): void {
 
           // New multi-provider format: { defaultProvider, providers: { ... } }
           if (body.defaultProvider) {
+            const validSet = new Set<string>(ALL_PROVIDERS);
+            if (!validSet.has(body.defaultProvider)) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'Unknown provider: ' + body.defaultProvider }));
+              return;
+            }
+
             const current = loadLLMSettings();
             const newSettings: LLMSettings = {
               defaultProvider: body.defaultProvider,
@@ -576,6 +583,7 @@ export function startViewer(outputPath: string, port = 7777): void {
 
             if (body.providers) {
               for (const [p, config] of Object.entries(body.providers as Record<string, any>)) {
+                if (!validSet.has(p)) continue; // skip unknown providers
                 const key = p as import('./summarizer').Provider;
                 const existing = current.providers[key] || {};
                 newSettings.providers[key] = {

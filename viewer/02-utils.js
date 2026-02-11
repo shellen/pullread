@@ -20,6 +20,11 @@ function escapeHtml(s) {
   return d.innerHTML;
 }
 
+// Escape a string for safe interpolation inside single-quoted JS strings in onclick attributes
+function escapeJsStr(s) {
+  return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+}
+
 // Clean up broken markdown patterns that marked.js can't handle
 function cleanMarkdown(md) {
   // Fix image/link patterns split across lines:

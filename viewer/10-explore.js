@@ -59,7 +59,7 @@ function showTagCloud() {
 
   // --- Tab: Discover (quick filters + ontological connections) ---
   const makeQf = function(label, query, variant) {
-    return '<button class="tag-pill' + (variant ? ' tag-pill-' + variant : '') + '" onclick="document.getElementById(\'search\').value=\'' + query + '\';filterFiles()">' + label + '</button>';
+    return '<button class="tag-pill' + (variant ? ' tag-pill-' + variant : '') + '" onclick="document.getElementById(\'search\').value=\'' + escapeJsStr(query) + '\';filterFiles()">' + escapeHtml(label) + '</button>';
   };
   let discoverHtml = '<div class="tag-cloud">';
   discoverHtml += makeQf('Favorites', 'is:favorite', 'pink');
@@ -115,7 +115,7 @@ function showTagCloud() {
       const pctStr = pct ? Math.round(pct * 100) + '%' : 'Opened';
       const domain = f.domain || '';
       const favicon = domain ? 'https://www.google.com/s2/favicons?domain=' + encodeURIComponent(domain) + '&sz=32' : '';
-      viewedHtml += '<div class="most-viewed-item" onclick="jumpToArticle(\'' + escapeHtml(f.filename.replace(/'/g, "\\'")) + '\')">';
+      viewedHtml += '<div class="most-viewed-item" onclick="jumpToArticle(\'' + escapeJsStr(f.filename) + '\')">';
       viewedHtml += '<div class="most-viewed-rank">' + (i + 1) + '</div>';
       viewedHtml += '<div class="most-viewed-info">';
       viewedHtml += '<div class="most-viewed-title">' + escapeHtml(f.title) + '</div>';
@@ -135,7 +135,7 @@ function showTagCloud() {
   if (sortedTags.length > 0) {
     tagsHtml = '<div class="tag-cloud">';
     for (const [tag, count] of sortedTags) {
-      tagsHtml += '<button class="tag-pill" onclick="document.getElementById(\'search\').value=\'' + escapeHtml(tag) + '\';filterFiles()">' + escapeHtml(tag) + '<span class="tag-count">' + count + '</span></button>';
+      tagsHtml += '<button class="tag-pill" onclick="document.getElementById(\'search\').value=\'' + escapeJsStr(tag) + '\';filterFiles()">' + escapeHtml(tag) + '<span class="tag-count">' + count + '</span></button>';
     }
     tagsHtml += '</div>';
   } else {
@@ -151,10 +151,10 @@ function showTagCloud() {
     domainsHtml += '<span>' + escapeHtml(domain) + '</span><span class="domain-group-count">' + articles.length + ' article' + (articles.length !== 1 ? 's' : '') + '</span></div>';
     domainsHtml += '<div class="domain-group-articles" style="display:none">';
     for (const a of articles.slice(0, 10)) {
-      domainsHtml += '<a href="#" onclick="event.preventDefault();jumpToArticle(\'' + escapeHtml(a.filename.replace(/'/g, "\\'")) + '\')">' + escapeHtml(a.title) + '</a>';
+      domainsHtml += '<a href="#" onclick="event.preventDefault();jumpToArticle(\'' + escapeJsStr(a.filename) + '\')">' + escapeHtml(a.title) + '</a>';
     }
     if (articles.length > 10) {
-      domainsHtml += '<a href="#" onclick="event.preventDefault();document.getElementById(\'search\').value=\'domain:' + escapeHtml(domain) + '\';filterFiles()" style="color:var(--link)">+ ' + (articles.length - 10) + ' more</a>';
+      domainsHtml += '<a href="#" onclick="event.preventDefault();document.getElementById(\'search\').value=\'domain:' + escapeJsStr(domain) + '\';filterFiles()" style="color:var(--link)">+ ' + (articles.length - 10) + ' more</a>';
     }
     domainsHtml += '</div></div>';
   }
@@ -204,14 +204,14 @@ function buildConnectionsHtml(tagArticles, sortedTags) {
     for (const f of articles) {
       const domain = f.domain || '';
       const favicon = domain ? 'https://www.google.com/s2/favicons?domain=' + encodeURIComponent(domain) + '&sz=32' : '';
-      html += '<div class="connection-article" onclick="jumpToArticle(\'' + escapeHtml(f.filename.replace(/'/g, "\\'")) + '\')">';
+      html += '<div class="connection-article" onclick="jumpToArticle(\'' + escapeJsStr(f.filename) + '\')">';
       if (favicon) html += '<img src="' + escapeHtml(favicon) + '" alt="" loading="lazy">';
       html += '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(f.title) + '</span>';
       if (domain) html += '<span class="conn-domain">' + escapeHtml(domain) + '</span>';
       html += '</div>';
     }
     if (tagArticles[tag].length > 5) {
-      html += '<div style="padding:4px 8px;font-size:11px"><a href="#" style="color:var(--link);text-decoration:none" onclick="event.preventDefault();document.getElementById(\'search\').value=\'' + escapeHtml(tag) + '\';filterFiles()">View all ' + count + ' &rsaquo;</a></div>';
+      html += '<div style="padding:4px 8px;font-size:11px"><a href="#" style="color:var(--link);text-decoration:none" onclick="event.preventDefault();document.getElementById(\'search\').value=\'' + escapeJsStr(tag) + '\';filterFiles()">View all ' + count + ' &rsaquo;</a></div>';
     }
     html += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
   }

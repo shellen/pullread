@@ -265,6 +265,14 @@ function acceptNotebookTagSuggestion(tag, btn) {
 async function checkNotebookGrammar() {
   var ta = document.querySelector('.notebook-editor textarea');
   if (!ta || !ta.value.trim()) return;
+
+  // First-use consent: LanguageTool sends text to an external API
+  if (!localStorage.getItem('pr-grammar-consent')) {
+    var ok = confirm('Grammar checking sends your notebook text to the LanguageTool API (languagetool.org) for analysis.\n\nYour text is processed but not stored. Continue?');
+    if (!ok) return;
+    localStorage.setItem('pr-grammar-consent', '1');
+  }
+
   var btn = document.getElementById('grammar-check-btn');
   if (btn) btn.textContent = 'Checking...';
 
