@@ -8,9 +8,9 @@ let ttsSpeed = 1.0;
 let ttsProvider = 'browser';
 let ttsGenerating = false;
 let ttsProgressTimer = null;
-let _ttsChunkSession = null; // { id, totalChunks, currentChunk, elapsedTime, prefetched }
+let _ttsChunkSession = null; // { id, totalChunks, currentChunk, elapsedTime }
 
-const TTS_SPEEDS = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.5, 1.75, 2.0];
+const TTS_SPEEDS = [0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.15, 1.2, 1.3, 1.5, 1.75, 2.0];
 
 function addCurrentToTTSQueue() {
   if (!activeFile) return;
@@ -65,8 +65,6 @@ function renderAudioPlayer() {
 
   if (ttsGenerating) {
     status.textContent = 'Generating...';
-  } else if (ttsPlaying && _ttsChunkSession) {
-    status.textContent = (_ttsChunkSession.currentChunk + 1) + '/' + _ttsChunkSession.totalChunks;
   } else if (ttsPlaying) {
     status.textContent = 'Playing';
   } else if (ttsCurrentIndex >= 0) {
@@ -298,12 +296,17 @@ async function playCloudTTSCached(filename) {
       }
     });
 
-    ttsAudio.addEventListener('error', function() {
+    ttsAudio.addEventListener('error', function(e) {
+      console.warn('TTS cached playback error:', e);
       ttsPlaying = false;
       renderAudioPlayer();
     });
 
-    ttsAudio.play();
+    ttsAudio.play().catch(function(e) {
+      console.warn('TTS cached play() rejected:', e);
+      ttsPlaying = false;
+      renderAudioPlayer();
+    });
     ttsPlaying = true;
     renderAudioPlayer();
   } catch (err) {
@@ -388,7 +391,12 @@ async function ttsPlayNextChunk(index) {
       renderAudioPlayer();
     });
 
-    ttsAudio.play();
+    ttsAudio.play().catch(function(e) {
+      console.warn('TTS chunk ' + index + ' play() rejected:', e);
+      ttsPlaying = false;
+      _ttsChunkSession = null;
+      renderAudioPlayer();
+    });
     ttsPlaying = true;
     renderAudioPlayer();
   } catch (err) {
