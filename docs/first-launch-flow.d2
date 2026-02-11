@@ -66,6 +66,20 @@ app_bundle: "Pull Read.app" {
 }
 
 # ──────────────────────────────────────────
+# View Types Legend
+# ──────────────────────────────────────────
+
+view_legend: {
+  style.fill: "#fafafa"
+  style.stroke-dash: 3
+  label: |md
+    **View Types**
+    - Steps 2–3: **Native SwiftUI** (OnboardingView.swift, AppDelegate.swift)
+    - Steps 6–8: **Web View** (viewer.html served at localhost:7777, opened in browser)
+  |
+}
+
+# ──────────────────────────────────────────
 # First Launch Sequence
 # ──────────────────────────────────────────
 
@@ -81,9 +95,11 @@ step2: "2. AppDelegate starts" {
 
 step2_detail: {
   label: |md
+    **Native SwiftUI** (AppDelegate.swift)
     - Creates menu bar icon (tray)
     - Checks onboardingCompleted flag
     - Shows Onboarding wizard (first run)
+      → Native SwiftUI window
   |
   shape: page
   style.fill: "#fff8e1"
@@ -92,6 +108,11 @@ step2_detail: {
 step3: "3. Onboarding Wizard (6 steps)" {
   shape: step
   style.fill: "#e8f5e9"
+  label: |md
+    **Native SwiftUI Window**
+    (OnboardingView.swift)
+    6 steps
+  |
 }
 
 onboarding: {
@@ -150,7 +171,8 @@ viewer_detail: {
     pullread view --config-path ...
     ```
     - HTTP server on localhost:7777
-    - Serves embedded viewer.html
+    - Serves embedded **viewer.html** (web UI)
+    - Opens in default **browser** (not an app view)
     - Kokoro pipeline preloaded from
       bundled model (no download!)
   |
@@ -158,16 +180,21 @@ viewer_detail: {
   style.fill: "#fce4ec"
 }
 
-step7: "7. Article Viewer opens" {
+step7: "7. Article Viewer opens in browser" {
   shape: step
   style.fill: "#f3e5f5"
+  label: |md
+    **Web View** (viewer.html)
+    Opens in default browser
+    at localhost:7777
+  |
 }
 
 viewer_ui: {
   style.fill: "#f8f0fc"
   sidebar: "Sidebar" {
     style.fill: "#e1bee7"
-    tabs: "Library | Explore | + Notebook"
+    tabs: "Library | Explore | Notebooks"
     search: "Search bar"
     list: "Article list"
     footer: "Shortcuts | Guide | Settings"
@@ -201,7 +228,7 @@ user_data: "User Data (~/.config/pullread/)" {
   notes: "notes.json" {shape: page}
   highlights: "highlights.json" {shape: page}
   notebooks: "notebooks.json" {shape: page}
-  tts_cache: "tts-cache/" {shape: folder}
+  tts_cache: "tts-cache/" {shape: rectangle}
 }
 
 output_folder: "Output Folder (user-chosen)" {

@@ -2679,6 +2679,7 @@
       <div class="sidebar-nav" id="sidebar-nav">
         <button class="sidebar-nav-tab active" data-view="library" onclick="switchSidebarView('library')">Library</button>
         <button class="sidebar-nav-tab" data-view="explore" onclick="switchSidebarView('explore')">Explore</button>
+        <button class="sidebar-nav-tab" data-view="notebooks" onclick="switchSidebarView('notebooks')">Notebooks</button>
       </div>
       <div class="sidebar-search" role="search">
         <label for="search" class="sr-only">Search articles</label>
@@ -3864,21 +3865,29 @@ function renderFileList() {
 
   const total = filteredFiles.length;
   const shown = displayFiles.length;
-  let countStr = shown + ' article' + (shown !== 1 ? 's' : '');
-  if (nbItems.length > 0) countStr += ', ' + nbItems.length + ' notebook' + (nbItems.length !== 1 ? 's' : '');
-  if (hideRead && shown < total) countStr += ' (' + (total - shown) + ' hidden)';
+  const isNotebooksTab = _sidebarView === 'notebooks';
+
+  let countStr;
+  if (isNotebooksTab) {
+    countStr = nbItems.length + ' notebook' + (nbItems.length !== 1 ? 's' : '');
+  } else {
+    countStr = shown + ' article' + (shown !== 1 ? 's' : '');
+    if (hideRead && shown < total) countStr += ' (' + (total - shown) + ' hidden)';
+  }
   countText.textContent = countStr;
 
-  // Render notebooks first, then a "Create new..." button, then articles
   let html = '';
-  for (const nb of nbItems) {
-    html += renderNotebookItem(nb);
+  if (isNotebooksTab) {
+    // Notebooks tab: show notebooks + create button only
+    for (const nb of nbItems) {
+      html += renderNotebookItem(nb);
+    }
+    html += '<button class="new-notebook-btn" onclick="createNewNotebook()" title="New notebook">+ Create new notebook\u2026</button>';
+  } else {
+    // Library / Explore: show articles only
+    displayedCount = Math.min(displayFiles.length, PAGE_SIZE);
+    html += displayFiles.slice(0, displayedCount).map((f, i) => renderFileItem(f, i)).join('');
   }
-  html += '<button class="new-notebook-btn" onclick="createNewNotebook()" title="New notebook">+ Create new notebook\u2026</button>';
-
-  // Paginate: render in chunks for performance with large lists
-  displayedCount = Math.min(displayFiles.length, PAGE_SIZE);
-  html += displayFiles.slice(0, displayedCount).map((f, i) => renderFileItem(f, i)).join('');
 
   list.innerHTML = html;
 }
@@ -6916,6 +6925,7 @@ function switchSidebarView(view) {
 
   // Trigger the appropriate view in the content area
   if (view === 'explore') showTagCloud();
+  else if (view === 'notebooks') { renderFileList(); }
   else if (view === 'library') goHome();
 }
 
@@ -6933,6 +6943,7 @@ function syncSidebarTabs() {
   var search = document.getElementById('search');
   if (search) {
     if (_sidebarView === 'explore') search.placeholder = 'Search articles, tags, sources...';
+    else if (_sidebarView === 'notebooks') search.placeholder = 'Search notebooks...';
     else search.placeholder = 'Search... try is:favorite or tag:tech';
   }
 }
