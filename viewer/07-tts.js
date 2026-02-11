@@ -270,7 +270,9 @@ async function playCloudTTSCached(filename) {
       return;
     }
 
-    const blob = await res.blob();
+    const contentType = res.headers.get('content-type') || 'audio/wav';
+    const arrayBuf = await res.arrayBuffer();
+    const blob = new Blob([arrayBuf], { type: contentType });
     const audioUrl = URL.createObjectURL(blob);
 
     ttsAudio = new Audio(audioUrl);
@@ -348,15 +350,18 @@ async function ttsPlayNextChunk(index) {
       }
       throw new Error(err.error || 'Chunk generation failed');
     }
-    var blob = await chunkRes.blob();
+    var contentType = chunkRes.headers.get('content-type') || 'audio/wav';
+    var arrayBuf = await chunkRes.arrayBuffer();
 
     // Bail out if session was cancelled while we were fetching
     if (session !== _ttsChunkSession) return;
 
-    if (!blob || blob.size === 0) {
+    if (!arrayBuf || arrayBuf.byteLength === 0) {
       throw new Error('Empty audio for chunk ' + index);
     }
 
+    console.log('TTS chunk ' + index + ': ' + arrayBuf.byteLength + ' bytes, type=' + contentType);
+    var blob = new Blob([arrayBuf], { type: contentType });
     var audioUrl = URL.createObjectURL(blob);
     ttsAudio = new Audio(audioUrl);
     ttsAudio.playbackRate = ttsSpeed;

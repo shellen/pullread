@@ -6,6 +6,7 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { request } from 'https';
 import { execFileSync } from 'child_process';
+import { saveToKeychain, loadFromKeychain } from './keychain';
 
 export type Provider = 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'apple';
 
@@ -97,7 +98,8 @@ export function loadLLMSettings(): LLMSettings {
         providers: {}
       };
       for (const [p, config] of Object.entries(llm.providers as Record<string, any>)) {
-        const apiKey = config?.apiKey || '';
+        // Keychain first, then settings.json fallback
+        const apiKey = loadFromKeychain(`llm-${p}`) || config?.apiKey || '';
         result.providers[p as Provider] = { apiKey, model: config?.model || '' };
       }
       return result;
@@ -162,11 +164,14 @@ export function saveLLMSettings(newSettings: LLMSettings): void {
     } catch {}
   }
 
-  const cleaned: Partial<Record<string, { apiKey?: string; model?: string }>> = {};
+  const cleaned: Partial<Record<string, { model?: string }>> = {};
   for (const [p, config] of Object.entries(newSettings.providers)) {
     if (config) {
-      const entry: { apiKey?: string; model?: string } = {};
-      if (config.apiKey) entry.apiKey = config.apiKey;
+      // Store API keys in Keychain, not in settings.json
+      if (config.apiKey && p !== 'apple') {
+        saveToKeychain(`llm-${p}`, config.apiKey);
+      }
+      const entry: { model?: string } = {};
       if (config.model) entry.model = config.model;
       if (Object.keys(entry).length > 0 || p === 'apple') cleaned[p] = entry;
     }

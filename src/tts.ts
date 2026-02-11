@@ -6,6 +6,7 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { createHash } from 'crypto';
 import { request as httpsRequest } from 'https';
+import { saveToKeychain, loadFromKeychain } from './keychain';
 
 const SETTINGS_PATH = join(homedir(), '.config', 'pullread', 'settings.json');
 const CACHE_DIR = join(homedir(), '.config', 'pullread', 'tts-cache');
@@ -107,7 +108,12 @@ export function loadTTSConfig(): TTSConfig {
     if (existsSync(SETTINGS_PATH)) {
       const settings = JSON.parse(readFileSync(SETTINGS_PATH, 'utf-8'));
       if (settings.tts) {
-        return settings.tts as TTSConfig;
+        const config = settings.tts as TTSConfig;
+        // Read API key from Keychain if not in settings
+        if (!config.apiKey && (config.provider === 'openai' || config.provider === 'elevenlabs')) {
+          config.apiKey = loadFromKeychain('tts-api-key') || '';
+        }
+        return config;
       }
     }
   } catch {}
@@ -115,13 +121,18 @@ export function loadTTSConfig(): TTSConfig {
 }
 
 export function saveTTSConfig(config: TTSConfig): void {
+  // Store API key in Keychain, strip from settings.json
+  if (config.apiKey) {
+    saveToKeychain('tts-api-key', config.apiKey);
+  }
+  const { apiKey, ...configWithoutKey } = config;
   let settings: Record<string, unknown> = {};
   if (existsSync(SETTINGS_PATH)) {
     try {
       settings = JSON.parse(readFileSync(SETTINGS_PATH, 'utf-8'));
     } catch {}
   }
-  settings.tts = config;
+  settings.tts = configWithoutKey;
   const dir = join(homedir(), '.config', 'pullread');
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2));

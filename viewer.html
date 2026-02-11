@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PullRead</title>
 <link rel="manifest" href="/manifest.json">
-<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="PullRead">
 <link rel="apple-touch-icon" href="/icon-256.png">
@@ -115,7 +115,7 @@
             <div class="audio-progress"><div class="audio-progress-fill" id="tts-progress"></div></div>
           </div>
           <span class="audio-time" id="tts-time-total">0:00</span>
-          <button class="audio-speed-btn" onclick="ttsCycleSpeed()" title="Playback speed" id="tts-speed-btn">1x</button>
+          <button class="audio-speed-btn" onclick="ttsToggleSpeedSlider()" title="Playback speed" id="tts-speed-btn">1x</button>
         </div>
         <div class="audio-queue-section" id="audio-queue-section" style="display:none">
           <div class="audio-queue-header">
