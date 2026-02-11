@@ -104,7 +104,7 @@
     background: var(--bg);
     color: var(--fg);
     transition: background 0.2s, color 0.2s;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     height: 100vh;
     overflow: hidden;
   }
@@ -815,7 +815,6 @@
     margin-bottom: 24px;
     padding-bottom: 16px;
     border-bottom: 1px solid var(--border);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
   .article-header h1 {
     font-size: 1.6em;
@@ -3203,8 +3202,10 @@ function showSettingsPage() {
 
       // Output path
       h += '<div class="settings-row"><div><label>Output Folder</label><div class="settings-desc">Where articles are saved as markdown</div></div>';
-      h += '<input type="text" id="sp-output-path" value="' + escapeHtml(cfg.outputPath || '') + '" placeholder="~/Documents/PullRead" style="min-width:240px">';
-      h += '</div>';
+      h += '<div style="display:flex;gap:8px;align-items:center">';
+      h += '<input type="text" id="sp-output-path" value="' + escapeHtml(cfg.outputPath || '') + '" placeholder="~/Documents/PullRead" style="min-width:200px">';
+      h += '<button onclick="pickOutputFolder(\'sp-output-path\')" style="white-space:nowrap;padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;cursor:pointer;font-family:inherit">Choose\u2026</button>';
+      h += '</div></div>';
 
       // Sync interval
       h += '<div class="settings-row"><div><label>Auto-sync</label><div class="settings-desc">How often to check for new articles</div></div>';
@@ -3489,6 +3490,17 @@ function settingsPageSaveLLM() {
 }
 
 // ---- Feeds & Sync settings ----
+function pickOutputFolder(inputId) {
+  fetch('/api/pick-folder', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.path) {
+        document.getElementById(inputId).value = data.path;
+      }
+    })
+    .catch(function() { /* osascript not available — user can type manually */ });
+}
+
 function settingsPageSaveConfig() {
   var outputPath = document.getElementById('sp-output-path').value.trim();
   var syncInterval = document.getElementById('sp-sync-interval').value;
@@ -6803,7 +6815,10 @@ function renderOnboardingStep() {
       + '<p class="ob-subtitle">Synced articles are saved as markdown here. A cloud-synced folder like Dropbox or iCloud works great.</p>'
       + '<div class="ob-glass-card">'
       + '<label>Output path</label>'
-      + '<input type="text" id="ob-output-path" value="' + escapeHtml(_obOutputPath) + '" placeholder="~/Documents/PullRead">'
+      + '<div style="display:flex;gap:8px;align-items:center">'
+      + '<input type="text" id="ob-output-path" value="' + escapeHtml(_obOutputPath) + '" placeholder="~/Documents/PullRead" style="flex:1">'
+      + '<button onclick="pickOutputFolder(\'ob-output-path\')" style="white-space:nowrap;padding:7px 14px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;cursor:pointer;font-family:inherit">Choose\u2026</button>'
+      + '</div>'
       + '<div style="font-size:11px;color:var(--muted);margin-top:6px">Default: ~/Documents/PullRead</div>'
       + '</div>';
   } else if (_obStep === 2) {

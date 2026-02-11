@@ -518,6 +518,28 @@ export function startViewer(outputPath: string, port = 7777): void {
       }
     }
 
+    // Folder picker API — opens native macOS folder dialog via osascript
+    if (url.pathname === '/api/pick-folder' && req.method === 'POST') {
+      const defaultPath = homedir() + '/Documents';
+      exec(
+        `osascript -e 'set p to POSIX path of (choose folder with prompt "Choose output folder" default location POSIX file "${defaultPath}")' 2>/dev/null`,
+        { timeout: 60000 },
+        (err, stdout) => {
+          if (err) {
+            // User cancelled or osascript not available
+            sendJson(res, { cancelled: true });
+          } else {
+            const folder = stdout.trim().replace(/\/$/, '');
+            // Convert absolute path back to ~/... for display
+            const home = homedir();
+            const display = folder.startsWith(home) ? '~' + folder.slice(home.length) : folder;
+            sendJson(res, { path: display });
+          }
+        }
+      );
+      return;
+    }
+
     // Settings API (LLM config)
     if (url.pathname === '/api/settings') {
       if (req.method === 'GET') {
