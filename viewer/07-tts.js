@@ -763,6 +763,12 @@ function ttsHighlightParagraph(paraIndex) {
   _ttsHighlightParaIndex = paraIndex;
   var content = document.getElementById('content');
   if (!content) return;
+
+  // Only highlight if the displayed article is the one being played
+  var playingFile = ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length
+    ? ttsQueue[ttsCurrentIndex].filename : null;
+  if (!playingFile || activeFile !== playingFile) return;
+
   // Remove previous highlight
   content.querySelectorAll('.tts-reading-hl').forEach(function(el) {
     el.classList.remove('tts-reading-hl');
