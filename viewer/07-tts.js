@@ -42,55 +42,19 @@ async function addToTTSQueue(filename) {
   if (ttsQueue.length === 1) playTTSItem(0);
 }
 
+function _getAudioPlayer() {
+  return document.querySelector('pr-audio-player');
+}
+
 function renderAudioPlayer() {
-  const panel = document.getElementById('audio-player');
-  if (!panel) return;
-
-  if (ttsQueue.length === 0) {
-    panel.classList.add('hidden');
-    return;
-  }
-  panel.classList.remove('hidden');
-
-  const label = document.getElementById('audio-now-label');
-  const status = document.getElementById('audio-now-status');
-  const playBtn = document.getElementById('tts-play-btn');
-
-  if (ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length) {
-    label.textContent = ttsQueue[ttsCurrentIndex].title;
-  } else {
-    label.textContent = 'No article playing';
-  }
-
-  if (ttsGenerating) {
-    status.textContent = 'Generating...';
-  } else if (ttsPlaying) {
-    status.textContent = 'Playing';
-  } else if (ttsCurrentIndex >= 0) {
-    status.textContent = 'Paused';
-  } else {
-    status.textContent = '';
-  }
-
-  playBtn.innerHTML = ttsPlaying
-    ? '<svg><use href="#i-pause"/></svg>'
-    : '<svg><use href="#i-play"/></svg>';
-
-  // Render queue
-  const queueSection = document.getElementById('audio-queue-section');
-  const queueList = document.getElementById('audio-queue-list');
-  if (ttsQueue.length > 1) {
-    queueSection.style.display = '';
-    queueList.innerHTML = ttsQueue.map((item, i) =>
-      '<div class="audio-queue-item' + (i === ttsCurrentIndex ? ' playing' : '') + '" onclick="playTTSItem(' + i + ')">'
-      + '<span style="font-size:10px;color:var(--muted);width:14px;text-align:center">' + (i === ttsCurrentIndex ? '&#9654;' : (i + 1)) + '</span>'
-      + '<span class="queue-title">' + escapeHtml(item.title) + '</span>'
-      + '<button class="queue-remove" onclick="event.stopPropagation();removeTTSQueueItem(' + i + ')" title="Remove">&times;</button>'
-      + '</div>'
-    ).join('');
-  } else {
-    queueSection.style.display = 'none';
-  }
+  var el = _getAudioPlayer();
+  if (!el) return;
+  el.update({
+    queue: ttsQueue,
+    currentIndex: ttsCurrentIndex,
+    playing: ttsPlaying,
+    generating: ttsGenerating
+  });
 }
 
 async function playTTSItem(index) {
@@ -177,12 +141,13 @@ async function playBrowserTTS(filename) {
     startTime = Date.now();
     ttsHighlightAtChar(0, paraOffsets);
     renderAudioPlayer();
-    document.getElementById('tts-time-total').textContent = formatTime(estimatedSeconds);
+    var _ap = _getAudioPlayer();
+    if (_ap) _ap.setProgress(0, '0:00', formatTime(estimatedSeconds));
     ttsProgressTimer = setInterval(() => {
       const elapsed = (Date.now() - startTime) / 1000;
       const pct = Math.min(100, (elapsed / estimatedSeconds) * 100);
-      document.getElementById('tts-progress').style.width = pct + '%';
-      document.getElementById('tts-time-current').textContent = formatTime(elapsed);
+      var _ap2 = _getAudioPlayer();
+      if (_ap2) _ap2.setProgress(pct, formatTime(elapsed));
       // Estimate-based highlight fallback (if no boundary events)
       ttsHighlightByProgress(pct / 100, paraOffsets);
     }, 200);
@@ -193,7 +158,8 @@ async function playBrowserTTS(filename) {
     ttsPlaying = false;
     ttsSynthUtterance = null;
     ttsClearHighlight();
-    document.getElementById('tts-progress').style.width = '100%';
+    var _ap = _getAudioPlayer();
+    if (_ap) _ap.setProgress(100);
     renderAudioPlayer();
     // Auto-play next
     if (ttsCurrentIndex + 1 < ttsQueue.length) {
@@ -263,17 +229,19 @@ async function playCloudTTS(filename) {
     ttsAudio = new Audio(audioUrl);
     ttsAudio.playbackRate = ttsSpeed;
     // Reset total time immediately; loadedmetadata will set the real value
-    document.getElementById('tts-time-total').textContent = '0:00';
+    var _ap = _getAudioPlayer();
+    if (_ap) _ap.setProgress(0, '0:00', '0:00');
 
     ttsAudio.addEventListener('loadedmetadata', () => {
-      document.getElementById('tts-time-total').textContent = formatTime(ttsAudio.duration);
+      var _ap2 = _getAudioPlayer();
+      if (_ap2) _ap2.setProgress(0, undefined, formatTime(ttsAudio.duration));
     });
 
     ttsAudio.addEventListener('timeupdate', () => {
       if (!ttsAudio) return;
       const pct = ttsAudio.duration ? (ttsAudio.currentTime / ttsAudio.duration) * 100 : 0;
-      document.getElementById('tts-progress').style.width = pct + '%';
-      document.getElementById('tts-time-current').textContent = formatTime(ttsAudio.currentTime);
+      var _ap2 = _getAudioPlayer();
+      if (_ap2) _ap2.setProgress(pct, formatTime(ttsAudio.currentTime));
       // Reading highlight based on playback progress
       ttsHighlightByProgress(pct / 100, _cloudParaOffsets);
     });
@@ -319,9 +287,8 @@ function stopTTS() {
   ttsPlaying = false;
   ttsGenerating = false;
   ttsClearHighlight();
-  document.getElementById('tts-progress').style.width = '0%';
-  document.getElementById('tts-time-current').textContent = '0:00';
-  document.getElementById('tts-time-total').textContent = '0:00';
+  var _ap = _getAudioPlayer();
+  if (_ap) _ap.setProgress(0, '0:00', '0:00');
 }
 
 function ttsTogglePlay() {
@@ -337,13 +304,17 @@ function ttsTogglePlay() {
       synth.resume();
       ttsPlaying = true;
       // Restart progress timer
+      var _resumeStartTime = Date.now();
+      var _ap = _getAudioPlayer();
+      var _resumeBase = 0;
+      if (_ap && _ap._els) {
+        var _parts = _ap._els.timeCurrent.textContent.split(':');
+        _resumeBase = parseInt(_parts[0]) * 60 + parseInt(_parts[1]);
+      }
       ttsProgressTimer = setInterval(() => {
-        const timeEl = document.getElementById('tts-time-current');
-        const totalEl = document.getElementById('tts-time-total');
-        // parse current time and increment
-        const parts = timeEl.textContent.split(':');
-        let secs = parseInt(parts[0]) * 60 + parseInt(parts[1]) + 0.2;
-        timeEl.textContent = formatTime(secs);
+        var elapsed = _resumeBase + (Date.now() - _resumeStartTime) / 1000;
+        var _ap2 = _getAudioPlayer();
+        if (_ap2) _ap2.setProgress(undefined, formatTime(elapsed));
       }, 200);
     } else if (ttsCurrentIndex >= 0) {
       playTTSItem(ttsCurrentIndex);
@@ -383,9 +354,16 @@ function ttsSkipPrev() {
 }
 
 function ttsSeek(event) {
-  const wrap = event.currentTarget;
-  const rect = wrap.getBoundingClientRect();
-  const pct = (event.clientX - rect.left) / rect.width;
+  // Accept either a CustomEvent from the Web Component (with detail.percent)
+  // or a raw mouse event for backward compatibility
+  var pct;
+  if (event.detail && event.detail.percent !== undefined) {
+    pct = event.detail.percent;
+  } else {
+    var wrap = event.currentTarget;
+    var rect = wrap.getBoundingClientRect();
+    pct = (event.clientX - rect.left) / rect.width;
+  }
 
   if (ttsAudio && ttsAudio.duration) {
     ttsAudio.currentTime = pct * ttsAudio.duration;
@@ -398,7 +376,8 @@ function ttsCycleSpeed() {
   const nextIdx = (currentIdx + 1) % TTS_SPEEDS.length;
   ttsSpeed = TTS_SPEEDS[nextIdx];
 
-  document.getElementById('tts-speed-btn').textContent = ttsSpeed + 'x';
+  var _ap = _getAudioPlayer();
+  if (_ap) _ap.setSpeed(ttsSpeed);
 
   if (ttsAudio) {
     ttsAudio.playbackRate = ttsSpeed;
@@ -708,6 +687,21 @@ function ttsSettingsProviderChanged() {
   const costEl = document.getElementById('tts-cost-estimate');
   if (costEl) costEl.innerHTML = ttsGetCostHtml(provider, model);
 }
+
+// Wire up <pr-audio-player> custom events to existing TTS functions
+(function() {
+  var ap = document.querySelector('pr-audio-player');
+  if (!ap) return;
+  ap.addEventListener('tts-toggle-play', function() { ttsTogglePlay(); });
+  ap.addEventListener('tts-skip-prev', function() { ttsSkipPrev(); });
+  ap.addEventListener('tts-skip-next', function() { ttsSkipNext(); });
+  ap.addEventListener('tts-seek', function(e) { ttsSeek(e); });
+  ap.addEventListener('tts-cycle-speed', function() { ttsCycleSpeed(); });
+  ap.addEventListener('tts-play-item', function(e) { playTTSItem(e.detail.index); });
+  ap.addEventListener('tts-remove-item', function(e) { removeTTSQueueItem(e.detail.index); });
+  ap.addEventListener('tts-clear-queue', function() { ttsClearQueue(); });
+  ap.addEventListener('tts-show-settings', function() { showTTSSettings(); });
+})();
 
 function saveTTSSettings() {
   const provider = document.getElementById('tts-provider-select').value;

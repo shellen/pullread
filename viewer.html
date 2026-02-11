@@ -100,32 +100,7 @@
         </label>
       </div>
       <div class="file-list" id="file-list" role="listbox" aria-label="Articles"></div>
-      <div class="audio-player-panel hidden" id="audio-player">
-        <div class="audio-now-playing">
-          <svg style="width:12px;height:12px;fill:currentColor;flex-shrink:0;opacity:0.5"><use href="#i-volume"/></svg>
-          <span class="audio-now-label" id="audio-now-label">No article queued</span>
-          <span class="audio-now-status" id="audio-now-status"></span>
-        </div>
-        <div class="audio-controls">
-          <button onclick="ttsSkipPrev()" title="Previous" id="tts-prev-btn"><svg><use href="#i-backward"/></svg></button>
-          <button onclick="ttsTogglePlay()" title="Play/Pause" id="tts-play-btn"><svg><use href="#i-play"/></svg></button>
-          <button onclick="ttsSkipNext()" title="Next" id="tts-next-btn"><svg><use href="#i-forward"/></svg></button>
-          <span class="audio-time" id="tts-time-current">0:00</span>
-          <div class="audio-progress-wrap" onclick="ttsSeek(event)">
-            <div class="audio-progress"><div class="audio-progress-fill" id="tts-progress"></div></div>
-          </div>
-          <span class="audio-time" id="tts-time-total">0:00</span>
-          <button class="audio-speed-btn" onclick="ttsCycleSpeed()" title="Playback speed" id="tts-speed-btn">1x</button>
-        </div>
-        <div class="audio-queue-section" id="audio-queue-section" style="display:none">
-          <div class="audio-queue-header">
-            <span>Queue</span>
-            <button class="audio-queue-clear" onclick="ttsClearQueue()">Clear</button>
-          </div>
-          <div id="audio-queue-list"></div>
-        </div>
-        <button class="audio-settings-link" onclick="showTTSSettings()">Voice Playback Settings</button>
-      </div>
+      <pr-audio-player id="audio-player" hidden></pr-audio-player>
       <div class="sidebar-footer">
         <button class="sidebar-footer-btn" onclick="showShortcutsModal()" aria-label="Keyboard shortcuts"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-keyboard"/></svg> Shortcuts</button>
         <button class="sidebar-footer-btn" onclick="showGuideModal()" aria-label="Features guide"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-book"/></svg> Guide</button>
