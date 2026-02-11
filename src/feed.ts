@@ -235,9 +235,26 @@ export function discoverFeedUrl(html: string, baseUrl: string): string | null {
 }
 
 /**
+ * Well-known RSS/Atom feed paths for popular newsletter and blogging platforms.
+ * Tried in order when HTML <link> auto-discovery fails.
+ */
+const WELL_KNOWN_FEED_PATHS = [
+  '/feed',           // WordPress, Ghost, many blogs
+  '/rss',            // Substack, Ghost, generic
+  '/feed.xml',       // Jekyll, Hugo, many static sites
+  '/rss.xml',        // common fallback
+  '/atom.xml',       // Atom feeds
+  '/index.xml',      // Hugo default
+  '/feed/rss',       // Buttondown
+  '/blog/rss',       // some platforms put feeds under /blog
+];
+
+/**
  * Try to discover and return the feed URL from a given URL.
  * If the URL is already an RSS/Atom feed, returns the original URL.
- * If it's an HTML page, tries to discover the feed via <link> tags.
+ * If it's an HTML page, tries to discover the feed via <link> tags,
+ * then falls back to probing well-known feed paths (Substack, Ghost,
+ * Buttondown, WordPress, etc.).
  */
 export async function discoverFeed(url: string): Promise<{ feedUrl: string; title: string | null } | null> {
   const response = await fetch(url);
@@ -250,20 +267,41 @@ export async function discoverFeed(url: string): Promise<{ feedUrl: string; titl
     return { feedUrl: url, title };
   }
 
-  // Not a feed — try HTML auto-discovery
+  // Not a feed — try HTML <link> auto-discovery
   const feedUrl = discoverFeedUrl(text, url);
-  if (!feedUrl) return null;
-
-  // Fetch the discovered feed to get its title
-  try {
-    const feedResponse = await fetch(feedUrl);
-    if (!feedResponse.ok) return { feedUrl, title: null };
-    const feedXml = await feedResponse.text();
-    const feedTitle = parseFeedTitle(feedXml);
-    return { feedUrl, title: feedTitle };
-  } catch {
+  if (feedUrl) {
+    try {
+      const feedResponse = await fetch(feedUrl);
+      if (feedResponse.ok) {
+        const feedXml = await feedResponse.text();
+        const feedTitle = parseFeedTitle(feedXml);
+        if (feedTitle !== null) return { feedUrl, title: feedTitle };
+      }
+    } catch {}
+    // Even if we couldn't fetch title, the <link> tag is authoritative
     return { feedUrl, title: null };
   }
+
+  // Fallback: probe well-known feed paths
+  let baseOrigin: string;
+  try { baseOrigin = new URL(url).origin; } catch { return null; }
+
+  for (const path of WELL_KNOWN_FEED_PATHS) {
+    const candidate = baseOrigin + path;
+    try {
+      const probeRes = await fetch(candidate, { redirect: 'follow' });
+      if (!probeRes.ok) continue;
+      const probeText = await probeRes.text();
+      const probeTitle = parseFeedTitle(probeText);
+      if (probeTitle !== null) {
+        return { feedUrl: candidate, title: probeTitle };
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
 }
 
 export async function fetchFeed(url: string): Promise<FeedEntry[]> {

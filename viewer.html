@@ -3219,8 +3219,16 @@ function showSettingsPage() {
         h += '</div>';
       }
       h += '<div style="display:flex;gap:8px;margin-top:10px">'
-        + '<input type="text" id="sp-new-feed" placeholder="Add feed URL or blog URL\u2026" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;font-family:inherit" onkeydown="if(event.key===\'Enter\')settingsAddFeed()">'
+        + '<input type="text" id="sp-new-feed" placeholder="e.g. newsletter.example.com or feed URL\u2026" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;font-family:inherit" onkeydown="if(event.key===\'Enter\')settingsAddFeed()">'
         + '<button class="btn-primary" onclick="settingsAddFeed()" id="sp-add-feed-btn" style="font-size:13px;padding:6px 14px">Add</button>'
+        + '</div>';
+      h += '<div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6">'
+        + 'Works with Substack, Ghost, Buttondown, WordPress, and any site with an RSS feed. '
+        + 'Just paste the web address \u2014 PullRead will find the feed automatically.'
+        + '</div>';
+      h += '<div style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;padding:8px 10px;background:color-mix(in srgb, var(--fg) 4%, transparent);border-radius:6px;font-size:11px;color:var(--muted)">'
+        + '<span style="flex-shrink:0">&#128196;</span>'
+        + '<span>Each new post from a feed is saved as a separate markdown file. High-volume feeds will create more files.</span>'
         + '</div>';
       h += '</div>';
 
@@ -3490,7 +3498,7 @@ async function settingsAddFeed() {
   if (!url) return;
   if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url;
   var btn = document.getElementById('sp-add-feed-btn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Adding\u2026'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Finding feed\u2026'; }
   try {
     var r = await fetch('/api/feed-discover?url=' + encodeURIComponent(url));
     var result = await r.json();
@@ -6760,8 +6768,8 @@ function renderOnboardingStep() {
       + '</div>';
   } else if (_obStep === 2) {
     var feedNames = Object.keys(_obFeeds);
-    html += '<h2>Connect Your Bookmarks</h2>'
-      + '<p class="ob-subtitle">Paste the RSS feed URL from your bookmark service or a blog URL. PullRead auto-discovers feeds.</p>'
+    html += '<h2>Connect Your Feeds</h2>'
+      + '<p class="ob-subtitle">Add your favorite newsletters, blogs, and bookmark services. Just paste a web address \u2014 PullRead will find the feed automatically.</p>'
       + '<div class="ob-glass-card">';
     if (feedNames.length > 0) {
       html += '<ul class="ob-feed-list">';
@@ -6773,15 +6781,23 @@ function renderOnboardingStep() {
       html += '</ul>';
     }
     html += '<div class="ob-feed-add">'
-      + '<input type="text" id="ob-feed-url" placeholder="Paste feed URL or blog URL\u2026" onkeydown="if(event.key===\'Enter\')obAddFeed()">'
-      + '<button onclick="obAddFeed()" id="ob-add-btn"' + (_obFeedLoading ? ' disabled' : '') + '>' + (_obFeedLoading ? 'Adding\u2026' : 'Add') + '</button>'
+      + '<input type="text" id="ob-feed-url" placeholder="e.g. newsletter.example.com or feed URL\u2026" onkeydown="if(event.key===\'Enter\')obAddFeed()">'
+      + '<button onclick="obAddFeed()" id="ob-add-btn"' + (_obFeedLoading ? ' disabled' : '') + '>' + (_obFeedLoading ? 'Finding feed\u2026' : 'Add') + '</button>'
       + '</div>'
       + '</div>'
       + '<div class="ob-hint-list">'
+      + '<div style="margin-bottom:8px;color:var(--fg);font-size:12px;font-weight:500">Works with newsletters and bookmark services:</div>'
+      + '<div><strong>Substack</strong> Paste the newsletter URL, e.g. example.substack.com</div>'
+      + '<div><strong>Ghost</strong> Paste the publication URL</div>'
+      + '<div><strong>Buttondown</strong> Paste the newsletter URL</div>'
+      + '<div><strong>WordPress</strong> Paste any WordPress blog URL</div>'
       + '<div><strong>Instapaper</strong> Settings &rarr; Export &rarr; RSS Feed URL</div>'
       + '<div><strong>Pinboard</strong> pinboard.in/feeds/u:USERNAME/</div>'
       + '<div><strong>Raindrop</strong> Collection &rarr; Share &rarr; RSS Feed</div>'
-      + '<div><strong>Any blog</strong> Paste the URL and PullRead finds the feed</div>'
+      + '</div>'
+      + '<div style="display:flex;gap:8px;align-items:flex-start;margin-top:12px;padding:10px 12px;background:color-mix(in srgb, var(--fg) 4%, transparent);border-radius:8px;font-size:12px;color:var(--muted)">'
+      + '<span style="flex-shrink:0;font-size:14px">&#128196;</span>'
+      + '<span>Each new post from a feed is saved as a separate markdown file in your output folder. High-volume feeds will create more files.</span>'
       + '</div>';
   } else if (_obStep === 3) {
     html += '<h2>Saving Articles</h2>'
