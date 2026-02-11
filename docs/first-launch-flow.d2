@@ -41,7 +41,7 @@ app_bundle: "Pull Read.app" {
         Kokoro ONNX Model
         - config.json
         - tokenizer.json
-        - model_q8.onnx (86MB)
+        - model_quantized.onnx (92MB)
         - voices.bin
       |
     }
@@ -74,8 +74,9 @@ view_legend: {
   style.stroke-dash: 3
   label: |md
     **View Types**
-    - Steps 2–3: **Native SwiftUI** (OnboardingView.swift, AppDelegate.swift)
-    - Steps 6–8: **Web View** (viewer.html served at localhost:7777, opened in browser)
+    - Step 2: **Native SwiftUI** (AppDelegate.swift — menu bar tray)
+    - Steps 3–8: **Web View** (viewer.html served at localhost:7777)
+    - Onboarding wizard runs inside the web viewer
   |
 }
 
@@ -97,21 +98,21 @@ step2_detail: {
   label: |md
     **Native SwiftUI** (AppDelegate.swift)
     - Creates menu bar icon (tray)
-    - Checks onboardingCompleted flag
-    - Shows Onboarding wizard (first run)
-      → Native SwiftUI window
+    - Detects first run (no feeds.json)
+    - Opens web viewer in browser
+      → Viewer shows onboarding wizard
   |
   shape: page
   style.fill: "#fff8e1"
 }
 
-step3: "3. Onboarding Wizard (6 steps)" {
+step3: "3. Onboarding Wizard (5 steps)" {
   shape: step
   style.fill: "#e8f5e9"
   label: |md
-    **Native SwiftUI Window**
-    (OnboardingView.swift)
-    6 steps
+    **Web View** (viewer.html)
+    Shown in browser on first launch
+    5 steps
   |
 }
 
@@ -120,10 +121,9 @@ onboarding: {
   s1: "Welcome" {shape: step; style.fill: "#c8e6c9"}
   s2: "Pick Output Folder" {shape: step; style.fill: "#c8e6c9"}
   s3: "Add Feed URLs" {shape: step; style.fill: "#c8e6c9"}
-  s4: "Options\n(cookies, sync freq)" {shape: step; style.fill: "#c8e6c9"}
-  s5: "Saving Articles\n(URL bar, Share Ext)" {shape: step; style.fill: "#c8e6c9"}
-  s6: "Ready!" {shape: step; style.fill: "#a5d6a7"}
-  s1 -> s2 -> s3 -> s4 -> s5 -> s6
+  s4: "Saving Articles\n(options, cookies)" {shape: step; style.fill: "#c8e6c9"}
+  s5: "Ready!\n(shortcuts)" {shape: step; style.fill: "#a5d6a7"}
+  s1 -> s2 -> s3 -> s4 -> s5
 }
 
 step4: "4. First Sync" {

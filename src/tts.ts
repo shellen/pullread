@@ -68,8 +68,8 @@ export const TTS_VOICES: Record<string, { id: string; label: string }[]> = {
 
 export const TTS_MODELS: Record<string, { id: string; label: string }[]> = {
   kokoro: [
-    { id: 'kokoro-v1-q8', label: 'Kokoro v1 (q8, 86MB)' },
-    { id: 'kokoro-v1-q4', label: 'Kokoro v1 (q4, 47MB, faster)' },
+    { id: 'kokoro-v1-q8', label: 'Kokoro v1 (q8, 92MB)' },
+    { id: 'kokoro-v1-q4', label: 'Kokoro v1 (q4, 305MB)' },
   ],
   openai: [
     { id: 'tts-1', label: 'TTS-1 (fast)' },

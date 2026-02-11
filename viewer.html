@@ -1374,29 +1374,161 @@
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 32px 36px;
-    max-width: 440px;
-    width: 90%;
+    max-width: 520px;
+    width: 92%;
     box-shadow: 0 16px 48px rgba(0,0,0,0.2);
+    max-height: 85vh;
+    overflow-y: auto;
   }
   .onboarding-card h2 {
-    font-size: 20px;
-    margin-bottom: 16px;
+    font-size: 22px;
+    margin-bottom: 6px;
     color: var(--fg);
   }
-  .onboarding-card p {
+  .onboarding-card .ob-subtitle {
     font-size: 14px;
     line-height: 1.6;
     color: var(--muted);
-    margin-bottom: 12px;
+    margin-bottom: 20px;
   }
-  .onboarding-shortcuts {
+  .ob-progress {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 24px;
+  }
+  .ob-progress-bar {
+    flex: 1;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    transition: background 0.2s;
+  }
+  .ob-progress-bar.active { background: var(--link); }
+  .ob-features {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 16px 0;
+  }
+  .ob-feature-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    background: color-mix(in srgb, var(--fg) 6%, transparent);
+    border-radius: 14px;
+    font-size: 12px;
+    color: var(--fg);
+  }
+  .ob-glass-card {
+    background: color-mix(in srgb, var(--fg) 4%, transparent);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .ob-glass-card label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .ob-glass-card input[type="text"] {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--fg);
+    font-size: 13px;
+    font-family: inherit;
+    box-sizing: border-box;
+  }
+  .ob-glass-card input[type="text"]:focus { outline: 2px solid var(--link); border-color: transparent; }
+  .ob-feed-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 12px;
+  }
+  .ob-feed-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .ob-feed-list li:last-child { border-bottom: none; }
+  .ob-feed-list .ob-feed-name { font-weight: 500; color: var(--fg); }
+  .ob-feed-list .ob-feed-url { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
+  .ob-feed-list button {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 2px 6px;
+  }
+  .ob-feed-list button:hover { color: var(--fg); }
+  .ob-feed-add {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .ob-feed-add input { flex: 1; }
+  .ob-feed-add button {
+    padding: 7px 14px;
+    background: var(--link);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .ob-feed-add button:disabled { opacity: 0.5; cursor: default; }
+  .ob-hint-list {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 12px;
+    line-height: 1.8;
+  }
+  .ob-hint-list strong { color: var(--fg); display: inline-block; width: 90px; }
+  .ob-method {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .ob-method:last-child { border-bottom: none; }
+  .ob-method-icon {
+    font-size: 20px;
+    width: 28px;
+    text-align: center;
+    flex-shrink: 0;
+    padding-top: 2px;
+  }
+  .ob-method-title { font-weight: 500; color: var(--fg); }
+  .ob-method-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .ob-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+  }
+  .ob-toggle-row label { margin-bottom: 0; flex: 1; }
+  .ob-toggle-row .ob-toggle-desc { font-size: 12px; color: var(--muted); margin-top: 2px; font-weight: normal; }
+  .ob-shortcuts {
     display: grid;
     grid-template-columns: auto 1fr;
     gap: 6px 14px;
     margin: 16px 0;
     font-size: 13px;
   }
-  .onboarding-shortcuts kbd {
+  .ob-shortcuts kbd {
     background: var(--code-bg);
     border: 1px solid var(--border);
     border-radius: 3px;
@@ -1405,23 +1537,31 @@
     font-family: inherit;
     text-align: center;
   }
-  .onboarding-shortcuts span {
-    color: var(--fg);
+  .ob-shortcuts span { color: var(--fg); }
+  .ob-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 24px;
+    gap: 12px;
   }
-  .onboarding-dismiss {
-    display: block;
-    margin: 20px auto 0;
+  .ob-nav button {
     padding: 8px 24px;
-    background: var(--fg);
-    color: var(--bg);
-    border: none;
     border-radius: 6px;
     font-size: 14px;
     cursor: pointer;
+    font-family: inherit;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--fg);
   }
-  .onboarding-dismiss:hover {
-    opacity: 0.85;
+  .ob-nav button:hover { background: var(--sidebar-active); }
+  .ob-nav .ob-primary {
+    background: var(--fg);
+    color: var(--bg);
+    border-color: var(--fg);
   }
+  .ob-nav .ob-primary:hover { opacity: 0.85; background: var(--fg); }
 
   /* Highlights */
   mark.pr-highlight {
@@ -2770,25 +2910,8 @@
 
 </div>
 
-<div class="onboarding-overlay" id="onboarding" style="display:none" onclick="dismissOnboarding(event)" role="dialog" aria-modal="true" aria-label="Welcome to PullRead">
-  <div class="onboarding-card" onclick="event.stopPropagation()">
-    <h2>Welcome to PullRead</h2>
-    <p>Browse your synced articles in a clean, distraction-free reader. Select text to highlight passages, or add notes to articles. Use the sidebar to search and select articles, or customize the theme and font above.</p>
-    <div class="onboarding-shortcuts">
-      <kbd>j</kbd> / <kbd>&rarr;</kbd> <span>Next article</span>
-      <kbd>k</kbd> / <kbd>&larr;</kbd> <span>Previous article</span>
-      <kbd>&uarr;</kbd> <kbd>&darr;</kbd> <span>Scroll (jumps articles at edges)</span>
-      <kbd>/</kbd> <span>Search articles</span>
-      <kbd>[</kbd> <span>Toggle sidebar</span>
-      <kbd>h</kbd> <span>Highlight selected text</span>
-      <kbd>n</kbd> <span>Toggle article notes</span>
-      <kbd>f</kbd> <span>Toggle focus mode</span>
-      <kbd>p</kbd> <span>Print article</span>
-      <kbd>Space</kbd> <span>Play / pause audio</span>
-      <kbd>Esc</kbd> <span>Clear search</span>
-    </div>
-    <button class="onboarding-dismiss" onclick="dismissOnboarding()">Got it</button>
-  </div>
+<div class="onboarding-overlay" id="onboarding" style="display:none" role="dialog" aria-modal="true" aria-label="Welcome to PullRead">
+  <div class="onboarding-card" id="onboarding-card"></div>
 </div>
 
 <script>
@@ -3020,6 +3143,12 @@ function showSettingsPage() {
     + '</select></div>';
   html += '</div>';
 
+  // ---- Feeds & Sync section (placeholder, loaded async) ----
+  html += '<div class="settings-section" id="settings-feeds">';
+  html += '<h2>Feeds &amp; Sync</h2>';
+  html += '<p style="color:var(--muted);font-size:13px">Loading feed configuration...</p>';
+  html += '</div>';
+
   // ---- Voice Playback section (placeholder, loaded async) ----
   html += '<div class="settings-section" id="settings-voice">';
   html += '<h2>Voice Playback</h2>';
@@ -3045,6 +3174,67 @@ function showSettingsPage() {
 
   content.innerHTML = html;
   document.getElementById('content-pane').scrollTop = 0;
+
+  // Load Feeds & Sync config async
+  if (serverMode) {
+    fetch('/api/config').then(function(r) { return r.json(); }).then(function(cfg) {
+      var sec = document.getElementById('settings-feeds');
+      if (!sec) return;
+      var feeds = cfg.feeds || {};
+      var feedNames = Object.keys(feeds);
+
+      var h = '<h2>Feeds &amp; Sync</h2>';
+      h += '<p style="font-size:13px;color:var(--muted);margin-bottom:16px">Manage your RSS feeds, output folder, and sync options.</p>';
+
+      // Output path
+      h += '<div class="settings-row"><div><label>Output Folder</label><div class="settings-desc">Where articles are saved as markdown</div></div>';
+      h += '<input type="text" id="sp-output-path" value="' + escapeHtml(cfg.outputPath || '') + '" placeholder="~/Documents/PullRead" style="min-width:240px">';
+      h += '</div>';
+
+      // Sync interval
+      h += '<div class="settings-row"><div><label>Auto-sync</label><div class="settings-desc">How often to check for new articles</div></div>';
+      h += '<select id="sp-sync-interval">';
+      var intervals = [['30m','Every 30 min'],['1h','Every hour'],['4h','Every 4 hours'],['12h','Every 12 hours'],['manual','Manual only']];
+      for (var ii = 0; ii < intervals.length; ii++) {
+        h += '<option value="' + intervals[ii][0] + '"' + (cfg.syncInterval === intervals[ii][0] ? ' selected' : '') + '>' + intervals[ii][1] + '</option>';
+      }
+      h += '</select></div>';
+
+      // Browser cookies
+      h += '<div class="settings-row"><div><label>Chrome Cookies</label><div class="settings-desc">Use Chrome login cookies for paywalled sites (local only)</div></div>';
+      h += '<input type="checkbox" id="sp-cookies"' + (cfg.useBrowserCookies ? ' checked' : '') + '>';
+      h += '</div>';
+
+      // Feed list
+      h += '<div style="margin-top:16px"><label style="font-size:13px;font-weight:500;margin-bottom:8px;display:block">Feeds (' + feedNames.length + ')</label>';
+      if (feedNames.length > 0) {
+        h += '<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">';
+        for (var fi = 0; fi < feedNames.length; fi++) {
+          var fn = feedNames[fi];
+          h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:' + (fi < feedNames.length - 1 ? '1px solid var(--border)' : 'none') + ';font-size:13px">'
+            + '<div><div style="font-weight:500">' + escapeHtml(fn) + '</div><div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px">' + escapeHtml(feeds[fn]) + '</div></div>'
+            + '<button onclick="settingsRemoveFeed(\'' + escapeHtml(fn.replace(/'/g, "\\'")) + '\')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:2px 6px" title="Remove">&times;</button>'
+            + '</div>';
+        }
+        h += '</div>';
+      }
+      h += '<div style="display:flex;gap:8px;margin-top:10px">'
+        + '<input type="text" id="sp-new-feed" placeholder="Add feed URL or blog URL\u2026" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;font-family:inherit" onkeydown="if(event.key===\'Enter\')settingsAddFeed()">'
+        + '<button class="btn-primary" onclick="settingsAddFeed()" id="sp-add-feed-btn" style="font-size:13px;padding:6px 14px">Add</button>'
+        + '</div>';
+      h += '</div>';
+
+      h += '<div class="settings-row" style="justify-content:flex-end;padding-top:12px">';
+      h += '<button class="btn-primary" onclick="settingsPageSaveConfig()" style="font-size:13px;padding:6px 16px">Save Feed Settings</button>';
+      h += '</div>';
+
+      sec.innerHTML = h;
+      sec._configData = cfg;
+    }).catch(function() {
+      var sec = document.getElementById('settings-feeds');
+      if (sec) sec.innerHTML = '<h2>Feeds &amp; Sync</h2><p style="color:var(--muted);font-size:13px">Could not load feed configuration.</p>';
+    });
+  }
 
   // Load TTS settings async
   if (serverMode) {
@@ -3273,6 +3463,60 @@ function settingsPageSaveLLM() {
       alert('Failed to save AI settings.');
     }
   });
+}
+
+// ---- Feeds & Sync settings ----
+function settingsPageSaveConfig() {
+  var outputPath = document.getElementById('sp-output-path').value.trim();
+  var syncInterval = document.getElementById('sp-sync-interval').value;
+  var cookies = document.getElementById('sp-cookies').checked;
+  var sec = document.getElementById('settings-feeds');
+  var cfg = sec ? sec._configData : {};
+  var feeds = cfg.feeds || {};
+
+  fetch('/api/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ outputPath: outputPath, feeds: feeds, syncInterval: syncInterval, useBrowserCookies: cookies })
+  }).then(function(r) {
+    if (r.ok) showSettingsPage();
+    else alert('Failed to save feed settings.');
+  });
+}
+
+async function settingsAddFeed() {
+  var input = document.getElementById('sp-new-feed');
+  var url = (input.value || '').trim();
+  if (!url) return;
+  if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url;
+  var btn = document.getElementById('sp-add-feed-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Adding\u2026'; }
+  try {
+    var r = await fetch('/api/feed-discover?url=' + encodeURIComponent(url));
+    var result = await r.json();
+    var feedUrl = result.feedUrl || url;
+    var title = result.title || feedUrl.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+    var sec = document.getElementById('settings-feeds');
+    if (sec && sec._configData) {
+      if (!sec._configData.feeds) sec._configData.feeds = {};
+      sec._configData.feeds[title] = feedUrl;
+    }
+  } catch (e) {
+    var sec2 = document.getElementById('settings-feeds');
+    if (sec2 && sec2._configData) {
+      if (!sec2._configData.feeds) sec2._configData.feeds = {};
+      sec2._configData.feeds[url] = url;
+    }
+  }
+  showSettingsPage();
+}
+
+function settingsRemoveFeed(name) {
+  var sec = document.getElementById('settings-feeds');
+  if (sec && sec._configData && sec._configData.feeds) {
+    delete sec._configData.feeds[name];
+  }
+  showSettingsPage();
 }
 
 function settingsBackup() {
@@ -6452,17 +6696,200 @@ document.getElementById('file-list').addEventListener('scroll', function() {
   }
 });
 
-// Onboarding overlay
-function dismissOnboarding(e) {
-  if (e && e.target && e.target.id !== 'onboarding' && e.target.className !== 'onboarding-dismiss') return;
+// ---- Onboarding Wizard ----
+let _obStep = 0;
+let _obFeeds = {}; // { name: url }
+let _obOutputPath = '~/Documents/PullRead';
+let _obCookies = false;
+let _obFeedLoading = false;
+const OB_TOTAL_STEPS = 5;
+
+function dismissOnboarding() {
   document.getElementById('onboarding').style.display = 'none';
   localStorage.setItem('pr-onboarded', '1');
 }
 
-function showOnboardingIfNeeded() {
-  if (!localStorage.getItem('pr-onboarded')) {
-    document.getElementById('onboarding').style.display = 'flex';
+async function showOnboardingIfNeeded() {
+  if (localStorage.getItem('pr-onboarded')) return;
+  // Check if already configured
+  try {
+    var r = await fetch('/api/config');
+    var cfg = await r.json();
+    if (cfg.configured) {
+      localStorage.setItem('pr-onboarded', '1');
+      return;
+    }
+    if (cfg.outputPath) _obOutputPath = cfg.outputPath;
+    if (cfg.feeds) _obFeeds = cfg.feeds;
+    if (cfg.useBrowserCookies) _obCookies = cfg.useBrowserCookies;
+  } catch (e) {}
+  _obStep = 0;
+  document.getElementById('onboarding').style.display = 'flex';
+  renderOnboardingStep();
+}
+
+function renderOnboardingStep() {
+  var card = document.getElementById('onboarding-card');
+  var progress = '<div class="ob-progress">';
+  for (var i = 0; i < OB_TOTAL_STEPS; i++) {
+    progress += '<div class="ob-progress-bar' + (i <= _obStep ? ' active' : '') + '"></div>';
   }
+  progress += '</div>';
+
+  var html = progress;
+
+  if (_obStep === 0) {
+    html += '<div style="text-align:center;padding:12px 0">'
+      + '<div style="font-size:48px;margin-bottom:12px">&#128218;</div>'
+      + '<h2>Welcome to PullRead</h2>'
+      + '<p class="ob-subtitle">Save articles from your bookmark services as clean, local markdown files. Connect Instapaper, Pinboard, Raindrop, or any RSS feed.</p>'
+      + '<div class="ob-features">'
+      + '<span class="ob-feature-pill">&#128278; Bookmark sync</span>'
+      + '<span class="ob-feature-pill">&#128228; Share Extension</span>'
+      + '<span class="ob-feature-pill">&#128196; Markdown files</span>'
+      + '<span class="ob-feature-pill">&#10024; AI summaries</span>'
+      + '</div>'
+      + '</div>';
+  } else if (_obStep === 1) {
+    html += '<h2>Choose Output Folder</h2>'
+      + '<p class="ob-subtitle">Synced articles are saved as markdown here. A cloud-synced folder like Dropbox or iCloud works great.</p>'
+      + '<div class="ob-glass-card">'
+      + '<label>Output path</label>'
+      + '<input type="text" id="ob-output-path" value="' + escapeHtml(_obOutputPath) + '" placeholder="~/Documents/PullRead">'
+      + '<div style="font-size:11px;color:var(--muted);margin-top:6px">Default: ~/Documents/PullRead</div>'
+      + '</div>';
+  } else if (_obStep === 2) {
+    var feedNames = Object.keys(_obFeeds);
+    html += '<h2>Connect Your Bookmarks</h2>'
+      + '<p class="ob-subtitle">Paste the RSS feed URL from your bookmark service or a blog URL. PullRead auto-discovers feeds.</p>'
+      + '<div class="ob-glass-card">';
+    if (feedNames.length > 0) {
+      html += '<ul class="ob-feed-list">';
+      for (var fi = 0; fi < feedNames.length; fi++) {
+        var fn = feedNames[fi];
+        html += '<li><div><div class="ob-feed-name">' + escapeHtml(fn) + '</div><div class="ob-feed-url">' + escapeHtml(_obFeeds[fn]) + '</div></div>'
+          + '<button onclick="obRemoveFeed(\'' + escapeHtml(fn.replace(/'/g, "\\'")) + '\')" title="Remove">&times;</button></li>';
+      }
+      html += '</ul>';
+    }
+    html += '<div class="ob-feed-add">'
+      + '<input type="text" id="ob-feed-url" placeholder="Paste feed URL or blog URL\u2026" onkeydown="if(event.key===\'Enter\')obAddFeed()">'
+      + '<button onclick="obAddFeed()" id="ob-add-btn"' + (_obFeedLoading ? ' disabled' : '') + '>' + (_obFeedLoading ? 'Adding\u2026' : 'Add') + '</button>'
+      + '</div>'
+      + '</div>'
+      + '<div class="ob-hint-list">'
+      + '<div><strong>Instapaper</strong> Settings &rarr; Export &rarr; RSS Feed URL</div>'
+      + '<div><strong>Pinboard</strong> pinboard.in/feeds/u:USERNAME/</div>'
+      + '<div><strong>Raindrop</strong> Collection &rarr; Share &rarr; RSS Feed</div>'
+      + '<div><strong>Any blog</strong> Paste the URL and PullRead finds the feed</div>'
+      + '</div>';
+  } else if (_obStep === 3) {
+    html += '<h2>Saving Articles</h2>'
+      + '<p class="ob-subtitle">There are several ways to get articles into PullRead.</p>'
+      + '<div class="ob-glass-card">'
+      + '<div class="ob-method"><div class="ob-method-icon">&#128225;</div><div><div class="ob-method-title">RSS Feeds</div><div class="ob-method-desc">Your primary source. Feeds sync automatically on a schedule you set in Settings.</div></div></div>'
+      + '<div class="ob-method"><div class="ob-method-icon">&#128228;</div><div><div class="ob-method-title">Share Extension</div><div class="ob-method-desc">In Safari or any app, tap Share &rarr; Save to PullRead. Queued for next sync.</div></div></div>'
+      + '<div class="ob-method"><div class="ob-method-icon">&#128433;</div><div><div class="ob-method-title">Services Menu</div><div class="ob-method-desc">Select any URL, then right-click &rarr; Services &rarr; Save to PullRead.</div></div></div>'
+      + '<div class="ob-method"><div class="ob-method-icon">&#9000;</div><div><div class="ob-method-title">Keyboard Shortcuts</div><div class="ob-method-desc">Navigate, highlight, and listen to articles without a mouse.</div></div></div>'
+      + '</div>'
+      + '<div class="ob-glass-card">'
+      + '<div class="ob-toggle-row">'
+      + '<label><strong>Use Chrome Cookies</strong><div class="ob-toggle-desc">Access paywalled sites using your Chrome login. Cookies stay local.</div></label>'
+      + '<input type="checkbox" id="ob-cookies"' + (_obCookies ? ' checked' : '') + ' onchange="_obCookies=this.checked">'
+      + '</div>'
+      + '</div>';
+  } else if (_obStep === 4) {
+    html += '<div style="text-align:center;padding:12px 0">'
+      + '<div style="font-size:48px;margin-bottom:12px">&#128640;</div>'
+      + '<h2>Ready to Go</h2>'
+      + '<p class="ob-subtitle">PullRead will fetch your bookmarked articles and save them as markdown. Sync anytime from the menu bar. Here are some keyboard shortcuts to get started:</p>'
+      + '</div>'
+      + '<div class="ob-shortcuts">'
+      + '<kbd>j</kbd> / <kbd>&rarr;</kbd> <span>Next article</span>'
+      + '<kbd>k</kbd> / <kbd>&larr;</kbd> <span>Previous article</span>'
+      + '<kbd>/</kbd> <span>Search articles</span>'
+      + '<kbd>[</kbd> <span>Toggle sidebar</span>'
+      + '<kbd>h</kbd> <span>Highlight selected text</span>'
+      + '<kbd>n</kbd> <span>Toggle article notes</span>'
+      + '<kbd>f</kbd> <span>Toggle focus mode</span>'
+      + '<kbd>Space</kbd> <span>Play / pause audio</span>'
+      + '</div>';
+  }
+
+  // Navigation
+  html += '<div class="ob-nav">';
+  if (_obStep > 0) {
+    html += '<button onclick="obBack()">Back</button>';
+  } else {
+    html += '<span></span>';
+  }
+  if (_obStep < OB_TOTAL_STEPS - 1) {
+    html += '<button class="ob-primary" onclick="obNext()">Next</button>';
+  } else {
+    html += '<button class="ob-primary" onclick="obFinish()">Get Started</button>';
+  }
+  html += '</div>';
+
+  card.innerHTML = html;
+}
+
+function obBack() {
+  if (_obStep > 0) { _obStep--; renderOnboardingStep(); }
+}
+
+function obNext() {
+  // Validate output path on step 1
+  if (_obStep === 1) {
+    var pathInput = document.getElementById('ob-output-path');
+    if (pathInput) _obOutputPath = pathInput.value.trim();
+    if (!_obOutputPath) { pathInput.focus(); return; }
+  }
+  if (_obStep < OB_TOTAL_STEPS - 1) { _obStep++; renderOnboardingStep(); }
+}
+
+async function obAddFeed() {
+  var input = document.getElementById('ob-feed-url');
+  var url = (input.value || '').trim();
+  if (!url) return;
+  if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url;
+  _obFeedLoading = true;
+  renderOnboardingStep();
+  try {
+    var r = await fetch('/api/feed-discover?url=' + encodeURIComponent(url));
+    var result = await r.json();
+    var feedUrl = result.feedUrl || url;
+    var title = result.title || feedUrl.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+    _obFeeds[title] = feedUrl;
+  } catch (e) {
+    _obFeeds[url] = url;
+  }
+  _obFeedLoading = false;
+  renderOnboardingStep();
+}
+
+function obRemoveFeed(name) {
+  delete _obFeeds[name];
+  renderOnboardingStep();
+}
+
+async function obFinish() {
+  // Save config via API
+  try {
+    await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        outputPath: _obOutputPath,
+        feeds: _obFeeds,
+        useBrowserCookies: _obCookies
+      })
+    });
+  } catch (e) {
+    console.error('Failed to save onboarding config:', e);
+  }
+  dismissOnboarding();
+  // Refresh article list after config is saved
+  setTimeout(function() { refreshArticleList(); }, 500);
 }
 
 // ---- Notebook ---- (synthesis writing surface)

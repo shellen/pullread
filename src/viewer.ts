@@ -106,6 +106,7 @@ function listFiles(outputPath: string): FileMeta[] {
 
 // Annotations storage path
 const ANNOTATIONS_DIR = join(homedir(), '.config', 'pullread');
+const FEEDS_PATH = join(ANNOTATIONS_DIR, 'feeds.json');
 const HIGHLIGHTS_PATH = join(ANNOTATIONS_DIR, 'highlights.json');
 const NOTES_PATH = join(ANNOTATIONS_DIR, 'notes.json');
 const NOTEBOOKS_PATH = join(ANNOTATIONS_DIR, 'notebooks.json');
@@ -474,6 +475,47 @@ export function startViewer(outputPath: string, port = 7777): void {
         sendJson(res, { feedUrl: null, title: null });
       }
       return;
+    }
+
+    // App config API (feeds.json — output path, feeds, sync interval, browser cookies)
+    if (url.pathname === '/api/config') {
+      if (req.method === 'GET') {
+        const config = loadJsonFile(FEEDS_PATH) as Record<string, unknown>;
+        sendJson(res, {
+          outputPath: config.outputPath || '',
+          feeds: config.feeds || {},
+          syncInterval: config.syncInterval || '1h',
+          useBrowserCookies: !!config.useBrowserCookies,
+          configured: !!(config.outputPath && config.feeds && Object.keys(config.feeds as object).length > 0)
+        });
+        return;
+      }
+      if (req.method === 'POST') {
+        try {
+          const body = JSON.parse(await readBody(req));
+          const existing = loadJsonFile(FEEDS_PATH);
+          // Merge incoming fields with existing config
+          if (body.outputPath !== undefined) existing.outputPath = body.outputPath;
+          if (body.feeds !== undefined) existing.feeds = body.feeds;
+          if (body.syncInterval !== undefined) existing.syncInterval = body.syncInterval;
+          if (body.useBrowserCookies !== undefined) existing.useBrowserCookies = body.useBrowserCookies;
+          saveJsonFile(FEEDS_PATH, existing);
+
+          // Create output directory if it doesn't exist
+          if (existing.outputPath) {
+            const expandedPath = (existing.outputPath as string).replace(/^~/, homedir());
+            if (!existsSync(expandedPath)) {
+              mkdirSync(expandedPath, { recursive: true });
+            }
+          }
+
+          sendJson(res, { ok: true });
+        } catch (err) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid request body' }));
+        }
+        return;
+      }
     }
 
     // Settings API (LLM config)
