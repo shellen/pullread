@@ -1,0 +1,766 @@
+// Rendering
+function renderDashboard() {
+  const dash = document.getElementById('dashboard');
+  if (!dash) return;
+
+  const empty = document.getElementById('empty-state');
+  const content = document.getElementById('content');
+  empty.style.display = '';
+  if (content) content.style.display = 'none';
+
+  if (allFiles.length === 0) {
+    dash.innerHTML = '<div class="dash-empty-hint"><p class="hint">No articles yet</p><p class="subhint">Add RSS feeds in the tray app, or drop a .md file here</p></div>';
+    return;
+  }
+
+  let html = '';
+
+  // Greeting
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const totalArticles = allFiles.length;
+  const unreadCount = allFiles.filter(f => !readArticles.has(f.filename)).length;
+  html += '<div class="dash-greeting">';
+  html += '<h1>' + greeting + '</h1>';
+  html += '<p>' + totalArticles + ' articles' + (unreadCount > 0 ? ' &middot; ' + unreadCount + ' unread' : '') + '</p>';
+  html += '</div>';
+
+  // Continue Reading — articles with saved scroll position (partially read)
+  const positions = JSON.parse(localStorage.getItem('pr-scroll-positions') || '{}');
+  const continueReading = allFiles.filter(f => {
+    const pos = positions[f.filename];
+    return pos && pos.pct > 0.05 && pos.pct < 0.9; // partially read
+  }).sort((a, b) => (positions[b.filename].ts || 0) - (positions[a.filename].ts || 0)).slice(0, 10);
+
+  if (continueReading.length > 0) {
+    html += '<div class="dash-section">';
+    html += '<div class="dash-section-header">';
+    html += '<span class="dash-section-title"><svg viewBox="0 0 384 512"><use href="#i-book"/></svg> Continue Reading <span class="dash-section-count">(' + continueReading.length + ')</span></span>';
+    html += '</div>';
+    html += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards">';
+    for (const f of continueReading) {
+      html += dashCardHtml(f, positions[f.filename]?.pct);
+    }
+    html += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
+  }
+
+  // Latest Reviews
+  const reviews = allFiles.filter(f => f.feed === 'weekly-review' || f.feed === 'daily-review' || f.domain === 'pullread').slice(0, 5);
+  if (reviews.length > 0) {
+    html += '<div class="dash-section">';
+    html += '<div class="dash-section-header">';
+    html += '<span class="dash-section-title"><svg viewBox="0 0 512 512"><use href="#i-wand"/></svg> Reviews</span>';
+    html += '</div>';
+    html += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards">';
+    for (const f of reviews) {
+      const isWeekly = f.feed === 'weekly-review';
+      const typeLabel = isWeekly ? 'Weekly' : 'Daily';
+      const date = f.bookmarked ? f.bookmarked.slice(0, 10) : '';
+      html += '<div class="dash-review-card" onclick="dashLoadArticle(\'' + escapeHtml(f.filename) + '\')">';
+      html += '<div class="dash-review-title">' + escapeHtml(f.title) + '</div>';
+      html += '<div class="dash-review-meta">' + typeLabel + ' Review' + (date ? ' &middot; ' + date : '') + '</div>';
+      if (f.excerpt) html += '<div class="dash-review-excerpt">' + escapeHtml(f.excerpt) + '</div>';
+      html += '</div>';
+    }
+    html += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
+  }
+
+  // Favorites
+  const favorites = allFiles.filter(f => allNotesIndex[f.filename]?.isFavorite);
+  if (favorites.length > 0) {
+    html += '<div class="dash-section">';
+    html += '<div class="dash-section-header">';
+    html += '<span class="dash-section-title"><svg viewBox="0 0 512 512"><use href="#i-heart"/></svg> Favorites <span class="dash-section-count">(' + favorites.length + ')</span></span>';
+    html += '</div>';
+    html += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards">';
+    for (const f of favorites.slice(0, 10)) {
+      html += dashCardHtml(f);
+    }
+    html += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
+  }
+
+  // Recent — latest unread articles
+  const recent = allFiles.filter(f => !readArticles.has(f.filename) && f.feed !== 'weekly-review' && f.feed !== 'daily-review' && f.domain !== 'pullread').slice(0, 20);
+  if (recent.length > 0) {
+    html += '<div class="dash-section">';
+    html += '<div class="dash-section-header">';
+    html += '<span class="dash-section-title"><svg viewBox="0 0 448 512"><use href="#i-calendar"/></svg> Recent <span class="dash-section-count">(' + recent.length + ')</span></span>';
+    if (unreadCount > recent.length) {
+      html += '<button class="dash-view-all" onclick="document.getElementById(\'search\').focus()">View all ' + unreadCount + ' &rsaquo;</button>';
+    }
+    html += '</div>';
+    html += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards">';
+    for (const f of recent) {
+      html += dashCardHtml(f);
+    }
+    html += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
+  }
+
+  dash.innerHTML = html;
+  // Initialize chevron visibility after DOM is populated
+  requestAnimationFrame(initDashChevrons);
+}
+
+function dashCardHtml(f, progressPct) {
+  const idx = displayFiles.findIndex(d => d.filename === f.filename);
+  const onclick = idx >= 0 ? 'loadFile(' + idx + ')' : 'dashLoadArticle(\'' + escapeHtml(f.filename) + '\')';
+  const domain = f.domain || '';
+  const favicon = domain ? 'https://www.google.com/s2/favicons?domain=' + encodeURIComponent(domain) + '&sz=32' : '';
+  const date = f.bookmarked ? f.bookmarked.slice(0, 10) : '';
+
+  let html = '<div class="dash-card" onclick="' + onclick + '">';
+
+  // Image or placeholder
+  if (f.image) {
+    html += '<img class="dash-card-img" src="' + escapeHtml(f.image) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<div class=dash-card-img-placeholder><svg style=width:32px;height:32px;fill:currentColor viewBox=&quot;0 0 448 512&quot;><use href=&quot;#i-book&quot;/></svg></div>\'">';
+  } else {
+    html += '<div class="dash-card-img-placeholder"><svg style="width:32px;height:32px;fill:currentColor" viewBox="0 0 448 512"><use href="#i-book"/></svg></div>';
+  }
+
+  html += '<div class="dash-card-body">';
+
+  // Meta row: favicon, domain, feed badge
+  html += '<div class="dash-card-meta">';
+  if (favicon) html += '<img src="' + escapeHtml(favicon) + '" alt="" loading="lazy">';
+  if (domain) html += '<span>' + escapeHtml(domain) + '</span>';
+  if (f.feed && f.feed !== domain) html += '<span class="dash-card-badge">' + escapeHtml(f.feed) + '</span>';
+  html += '</div>';
+
+  // Title
+  html += '<div class="dash-card-title">' + escapeHtml(f.title) + '</div>';
+
+  // Excerpt
+  if (f.excerpt) {
+    html += '<div class="dash-card-excerpt">' + escapeHtml(f.excerpt) + '</div>';
+  }
+
+  // Progress bar for continue reading
+  if (progressPct !== undefined && progressPct > 0) {
+    html += '<div class="dash-card-progress"><div class="dash-card-progress-fill" style="width:' + Math.round(progressPct * 100) + '%"></div></div>';
+  }
+
+  html += '</div></div>';
+  return html;
+}
+
+function goHome() {
+  _sidebarView = 'library'; syncSidebarTabs();
+  activeFile = null;
+  document.title = 'PullRead';
+  renderDashboard();
+}
+
+function dashScrollLeft(btn) {
+  const cards = btn.closest('.dash-cards-wrap').querySelector('.dash-cards');
+  cards.scrollBy({ left: -300, behavior: 'smooth' });
+}
+
+function dashScrollRight(btn) {
+  const cards = btn.closest('.dash-cards-wrap').querySelector('.dash-cards');
+  cards.scrollBy({ left: 300, behavior: 'smooth' });
+}
+
+function initDashChevrons() {
+  document.querySelectorAll('.dash-cards').forEach(cards => {
+    const wrap = cards.closest('.dash-cards-wrap');
+    if (!wrap) return;
+    const leftBtn = wrap.querySelector('.dash-chevron.left');
+    const rightBtn = wrap.querySelector('.dash-chevron.right');
+
+    function updateChevrons() {
+      const hasOverflow = cards.scrollWidth > cards.clientWidth + 8;
+      if (leftBtn) leftBtn.classList.toggle('visible', hasOverflow && cards.scrollLeft > 8);
+      if (rightBtn) rightBtn.classList.toggle('visible', hasOverflow && cards.scrollLeft < cards.scrollWidth - cards.clientWidth - 8);
+    }
+    cards.addEventListener('scroll', updateChevrons);
+    updateChevrons();
+    // Recheck after images load
+    setTimeout(updateChevrons, 500);
+  });
+}
+
+function dashLoadArticle(filename) {
+  const idx = displayFiles.findIndex(f => f.filename === filename);
+  if (idx >= 0) {
+    loadFile(idx);
+  } else {
+    // File might be filtered out — search all files
+    const allIdx = allFiles.findIndex(f => f.filename === filename);
+    if (allIdx >= 0) {
+      // Clear search and reload
+      document.getElementById('search').value = '';
+      filterFiles();
+      const newIdx = displayFiles.findIndex(f => f.filename === filename);
+      if (newIdx >= 0) loadFile(newIdx);
+    }
+  }
+}
+
+function renderArticle(text, filename) {
+  const { meta, body } = parseFrontmatter(text);
+  const content = document.getElementById('content');
+  const empty = document.getElementById('empty-state');
+
+  empty.style.display = 'none';
+  content.style.display = 'block';
+
+  let html = '';
+
+  // Article header: title, author, date, domain, actions
+  html += '<div class="article-header">';
+  if (meta && meta.title) {
+    html += '<h1>' + escapeHtml(meta.title) + '</h1>';
+  }
+  html += '<div class="article-byline">';
+  const bylineParts = [];
+  if (meta && meta.author) {
+    // Truncate overly long bylines (e.g. full author bios from PDFs/arxiv)
+    var authorText = meta.author;
+    if (authorText.length > 80) {
+      // Try to cut at first sentence boundary or period
+      var cutoff = authorText.indexOf('. ');
+      if (cutoff > 10 && cutoff < 80) authorText = authorText.slice(0, cutoff);
+      else authorText = authorText.slice(0, 80).replace(/\s+\S*$/, '') + '\u2026';
+    }
+    bylineParts.push('<span class="author">' + escapeHtml(authorText) + '</span>');
+  }
+  if (meta && meta.domain) bylineParts.push('<a href="' + escapeHtml(meta.url || '') + '" target="_blank">' + escapeHtml(meta.domain) + '</a>');
+  if (meta && meta.bookmarked) bylineParts.push(escapeHtml(meta.bookmarked.slice(0, 10)));
+  html += bylineParts.join('<span class="sep">&middot;</span>');
+  // Read time will be inserted after rendering
+  html += '</div>';
+
+  // Detect review/summary articles where Summarize doesn't make sense
+  const isReviewArticle = meta && (meta.feed === 'weekly-review' || meta.feed === 'daily-review' || meta.domain === 'pullread');
+
+  // Action buttons row
+  html += '<div class="article-actions">';
+  const isFav = articleNotes.isFavorite;
+  html += '<button onclick="toggleFavoriteFromHeader(this)" class="' + (isFav ? 'active-fav' : '') + '" aria-label="' + (isFav ? 'Remove from favorites' : 'Add to favorites') + '" aria-pressed="' + isFav + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg> Favorite</button>';
+  html += '<button onclick="toggleNotesFromHeader()" aria-label="Toggle notes panel"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-pen"/></svg> Notes</button>';
+  if (!isReviewArticle) {
+    html += '<button onclick="summarizeArticle()" id="summarize-btn" aria-label="Summarize article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Summarize</button>';
+  }
+  html += '<button onclick="addCurrentToTTSQueue()" aria-label="Listen to article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> Listen</button>';
+  if (meta && meta.url) {
+    html += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg> Share</button></div>';
+  }
+  html += '<button onclick="markCurrentAsUnread()" aria-label="Mark as unread"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-eye-slash"/></svg> Unread</button>';
+  html += '</div>';
+  // Show notebook back-references
+  var nbRefs = Object.values(_notebooks || {}).filter(function(nb) { return nb.sources && nb.sources.indexOf(filename) >= 0; });
+  if (nbRefs.length) {
+    html += '<div style="margin-top:6px">';
+    for (var nbi = 0; nbi < nbRefs.length; nbi++) {
+      html += '<span class="notebook-ref" onclick="openNotebookEditor(\'' + nbRefs[nbi].id + '\')"><svg class="icon icon-sm" style="vertical-align:-1px"><use href="#i-pen"/></svg> ' + escapeHtml(nbRefs[nbi].title || 'Untitled notebook') + '</span>';
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // Show existing summary if present in frontmatter
+  if (meta && meta.summary) {
+    const sp = meta.summaryProvider || '';
+    const sm = meta.summaryModel || '';
+    html += '<div class="article-summary"><div class="summary-header"><div class="summary-header-left">'
+      + summaryBadgesHtml(sp, sm)
+      + '</div><span class="summary-actions"><button onclick="hideSummary()" title="Hide summary"><svg class="icon icon-sm"><use href="#i-xmark"/></svg></button></span></div>'
+      + escapeHtml(meta.summary) + '</div>';
+  }
+
+  // YouTube embed: detect from frontmatter and inject responsive iframe
+  const isYouTube = meta && meta.domain && /youtube\.com|youtu\.be|m\.youtube\.com/.test(meta.domain);
+  if (isYouTube && meta.url) {
+    var ytId = null;
+    try {
+      var ytUrl = new URL(meta.url);
+      if (ytUrl.hostname === 'youtu.be') ytId = ytUrl.pathname.slice(1).split('/')[0];
+      else if (ytUrl.searchParams.get('v')) ytId = ytUrl.searchParams.get('v');
+      else { var em = ytUrl.pathname.match(/\/(embed|v)\/([^/?]+)/); if (em) ytId = em[2]; }
+    } catch {}
+    if (ytId) {
+      html += '<div class="yt-embed"><iframe src="https://www.youtube.com/embed/' + encodeURIComponent(ytId)
+        + '" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy" title="Embedded video"></iframe></div>';
+    }
+  }
+
+  // Strip the leading H1 from markdown body if it matches the title (avoid duplication)
+  let articleBody = cleanMarkdown(body);
+  if (meta && meta.title) {
+    var h1Match = articleBody.match(/^\s*#\s+(.+)\s*\n/);
+    if (h1Match) {
+      var normalize = function(s) { return s.toLowerCase().replace(/[\u2018\u2019\u201C\u201D]/g, "'").replace(/[^a-z0-9]/g, ''); };
+      // Strip if title matches, or if it's a review (title always duplicated in body)
+      if (normalize(h1Match[1]) === normalize(meta.title) || isReviewArticle) {
+        articleBody = articleBody.slice(h1Match[0].length);
+      }
+    }
+  }
+
+  // Strip the YouTube thumbnail link from body when we already injected an embed
+  if (isYouTube) {
+    articleBody = articleBody.replace(/\[!\[.*?\]\(https:\/\/img\.youtube\.com\/vi\/[^)]*\)\]\([^)]*\)\s*/g, '');
+  }
+
+  html += marked.parse(articleBody);
+
+  // Deduplicate images: remove consecutive/nearby img tags with the same src
+  html = (function dedupeImages(h) {
+    const div = document.createElement('div');
+    div.innerHTML = h;
+    const imgs = Array.from(div.querySelectorAll('img'));
+    const seen = new Set();
+    for (const img of imgs) {
+      const src = img.getAttribute('src');
+      if (!src) continue;
+      // Normalize: strip query params for dedup comparison
+      let key;
+      try { key = new URL(src).origin + new URL(src).pathname; } catch { key = src; }
+      if (seen.has(key)) {
+        // Remove the duplicate image (and its wrapping <p> or <a> if it's the only child)
+        const parent = img.parentElement;
+        if (parent && (parent.tagName === 'P' || parent.tagName === 'A') && parent.children.length === 1 && parent.textContent.trim() === '') {
+          parent.remove();
+        } else {
+          img.remove();
+        }
+      } else {
+        seen.add(key);
+      }
+    }
+    return div.innerHTML;
+  })(html);
+
+  // Convert YouTube thumbnail links into embedded video iframes (fallback for inline links)
+  html = html.replace(
+    /<a[^>]*href="(https?:\/\/(?:www\.|m\.)?youtube\.com\/watch\?v=([^"&]+)[^"]*|https?:\/\/youtu\.be\/([^"/?]+)[^"]*)"[^>]*>\s*<img[^>]*src="https:\/\/img\.youtube\.com\/vi\/[^"]*"[^>]*\/?>\s*<\/a>/gi,
+    function(match, url, id1, id2) {
+      var videoId = id1 || id2;
+      if (!videoId) return match;
+      return '<div class="yt-embed"><iframe src="https://www.youtube.com/embed/' + encodeURIComponent(videoId) + '" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy" title="Embedded video"></iframe></div>';
+    }
+  );
+
+  content.innerHTML = html;
+  document.title = (meta && meta.title) || filename || 'PullRead';
+
+  // Apply review-content class for link-blog styling on review articles
+  if (isReviewArticle) {
+    content.classList.add('review-content');
+  } else {
+    content.classList.remove('review-content');
+  }
+
+  // Post-process for accessibility
+  content.querySelectorAll('img:not([alt])').forEach(function(img) { img.setAttribute('alt', ''); });
+  content.querySelectorAll('img[alt=""]').forEach(function(img) { img.setAttribute('role', 'presentation'); });
+  content.querySelectorAll('table').forEach(function(table) {
+    if (!table.querySelector('thead')) {
+      var firstRow = table.querySelector('tr');
+      if (firstRow && firstRow.querySelectorAll('th').length > 0) {
+        firstRow.querySelectorAll('th').forEach(function(th) { th.setAttribute('scope', 'col'); });
+      }
+    }
+    table.setAttribute('role', 'table');
+  });
+  // Open article content links in new window
+  content.querySelectorAll('a[href]').forEach(function(a) {
+    var href = a.getAttribute('href');
+    if (href && !href.startsWith('#')) {
+      a.setAttribute('target', '_blank');
+      a.setAttribute('rel', 'noopener noreferrer');
+    }
+  });
+  // Wrap standalone images in links to their full-size source
+  content.querySelectorAll('img[src]').forEach(function(img) {
+    var parent = img.parentElement;
+    // Skip images already wrapped in a link
+    if (parent && parent.tagName === 'A') return;
+    var src = img.getAttribute('src');
+    if (!src || src.startsWith('data:')) return;
+    var a = document.createElement('a');
+    a.href = src;
+    a.setAttribute('target', '_blank');
+    a.setAttribute('rel', 'noopener noreferrer');
+    img.parentNode.insertBefore(a, img);
+    a.appendChild(img);
+  });
+  // Clean up leftover broken markdown artifacts (stray brackets, parenthesized URLs)
+  (function cleanBrokenFragments(root) {
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    var removals = [];
+    while (walker.nextNode()) {
+      var node = walker.currentNode;
+      var text = node.textContent;
+      // Remove text nodes that are just lone brackets
+      if (/^\s*[\[\]]\s*$/.test(text)) { removals.push(node); continue; }
+      // Remove text nodes that are just a parenthesized URL
+      if (/^\s*\(https?:\/\/[^)]+\)\s*$/.test(text)) { removals.push(node); continue; }
+      // Remove leading/trailing lone brackets in mixed text
+      var cleaned = text.replace(/^\s*\[\s*/, '').replace(/\s*\]\s*$/, '');
+      if (cleaned !== text) node.textContent = cleaned;
+    }
+    removals.forEach(function(n) {
+      var p = n.parentElement;
+      n.remove();
+      // Remove empty <p> tags left behind
+      if (p && p.tagName === 'P' && !p.textContent.trim() && !p.querySelector('img,a,iframe')) p.remove();
+    });
+  })(content);
+
+  // Add read time & word count to byline
+  const articleBodyText = content.textContent || '';
+  const { words, minutes } = calculateReadStats(articleBodyText);
+  const bylineEl = content.querySelector('.article-byline');
+  if (bylineEl && words > 50) {
+    const statsSpan = document.createElement('span');
+    statsSpan.className = 'read-stats';
+    if (bylineEl.children.length > 0) {
+      const sep = document.createElement('span');
+      sep.className = 'sep';
+      sep.innerHTML = '&middot;';
+      bylineEl.appendChild(sep);
+    }
+    statsSpan.innerHTML = minutes + ' min read<span class="stat-divider">&middot;</span>' + (words >= 1000 ? (words / 1000).toFixed(1) + 'k' : words) + ' words';
+    bylineEl.appendChild(statsSpan);
+  }
+
+  // Render diagrams (mermaid, d2) before highlighting
+  renderDiagrams();
+
+  // Apply syntax highlighting to code blocks
+  applySyntaxHighlighting();
+
+  // Generate table of contents
+  generateToc();
+
+  // Scroll to top
+  document.getElementById('content-pane').scrollTop = 0;
+
+  // Reset reading progress
+  updateReadingProgress();
+
+  // Clear margin notes
+  document.getElementById('margin-notes').innerHTML = '';
+
+  // Restore scroll position (after a tick so DOM is settled)
+  setTimeout(() => restoreScrollPosition(filename), 100);
+
+  // Update focus mode if active
+  if (focusModeActive) {
+    setTimeout(updateFocusMode, 200);
+  }
+}
+
+
+// ---- Reading Progress Bar ----
+function updateReadingProgress() {
+  const pane = document.getElementById('content-pane');
+  const bar = document.getElementById('reading-progress-bar');
+  if (!pane || !bar) return;
+  const scrollTop = pane.scrollTop;
+  const scrollHeight = pane.scrollHeight - pane.clientHeight;
+  const progress = scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0;
+  bar.style.width = Math.min(100, Math.max(0, progress)) + '%';
+}
+
+document.getElementById('content-pane').addEventListener('scroll', function() {
+  updateReadingProgress();
+  updateFocusMode();
+  updateTocActive();
+  saveScrollPosition();
+});
+
+// ---- Read Time & Word Count ----
+function calculateReadStats(text) {
+  const words = text.trim().split(/\s+/).filter(w => w.length > 0).length;
+  const wpm = 238; // average adult reading speed
+  const minutes = Math.ceil(words / wpm);
+  return { words, minutes };
+}
+
+function formatReadStats(words, minutes) {
+  const wordStr = words >= 1000 ? (words / 1000).toFixed(1) + 'k' : words.toString();
+  return '<span class="read-stats">' + minutes + ' min read<span class="stat-divider">&middot;</span>' + wordStr + ' words</span>';
+}
+
+// ---- Focus Mode ----
+let focusModeActive = false;
+let focusObserver = null;
+
+function toggleFocusMode() {
+  focusModeActive = !focusModeActive;
+  document.body.classList.toggle('focus-mode', focusModeActive);
+  document.getElementById('focus-btn').classList.toggle('active', focusModeActive);
+  localStorage.setItem('pr-focus', focusModeActive ? '1' : '0');
+  if (focusModeActive) {
+    updateFocusMode();
+  } else {
+    clearFocusClasses();
+  }
+}
+
+function clearFocusClasses() {
+  document.querySelectorAll('.focus-active, .focus-adjacent').forEach(el => {
+    el.classList.remove('focus-active', 'focus-adjacent');
+  });
+}
+
+function updateFocusMode() {
+  if (!focusModeActive) return;
+  const content = document.getElementById('content');
+  if (!content || content.style.display === 'none') return;
+
+  const pane = document.getElementById('content-pane');
+  const paneRect = pane.getBoundingClientRect();
+  // Shift the focus point near the top/bottom of the scroll so edge
+  // paragraphs still get highlighted instead of being permanently dimmed.
+  const scrollTop = pane.scrollTop;
+  const scrollBottom = pane.scrollHeight - pane.clientHeight - scrollTop;
+  let focusRatio = 0.4;
+  if (scrollTop < 200) focusRatio = 0.15;
+  else if (scrollBottom < 200) focusRatio = 0.7;
+  const centerY = paneRect.top + paneRect.height * focusRatio;
+
+  const blocks = content.querySelectorAll(':scope > p, :scope > blockquote, :scope > ul, :scope > ol, :scope > pre, :scope > h2, :scope > h3, :scope > h4, :scope > table');
+
+  clearFocusClasses();
+
+  let closest = null;
+  let closestDist = Infinity;
+
+  blocks.forEach(block => {
+    const rect = block.getBoundingClientRect();
+    const blockCenter = rect.top + rect.height / 2;
+    const dist = Math.abs(blockCenter - centerY);
+    if (dist < closestDist) {
+      closestDist = dist;
+      closest = block;
+    }
+  });
+
+  if (closest) {
+    closest.classList.add('focus-active');
+    // Also highlight immediate siblings for context
+    if (closest.previousElementSibling && !closest.previousElementSibling.classList.contains('article-header')) {
+      closest.previousElementSibling.classList.add('focus-adjacent');
+    }
+    if (closest.nextElementSibling && !closest.nextElementSibling.classList.contains('notes-panel')) {
+      closest.nextElementSibling.classList.add('focus-adjacent');
+    }
+  }
+}
+
+// ---- Code Syntax Highlighting ----
+const DIAGRAM_LANGUAGES = new Set(['mermaid', 'd2']);
+
+function applySyntaxHighlighting() {
+  if (typeof hljs === 'undefined') return;
+  const content = document.getElementById('content');
+  if (!content) return;
+
+  // Update highlight.js theme based on current app theme
+  updateHljsTheme();
+
+  content.querySelectorAll('pre code').forEach(block => {
+    // Skip if already highlighted
+    if (block.classList.contains('hljs')) return;
+    // Skip diagram languages — they get rendered by renderDiagrams()
+    const langMatch = block.className.match(/language-(\w+)/);
+    if (langMatch && DIAGRAM_LANGUAGES.has(langMatch[1])) return;
+
+    hljs.highlightElement(block);
+
+    // Add language label if detected
+    const detected = block.result && block.result.language;
+    const langName = (langMatch && langMatch[1]) || detected;
+    if (langName && langName !== 'undefined') {
+      const label = document.createElement('span');
+      label.className = 'code-lang-label';
+      label.textContent = langName;
+      block.closest('pre').appendChild(label);
+    }
+  });
+}
+
+// ---- Diagram Rendering (Mermaid + D2) ----
+function renderDiagrams() {
+  const content = document.getElementById('content');
+  if (!content) return;
+
+  // Mermaid: client-side rendering
+  const mermaidBlocks = content.querySelectorAll('pre code.language-mermaid');
+  if (mermaidBlocks.length > 0 && typeof mermaid !== 'undefined') {
+    mermaidBlocks.forEach((block, i) => {
+      const source = block.textContent;
+      const pre = block.closest('pre');
+      const container = document.createElement('div');
+      container.className = 'diagram-container mermaid';
+      container.id = 'mermaid-diagram-' + Date.now() + '-' + i;
+      container.textContent = source;
+      pre.replaceWith(container);
+    });
+    const theme = document.body.getAttribute('data-theme');
+    const isDark = theme === 'dark' || theme === 'high-contrast';
+    mermaid.initialize({ startOnLoad: false, theme: isDark ? 'dark' : 'default' });
+    mermaid.run();
+  }
+
+  // D2: server-side via kroki.io (no client-side renderer exists)
+  content.querySelectorAll('pre code.language-d2').forEach(block => {
+    const source = block.textContent;
+    const pre = block.closest('pre');
+    const container = document.createElement('div');
+    container.className = 'diagram-container diagram-d2';
+    container.innerHTML = '<span class="diagram-loading">Rendering d2 diagram\u2026</span>';
+    pre.replaceWith(container);
+
+    fetch('https://kroki.io/d2/svg', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: source
+    })
+    .then(function(r) { return r.ok ? r.text() : Promise.reject(r.status + ' ' + r.statusText); })
+    .then(function(svg) { container.innerHTML = svg; })
+    .catch(function(err) {
+      container.innerHTML = '<pre style="text-align:left"><code>' + escapeHtml(source) + '</code></pre>'
+        + '<p class="diagram-error-msg">D2 rendering unavailable: ' + escapeHtml(String(err)) + '</p>';
+    });
+  });
+}
+
+function updateHljsTheme() {
+  const theme = document.body.getAttribute('data-theme');
+  const lightSheet = document.getElementById('hljs-light');
+  const darkSheet = document.getElementById('hljs-dark');
+  if (!lightSheet || !darkSheet) return;
+
+  if (theme === 'dark' || theme === 'high-contrast') {
+    lightSheet.media = 'not all';
+    darkSheet.media = 'all';
+  } else {
+    lightSheet.media = 'all';
+    darkSheet.media = 'not all';
+  }
+}
+
+// ---- Reading Position Memory ----
+let scrollSaveTimeout = null;
+
+function saveScrollPosition() {
+  if (!activeFile) return;
+  clearTimeout(scrollSaveTimeout);
+  scrollSaveTimeout = setTimeout(() => {
+    const pane = document.getElementById('content-pane');
+    if (!pane) return;
+    const scrollHeight = pane.scrollHeight - pane.clientHeight;
+    if (scrollHeight <= 0) return;
+    const pct = pane.scrollTop / scrollHeight;
+    const positions = JSON.parse(localStorage.getItem('pr-scroll-positions') || '{}');
+    positions[activeFile] = { pct, ts: Date.now() };
+    // Keep only last 100 positions
+    const keys = Object.keys(positions);
+    if (keys.length > 100) {
+      const sorted = keys.sort((a, b) => positions[a].ts - positions[b].ts);
+      sorted.slice(0, keys.length - 100).forEach(k => delete positions[k]);
+    }
+    localStorage.setItem('pr-scroll-positions', JSON.stringify(positions));
+  }, 500);
+}
+
+function restoreScrollPosition(filename) {
+  const positions = JSON.parse(localStorage.getItem('pr-scroll-positions') || '{}');
+  const saved = positions[filename];
+  if (!saved || saved.pct < 0.02) return; // Don't restore if near the top
+
+  const pane = document.getElementById('content-pane');
+  if (!pane) return;
+
+  // Show a "resume" indicator
+  const indicator = document.createElement('div');
+  indicator.className = 'resume-indicator';
+  indicator.textContent = 'Resume reading \u2193';
+  indicator.setAttribute('role', 'button');
+  indicator.setAttribute('aria-label', 'Resume reading from where you left off');
+  indicator.onclick = function() {
+    const scrollHeight = pane.scrollHeight - pane.clientHeight;
+    pane.scrollTo({ top: saved.pct * scrollHeight, behavior: 'smooth' });
+    indicator.remove();
+  };
+  document.body.appendChild(indicator);
+
+  // Auto-dismiss after 5 seconds
+  setTimeout(() => { if (indicator.parentNode) indicator.remove(); }, 5000);
+}
+
+// ---- Table of Contents ----
+function generateToc() {
+  const content = document.getElementById('content');
+  const tocContainer = document.getElementById('toc-container');
+  if (!content || !tocContainer) return;
+
+  const headings = content.querySelectorAll('h2, h3');
+  tocContainer.innerHTML = '';
+
+  if (headings.length < 3) return; // Only show TOC for articles with 3+ headings
+
+  const panel = document.createElement('div');
+  panel.className = 'toc-panel';
+
+  const label = document.createElement('div');
+  label.className = 'toc-label';
+  label.textContent = 'Contents';
+  panel.appendChild(label);
+
+  const list = document.createElement('ul');
+  list.className = 'toc-list';
+
+  headings.forEach((heading, i) => {
+    // Skip headings inside article-header
+    if (heading.closest('.article-header')) return;
+
+    const id = 'toc-heading-' + i;
+    heading.id = id;
+
+    const li = document.createElement('li');
+    const a = document.createElement('a');
+    a.href = '#' + id;
+    a.textContent = heading.textContent;
+    a.setAttribute('data-toc-target', id);
+    if (heading.tagName === 'H3') a.classList.add('toc-h3');
+
+    a.onclick = function(e) {
+      e.preventDefault();
+      heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    li.appendChild(a);
+    list.appendChild(li);
+  });
+
+  panel.appendChild(list);
+  tocContainer.appendChild(panel);
+}
+
+function updateTocActive() {
+  const tocLinks = document.querySelectorAll('.toc-list a');
+  if (!tocLinks.length) return;
+
+  const pane = document.getElementById('content-pane');
+  const paneRect = pane.getBoundingClientRect();
+  const threshold = paneRect.top + 80;
+
+  let activeId = null;
+  const headings = document.querySelectorAll('#content h2[id], #content h3[id]');
+
+  headings.forEach(heading => {
+    if (heading.getBoundingClientRect().top <= threshold) {
+      activeId = heading.id;
+    }
+  });
+
+  tocLinks.forEach(link => {
+    link.classList.toggle('toc-active', link.getAttribute('data-toc-target') === activeId);
+  });
+}
+

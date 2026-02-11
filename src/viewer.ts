@@ -7,7 +7,7 @@ import { join, extname, dirname } from 'path';
 import { exec } from 'child_process';
 import { homedir } from 'os';
 import { VIEWER_HTML } from './viewer-html';
-import { summarizeText, loadLLMConfig, saveLLMConfig, getDefaultModel, KNOWN_MODELS, LLMConfig } from './summarizer';
+import { summarizeText, loadLLMConfig, saveLLMConfig, loadLLMSettings, saveLLMSettings, getDefaultModel, isAppleAvailable, KNOWN_MODELS, LLMConfig, LLMSettings } from './summarizer';
 import { autotagText, autotagBatch, saveMachineTags, hasMachineTags } from './autotagger';
 import { APP_ICON } from './app-icon';
 import { fetchAndExtract } from './extractor';
@@ -540,32 +540,71 @@ export function startViewer(outputPath: string, port = 7777): void {
       return;
     }
 
-    // Settings API (LLM config)
+    // Settings API (LLM config — multi-provider)
     if (url.pathname === '/api/settings') {
       if (req.method === 'GET') {
-        const config = loadLLMConfig();
+        const settings = loadLLMSettings();
+        const ALL_PROVIDERS = ['anthropic', 'openai', 'gemini', 'openrouter', 'apple'] as const;
+        const providers: Record<string, { hasKey: boolean; model: string }> = {};
+        for (const p of ALL_PROVIDERS) {
+          const config = settings.providers[p];
+          providers[p] = {
+            hasKey: p === 'apple' || !!(config?.apiKey),
+            model: config?.model || getDefaultModel(p)
+          };
+        }
         sendJson(res, {
-          llm: config ? {
-            provider: config.provider,
-            model: config.model || getDefaultModel(config.provider),
-            hasKey: config.provider === 'apple' || !!config.apiKey
-          } : { provider: 'apple', model: 'on-device', hasKey: true }
+          llm: {
+            defaultProvider: settings.defaultProvider,
+            providers,
+            appleAvailable: isAppleAvailable()
+          }
         });
         return;
       }
       if (req.method === 'POST') {
         try {
           const body = JSON.parse(await readBody(req));
+
+          // New multi-provider format: { defaultProvider, providers: { ... } }
+          if (body.defaultProvider) {
+            const current = loadLLMSettings();
+            const newSettings: LLMSettings = {
+              defaultProvider: body.defaultProvider,
+              providers: { ...current.providers }
+            };
+
+            if (body.providers) {
+              for (const [p, config] of Object.entries(body.providers as Record<string, any>)) {
+                const key = p as import('./summarizer').Provider;
+                const existing = current.providers[key] || {};
+                newSettings.providers[key] = {
+                  // Only update apiKey if a non-empty value was sent
+                  apiKey: config.apiKey || existing.apiKey || '',
+                  model: config.model || existing.model || getDefaultModel(p)
+                };
+              }
+            }
+
+            saveLLMSettings(newSettings);
+            sendJson(res, { ok: true });
+            return;
+          }
+
+          // Legacy single-provider format: { provider, apiKey, model }
           const { provider, apiKey, model } = body;
           if (!provider) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'provider is required' }));
+            res.end(JSON.stringify({ error: 'provider or defaultProvider is required' }));
             return;
           }
           if (provider !== 'apple' && !apiKey) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'apiKey is required for this provider' }));
-            return;
+            const current = loadLLMSettings();
+            if (!current.providers[provider as import('./summarizer').Provider]?.apiKey) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'apiKey is required for this provider' }));
+              return;
+            }
           }
           saveLLMConfig({ provider, apiKey: apiKey || '', model: model || getDefaultModel(provider) });
           sendJson(res, { ok: true });

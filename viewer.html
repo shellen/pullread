@@ -61,6 +61,7 @@
   <symbol id="i-forward" viewBox="0 0 512 512"><path d="M52.5 440.6c-9.5 7.9-22.8 9.7-34.1 4.4S0 428.4 0 416V96C0 83.6 7.2 72.3 18.4 67s24.5-3.6 34.1 4.4L224 214.3V96c0-12.4 7.2-23.7 18.4-29s24.5-3.6 34.1 4.4l192 160c7.3 6.1 11.5 15.1 11.5 24.6s-4.2 18.5-11.5 24.6l-192 160c-9.5 7.9-22.8 9.7-34.1 4.4S224 428.4 224 416V297.7L52.5 440.6z"/></symbol>
   <symbol id="i-backward" viewBox="0 0 512 512"><path d="M459.5 440.6c9.5 7.9 22.8 9.7 34.1 4.4S512 428.4 512 416V96c0-12.4-7.2-23.7-18.4-29s-24.5-3.6-34.1 4.4L288 214.3V96c0-12.4-7.2-23.7-18.4-29s-24.5-3.6-34.1 4.4l-192 160C36.2 237.5 32 246.5 32 256s4.2 18.5 11.5 24.6l192 160c9.5 7.9 22.8 9.7 34.1 4.4S288 428.4 288 416V297.7L459.5 440.6z"/></symbol>
   <symbol id="i-queue" viewBox="0 0 512 512"><path d="M40 48C26.7 48 16 58.7 16 72v48c0 13.3 10.7 24 24 24H472c13.3 0 24-10.7 24-24V72c0-13.3-10.7-24-24-24H40zM40 176c-13.3 0-24 10.7-24 24v48c0 13.3 10.7 24 24 24H472c13.3 0 24-10.7 24-24V200c0-13.3-10.7-24-24-24H40zM16 328c0-13.3 10.7-24 24-24H280c13.3 0 24 10.7 24 24v48c0 13.3-10.7 24-24 24H40c-13.3 0-24-10.7-24-24V328zm320 24v-48c0-13.3 10.7-24 24-24h48V232c0-13.3 10.7-24 24-24s24 10.7 24 24v48h48c13.3 0 24 10.7 24 24v48c0 13.3-10.7 24-24 24H456v48c0 13.3-10.7 24-24 24s-24-10.7-24-24V400H360c-13.3 0-24-10.7-24-24z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 448 512"><path d="M256 80c0-17.7-14.3-32-32-32s-32 14.3-32 32V224H48c-17.7 0-32 14.3-32 32s14.3 32 32 32H192V432c0 17.7 14.3 32 32 32s32-14.3 32-32V288H400c17.7 0 32-14.3 32-32s-14.3-32-32-32H256V80z"/></symbol>
 </svg>
 <div class="app" role="application" aria-label="PullRead article reader">
 
@@ -70,6 +71,7 @@
         <span class="brand" onclick="goHome()" role="heading" aria-level="1">PullRead</span>
         <div class="sidebar-header-actions">
           <button class="focus-btn" onclick="toggleFocusMode()" aria-label="Toggle focus mode" title="Focus mode (f)" id="focus-btn"><svg class="icon" aria-hidden="true"><use href="#i-focus"/></svg></button>
+          <button class="toolbar-icon-btn" onclick="toggleQuickAdd()" aria-label="Add article by URL" title="Add URL" id="quick-add-btn"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg></button>
           <button class="toolbar-icon-btn" onclick="refreshArticleList()" aria-label="Refresh articles" title="Refresh" id="refresh-btn"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></button>
           <div class="settings-dropdown">
             <button class="settings-dropdown-btn" onclick="toggleSettingsDropdown()" aria-label="Reader settings" aria-expanded="false" id="settings-toggle-btn"><svg class="icon" aria-hidden="true"><use href="#i-gear"/></svg></button>
@@ -85,6 +87,10 @@
       <div class="sidebar-search" role="search">
         <label for="search" class="sr-only">Search articles</label>
         <input type="text" id="search" placeholder="Search... try is:favorite or tag:tech" oninput="filterFiles()" />
+      </div>
+      <div class="quick-add-row" id="quick-add-row" style="display:none">
+        <input type="url" id="quick-add-input" placeholder="Paste article URL and press Enter" onkeydown="if(event.key==='Enter')quickAddUrl()" />
+        <button class="btn-primary" onclick="quickAddUrl()" id="quick-add-save" style="font-size:12px;padding:4px 10px;white-space:nowrap">Save</button>
       </div>
       <div class="file-count" id="file-count" aria-live="polite" aria-atomic="true">
         <span id="file-count-text"></span>
