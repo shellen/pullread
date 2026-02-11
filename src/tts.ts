@@ -2,7 +2,7 @@
 // ABOUTME: Supports Kokoro (local), OpenAI TTS, and ElevenLabs; browser speech synthesis is handled client-side
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { createHash } from 'crypto';
 import { request as httpsRequest } from 'https';
@@ -281,6 +281,42 @@ export async function preloadKokoro(model: string = 'kokoro-v1-q8'): Promise<{ r
 let kokoroPipeline: any = null;
 let kokoroLoading = false;
 
+/**
+ * Find the kokoro.web.js self-contained bundle on the filesystem.
+ * This is used as a fallback when the normal `import('kokoro-js')` fails
+ * (e.g. in Bun compiled binaries where module resolution is broken).
+ *
+ * The web build is a single 2MB file with zero external dependencies — it
+ * bundles @huggingface/transformers and onnxruntime-web (WASM) internally,
+ * which sidesteps both the webpack re-bundling issue and native .node addon
+ * loading failures.
+ */
+function resolveKokoroWebBuild(): string | null {
+  // 1. Explicit env var (set by SyncService.swift in the macOS app)
+  const explicit = process.env.PULLREAD_KOKORO_JS_PATH;
+  if (explicit && existsSync(explicit)) return explicit;
+
+  // 2. Adjacent to the bundled model directory (app Resources/)
+  const modelDir = process.env.PULLREAD_KOKORO_MODEL_DIR;
+  if (modelDir) {
+    const adjacent = join(dirname(modelDir), 'kokoro.web.js');
+    if (existsSync(adjacent)) return adjacent;
+  }
+
+  // 3. In node_modules (dev / non-bundled installs)
+  // Walk up from __dirname to find node_modules
+  let dir = __dirname;
+  for (let i = 0; i < 5; i++) {
+    const candidate = join(dir, 'node_modules', 'kokoro-js', 'dist', 'kokoro.web.js');
+    if (existsSync(candidate)) return candidate;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+
+  return null;
+}
+
 async function getKokoroPipeline(model: string): Promise<any> {
   if (kokoroPipeline) return kokoroPipeline;
   if (kokoroLoading) {
@@ -291,20 +327,51 @@ async function getKokoroPipeline(model: string): Promise<any> {
 
   kokoroLoading = true;
   try {
-    const { KokoroTTS } = await import('kokoro-js');
+    let KokoroTTS: any;
+    let usingWebBuild = false;
+
+    // Strategy 1: normal import — works in dev mode (ts-node / unbundled bun)
+    // where node_modules is available on the filesystem.
+    try {
+      const mod = await import('kokoro-js');
+      KokoroTTS = mod.KokoroTTS;
+    } catch {
+      // Strategy 2: load the self-contained web build by absolute path.
+      // This works in Bun compiled binaries where `import('kokoro-js')`
+      // fails because (a) Bun's bundler breaks the webpack internals of
+      // @huggingface/transformers, or (b) onnxruntime-node's native addon
+      // can't be loaded from Bun's virtual filesystem.
+      const webBuildPath = resolveKokoroWebBuild();
+      if (!webBuildPath) {
+        throw new Error(
+          'Kokoro voice engine not found — neither the kokoro-js package nor ' +
+          'the bundled kokoro.web.js could be located.'
+        );
+      }
+      const mod = await import(webBuildPath);
+      KokoroTTS = mod.KokoroTTS;
+      usingWebBuild = true;
+    }
+
     const dtype = model === 'kokoro-v1-q4' ? 'q4' : 'q8';
     const modelDir = resolveKokoroModelDir();
 
     // If the model is bundled inside the app, use that path directly.
     // Otherwise fall back to downloading from HuggingFace Hub.
     const bundled = process.env.PULLREAD_KOKORO_MODEL_DIR && existsSync(process.env.PULLREAD_KOKORO_MODEL_DIR);
-    const modelSource = bundled
-      ? modelDir  // Local path to bundled model — no download needed
-      : 'onnx-community/Kokoro-82M-v1.0-ONNX';  // HuggingFace Hub model ID
+
+    let modelSource: string;
+    if (bundled) {
+      // The web build uses fetch() for file I/O, so it needs file:// URLs
+      // to access the local filesystem. The node build uses fs directly.
+      modelSource = usingWebBuild ? 'file://' + modelDir : modelDir;
+    } else {
+      modelSource = 'onnx-community/Kokoro-82M-v1.0-ONNX';
+    }
 
     kokoroPipeline = await KokoroTTS.from_pretrained(
       modelSource,
-      { dtype, cache_dir: modelDir }
+      { dtype, cache_dir: usingWebBuild ? undefined : modelDir }
     );
     return kokoroPipeline;
   } finally {
