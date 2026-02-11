@@ -3647,6 +3647,31 @@ function cleanMarkdown(md) {
   // Collapse linked images where link URL = image URL: [![alt](url)](url) → ![alt](url)
   md = md.replace(/\[!\[([^\]]*)\]\(([^)]+)\)\]\(\2\)/g, '![$1]($2)');
 
+  // Simplify Substack CDN proxy URLs in images — these are extremely long and contain
+  // commas/colons that break marked.js. Extract the real image URL from inside.
+  // e.g. ![alt](https://substackcdn.com/image/fetch/w_1456,c_limit,.../https%3A%2F%2Fsubstack-post-media...)
+  // becomes ![alt](https://substack-post-media.s3.amazonaws.com/public/images/abc.png)
+  md = md.replace(/!\[([^\]]*)\]\((https:\/\/substackcdn\.com\/image\/fetch\/[^)]+)\)/g, function(m, alt, url) {
+    var inner = url.match(/\/image\/fetch\/[^/]*\/(https?[:%].*)/);
+    if (inner) {
+      try { return '![' + alt + '](' + decodeURIComponent(inner[1]) + ')'; } catch(e) {}
+      return '![' + alt + '](' + inner[1] + ')';
+    }
+    return m;
+  });
+
+  // Also catch Substack CDN URLs that leaked out of image syntax as raw text on their own line.
+  // These appear when the markdown image syntax broke (e.g. commas terminated the URL).
+  // Pattern: line starting with the raw URL (possibly with a leading "(" or broken "![" prefix)
+  md = md.replace(/^!?\[?[^\]\n]*\]?\(?(https:\/\/substackcdn\.com\/image\/fetch\/[^\s)]+)\)?$/gm, function(m, url) {
+    var inner = url.match(/\/image\/fetch\/[^/]*\/(https?[:%].*)/);
+    if (inner) {
+      try { return '![]('+decodeURIComponent(inner[1])+')'; } catch(e) {}
+      return '![]('+inner[1]+')';
+    }
+    return m;
+  });
+
   // Remove standalone parenthesized URLs on their own line (leftover link targets)
   // e.g. a line that is just "(https://substackcdn.com/image/fetch/...)"
   md = md.replace(/^\(https?:\/\/[^)]+\)\s*$/gm, '');

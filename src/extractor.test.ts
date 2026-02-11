@@ -2,7 +2,7 @@
 // ABOUTME: Verifies Readability extracts clean content from HTML pages
 
 import {
-  extractArticle, resolveRelativeUrls, isYouTubeUrl, extractYouTubeId,
+  extractArticle, resolveRelativeUrls, simplifySubstackUrl, isYouTubeUrl, extractYouTubeId,
   matchPaperSource, fixPdfLigatures, stripRunningHeaders, buildParagraphs, extractPdfTitle
 } from './extractor';
 
@@ -185,6 +185,76 @@ describe('resolveRelativeUrls', () => {
     expect(result).toContain('https://example.com/page1');
     expect(result).toContain('https://example.com/img/2.png');
     expect(result).toContain('https://example.com/page2');
+  });
+});
+
+describe('simplifySubstackUrl', () => {
+  test('extracts inner URL from Substack CDN proxy URL', () => {
+    const url = 'https://substackcdn.com/image/fetch/w_1456,c_limit,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fabc123.png';
+    expect(simplifySubstackUrl(url)).toBe('https://substack-post-media.s3.amazonaws.com/public/images/abc123.png');
+  });
+
+  test('handles already-decoded inner URLs', () => {
+    const url = 'https://substackcdn.com/image/fetch/f_auto,q_auto:good/https://substack-post-media.s3.amazonaws.com/public/images/test.jpg';
+    expect(simplifySubstackUrl(url)).toBe('https://substack-post-media.s3.amazonaws.com/public/images/test.jpg');
+  });
+
+  test('returns non-Substack URLs unchanged', () => {
+    const url = 'https://example.com/image.png';
+    expect(simplifySubstackUrl(url)).toBe(url);
+  });
+
+  test('handles bucketeer S3 URLs', () => {
+    const url = 'https://substackcdn.com/image/fetch/w_848,c_limit,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fbucketeer-e05bbc84-baa3-437e-9518-adb32be77984.s3.amazonaws.com%2Fpublic%2Fimages%2Fphoto.jpeg';
+    expect(simplifySubstackUrl(url)).toBe('https://bucketeer-e05bbc84-baa3-437e-9518-adb32be77984.s3.amazonaws.com/public/images/photo.jpeg');
+  });
+});
+
+describe('resolveRelativeUrls — Substack CDN simplification', () => {
+  test('simplifies Substack CDN URLs in image markdown', () => {
+    const md = '![photo](https://substackcdn.com/image/fetch/w_1456,c_limit,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fabc.png)';
+    const result = resolveRelativeUrls(md, 'https://example.substack.com/p/test');
+    expect(result).toBe('![photo](https://substack-post-media.s3.amazonaws.com/public/images/abc.png)');
+  });
+});
+
+describe('extractArticle — Substack image handling', () => {
+  test('extracts images from Substack-style linked image with wrapper div', () => {
+    const html = `<html><head><title>Test Post</title></head><body>
+      <article>
+        <p>This is a paragraph with enough content for readability to extract it properly.</p>
+        <a href="https://substackcdn.com/image/fetch/f_auto,q_auto:good/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Ffull.png">
+          <div class="captioned-image-container">
+            <img src="https://substackcdn.com/image/fetch/w_1456,c_limit,f_auto,q_auto:good/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Ffull.png" alt="A test image" />
+          </div>
+        </a>
+        <p>Another paragraph of content so readability keeps extracting the article text here.</p>
+        <p>And a third paragraph to ensure we have enough content for extraction to work properly.</p>
+      </article>
+    </body></html>`;
+    const result = extractArticle(html, 'https://example.substack.com/p/test-post');
+    expect(result).not.toBeNull();
+    // Should contain a proper image, not raw URL text
+    expect(result!.markdown).toContain('![');
+    expect(result!.markdown).toContain('](');
+    // The Substack CDN URL should be simplified to the direct S3 URL
+    expect(result!.markdown).not.toContain('substackcdn.com/image/fetch');
+    expect(result!.markdown).toContain('substack-post-media.s3.amazonaws.com');
+  });
+
+  test('extracts images from direct Substack img tags', () => {
+    const html = `<html><head><title>Direct Image Post</title></head><body>
+      <article>
+        <p>This article has a direct image tag from substack without a link wrapper around it.</p>
+        <img src="https://substackcdn.com/image/fetch/w_848,c_limit,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Ftest.jpg" alt="Direct" />
+        <p>More content after the image to ensure proper extraction by readability algorithm.</p>
+        <p>And a third paragraph to ensure we have enough content for extraction to work properly.</p>
+      </article>
+    </body></html>`;
+    const result = extractArticle(html, 'https://example.substack.com/p/direct-image');
+    expect(result).not.toBeNull();
+    expect(result!.markdown).toContain('![');
+    expect(result!.markdown).not.toContain('substackcdn.com/image/fetch');
   });
 });
 
