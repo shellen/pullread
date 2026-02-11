@@ -149,15 +149,6 @@ async function playBrowserTTS(filename) {
   // Cancel any existing
   synth.cancel();
 
-  // Build paragraph map for reading highlight
-  const paragraphs = plainText.split(/\n\n+/).filter(p => p.trim());
-  let charOffset = 0;
-  const paraOffsets = paragraphs.map(function(p) {
-    var start = charOffset;
-    charOffset += p.length + 2; // account for \n\n
-    return { start: start, end: start + p.length, text: p };
-  });
-
   const utterance = new SpeechSynthesisUtterance(plainText);
   utterance.rate = ttsSpeed;
   utterance.lang = navigator.language || 'en-US';
@@ -168,17 +159,9 @@ async function playBrowserTTS(filename) {
   const estimatedSeconds = estimatedWords / (150 * ttsSpeed); // ~150 wpm base
   let startTime = Date.now();
 
-  // Voice reading highlight: track boundary events for paragraph-level highlighting
-  utterance.addEventListener('boundary', function(ev) {
-    if (ev.charIndex !== undefined) {
-      ttsHighlightAtChar(ev.charIndex, paraOffsets);
-    }
-  });
-
   utterance.onstart = function() {
     ttsPlaying = true;
     startTime = Date.now();
-    ttsHighlightAtChar(0, paraOffsets);
     renderAudioPlayer();
     document.getElementById('tts-time-total').textContent = formatTime(estimatedSeconds);
     ttsProgressTimer = setInterval(() => {
@@ -186,8 +169,6 @@ async function playBrowserTTS(filename) {
       const pct = Math.min(100, (elapsed / estimatedSeconds) * 100);
       document.getElementById('tts-progress').style.width = pct + '%';
       document.getElementById('tts-time-current').textContent = formatTime(elapsed);
-      // Estimate-based highlight fallback (if no boundary events)
-      ttsHighlightByProgress(pct / 100, paraOffsets);
     }, 200);
   };
 
@@ -195,7 +176,6 @@ async function playBrowserTTS(filename) {
     clearInterval(ttsProgressTimer);
     ttsPlaying = false;
     ttsSynthUtterance = null;
-    ttsClearHighlight();
     document.getElementById('tts-progress').style.width = '100%';
     renderAudioPlayer();
     // Auto-play next
@@ -208,7 +188,6 @@ async function playBrowserTTS(filename) {
     clearInterval(ttsProgressTimer);
     ttsPlaying = false;
     ttsSynthUtterance = null;
-    ttsClearHighlight();
     renderAudioPlayer();
   };
 
@@ -218,23 +197,6 @@ async function playBrowserTTS(filename) {
 async function playCloudTTS(filename) {
   ttsGenerating = true;
   renderAudioPlayer();
-
-  // Fetch article text for reading highlight
-  let _cloudParaOffsets = [];
-  try {
-    const textRes = await fetch('/api/file?name=' + encodeURIComponent(filename));
-    if (textRes.ok) {
-      const rawText = await textRes.text();
-      const { body } = parseFrontmatter(rawText);
-      const plainText = stripMarkdownForTTS(body);
-      var paragraphs = plainText.split(/\n\n+/).filter(function(p) { return p.trim(); });
-      var co = 0;
-      _cloudParaOffsets = paragraphs.map(function(p) {
-        var s = co; co += p.length + 2;
-        return { start: s, end: s + p.length, text: p };
-      });
-    }
-  } catch {}
 
   try {
     // Start a chunked TTS session
@@ -263,7 +225,7 @@ async function playCloudTTS(filename) {
 
     if (session.cached) {
       // Already cached on disk — use the full-file endpoint for instant playback
-      await playCloudTTSCached(filename, _cloudParaOffsets);
+      await playCloudTTSCached(filename);
       return;
     }
 
@@ -273,13 +235,12 @@ async function playCloudTTS(filename) {
       totalChunks: session.totalChunks,
       currentChunk: 0,
       elapsedTime: 0,
-      prefetched: null,
       estimatedTotalDuration: 0,
     };
 
     ttsPlaying = true;
     renderAudioPlayer();
-    ttsPlayNextChunk(0, _cloudParaOffsets);
+    ttsPlayNextChunk(0);
   } catch (err) {
     ttsGenerating = false;
     ttsPlaying = false;
@@ -290,7 +251,7 @@ async function playCloudTTS(filename) {
 }
 
 /** Play a full cached audio file via the existing /api/tts endpoint */
-async function playCloudTTSCached(filename, paraOffsets) {
+async function playCloudTTSCached(filename) {
   try {
     const res = await fetch('/api/tts', {
       method: 'POST',
@@ -327,12 +288,10 @@ async function playCloudTTSCached(filename, paraOffsets) {
       var pct = ttsAudio.duration ? (ttsAudio.currentTime / ttsAudio.duration) * 100 : 0;
       document.getElementById('tts-progress').style.width = pct + '%';
       document.getElementById('tts-time-current').textContent = formatTime(ttsAudio.currentTime);
-      ttsHighlightByProgress(pct / 100, paraOffsets);
     });
 
     ttsAudio.addEventListener('ended', function() {
       ttsPlaying = false;
-      ttsClearHighlight();
       renderAudioPlayer();
       if (ttsCurrentIndex + 1 < ttsQueue.length) {
         setTimeout(function() { playTTSItem(ttsCurrentIndex + 1); }, 500);
@@ -341,7 +300,6 @@ async function playCloudTTSCached(filename, paraOffsets) {
 
     ttsAudio.addEventListener('error', function() {
       ttsPlaying = false;
-      ttsClearHighlight();
       renderAudioPlayer();
     });
 
@@ -356,7 +314,7 @@ async function playCloudTTSCached(filename, paraOffsets) {
 }
 
 /** Fetch and play a single TTS chunk, then chain to the next */
-async function ttsPlayNextChunk(index, paraOffsets) {
+async function ttsPlayNextChunk(index) {
   var session = _ttsChunkSession;
   if (!session || session !== _ttsChunkSession) return;
 
@@ -364,7 +322,6 @@ async function ttsPlayNextChunk(index, paraOffsets) {
     // All chunks played — done
     ttsPlaying = false;
     _ttsChunkSession = null;
-    ttsClearHighlight();
     document.getElementById('tts-progress').style.width = '100%';
     renderAudioPlayer();
     if (ttsCurrentIndex + 1 < ttsQueue.length) {
@@ -377,38 +334,24 @@ async function ttsPlayNextChunk(index, paraOffsets) {
   renderAudioPlayer();
 
   try {
-    // Use prefetched blob if available, otherwise fetch
-    var blob;
-    if (session.prefetched && session.prefetched.index === index) {
-      blob = await session.prefetched.promise;
-      session.prefetched = null;
-    } else {
-      var chunkRes = await fetch('/api/tts/chunk/' + session.id + '/' + index);
-      if (!chunkRes.ok) {
-        var err = await chunkRes.json().catch(function() { return { error: 'Chunk failed' }; });
-        if (err.fallback === 'browser') {
-          console.warn('Kokoro unavailable, falling back to browser TTS:', err.error);
-          _ttsChunkSession = null;
-          await playBrowserTTS(ttsQueue[ttsCurrentIndex].filename);
-          return;
-        }
-        throw new Error(err.error || 'Chunk generation failed');
+    var chunkRes = await fetch('/api/tts/chunk/' + session.id + '/' + index);
+    if (!chunkRes.ok) {
+      var err = await chunkRes.json().catch(function() { return { error: 'Chunk failed' }; });
+      if (err.fallback === 'browser') {
+        console.warn('Kokoro unavailable, falling back to browser TTS:', err.error);
+        _ttsChunkSession = null;
+        await playBrowserTTS(ttsQueue[ttsCurrentIndex].filename);
+        return;
       }
-      blob = await chunkRes.blob();
+      throw new Error(err.error || 'Chunk generation failed');
     }
+    var blob = await chunkRes.blob();
 
     // Bail out if session was cancelled while we were fetching
     if (session !== _ttsChunkSession) return;
 
-    // Start prefetching the next chunk immediately
-    if (index + 1 < session.totalChunks) {
-      var nextIndex = index + 1;
-      session.prefetched = {
-        index: nextIndex,
-        promise: fetch('/api/tts/chunk/' + session.id + '/' + nextIndex)
-          .then(function(r) { return r.ok ? r.blob() : null; })
-          .catch(function() { return null; }),
-      };
+    if (!blob || blob.size === 0) {
+      throw new Error('Empty audio for chunk ' + index);
     }
 
     var audioUrl = URL.createObjectURL(blob);
@@ -430,20 +373,18 @@ async function ttsPlayNextChunk(index, paraOffsets) {
       document.getElementById('tts-progress').style.width = overallPct + '%';
       var currentTime = session.elapsedTime + ttsAudio.currentTime;
       document.getElementById('tts-time-current').textContent = formatTime(currentTime);
-      // Reading highlight based on overall progress
-      ttsHighlightByProgress(overallPct / 100, paraOffsets);
     });
 
     ttsAudio.addEventListener('ended', function() {
       if (session !== _ttsChunkSession) return;
       session.elapsedTime += ttsAudio.duration || 0;
-      ttsPlayNextChunk(index + 1, paraOffsets);
+      ttsPlayNextChunk(index + 1);
     });
 
-    ttsAudio.addEventListener('error', function() {
+    ttsAudio.addEventListener('error', function(e) {
+      console.warn('TTS chunk ' + index + ' audio error:', e);
       ttsPlaying = false;
       _ttsChunkSession = null;
-      ttsClearHighlight();
       renderAudioPlayer();
     });
 
@@ -472,7 +413,6 @@ function stopTTS() {
   }
   ttsPlaying = false;
   ttsGenerating = false;
-  ttsClearHighlight();
   document.getElementById('tts-progress').style.width = '0%';
   document.getElementById('tts-time-current').textContent = '0:00';
   document.getElementById('tts-time-total').textContent = '0:00';
