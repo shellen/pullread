@@ -510,19 +510,7 @@
   }
 
   .reader-chrome {
-    background: #f8f8f8;
-    border-bottom: 1px solid var(--border-light);
-    padding: 12px 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .reader-dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: #e5e5e5;
+    display: none;
   }
 
   .reader-body {
@@ -534,7 +522,29 @@
   .reader-sidebar {
     background: #f9f9f8;
     border-right: 1px solid var(--border-light);
-    padding: 12px 8px;
+    padding: 0 8px 12px;
+  }
+
+  .reader-sidebar-header {
+    display: flex;
+    align-items: center;
+    padding: 12px 4px 8px;
+    gap: 8px;
+  }
+  .reader-sidebar-header .reader-brand {
+    font-family: 'Work Sans', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--fg);
+    flex: 1;
+  }
+  .reader-sidebar-header .reader-header-icons {
+    display: flex;
+    gap: 6px;
+    opacity: 0.35;
+  }
+  .reader-sidebar-header .reader-header-icons span {
+    font-size: 13px;
   }
 
   .reader-sidebar-search {
@@ -1155,13 +1165,15 @@
     </div>
 
     <div class="reader-preview reveal">
-      <div class="reader-chrome">
-        <div class="reader-dot"></div>
-        <div class="reader-dot"></div>
-        <div class="reader-dot"></div>
-      </div>
       <div class="reader-body">
         <div class="reader-sidebar">
+          <div class="reader-sidebar-header">
+            <span class="reader-brand">PullRead</span>
+            <div class="reader-header-icons">
+              <span>&#x2699;</span>
+              <span>&#x2630;</span>
+            </div>
+          </div>
           <div class="reader-sidebar-search">
             <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="5" r="4"/><path d="M8 8l3 3"/></svg>
             Search articles...

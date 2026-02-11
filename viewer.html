@@ -116,50 +116,6 @@
     flex-direction: column;
   }
 
-  .toolbar {
-    flex-shrink: 0;
-    z-index: 10;
-    background: var(--sidebar-bg);
-    border-bottom: 1px solid var(--border);
-    padding: 6px 12px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-  }
-
-  .toolbar label {
-    color: var(--muted);
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  .toolbar-group {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .toolbar button, .toolbar select {
-    background: var(--bg);
-    color: var(--fg);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 3px 8px;
-    font-size: 12px;
-    cursor: pointer;
-    line-height: 1.4;
-  }
-  .toolbar button:hover, .toolbar select:hover {
-    border-color: var(--muted);
-  }
-  .toolbar button.active {
-    background: var(--fg);
-    color: var(--bg);
-    border-color: var(--fg);
-  }
-
   .brand {
     font-family: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-weight: 600;
@@ -168,8 +124,6 @@
     cursor: pointer;
     letter-spacing: -0.01em;
   }
-
-  .toolbar-spacer { flex: 1; }
 
   .sidebar-toggle {
     background: none !important;
@@ -337,6 +291,7 @@
     flex: 1;
     display: flex;
     overflow: hidden;
+    position: relative;
   }
 
   /* Sidebar */
@@ -348,12 +303,59 @@
     display: flex;
     flex-direction: column;
     transition: margin-left 0.2s ease, opacity 0.2s ease;
-    overflow: hidden;
+    overflow: visible;
   }
   .sidebar.collapsed {
     margin-left: -300px;
     opacity: 0;
     pointer-events: none;
+    overflow: hidden;
+  }
+
+  /* Sidebar header (replaces full-width toolbar) */
+  .sidebar-header {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    gap: 8px;
+    flex-shrink: 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+  }
+  .sidebar-header .brand {
+    flex: 1;
+  }
+  .sidebar-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .sidebar-header-actions .sidebar-toggle {
+    margin-left: 2px;
+  }
+
+  /* Floating sidebar toggle (visible when sidebar is collapsed) */
+  .sidebar-toggle-float {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 15;
+    background: var(--sidebar-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 5px 8px;
+    cursor: pointer;
+    font-size: 18px;
+    color: var(--fg);
+    display: none;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    transition: opacity 0.15s;
+  }
+  .sidebar-toggle-float:hover {
+    border-color: var(--muted);
+  }
+  .sidebar.collapsed ~ .sidebar-toggle-float {
+    display: flex;
   }
 
   .sidebar-search {
@@ -907,7 +909,7 @@
     .sidebar {
       position: absolute;
       z-index: 20;
-      height: calc(100vh - 42px);
+      height: 100vh;
       box-shadow: 4px 0 16px rgba(0,0,0,0.1);
     }
     .sidebar.collapsed {
@@ -937,8 +939,8 @@
 
   /* Mobile */
   @media (max-width: 480px) {
-    .toolbar {
-      padding: 4px 8px;
+    .sidebar-header {
+      padding: 8px 10px 4px;
     }
     .brand {
       font-size: 13px;
@@ -994,7 +996,7 @@
     outline: 2px solid var(--link);
     outline-offset: 2px;
   }
-  .toolbar button:focus-visible,
+  .sidebar-header-actions button:focus-visible,
   .sidebar-footer-btn:focus-visible {
     outline: 2px solid var(--link);
     outline-offset: 1px;
@@ -2130,20 +2132,22 @@
   .hl-picker-item input[type="checkbox"] { margin-top: 3px; }
   .hl-picker-item-text { font-size: 12px; color: var(--fg); line-height: 1.4; }
 
-  /* Writing focus mode — distraction-free, full-screen */
+  /* Writing focus mode — iA Writer-style: current line at full brightness,
+     surrounding text dimmed. No pill/highlight background. */
   .writing-focus .notebook-editor textarea {
-    color: color-mix(in srgb, var(--fg) 35%, transparent);
     caret-color: var(--fg);
   }
   .notebook-focus-line {
     position: absolute;
-    left: 17px; right: 17px;
+    left: 0; right: 0;
     height: 1.7em;
-    background: color-mix(in srgb, var(--fg) 6%, transparent);
-    border-radius: 3px;
+    background: transparent;
     pointer-events: none;
     transition: top 0.08s ease;
-    z-index: 1;
+    z-index: 3;
+    /* Massive inset shadow dims everything outside this element's bounds,
+       leaving the current line text at full brightness (iA Writer style) */
+    box-shadow: 0 -3px 0 0 var(--bg), 0 3px 0 0 var(--bg), 0 0 0 9999px color-mix(in srgb, var(--bg) 70%, transparent);
   }
   .writing-focus .notebook-editor textarea::selection {
     background: color-mix(in srgb, var(--link) 25%, transparent);
@@ -2193,17 +2197,18 @@
     font-size: 16px; line-height: 1.8;
     border: none; outline: none; resize: none;
     background: transparent;
-    color: color-mix(in srgb, var(--fg) 35%, transparent);
+    color: var(--fg);
     caret-color: var(--fg);
   }
   .writing-focus-overlay .wf-focus-line {
     position: absolute;
-    left: 24px; right: 24px;
+    left: 0; right: 0;
     height: 1.8em;
-    background: color-mix(in srgb, var(--fg) 6%, transparent);
-    border-radius: 3px;
+    background: transparent;
     pointer-events: none;
     transition: top 0.08s ease;
+    z-index: 3;
+    box-shadow: 0 -3px 0 0 var(--bg), 0 3px 0 0 var(--bg), 0 0 0 9999px color-mix(in srgb, var(--bg) 70%, transparent);
   }
   .writing-focus-overlay .wf-word-count {
     font-size: 11px; color: var(--muted);
@@ -2743,7 +2748,7 @@
 
   /* Print styles */
   @media print {
-    .toolbar, .sidebar, .skip-link, .margin-notes, .toc-container,
+    .toolbar, .sidebar, .sidebar-toggle-float, .skip-link, .margin-notes, .toc-container,
     .reading-progress, .hl-toolbar, .annotation-popover, .resume-indicator,
     .article-actions, .notes-panel summary, .notes-panel .favorite-row,
     .notes-panel .tags-row, .notes-panel textarea, .notes-save-hint,
@@ -2832,21 +2837,19 @@
 </svg>
 <div class="app" role="application" aria-label="PullRead article reader">
 
-  <nav class="toolbar" aria-label="Reader toolbar">
-    <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle sidebar" aria-expanded="true" id="sidebar-toggle-btn"><svg class="icon" aria-hidden="true"><use href="#i-bars"/></svg></button>
-    <span class="brand" onclick="goHome()" role="heading" aria-level="1">PullRead</span>
-
-    <div class="toolbar-spacer"></div>
-
-    <button class="focus-btn" onclick="toggleFocusMode()" aria-label="Toggle focus mode" title="Focus mode (f)" id="focus-btn"><svg class="icon" aria-hidden="true"><use href="#i-focus"/></svg></button>
-    <button class="toolbar-icon-btn" onclick="refreshArticleList()" aria-label="Refresh articles" title="Refresh" id="refresh-btn"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></button>
-    <div class="settings-dropdown">
-      <button class="settings-dropdown-btn" onclick="toggleSettingsDropdown()" aria-label="Reader settings" aria-expanded="false" id="settings-toggle-btn"><svg class="icon" aria-hidden="true"><use href="#i-gear"/></svg></button>
-    </div>
-  </nav>
-
   <div class="main">
     <aside class="sidebar" id="sidebar" aria-label="Article list">
+      <div class="sidebar-header">
+        <span class="brand" onclick="goHome()" role="heading" aria-level="1">PullRead</span>
+        <div class="sidebar-header-actions">
+          <button class="focus-btn" onclick="toggleFocusMode()" aria-label="Toggle focus mode" title="Focus mode (f)" id="focus-btn"><svg class="icon" aria-hidden="true"><use href="#i-focus"/></svg></button>
+          <button class="toolbar-icon-btn" onclick="refreshArticleList()" aria-label="Refresh articles" title="Refresh" id="refresh-btn"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></button>
+          <div class="settings-dropdown">
+            <button class="settings-dropdown-btn" onclick="toggleSettingsDropdown()" aria-label="Reader settings" aria-expanded="false" id="settings-toggle-btn"><svg class="icon" aria-hidden="true"><use href="#i-gear"/></svg></button>
+          </div>
+          <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Collapse sidebar" aria-expanded="true" id="sidebar-toggle-btn"><svg class="icon" aria-hidden="true"><use href="#i-bars"/></svg></button>
+        </div>
+      </div>
       <div class="sidebar-nav" id="sidebar-nav">
         <button class="sidebar-nav-tab active" data-view="library" onclick="switchSidebarView('library')">Library</button>
         <button class="sidebar-nav-tab" data-view="explore" onclick="switchSidebarView('explore')">Explore</button>
@@ -2896,6 +2899,8 @@
         <button class="sidebar-footer-btn" onclick="showSettingsPage()" aria-label="Settings"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-gear"/></svg> Settings</button>
       </div>
     </aside>
+
+    <button class="sidebar-toggle-float" onclick="toggleSidebar()" aria-label="Show sidebar" id="sidebar-toggle-float"><svg class="icon" aria-hidden="true"><use href="#i-bars"/></svg></button>
 
     <main class="content-pane" id="content-pane" aria-label="Article content">
       <div class="reading-progress" aria-hidden="true"><div class="reading-progress-bar" id="reading-progress-bar"></div></div>
