@@ -493,12 +493,17 @@ export function startViewer(outputPath: string, port = 7777): void {
         try {
           const body = JSON.parse(await readBody(req));
           const { provider, apiKey, model } = body;
-          if (!provider || !apiKey) {
+          if (!provider) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'provider and apiKey are required' }));
+            res.end(JSON.stringify({ error: 'provider is required' }));
             return;
           }
-          saveLLMConfig({ provider, apiKey, model: model || getDefaultModel(provider) });
+          if (provider !== 'apple' && !apiKey) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'apiKey is required for this provider' }));
+            return;
+          }
+          saveLLMConfig({ provider, apiKey: apiKey || '', model: model || getDefaultModel(provider) });
           sendJson(res, { ok: true });
         } catch (err) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -824,6 +829,22 @@ export function startViewer(outputPath: string, port = 7777): void {
     console.log(`PullRead viewer running at ${url}`);
     console.log(`Reading from: ${outputPath}`);
     console.log('Press Ctrl+C to stop\n');
+
+    // Eagerly preload Kokoro if it's the configured TTS provider so the model
+    // is warm on first listen and native-library errors surface immediately.
+    const ttsConfig = loadTTSConfig();
+    if (ttsConfig.provider === 'kokoro') {
+      const model = ttsConfig.model || 'kokoro-v1-q8';
+      console.log(`[TTS] Kokoro is configured — preloading ${model} in background...`);
+      preloadKokoro(model).then(result => {
+        if (result.ready) {
+          console.log('[TTS] Kokoro model loaded and ready');
+        } else {
+          console.error('[TTS] Kokoro preload failed:', result.error);
+          console.error('[TTS] Audio will fall back to browser speech synthesis');
+        }
+      });
+    }
 
     // Open browser
     const cmd = process.platform === 'darwin' ? 'open'

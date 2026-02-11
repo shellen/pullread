@@ -2057,12 +2057,12 @@
   /* Sidebar nav tabs */
   .sidebar-nav {
     display: flex;
+    align-items: center;
     padding: 8px 8px 0;
     gap: 2px;
   }
   .sidebar-nav-tab {
-    flex: 1;
-    padding: 7px 0;
+    padding: 7px 12px;
     font-size: 12px;
     font-weight: 500;
     color: var(--muted);
@@ -2077,6 +2077,10 @@
   .sidebar-nav-tab.active {
     color: var(--fg);
     border-bottom-color: var(--link);
+  }
+  .sidebar-nav .new-notebook-btn {
+    margin-left: auto;
+    border-bottom: 2px solid transparent;
   }
 
   /* Reading progress bar */
@@ -2665,6 +2669,7 @@
       <div class="sidebar-nav" id="sidebar-nav">
         <button class="sidebar-nav-tab active" data-view="library" onclick="switchSidebarView('library')">Library</button>
         <button class="sidebar-nav-tab" data-view="explore" onclick="switchSidebarView('explore')">Explore</button>
+        <button class="new-notebook-btn" onclick="createNewNotebook()" title="New notebook">+ Notebook</button>
       </div>
       <div class="sidebar-search" role="search">
         <label for="search" class="sr-only">Search articles</label>
@@ -2672,7 +2677,6 @@
       </div>
       <div class="file-count" id="file-count" aria-live="polite" aria-atomic="true">
         <span id="file-count-text"></span>
-        <button class="new-notebook-btn" onclick="createNewNotebook()" title="New notebook">+ Notebook</button>
         <label class="hide-read-toggle" title="Hide viewed articles">
           <input type="checkbox" id="hide-read-toggle" onchange="toggleHideRead()" />
           <span class="hide-read-label">Hide read</span>
@@ -2739,6 +2743,7 @@
       <kbd>n</kbd> <span>Toggle article notes</span>
       <kbd>f</kbd> <span>Toggle focus mode</span>
       <kbd>p</kbd> <span>Print article</span>
+      <kbd>Space</kbd> <span>Play / pause audio</span>
       <kbd>Esc</kbd> <span>Clear search</span>
     </div>
     <button class="onboarding-dismiss" onclick="dismissOnboarding()">Got it</button>
@@ -2812,45 +2817,6 @@ function setWidth(val) {
   localStorage.setItem('pr-width', val);
 }
 
-function setIntegrationEditor(val) {
-  localStorage.setItem('pr-integration-editor', val);
-}
-
-function getIntegrationEditor() {
-  return localStorage.getItem('pr-integration-editor') || 'none';
-}
-
-function openInExternalEditor(markdownContent, title) {
-  var editor = getIntegrationEditor();
-  if (editor === 'none') return;
-
-  // Create a .md file and trigger download — the user's OS handles "Open with"
-  // For URL-scheme apps, we can deep-link
-  var filename = (title || 'Untitled').replace(/[^a-zA-Z0-9 _-]/g, '').trim() + '.md';
-
-  if (editor === 'obsidian') {
-    // Obsidian URI: obsidian://new?name=Title&content=...
-    var uri = 'obsidian://new?name=' + encodeURIComponent(title || 'Untitled') + '&content=' + encodeURIComponent(markdownContent);
-    window.open(uri);
-  } else if (editor === 'bear') {
-    // Bear URI: bear://x-callback-url/create?title=...&text=...
-    var uri = 'bear://x-callback-url/create?title=' + encodeURIComponent(title || 'Untitled') + '&text=' + encodeURIComponent(markdownContent);
-    window.open(uri);
-  } else if (editor === 'ulysses') {
-    // Ulysses URI: ulysses://x-callback-url/new-sheet?text=...
-    var uri = 'ulysses://x-callback-url/new-sheet?text=' + encodeURIComponent(markdownContent);
-    window.open(uri);
-  } else {
-    // iA Writer, Typora, etc. — download .md file
-    var blob = new Blob([markdownContent], { type: 'text/markdown' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-}
 
 function toggleSettingsDropdown() {
   const existing = document.querySelector('.settings-dropdown-panel');
@@ -2928,19 +2894,6 @@ function toggleSettingsDropdown() {
     <div class="setting-row">
       <button onclick="reprocessCurrentArticle(this)" id="reprocess-btn" style="flex:1;text-align:center" title="Re-fetch this article from the original URL"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-cloud-download"/></svg> Re-fetch from source</button>
     </div>
-    <hr style="border:none;border-top:1px solid var(--border);margin:12px 0 8px">
-    <label>Integrations</label>
-    <div class="setting-row" style="flex-direction:column;gap:6px">
-      <select id="integration-editor-select" onchange="setIntegrationEditor(this.value)" aria-label="External editor for notebooks" style="width:100%">
-        <option value="none" ${(localStorage.getItem('pr-integration-editor')||'none')==='none'?'selected':''}>None (use built-in editor)</option>
-        <option value="obsidian" ${localStorage.getItem('pr-integration-editor')==='obsidian'?'selected':''}>Obsidian</option>
-        <option value="ia-writer" ${localStorage.getItem('pr-integration-editor')==='ia-writer'?'selected':''}>iA Writer</option>
-        <option value="bear" ${localStorage.getItem('pr-integration-editor')==='bear'?'selected':''}>Bear</option>
-        <option value="ulysses" ${localStorage.getItem('pr-integration-editor')==='ulysses'?'selected':''}>Ulysses</option>
-        <option value="typora" ${localStorage.getItem('pr-integration-editor')==='typora'?'selected':''}>Typora</option>
-      </select>
-      <span style="font-size:11px;color:var(--muted)">When set, "Open in..." buttons appear on notebooks and exports to let you edit in your preferred app.</span>
-    </div>
   `;
   document.querySelector('.settings-dropdown').appendChild(panel);
   btn.setAttribute('aria-expanded', 'true');
@@ -2987,8 +2940,6 @@ function showSettingsPage() {
   var currentLeading = localStorage.getItem('pr-leading') || 'default';
   var currentSpacing = localStorage.getItem('pr-spacing') || 'default';
   var currentWidth = localStorage.getItem('pr-width') || 'default';
-  var currentEditor = localStorage.getItem('pr-integration-editor') || 'none';
-
   function themeBtn(val, label) {
     return '<button class="' + (currentTheme === val ? 'active' : '') + '" onclick="setTheme(\'' + val + '\');showSettingsPage()">' + label + '</button>';
   }
@@ -3040,16 +2991,6 @@ function showSettingsPage() {
   html += '<p style="color:var(--muted);font-size:13px">Loading AI settings...</p>';
   html += '</div>';
 
-  // ---- Integrations section ----
-  html += '<div class="settings-section">';
-  html += '<h2>Integrations</h2>';
-  html += '<div class="settings-row"><div><label>External editor</label><div class="settings-desc">Open notebooks and exports in your preferred writing app</div></div>'
-    + '<select onchange="setIntegrationEditor(this.value)">'
-    + opt('none','None (built-in)',currentEditor)
-    + opt('obsidian','Obsidian',currentEditor) + opt('ia-writer','iA Writer',currentEditor)
-    + opt('bear','Bear',currentEditor) + opt('ulysses','Ulysses',currentEditor) + opt('typora','Typora',currentEditor)
-    + '</select></div>';
-  html += '</div>';
 
   content.innerHTML = html;
   document.getElementById('content-pane').scrollTop = 0;
@@ -3236,8 +3177,20 @@ function settingsPageLLMProviderChanged() {
   var provider = document.getElementById('sp-llm-provider').value;
   var keyRow = document.getElementById('sp-llm-key-row');
   var appleNote = document.getElementById('sp-apple-note');
+  var modelInput = document.getElementById('sp-llm-model');
   if (keyRow) keyRow.style.display = provider === 'apple' ? 'none' : 'flex';
   if (appleNote) appleNote.style.display = provider === 'apple' ? 'block' : 'none';
+  // Update model field to match the selected provider
+  if (modelInput) {
+    if (provider === 'apple') {
+      modelInput.value = 'on-device';
+      modelInput.disabled = true;
+    } else {
+      var defaults = { anthropic: 'claude-haiku-4-5-20251001', openai: 'gpt-4.1-nano', gemini: 'gemini-2.5-flash-lite-preview', openrouter: 'anthropic/claude-haiku-4.5' };
+      modelInput.value = defaults[provider] || '';
+      modelInput.disabled = false;
+    }
+  }
 }
 
 function settingsPageSaveLLM() {
@@ -3245,8 +3198,9 @@ function settingsPageSaveLLM() {
   var model = document.getElementById('sp-llm-model').value;
   var apiKey = document.getElementById('sp-llm-key').value;
 
-  var body = { provider: provider, model: model };
-  if (apiKey) body.apiKey = apiKey;
+  var body = { provider: provider, model: provider === 'apple' ? 'on-device' : model };
+  if (provider === 'apple') body.apiKey = '';
+  else if (apiKey) body.apiKey = apiKey;
 
   fetch('/api/settings', {
     method: 'POST',
@@ -5972,6 +5926,13 @@ function showShortcutsModal() {
         <kbd>p</kbd> <span>Print article</span>
         <kbd>Esc</kbd> <span>Clear search / close popover</span>
       </div>
+      <h3 style="font-size:13px;margin:14px 0 6px;color:var(--muted)">Audio Playback</h3>
+      <div class="shortcuts-grid">
+        <kbd>Space</kbd> <span>Play / pause audio</span>
+        <kbd>&gt;</kbd> <span>Skip to next track</span>
+        <kbd>&lt;</kbd> <span>Skip to previous track</span>
+        <kbd>s</kbd> <span>Cycle playback speed</span>
+      </div>
       <button class="modal-close" onclick="closeModal()">Done</button>
     </div>
   `;
@@ -6072,9 +6033,6 @@ function showGuideModal() {
     <h2>Machine Tags &amp; Explore</h2>
     <p>PullRead can auto-generate topic, entity, and theme tags using your configured AI provider. Tags power relational mapping — discover connections between articles through the <strong>Explore</strong> page. Use the auto-tagging buttons on the Explore page's Discover tab, or enable auto-tagging after sync in the macOS app settings.</p>
 
-    <h2>Integrations</h2>
-    <p>PullRead works with external writing apps. Configure an integration in the Settings gear menu to add "Open in..." buttons to notebooks. Supported apps: <strong>Obsidian</strong>, <strong>iA Writer</strong>, <strong>Bear</strong>, <strong>Ulysses</strong>, and <strong>Typora</strong>. Obsidian, Bear, and Ulysses use URL schemes for direct handoff; others export as .md files.</p>
-
     <h2>Apple News &amp; Social Posts</h2>
     <p>PullRead resolves Apple News links (apple.news) to their original article URLs. Social posts from X/Twitter, Bluesky, Mastodon, Reddit, and Hacker News are extracted with special handling to preserve the post structure.</p>
 
@@ -6098,6 +6056,17 @@ function showGuideModal() {
         <tr><td><kbd>f</kbd></td><td>Toggle focus mode</td></tr>
         <tr><td><kbd>p</kbd></td><td>Print article</td></tr>
         <tr><td><kbd>Esc</kbd></td><td>Clear search / close popover</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Audio Playback (when player is visible)</h3>
+    <table>
+      <thead><tr><th>Key</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr><td><kbd>Space</kbd></td><td>Play / pause audio</td></tr>
+        <tr><td><kbd>&gt;</kbd></td><td>Skip to next track</td></tr>
+        <tr><td><kbd>&lt;</kbd></td><td>Skip to previous track</td></tr>
+        <tr><td><kbd>s</kbd></td><td>Cycle playback speed</td></tr>
       </tbody>
     </table>
 
@@ -6262,6 +6231,36 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
     const currentIdx = displayFiles.findIndex(f => f.filename === activeFile);
     if (currentIdx >= 0) loadFile(currentIdx);
+  }
+
+  // Audio playback shortcuts (only when audio player is visible)
+  const audioPanel = document.getElementById('audio-player');
+  const audioVisible = audioPanel && !audioPanel.classList.contains('hidden');
+  if (audioVisible && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+    // Space = play/pause
+    if (e.key === ' ' && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      ttsTogglePlay();
+      return;
+    }
+    // Shift+. (>) = skip next
+    if (e.key === '>' || (e.key === '.' && e.shiftKey)) {
+      e.preventDefault();
+      ttsSkipNext();
+      return;
+    }
+    // Shift+, (<) = skip prev
+    if (e.key === '<' || (e.key === ',' && e.shiftKey)) {
+      e.preventDefault();
+      ttsSkipPrev();
+      return;
+    }
+    // s to cycle playback speed
+    if (e.key === 's') {
+      e.preventDefault();
+      ttsCycleSpeed();
+      return;
+    }
   }
 });
 
@@ -6579,11 +6578,6 @@ function toggleNotebookExportDropdown(e) {
   var items = '';
   items += '<button onclick="exportNotebook();this.closest(\'.nb-export-panel\').remove()">Export .md</button>';
   items += '<button onclick="exportNotebookPdf();this.closest(\'.nb-export-panel\').remove()">Export .pdf</button>';
-  var editorIntegration = getIntegrationEditor();
-  if (editorIntegration !== 'none') {
-    var edLabel = escapeHtml(editorIntegration.replace(/-/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); }));
-    items += '<button onclick="openInExternalEditor(_activeNotebook.content, _activeNotebook.title);this.closest(\'.nb-export-panel\').remove()">Open in ' + edLabel + '</button>';
-  }
   panel.innerHTML = items;
   btn.closest('.share-dropdown').appendChild(panel);
   // Close when clicking elsewhere
@@ -7623,7 +7617,7 @@ async function init() {
       // Preload Kokoro TTS model if it's the selected provider
       fetch('/api/tts-settings').then(r => r.json()).then(cfg => {
         ttsProvider = cfg.provider || 'browser';
-        if (cfg.provider === 'kokoro' && !cfg.kokoro?.installed) {
+        if (cfg.provider === 'kokoro') {
           fetch('/api/kokoro-preload', { method: 'POST' }).catch(() => {});
         }
       }).catch(() => {});
