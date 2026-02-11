@@ -10,12 +10,13 @@ PullRead connects to bookmark services like Instapaper, Pinboard, Raindrop, and 
 
 **[Download the latest release](https://github.com/shellen/pullread/releases/latest)**
 
-| Platform | Download | Notes |
-|----------|----------|-------|
-| **macOS** | [PullRead.dmg](https://github.com/shellen/pullread/releases/latest/download/PullRead.dmg) | Self-contained menu bar app with bundled CLI |
-| **CLI** | Clone this repo | For development or running on Linux/Windows |
+| Platform | Download | Architecture |
+|----------|----------|-------------|
+| **macOS (Tauri)** | [PullRead.dmg](https://github.com/shellen/pullread/releases/latest/download/PullRead.dmg) | Cross-platform shell with bundled CLI |
+| **macOS (Swift)** | [PullRead-Swift.dmg](https://github.com/shellen/pullread/releases/latest/download/PullRead-Swift.dmg) | Native Swift menu bar app (legacy) |
+| **CLI** | Clone this repo | For development, Linux, or Windows |
 
-> **Quick install:** Download the DMG, open it, drag Pull Read to your Applications folder, and launch it. The app is fully self-contained—no Node.js or other dependencies required. Configure your feeds in Settings and start syncing.
+> **Quick install:** Download the DMG, open it, drag PullRead to your Applications folder, and launch it. The app is fully self-contained — no Node.js or other dependencies required. Configure your feeds in Settings and start syncing.
 
 ---
 
@@ -29,14 +30,14 @@ PullRead connects to bookmark services like Instapaper, Pinboard, Raindrop, and 
 - [Usage](#usage)
 - [Supported Feed Formats](#supported-feed-formats)
 - [Output Format](#output-format)
-- [macOS Menu Bar App](#macos-menu-bar-app)
+- [Desktop App](#desktop-app)
 - [Scheduling](#scheduling)
 - [Architecture](#architecture)
 - [Development](#development)
 - [LLM Models](#llm-models)
 - [Testing](#testing)
-- [Code Signing](#code-signing)
-- [Auto-Updates (Sparkle)](#auto-updates-sparkle)
+- [Code Signing & Distribution](#code-signing--distribution)
+- [Auto-Updates](#auto-updates)
 - [Troubleshooting](#troubleshooting)
 - [Room for Improvement](#room-for-improvement)
 - [Future Ideas](#future-ideas)
@@ -62,7 +63,7 @@ PullRead connects to bookmark services like Instapaper, Pinboard, Raindrop, and 
 - **Homepage dashboard** - Card-based landing page with continue reading, reviews, favorites, and recent articles
 - **Search operators** - Filter articles with `is:favorite`, `tag:tech`, `has:summary`, AND/OR logic, and more
 - **Weekly reviews** - AI-generated summaries of your recent reading (daily/weekly schedule or on-demand)
-- **Self-contained macOS app** - Native Swift menu bar app with bundled CLI binary (no Node.js required)
+- **Cross-platform desktop app** - Tauri-based menu bar app with bundled CLI (macOS first, Windows/Linux planned)
 - **Article summaries** - On-demand summarization with 5 LLM providers, shown with provider/model badges
 - **Text-to-speech** - Listen to articles via browser TTS (free), Kokoro local AI, OpenAI, or ElevenLabs
 - **Voice notes** - Record article notes using your microphone via Web Speech API
@@ -93,13 +94,18 @@ npm run sync
 
 ### Prerequisites
 
-**For the macOS menu bar app:**
-- **macOS** 11+ (no other dependencies required—the app is self-contained)
+**For the desktop app (download):**
+- **macOS** 13+ (no other dependencies required — the app is self-contained)
 
 **For CLI development:**
 - **Node.js** 16 or higher (for development with ts-node)
 - **Bun** (optional, for building standalone binaries)
-- **Xcode** 15.2+ (only if building the menu bar app from source)
+
+**For building the Tauri app from source:**
+- **Rust** (latest stable) and **Cargo**
+- **Bun** (for compiling the CLI sidecar binary)
+- On macOS: Xcode Command Line Tools
+- On Linux: `libwebkit2gtk-4.1-dev`, `libappindicator3-dev`, `librsvg2-dev`, `patchelf`
 
 ### CLI Installation
 
@@ -115,42 +121,64 @@ npm install
 npm run sync -- --help
 ```
 
-### macOS Menu Bar App
+### Desktop App (Tauri)
 
 **Option A: Download Release (Recommended)**
 
 1. Download `PullRead.dmg` from [GitHub Releases](https://github.com/shellen/pullread/releases)
-2. Open the DMG and drag Pull Read to Applications
-3. Launch Pull Read from Applications
-4. Open Settings to configure your feeds and output path
-5. (Optional) Add to Login Items for auto-start
+2. Open the DMG and drag PullRead to Applications
+3. Launch PullRead from Applications
+4. The onboarding wizard walks you through setting up feeds and output path
+5. (Optional) Enable "Launch at Login" in Settings
 
-The app bundles its own CLI binary—no Node.js or npm required.
+The app bundles its own CLI binary — no Node.js or npm required.
 
 **Option B: Build from Source**
 
 ```bash
-# First, build the CLI binary (requires Bun)
+# Install dependencies
+bun install
+
+# Build the CLI sidecar binary
+bun build src/index.ts --compile --outfile dist/pullread
+
+# Prepare the sidecar for Tauri
+bash scripts/prepare-sidecar.sh
+
+# Build the Tauri app
+cd src-tauri && cargo tauri build
+# Output: src-tauri/target/release/bundle/dmg/PullRead_*.dmg
+```
+
+Or use the all-in-one build script:
+
+```bash
+bash scripts/build-tauri.sh
+```
+
+### Legacy Swift App (macOS only)
+
+The original native Swift menu bar app is still available for macOS users who prefer it:
+
+```bash
+# Build the CLI binary (requires Bun)
 npm install
 ./scripts/build-release.sh
 
-# Then build the Xcode project
+# Build the Xcode project
 cd PullReadTray
 xcodebuild -project PullReadTray.xcodeproj \
   -scheme PullReadTray \
   -configuration Release \
   -derivedDataPath build \
   build
-
-# App bundle location:
-# build/Build/Products/Release/Pull Read.app
 ```
 
 ---
 
 ## Configuration
 
-**For the macOS app:** Open Pull Read's Settings window to configure your feeds and output path. Configuration is stored at `~/.config/pullread/feeds.json`.
+**For the desktop app:** Launch PullRead and the onboarding wizard guides you through setup. All configuration is stored at `~/.config/pullread/feeds.json`.
 
 **For CLI development:** Create a configuration file in the project directory:
 
@@ -180,6 +208,7 @@ Edit `feeds.json`:
 |-------|-------------|---------|
 | `outputPath` | Where to save markdown files (supports `~`) | `~/Documents/Articles` |
 | `feeds` | Map of feed names to URLs | See above |
+| `syncInterval` | Auto-sync interval (`30m`, `1h`, `4h`, `12h`, `manual`) | `1h` |
 
 ### Feed Names
 
@@ -248,7 +277,7 @@ PullRead handles certain URLs with specialized extractors:
 
 ### Weekly Reviews
 
-PullRead can generate AI-powered summaries of your recent reading. In the macOS app, go to Settings and set the review schedule to **Daily** or **Weekly**. You can also generate a review on-demand from the menu bar.
+PullRead can generate AI-powered summaries of your recent reading. In the desktop app, go to Settings and set the review schedule to **Daily** or **Weekly**. You can also generate a review on-demand from the menu bar.
 
 Reviews use the same LLM settings as article summaries (configure your API key in the viewer's gear icon). From the CLI:
 
@@ -384,28 +413,48 @@ Examples:
 
 ---
 
-## macOS Menu Bar App
+## Desktop App
 
-Pull Read is a self-contained native Swift menu bar application. It bundles the CLI binary, so no external dependencies (Node.js, npm) are required.
+PullRead ships as a menu bar application that runs quietly in the system tray. The app is built with **Tauri** (Rust + WebView) and bundles the CLI as a sidecar binary, so no external dependencies are required.
+
+### How It Works
+
+The Tauri shell manages the system tray, timers, notifications, and window lifecycle. When you trigger a sync or open the viewer, it spawns the bundled Bun CLI binary as a subprocess. The viewer runs as an HTTP server on a dynamic localhost port, displayed in a native WebView window.
+
+```
+Tauri App (Rust)
+├── System tray with menu ──→ User interaction
+├── Sync/review timers    ──→ Periodic background operations
+├── Notifications          ──→ Sync complete / failed alerts
+├── URL scheme handler    ──→ pullread://open, save, sync
+└── WebView window        ──→ Displays viewer on localhost:PORT
+         │
+         │ spawns sidecar
+         ▼
+Bun CLI Binary (TypeScript)
+├── sync   ──→ Fetch feeds, extract articles, save markdown
+├── view   ──→ HTTP server with REST API + viewer HTML
+├── review ──→ AI-generated reading summaries
+└── autotag ──→ Machine tagging via LLM providers
+```
 
 ### Menu Structure
 
 ```
 ┌──────────────────────────┐
-│ Status: Idle             │  ← Current sync state
-│ Last sync: 2:34 PM       │  ← Time of last sync
-├──────────────────────────┤
 │ Sync Now            ⌘S   │  → Runs the bundled CLI
+│ Last sync: Never         │  ← Updated after each sync
+│ Next sync: —             │
+├──────────────────────────┤
+│ View Articles       ⌘D   │  → Opens the markdown reader
+│ Open Folder         ⌘O   │  → Opens your Articles folder
+├──────────────────────────┤
 │ Retry Failed        ⌘R   │  → Retries failed URLs
-│ Generate Review Now       │  → AI summary of recent reading
+│ Generate Review          │  → AI summary of recent reading
 ├──────────────────────────┤
-│ Open Output Folder  ⌘O   │  → Opens your Articles folder
-│ View Articles...    ⌘D   │  → Opens the markdown reader
-│ Settings            ⌘,   │  → Configure feeds, services, reviews
-│ View Logs...        ⌘L   │  → Opens sync log
-│ Check for Updates...      │  → Sparkle auto-update check
+│ Logs                ⌘L   │  → Opens sync log
+│ Check for Updates…       │  → Tauri auto-update check
 ├──────────────────────────┤
-│ Welcome Guide...          │
 │ About PullRead           │
 │ Quit PullRead       ⌘Q   │
 └──────────────────────────┘
@@ -414,21 +463,43 @@ Pull Read is a self-contained native Swift menu bar application. It bundles the 
 ### Features
 
 - **Self-contained** - Bundled CLI binary, no Node.js required
-- **Article reader** - Built-in two-pane markdown viewer via "View Articles..." menu
+- **No dock icon** - Runs as a menu bar accessory (dock icon appears when viewer is open)
+- **Article reader** - Built-in two-pane markdown viewer in a native WebView window
 - **Highlights & notes** - Select text to highlight, add inline annotations, and write article-level notes
 - **Weekly reviews** - Scheduled AI summaries of your recent reading (daily, weekly, or on-demand)
 - **Bookmark import** - Import a `bookmarks.html` file from any browser or service
 - **RSS auto-discovery** - Paste a blog URL and the app finds the feed automatically
-- **Resync recovery** - Deleted output files are detected and re-synced automatically
-- **Status indicator** showing idle/syncing state with badge for unread reviews
-- **Icon animation** during sync operations
-- **Native notifications** on sync completion or failure
-- **Keyboard shortcuts** for common actions
-- **No dock icon** - runs quietly in the menu bar
+- **Native notifications** on sync completion or failure (with configurable sounds)
+- **Launch at login** via system autostart
+- **URL scheme** - `pullread://save?url=...` to save articles from other apps
+- **Auto-updates** - Built-in update mechanism checks for new versions
+
+### Platform Support
+
+| Platform | Status | Notes |
+|----------|--------|-------|
+| **macOS** (ARM) | Supported | Primary target, full feature parity |
+| **macOS** (Intel) | Supported | Universal binary via CI |
+| **Windows** | Planned | Platform stubs in place |
+| **Linux** | Planned | Platform stubs in place |
+
+The platform abstraction layer (`src-tauri/src/platform/`) provides a `PlatformServices` trait with implementations for macOS (Keychain, NSSpellChecker) and stubs for Windows/Linux.
+
+### macOS-Specific Features
+
+These features use native macOS APIs and are available only on macOS:
+
+- **Keychain integration** - API keys stored securely in macOS Keychain
+- **Grammar checking** - Local grammar check via NSSpellChecker
+- **Spotlight indexing** - Articles indexed for macOS search (via Swift helper)
+- **Share Extension** - Accept URLs from macOS Share sheet (via companion appex)
+- **Shortcuts/Siri** - "Save article", "Sync feeds" via App Intents
+
+On other platforms, these features degrade gracefully (API keys in config file, no grammar check, no system search indexing).
 
 ### Article Reader
 
-The built-in article reader (`pullread view` or **View Articles** in the menu bar app) is a two-pane web UI served on `localhost:7777`. It supports themes (Light, Dark, Sepia), multiple font families, adjustable text sizes, highlights, notes, and full keyboard navigation.
+The built-in article reader (**View Articles** in the menu bar) is a two-pane web UI served on a dynamic localhost port. It supports themes (Light, Dark, Sepia), multiple font families, adjustable text sizes, highlights, notes, and full keyboard navigation.
 
 #### Highlights & Notes
 
@@ -515,7 +586,7 @@ Listen to articles read aloud with multiple TTS providers:
 | **ElevenLabs** | ~$1.20-2.40/article | Cloud API, bring your own key |
 
 - Queue multiple articles for continuous playback
-- Adjustable speed (0.5x–2x) with skip/previous controls
+- Adjustable speed (0.5x-2x) with skip/previous controls
 - Audio is cached locally after first listen
 - Paid providers require a separate TTS API key (never shared with summaries)
 - Cost estimates shown in TTS Settings with consent gate before first paid use
@@ -523,7 +594,7 @@ Listen to articles read aloud with multiple TTS providers:
 #### Export Markdown
 
 Share articles as markdown files with optional content:
-- Click **Share → Export Markdown** on any article
+- Click **Share > Export Markdown** on any article
 - Choose what to include: summary, highlights, notes, tags
 - Download as `.md` file or copy to clipboard
 
@@ -545,27 +616,29 @@ Share articles as markdown files with optional content:
 
 Arrow key scrolling is boundary-aware: when you reach the bottom of an article and press Down, or the top and press Up, it automatically advances to the next or previous article.
 
-### Auto-Start on Login
+### URL Scheme
 
-**Via System Preferences:**
-1. Open System Preferences > Users & Groups
-2. Select your user, then "Login Items"
-3. Click + and add Pull Read.app
+PullRead registers the `pullread://` URL scheme for deep linking:
 
-**Via command line:**
-```bash
-osascript -e 'tell application "System Events" to make login item at end with properties {path:"/Applications/Pull Read.app", hidden:false}'
-```
+| URL | Action |
+|-----|--------|
+| `pullread://open` | Open the viewer |
+| `pullread://open?file=article.md` | Open a specific article |
+| `pullread://save?url=https://...` | Save a URL to the inbox for next sync |
+| `pullread://sync` | Trigger a sync |
+| `pullread://notebook?id=my-notebook` | Open a specific notebook |
+
+Use these from browser bookmarklets, Alfred/Raycast, Shortcuts, or other automation tools.
 
 ---
 
 ## Scheduling
 
-### Option 1: macOS Menu Bar App (Recommended)
+### Option 1: Desktop App (Recommended)
 
-The macOS app handles scheduling automatically. Just add it to your Login Items (see [Auto-Start on Login](#auto-start-on-login)) and it stays in your menu bar. Click **Sync Now** or let it sync on launch. You can also schedule **Weekly Reviews** under Settings → Options.
+The desktop app handles scheduling automatically. Configure the sync interval in Settings (`30m`, `1h`, `4h`, `12h`, or `manual`). The app stays in your menu bar and syncs on schedule. You can also schedule **Weekly Reviews** under Settings.
 
-### Option 2: launchd
+### Option 2: launchd (macOS)
 
 Create a plist at `~/Library/LaunchAgents/com.pullread.sync.plist`:
 
@@ -609,13 +682,13 @@ crontab -e
 */30 * * * * cd /path/to/pullread && /usr/local/bin/npm run sync >> /tmp/pullread.log 2>&1
 ```
 
-### Option 4: AppleScript (for idle-based sync)
-
-See `scripts/PullReadScheduler.applescript` for an idle-based scheduler that runs when your Mac has been idle for a set period.
-
 ---
 
 ## Architecture
+
+PullRead uses a **hybrid architecture**: a Tauri shell (Rust) manages the system tray, window, and platform integrations, while the content processing engine remains in TypeScript, bundled as a sidecar binary compiled with Bun.
+
+This design preserves Mozilla Readability's extraction quality (the gold-standard JS implementation) while providing a native desktop experience with cross-platform potential.
 
 ### Project Structure
 
@@ -626,41 +699,97 @@ pullread/
 │   ├── feed.ts                    # RSS/Atom parsing, auto-discovery
 │   ├── extractor.ts               # Article extraction (Readability, YouTube, X.com)
 │   ├── writer.ts                  # Markdown generation with frontmatter
-│   ├── viewer.ts                  # Local article reader (HTTP server on port 7777)
-│   ├── storage.ts                 # JSON file storage operations
+│   ├── viewer.ts                  # Local article reader (HTTP server)
+│   ├── storage.ts                 # SQLite-backed sync state
 │   ├── summarizer.ts              # Article summarization (5 LLM providers)
 │   ├── autotagger.ts              # Machine tagging using LLM providers
 │   ├── tts.ts                     # Text-to-speech (Kokoro, OpenAI, ElevenLabs)
 │   ├── review.ts                  # Weekly review generation
 │   └── *.test.ts                  # Unit tests (86 tests across 5 suites)
 │
-├── PullReadTray/                  # macOS menu bar app (Swift)
+├── src-tauri/                     # Tauri desktop app (Rust)
+│   ├── src/
+│   │   ├── main.rs                # Entry point
+│   │   ├── lib.rs                 # App setup, plugins, startup flow
+│   │   ├── tray.rs                # System tray menu (14 items)
+│   │   ├── sidecar.rs             # Bun binary lifecycle management
+│   │   ├── commands.rs            # IPC commands, viewer window, deep links
+│   │   ├── notifications.rs       # Cross-platform notification helpers
+│   │   ├── timers.rs              # Sync/review scheduling
+│   │   └── platform/              # OS-specific services
+│   │       ├── mod.rs             # PlatformServices trait definition
+│   │       ├── macos.rs           # Keychain, NSSpellChecker
+│   │       ├── windows.rs         # Stubs (Credential Manager)
+│   │       └── linux.rs           # Stubs (keyring, hunspell)
+│   ├── binaries/                  # Sidecar binaries (gitignored, built)
+│   ├── Cargo.toml                 # Rust dependencies
+│   ├── tauri.conf.json            # App configuration
+│   └── capabilities/default.json  # Permission definitions
+│
+├── viewer/                        # Article reader (modular JS)
+│   ├── 00-tauri-shim.js           # Tauri environment detection & helpers
+│   ├── 01-state.js                # Global state and data structures
+│   ├── 02-utils.js                # Helper functions
+│   ├── 03-settings.js             # Preferences UI
+│   ├── 04-article.js              # Article rendering
+│   ├── 05-sidebar.js              # Sidebar/file list
+│   ├── 06-annotations.js          # Highlights and notes
+│   ├── 07-tts.js                  # Text-to-speech controls
+│   ├── 08-ai.js                   # AI summarization
+│   ├── 09-notebooks.js            # Notebook/collection management
+│   ├── 10-explore.js              # Feed discovery
+│   ├── 11-modals.js               # Settings, onboarding, guides
+│   ├── 12-keyboard.js             # Keyboard shortcuts
+│   └── 13-init.js                 # Initialization and auto-refresh
+│
+├── viewer.html                    # Viewer HTML template
+├── viewer.css                     # Viewer styles
+├── viewer-dist/                   # Tauri frontend placeholder (loading screen)
+│
+├── PullReadTray/                  # Legacy Swift menu bar app (macOS only)
 │   ├── PullReadTray/
-│   │   ├── PullReadTrayApp.swift  # SwiftUI entry point
-│   │   ├── AppDelegate.swift      # Menu bar, notifications, review scheduling
-│   │   ├── SyncService.swift      # Bundled CLI binary execution
-│   │   ├── SettingsView.swift     # Feed management, bookmark services, options
-│   │   └── OnboardingView.swift   # First-run setup wizard
+│   │   ├── AppDelegate.swift      # Menu bar, notifications, scheduling
+│   │   ├── SyncService.swift      # CLI binary execution
+│   │   ├── SettingsView.swift     # Native SwiftUI settings
+│   │   ├── KeychainService.swift  # macOS Keychain integration
+│   │   ├── SpotlightIndexer.swift # CoreSpotlight indexing
+│   │   └── Intents/               # Siri Shortcuts
 │   ├── PullReadTrayTests/         # XCTest unit tests
 │   └── PullReadTrayUITests/       # XCTest UI tests
 │
-├── scripts/                       # Build and scheduler scripts
-│   ├── build-release.sh           # Builds universal CLI binary
-│   └── embed-viewer.ts            # Generates viewer-html.ts from viewer.html
-├── viewer.html                    # Article reader source (single-file HTML/JS/CSS)
-├── .github/workflows/             # CI: build, test, sign, notarize
-├── dist/                          # Compiled CLI binaries (gitignored)
-├── feeds.json                     # Dev configuration (gitignored)
-└── feeds.json.example             # Configuration template
+├── scripts/
+│   ├── build-tauri.sh             # Full Tauri build pipeline
+│   ├── prepare-sidecar.sh         # Copy Bun binary with target triple naming
+│   ├── build-release.sh           # Legacy: builds universal CLI binary
+│   ├── embed-viewer.ts            # Inlines viewer modules into viewer-html.ts
+│   └── sync-swift-models.ts       # Updates Swift settings from models.json
+│
+├── .github/workflows/
+│   ├── build-tauri.yml            # CI: Tauri app build (macOS ARM + Intel)
+│   ├── build-macos-app.yml        # CI: Legacy Swift app build
+│   ├── release.yml                # CI: Full release workflow
+│   └── check-models.yml           # CI: Scheduled LLM model checks
+│
+├── docs/plans/                    # Architecture and migration plans
+│   ├── 2026-02-11-tauri-hybrid-migration-plan.md
+│   ├── 2026-02-05-tauri-alternative.md
+│   └── ...
+│
+├── TAURI_MIGRATION_ASSESSMENT.md  # Tauri migration analysis
+├── models.json                    # LLM model registry (single source of truth)
+├── package.json                   # Node dependencies
+├── feeds.json.example             # Configuration template
+└── dist/                          # Compiled CLI binaries (gitignored)
 
 ~/.config/pullread/                # User config directory (created by app)
 ├── feeds.json                     # User's feed configuration
-├── pullread.json                  # Processed URL tracking database
+├── pullread.db                    # SQLite processed URL tracking database
 ├── settings.json                  # LLM and TTS provider settings
 ├── highlights.json                # Article highlights
 ├── notes.json                     # Article notes, tags, and annotations
+├── inbox.json                     # URLs saved via pullread:// scheme
 ├── tts-cache/                     # Cached TTS audio files (mp3/wav)
-└── kokoro-model/                  # Local Kokoro TTS model (~86MB, auto-downloaded)
+└── kokoro-model/                  # Local Kokoro TTS model (~86MB)
 ```
 
 ### Data Flow
@@ -702,28 +831,7 @@ feeds.json
 
 ### Storage Format
 
-The processed URL database is stored as a JSON file at `~/.config/pullread/pullread.json`:
-
-```json
-{
-  "entries": {
-    "https://example.com/article": {
-      "url": "https://example.com/article",
-      "title": "Article Title",
-      "bookmarkedAt": "2024-01-29T19:05:18Z",
-      "processedAt": "2024-01-29T20:00:00Z",
-      "status": "success",
-      "outputFile": "~/Dropbox/Articles/2024-01-29-article-title.md"
-    },
-    "https://example.com/failed-article": {
-      "url": "https://example.com/failed-article",
-      "processedAt": "2024-01-29T20:01:00Z",
-      "status": "failed",
-      "error": "Failed to fetch content (timeout)"
-    }
-  }
-}
-```
+The processed URL database is stored as SQLite at `~/.config/pullread/pullread.db`, tracking URL status (processed/failed), titles, timestamps, and output file paths.
 
 ---
 
@@ -739,23 +847,36 @@ npm install
 
 ### Running in Development
 
+**CLI only (no Tauri):**
 ```bash
 # Run with ts-node (no compilation needed)
 npm run sync
 
-# Or compile and run
-npx tsc
-node dist/index.js sync
+# Start the viewer
+npm run -- view
+```
+
+**Tauri development mode:**
+```bash
+# Build the CLI sidecar first
+bun build src/index.ts --compile --outfile dist/pullread
+bash scripts/prepare-sidecar.sh
+
+# Run Tauri dev mode (hot-reload for Rust changes)
+cd src-tauri && cargo tauri dev
 ```
 
 ### Code Style
 
-- TypeScript with strict mode enabled
+- TypeScript with strict mode enabled (CLI engine)
+- Rust with standard Clippy lints (Tauri shell)
 - ES2022 target
 - Functional approach where practical
 - Minimal dependencies
 
 ### Key Dependencies
+
+**TypeScript CLI:**
 
 | Package | Purpose |
 |---------|---------|
@@ -765,14 +886,28 @@ node dist/index.js sync
 | `turndown` | HTML to Markdown conversion |
 | `kokoro-js` | Local TTS voice synthesis (optional) |
 
+**Tauri Shell (Rust):**
+
+| Crate | Purpose |
+|-------|---------|
+| `tauri` | App framework, window management, system tray |
+| `tauri-plugin-shell` | Sidecar binary spawning |
+| `tauri-plugin-dialog` | Native folder picker |
+| `tauri-plugin-notification` | Desktop notifications |
+| `tauri-plugin-updater` | Auto-update mechanism |
+| `tauri-plugin-deep-link` | URL scheme handling |
+| `tauri-plugin-autostart` | Launch at login |
+| `portpicker` | Dynamic port allocation |
+
 **Build tooling:**
-- **Bun** - Used to compile TypeScript to standalone binaries for the macOS app
+- **Bun** - Compiles TypeScript to standalone binaries for the sidecar
+- **Cargo** - Builds the Tauri Rust application
 
 ---
 
 ## LLM Models
 
-PullRead supports five LLM providers for article summarization, auto-tagging, and reviews. Available models are defined in **`models.json`** (single source of truth) and used by both the CLI and the macOS app.
+PullRead supports five LLM providers for article summarization, auto-tagging, and reviews. Available models are defined in **`models.json`** (single source of truth) and used by both the CLI and the desktop app.
 
 | Provider | Default Model | Notes |
 |----------|---------------|-------|
@@ -837,216 +972,91 @@ npm test
   - Filename slugification
   - Special character handling
 
-### macOS App Tests
+---
+
+## Code Signing & Distribution
+
+### Tauri App
+
+The Tauri build pipeline handles signing, notarization, and packaging via `tauri-apps/tauri-action`. When the required secrets are configured, the CI workflow produces a signed, notarized DMG.
+
+**Important:** The sidecar binary (Bun CLI) must be code-signed separately *before* the Tauri build step, due to a [known Tauri issue](https://github.com/tauri-apps/tauri/issues/11992) with notarization of external binaries.
+
+#### Required Secrets
+
+| Secret | Purpose |
+|--------|---------|
+| `APPLE_CERTIFICATE` | Base64-encoded .p12 signing certificate |
+| `APPLE_CERTIFICATE_PASSWORD` | Certificate password |
+| `APPLE_SIGNING_IDENTITY` | Certificate common name |
+| `APPLE_ID` | Apple ID for notarization |
+| `APPLE_APP_SPECIFIC_PASSWORD` | App-specific password for notarization |
+| `APPLE_TEAM_ID` | Developer team ID |
+| `TAURI_SIGNING_KEY` | Ed25519 private key for update signatures |
+| `TAURI_SIGNING_KEY_PASSWORD` | Key password (optional) |
+
+#### Build Pipeline
 
 ```bash
-cd PullReadTray
-xcodebuild test \
-  -project PullReadTray.xcodeproj \
-  -scheme PullReadTray \
-  -destination 'platform=macOS'
+# Full build:
+bash scripts/build-tauri.sh
+
+# Steps:
+# 1. bun install
+# 2. Embed viewer HTML
+# 3. Compile Bun CLI binary
+# 4. Copy to src-tauri/binaries/ with target triple naming
+# 5. Code-sign sidecar (macOS, if APPLE_SIGNING_IDENTITY set)
+# 6. cargo tauri build (compiles Rust, packages DMG)
 ```
+
+### Legacy Swift App
+
+The original Swift app uses Xcode signing and Sparkle for updates. See [docs/code-signing.md](docs/code-signing.md) for the Xcode-based workflow.
 
 ---
 
-## Code Signing
+## Auto-Updates
 
-The CI workflow automatically signs, notarizes, and staples the macOS app when the required secrets are configured. Without them, the workflow still builds and tests the app — it just produces an unsigned build.
+### Tauri App
 
-### Prerequisites
+The Tauri app uses `tauri-plugin-updater` with Ed25519 signatures for update verification. The update endpoint returns a JSON manifest with download URLs and signatures per platform.
 
-- An [Apple Developer Program](https://developer.apple.com/programs/) membership ($99/year)
-- A **Developer ID Application** certificate (for distributing outside the App Store)
-
-### Step 1: Create a Developer ID Certificate
-
-1. Go to [developer.apple.com/account/resources/certificates](https://developer.apple.com/account/resources/certificates)
-2. Click **+** to create a new certificate
-3. Select **Developer ID Application** and follow the prompts
-4. Download and install the certificate into Keychain Access
-
-### Step 2: Export as .p12
-
-1. Open **Keychain Access**
-2. Find your "Developer ID Application: ..." certificate under **My Certificates**
-3. Right-click → **Export** → choose `.p12` format
-4. Set a strong password (you'll need this for the GitHub secret)
-
-### Step 3: Base64-encode the .p12
-
+**Setup:**
 ```bash
-base64 -i Certificates.p12 | pbcopy
+# Generate signing keys (one-time)
+npx tauri signer generate -- -w ~/.tauri/pullread.key
 ```
 
-This copies the encoded certificate to your clipboard.
+The public key goes in `tauri.conf.json` under `plugins.updater.pubkey`. The private key is stored as a GitHub secret (`TAURI_SIGNING_KEY`) and used at build time.
 
-### Step 4: Create an App-Specific Password
+Users can check for updates via the **Check for Updates...** menu item. The app also checks periodically in the background.
 
-1. Go to [appleid.apple.com](https://appleid.apple.com) → **Sign-In and Security** → **App-Specific Passwords**
-2. Generate a new password and label it "PullRead Notarization"
-3. Save the generated password
+### Legacy Swift App (Sparkle)
 
-### Step 5: Find Your Team ID
+The Swift app uses [Sparkle 2](https://sparkle-project.org/) for automatic updates. See the [Sparkle setup guide](#legacy-sparkle-setup) below for configuration details.
 
-1. Go to [developer.apple.com/account](https://developer.apple.com/account) → **Membership Details**
-2. Copy the **Team ID** (a 10-character alphanumeric string)
+<details>
+<summary><strong>Legacy Sparkle Setup</strong></summary>
 
-### Step 6: Add GitHub Secrets
+Sparkle requires an Ed25519 keypair. The **public key** is shipped in the app bundle (`SUPublicEDKey` in Info.plist). The **private key** stays in GitHub Secrets (`SPARKLE_PRIVATE_KEY`).
 
-Go to your repository's **Settings → Secrets and variables → Actions** and add these five secrets:
+1. Run the **Sparkle Key Generation** workflow in GitHub Actions
+2. Copy both keys from the workflow output
+3. Store the private key as the `SPARKLE_PRIVATE_KEY` secret
+4. Verify `SUPublicEDKey` in Info.plist matches the public key
+5. Enable GitHub Pages for appcast hosting
 
-| Secret | Value |
-|--------|-------|
-| `APPLE_CERTIFICATE_BASE64` | The base64-encoded `.p12` from Step 3 |
-| `APPLE_CERTIFICATE_PASSWORD` | The password you set when exporting the `.p12` |
-| `APPLE_ID` | Your Apple ID email address |
-| `APPLE_ID_PASSWORD` | The app-specific password from Step 4 |
-| `APPLE_TEAM_ID` | Your 10-character Team ID from Step 5 |
+The release workflow automatically builds, signs, notarizes, and publishes the appcast.
 
-### Step 7: Test
+| Info.plist Key | Value | Purpose |
+|----------------|-------|---------|
+| `SUFeedURL` | `https://pullread.com/appcast.xml` | Appcast feed URL |
+| `SUPublicEDKey` | *(base64 Ed25519 key)* | Update signature verification |
+| `SUEnableAutomaticChecks` | `true` | Check on launch |
+| `SUScheduledCheckInterval` | `86400` | Check interval (24 hours) |
 
-Push a commit that touches `PullReadTray/` or `src/` and watch the [Actions tab](../../actions). The workflow will:
-
-1. Build the CLI binary
-2. Import the certificate into a temporary keychain
-3. Build the Xcode project with `CODE_SIGN_IDENTITY="Developer ID Application"`
-4. Sign the app bundle and DMG
-5. Submit for notarization via `xcrun notarytool` and staple the ticket
-6. Upload the signed DMG as a build artifact
-
-If the signing secrets aren't configured, the workflow gracefully falls back to an unsigned build.
-
----
-
-## Auto-Updates (Sparkle)
-
-PullRead uses [Sparkle 2](https://sparkle-project.org/) for automatic updates. When configured, the app checks for updates daily and shows a native macOS update prompt when a new version is available. Users can also check manually via the **Check for Updates...** menu item.
-
-### How It Works
-
-1. The release workflow (`release.yml`) builds a signed, notarized DMG
-2. The DMG is signed with an EdDSA (Ed25519) key for Sparkle verification
-3. An `appcast.xml` feed is generated and published to GitHub Pages
-4. Installed apps check the appcast on a schedule (daily by default)
-5. When a new version is found, Sparkle prompts the user to download and install it
-
-### Setup
-
-Sparkle requires an Ed25519 keypair. The **public key** is shipped in the app bundle so it can verify update signatures. The **private key** stays in GitHub Secrets and is only used during releases to sign the DMG.
-
-> **One-time setup only.** These steps need to be done once when first configuring Sparkle for a fork or fresh repo. After setup, releases are fully automated from the GitHub Actions UI.
-
-#### Step 1: Generate Ed25519 Signing Keys
-
-1. Go to your repo on GitHub
-2. Click **Actions** → **Sparkle Key Generation (one-time)** → **Run workflow** → **Run workflow**
-3. Wait for the job to complete, then click into the completed job
-4. Expand the **Generate Ed25519 keys** step to see the output
-
-The output will contain two things you need to copy:
-
-**The public key** looks like this in the output:
-```
-<key>SUPublicEDKey</key>
-<string>kp53pifY8xCdPlB+Z+laUwknXBgRMJLTxFIAk+7/0rc=</string>
-```
-
-**The private key** is printed between the separator lines by `generate_keys -p`. It will be a long base64 string.
-
-> **Important:** The CI runner is ephemeral — once the job finishes, the keys are gone forever. Copy both keys from the log output before navigating away. If you lose them, re-run the workflow to generate a new pair.
-
-#### Step 2: Store the Private Key as a GitHub Secret (manual copy-paste required)
-
-This is a one-time manual step. GitHub Secrets cannot be set by workflows — you must paste the value yourself.
-
-1. Copy the **private key** string from the workflow output (Step 1)
-2. Go to your repo → **Settings** → **Secrets and variables** → **Actions**
-3. Click **New repository secret**
-4. Name: `SPARKLE_PRIVATE_KEY`
-5. Value: paste the private key you copied
-6. Click **Add secret**
-
-The private key is only accessed by the `release.yml` workflow during the "Sign DMG for Sparkle" and "Update Sparkle appcast" steps. It never appears in source code.
-
-#### Step 3: Update the Public Key in Info.plist (if regenerating keys)
-
-The public key is already set in `PullReadTray/PullReadTray/Info.plist` under `SUPublicEDKey`. If you ran the keygen workflow and got a **different** public key than what's currently in Info.plist, you need to update it:
-
-1. Open `PullReadTray/PullReadTray/Info.plist`
-2. Find the `SUPublicEDKey` entry
-3. Replace the `<string>...</string>` value with your new public key from the workflow output
-4. Commit and push the change
-
-If the public key matches what's already in Info.plist, skip this step.
-
-#### Step 4: Enable GitHub Pages (if not already configured)
-
-The Sparkle appcast is served from GitHub Pages. If your repo already has GitHub Pages enabled (e.g., serving `pullread.com`), this step is already done.
-
-Otherwise:
-
-1. Go to your repo → **Settings** → **Pages**
-2. Under **Source**, select **Deploy from a branch**
-3. Set **Branch** to `gh-pages` / `root`
-4. Click **Save**
-
-The `deploy-site.yml` workflow publishes `site/appcast.xml` (and any other site content) automatically.
-
-#### Setup Checklist
-
-- [ ] Ran **Sparkle Key Generation** workflow and copied both keys from the log output
-- [ ] Created `SPARKLE_PRIVATE_KEY` secret in repo Settings with the private key
-- [ ] Verified `SUPublicEDKey` in Info.plist matches the public key from the workflow
-- [ ] Enabled GitHub Pages (Settings → Pages → gh-pages / root) — already done if pullread.com is live
-
-### Releasing an Update
-
-Once Sparkle is configured, cut a new release entirely from the GitHub UI — no CLI or git tags required:
-
-1. Go to **Actions** → **Build and Release** → **Run workflow**
-2. Enter the version number (e.g., `1.1.0`)
-3. Click **Run workflow**
-
-The workflow automatically:
-1. Creates and pushes a `v1.1.0` git tag
-2. Builds the universal CLI binary (arm64 + x64)
-3. Builds, signs, and notarizes the app and DMG
-4. Signs the DMG with the Sparkle private key
-5. Creates a GitHub Release with the DMG attached
-6. Generates a new `appcast.xml` and pushes it to the site
-7. GitHub Pages deploys the updated appcast
-
-Alternatively, pushing a tag (`git tag v1.1.0 && git push origin v1.1.0`) triggers the same workflow.
-
-Existing users with Sparkle enabled will see the update prompt within 24 hours (or immediately via **Check for Updates...**).
-
-### Configuration Reference
-
-These values are set in `PullReadTray/PullReadTray/Info.plist`:
-
-| Key | Value | Purpose |
-|-----|-------|---------|
-| `SUFeedURL` | `https://pullread.com/appcast.xml` | URL of the Sparkle appcast feed |
-| `SUPublicEDKey` | *(base64 Ed25519 public key)* | Verifies update signatures |
-| `SUEnableAutomaticChecks` | `true` | Check for updates on launch |
-| `SUScheduledCheckInterval` | `86400` | Check interval in seconds (24 hours) |
-
-### Important Notes
-
-- **Existing users without Sparkle** cannot be auto-updated. If a user installed a version before Sparkle was enabled, they need to manually download the new version once. After that, all future updates are automatic.
-- **The public key is safe to commit.** It can only verify signatures, not create them. This is by design — Sparkle needs it in the app bundle.
-- **If you regenerate keys**, you must update `SUPublicEDKey` in Info.plist to match the new public key, and update the `SPARKLE_PRIVATE_KEY` secret with the new private key. The old and new keys are not interchangeable.
-
-### GitHub Secrets Summary
-
-| Secret | Purpose | Required For |
-|--------|---------|--------------|
-| `SPARKLE_PRIVATE_KEY` | Signs DMGs for Sparkle update verification | `release.yml` |
-| `APPLE_CERTIFICATE_BASE64` | Code signing certificate | `release.yml` |
-| `APPLE_CERTIFICATE_PASSWORD` | Certificate password | `release.yml` |
-| `APPLE_ID` | Apple ID for notarization | `release.yml` |
-| `APPLE_ID_PASSWORD` | App-specific password for notarization | `release.yml` |
-| `APPLE_TEAM_ID` | Developer team ID | `release.yml` |
+</details>
 
 ---
 
@@ -1073,9 +1083,25 @@ npm install
 
 **Storage file is corrupted**
 ```bash
-# Reset the storage file (will re-fetch all articles)
-rm ~/.config/pullread/pullread.json
+# Reset the database (will re-fetch all articles)
+rm ~/.config/pullread/pullread.db
 # Then run a new sync from the app or CLI
+```
+
+**Tauri app won't start**
+```bash
+# Check logs
+tail -f /tmp/pullread.log
+
+# Verify sidecar binary exists and is executable
+ls -la src-tauri/binaries/pullread-cli-*
+```
+
+**Sidecar binary not found**
+```bash
+# Rebuild the sidecar
+bun build src/index.ts --compile --outfile dist/pullread
+bash scripts/prepare-sidecar.sh
 ```
 
 ### Viewing Logs
@@ -1083,10 +1109,10 @@ rm ~/.config/pullread/pullread.json
 ```bash
 # CLI output is printed to terminal
 
-# macOS app logs
+# Desktop app logs
 tail -f /tmp/pullread.log
 
-# View in Console.app
+# View in Console.app (macOS)
 # Filter by "PullRead"
 ```
 
@@ -1094,41 +1120,18 @@ tail -f /tmp/pullread.log
 
 ## Room for Improvement
 
-This project works well for its intended purpose, but there are several areas that could be enhanced:
-
 ### Code Quality
 
 - **Add ESLint/Prettier** - The codebase currently lacks linting configuration. Adding ESLint with TypeScript support and Prettier for formatting would improve code consistency.
-
 - **Increase type safety** - Some areas use `any` types that could be more strictly typed, particularly in the feed parsing logic where the XML structure varies.
-
 - **Error handling refinement** - While errors are caught and logged, the error types could be more specific (network errors vs parsing errors vs extraction errors) to enable smarter retry logic.
 
 ### Functionality
 
 - **Parallel fetching** - Currently processes feeds sequentially. Could use `Promise.all` with concurrency limits for faster syncs with many feeds.
-
 - **Configurable extraction** - Some sites work better with custom extraction rules. A `siteRules.json` for site-specific selectors would help.
-
 - **Incremental sync** - The feed is re-fetched entirely each time. Supporting `If-Modified-Since` headers would reduce bandwidth.
-
 - **Content caching** - Store extracted content in SQLite to enable re-generating markdown without re-fetching.
-
-### User Experience
-
-- **Progress indicators** - Long syncs could benefit from a progress bar or percentage indicator.
-
-- **Configuration validation** - Validate `feeds.json` on load and provide helpful error messages for common mistakes.
-
-- **Interactive mode** - A `--dry-run` flag to preview what would be synced without actually processing.
-
-### Documentation
-
-- **JSDoc comments** - Add documentation comments to public functions for better IDE support.
-
-- **Architecture diagram** - A visual diagram showing the data flow would help new contributors.
-
-- **Example outputs** - Include sample markdown files in the repo to show expected output.
 
 ---
 
@@ -1136,15 +1139,15 @@ This project works well for its intended purpose, but there are several areas th
 
 Ideas that would extend PullRead's capabilities:
 
-- **Browser extension** - "Send to PullRead" button that adds URLs directly to a local feed
-- **Multi-platform tray app** - Electron or Tauri version for Windows/Linux
+- **Windows & Linux builds** - Platform stubs are in place; needs CI runners and platform testing
+- **Browser extension** - "Send to PullRead" button that uses the `pullread://save` URL scheme
 - **Kindle/epub export** - Convert markdown collection to ebook format
 - **Webhook support** - Trigger sync via webhook for real-time updates
 - **Self-hosted option** - Run as a service with web interface
 - **Sync to Obsidian/Notion** - Direct integration with note-taking apps
 - **Recommendations** - Suggest similar articles based on reading history and tags
-- **iOS companion app** - View synced articles with iCloud sync
-- **Alfred/Raycast extension** - Quick actions for macOS power users
+- **iOS companion app** - View synced articles with iCloud sync (Tauri supports iOS)
+- **Alfred/Raycast extension** - Quick actions using `pullread://` URL scheme
 
 ---
 
@@ -1165,15 +1168,15 @@ Contributions are welcome! Here's how to get started:
 - Write tests for new functionality
 - Keep commits focused and atomic
 - Update documentation for user-facing changes
-- Follow existing code style
+- Follow existing code style (TypeScript for CLI, Rust for Tauri shell)
 
 ### Areas Seeking Contributions
 
-- Windows/Linux scheduling scripts
+- Windows/Linux platform implementations (`src-tauri/src/platform/`)
 - Additional feed format support (JSON Feed)
 - Site-specific extraction rules
-- Documentation improvements
 - Test coverage expansion
+- Tauri app testing and polish
 
 ---
 
@@ -1181,15 +1184,15 @@ Contributions are welcome! Here's how to get started:
 
 ### Content and copyright
 
-Pull Read is a tool that fetches, extracts, and saves web content at your direction. **You are responsible for ensuring that your use complies with applicable copyright laws and the terms of service of any websites or services you access.** Only sync content you are authorized to copy or that is available under terms permitting personal archival. Do not use Pull Read to redistribute or commercially exploit content you do not have rights to.
+PullRead is a tool that fetches, extracts, and saves web content at your direction. **You are responsible for ensuring that your use complies with applicable copyright laws and the terms of service of any websites or services you access.** Only sync content you are authorized to copy or that is available under terms permitting personal archival. Do not use PullRead to redistribute or commercially exploit content you do not have rights to.
 
 ### Privacy
 
-Pull Read is local-first by design. Articles, highlights, notes, and reading history stay on your Mac. Data is only sent to third parties when you explicitly use optional AI features (summaries, auto-tagging, reviews, cloud TTS), at which point article text is transmitted to your selected provider using your own API key. Browser TTS, Kokoro local TTS, and all reading features work entirely on-device. See [Privacy Policy](https://pullread.com/privacy) for details.
+PullRead is local-first by design. Articles, highlights, notes, and reading history stay on your machine. Data is only sent to third parties when you explicitly use optional AI features (summaries, auto-tagging, reviews, cloud TTS), at which point article text is transmitted to your selected provider using your own API key. Browser TTS, Kokoro local TTS, and all reading features work entirely on-device. See [Privacy Policy](https://pullread.com/privacy) for details.
 
 ### Third-party services
 
-Pull Read is **not affiliated with, endorsed by, or sponsored by** Instapaper, Pinboard, Raindrop, Omnivore, Feedbin, YouTube, X (Twitter), Anthropic, OpenAI, Google, ElevenLabs, OpenRouter, or any other third-party service. All trademarks belong to their respective owners.
+PullRead is **not affiliated with, endorsed by, or sponsored by** Instapaper, Pinboard, Raindrop, Omnivore, Feedbin, YouTube, X (Twitter), Anthropic, OpenAI, Google, ElevenLabs, OpenRouter, or any other third-party service. All trademarks belong to their respective owners.
 
 ### Third-party notices
 
@@ -1210,6 +1213,7 @@ See [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES) for open-source license attributi
 - [fast-xml-parser](https://github.com/NaturalIntelligence/fast-xml-parser) - Fast and reliable XML parsing
 - [Kokoro](https://github.com/hexgrad/kokoro) - High-quality local text-to-speech model
 - [Bun](https://bun.sh) - Fast JavaScript runtime used to build standalone binaries
+- [Tauri](https://tauri.app) - Lightweight cross-platform desktop app framework
 
 ---
 
