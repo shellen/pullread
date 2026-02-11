@@ -106,6 +106,7 @@ function listFiles(outputPath: string): FileMeta[] {
 
 // Annotations storage path
 const ANNOTATIONS_DIR = join(homedir(), '.config', 'pullread');
+const FEEDS_PATH = join(ANNOTATIONS_DIR, 'feeds.json');
 const HIGHLIGHTS_PATH = join(ANNOTATIONS_DIR, 'highlights.json');
 const NOTES_PATH = join(ANNOTATIONS_DIR, 'notes.json');
 const NOTEBOOKS_PATH = join(ANNOTATIONS_DIR, 'notebooks.json');
@@ -476,6 +477,47 @@ export function startViewer(outputPath: string, port = 7777): void {
       return;
     }
 
+    // App config API (feeds.json — output path, feeds, sync interval, browser cookies)
+    if (url.pathname === '/api/config') {
+      if (req.method === 'GET') {
+        const config = loadJsonFile(FEEDS_PATH) as Record<string, unknown>;
+        sendJson(res, {
+          outputPath: config.outputPath || '',
+          feeds: config.feeds || {},
+          syncInterval: config.syncInterval || '1h',
+          useBrowserCookies: !!config.useBrowserCookies,
+          configured: !!(config.outputPath && config.feeds && Object.keys(config.feeds as object).length > 0)
+        });
+        return;
+      }
+      if (req.method === 'POST') {
+        try {
+          const body = JSON.parse(await readBody(req));
+          const existing = loadJsonFile(FEEDS_PATH);
+          // Merge incoming fields with existing config
+          if (body.outputPath !== undefined) existing.outputPath = body.outputPath;
+          if (body.feeds !== undefined) existing.feeds = body.feeds;
+          if (body.syncInterval !== undefined) existing.syncInterval = body.syncInterval;
+          if (body.useBrowserCookies !== undefined) existing.useBrowserCookies = body.useBrowserCookies;
+          saveJsonFile(FEEDS_PATH, existing);
+
+          // Create output directory if it doesn't exist
+          if (existing.outputPath) {
+            const expandedPath = (existing.outputPath as string).replace(/^~/, homedir());
+            if (!existsSync(expandedPath)) {
+              mkdirSync(expandedPath, { recursive: true });
+            }
+          }
+
+          sendJson(res, { ok: true });
+        } catch (err) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid request body' }));
+        }
+        return;
+      }
+    }
+
     // Settings API (LLM config)
     if (url.pathname === '/api/settings') {
       if (req.method === 'GET') {
@@ -493,12 +535,17 @@ export function startViewer(outputPath: string, port = 7777): void {
         try {
           const body = JSON.parse(await readBody(req));
           const { provider, apiKey, model } = body;
-          if (!provider || !apiKey) {
+          if (!provider) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'provider and apiKey are required' }));
+            res.end(JSON.stringify({ error: 'provider is required' }));
             return;
           }
-          saveLLMConfig({ provider, apiKey, model: model || getDefaultModel(provider) });
+          if (provider !== 'apple' && !apiKey) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'apiKey is required for this provider' }));
+            return;
+          }
+          saveLLMConfig({ provider, apiKey: apiKey || '', model: model || getDefaultModel(provider) });
           sendJson(res, { ok: true });
         } catch (err) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -816,6 +863,60 @@ export function startViewer(outputPath: string, port = 7777): void {
       return;
     }
 
+    // Backup API — export all user data as a single JSON download
+    if (url.pathname === '/api/backup' && req.method === 'GET') {
+      const backupFiles = ['feeds.json', 'settings.json', 'highlights.json', 'notes.json', 'notebooks.json', 'inbox.json'];
+      const backup: Record<string, unknown> = {
+        _pullread_backup: true,
+        _version: '1',
+        _createdAt: new Date().toISOString(),
+      };
+      for (const f of backupFiles) {
+        const p = join(ANNOTATIONS_DIR, f);
+        if (existsSync(p)) {
+          try { backup[f] = JSON.parse(readFileSync(p, 'utf-8')); } catch {}
+        }
+      }
+      // Include sync database if it exists
+      const dbPath = join(ANNOTATIONS_DIR, 'pullread.json');
+      if (existsSync(dbPath)) {
+        try { backup['pullread.json'] = JSON.parse(readFileSync(dbPath, 'utf-8')); } catch {}
+      }
+      const body = JSON.stringify(backup, null, 2);
+      const dateStr = new Date().toISOString().slice(0, 10);
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Content-Disposition': `attachment; filename="pullread-backup-${dateStr}.json"`,
+      });
+      res.end(body);
+      return;
+    }
+
+    // Restore API — import a backup JSON file
+    if (url.pathname === '/api/restore' && req.method === 'POST') {
+      try {
+        const body = JSON.parse(await readBody(req));
+        if (!body._pullread_backup) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Not a valid PullRead backup file' }));
+          return;
+        }
+        const restorableFiles = ['feeds.json', 'settings.json', 'highlights.json', 'notes.json', 'notebooks.json', 'inbox.json', 'pullread.json'];
+        let restored = 0;
+        for (const f of restorableFiles) {
+          if (body[f] && typeof body[f] === 'object') {
+            saveJsonFile(join(ANNOTATIONS_DIR, f), body[f]);
+            restored++;
+          }
+        }
+        sendJson(res, { ok: true, restored });
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid backup file' }));
+      }
+      return;
+    }
+
     send404(res);
   });
 
@@ -824,6 +925,27 @@ export function startViewer(outputPath: string, port = 7777): void {
     console.log(`PullRead viewer running at ${url}`);
     console.log(`Reading from: ${outputPath}`);
     console.log('Press Ctrl+C to stop\n');
+
+    // Eagerly preload Kokoro if it's the configured TTS provider so the model
+    // is warm on first listen and native-library errors surface immediately.
+    const ttsConfig = loadTTSConfig();
+    if (ttsConfig.provider === 'kokoro') {
+      const model = ttsConfig.model || 'kokoro-v1-q8';
+      const status = getKokoroStatus();
+      if (status.bundled) {
+        console.log(`[TTS] Kokoro model bundled with app — loading ${model}...`);
+      } else {
+        console.log(`[TTS] Kokoro is configured — preloading ${model} (may download on first run)...`);
+      }
+      preloadKokoro(model).then(result => {
+        if (result.ready) {
+          console.log('[TTS] Kokoro model loaded and ready');
+        } else {
+          console.error('[TTS] Kokoro preload failed:', result.error);
+          console.error('[TTS] Audio will fall back to browser speech synthesis');
+        }
+      });
+    }
 
     // Open browser
     const cmd = process.platform === 'darwin' ? 'open'

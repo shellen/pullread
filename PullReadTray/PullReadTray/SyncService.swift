@@ -26,13 +26,21 @@ class SyncService {
         return FileManager.default.fileExists(atPath: binaryPath)
     }
 
-    /// Build process environment with DYLD_LIBRARY_PATH pointing to Resources
-    /// so the ONNX Runtime dylib (bundled for Kokoro TTS) is found at runtime.
+    /// Build process environment with paths pointing to bundled Resources
+    /// so the ONNX Runtime dylib and Kokoro model are found at runtime.
     private func processEnvironment() -> [String: String] {
         var env = ProcessInfo.processInfo.environment
         if let resourcePath = Bundle.main.resourcePath {
+            // DYLD_LIBRARY_PATH: lets the ONNX Runtime dylib load from the app bundle
             let existing = env["DYLD_LIBRARY_PATH"] ?? ""
             env["DYLD_LIBRARY_PATH"] = existing.isEmpty ? resourcePath : "\(resourcePath):\(existing)"
+
+            // PULLREAD_KOKORO_MODEL_DIR: tells tts.ts where the bundled Kokoro model lives
+            // so it can use it directly without downloading from HuggingFace
+            let kokoroModelPath = "\(resourcePath)/kokoro-model"
+            if FileManager.default.fileExists(atPath: kokoroModelPath) {
+                env["PULLREAD_KOKORO_MODEL_DIR"] = kokoroModelPath
+            }
         }
         return env
     }

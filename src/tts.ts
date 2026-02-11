@@ -12,6 +12,17 @@ const SETTINGS_PATH = join(homedir(), '.config', 'pullread', 'settings.json');
 const CACHE_DIR = join(homedir(), '.config', 'pullread', 'tts-cache');
 const KOKORO_MODEL_DIR = join(homedir(), '.config', 'pullread', 'kokoro-model');
 
+/** Resolve the best Kokoro model directory — bundled (from app Resources) or user cache */
+function resolveKokoroModelDir(): string {
+  // If running inside the macOS app, SyncService sets this to the bundled model path
+  const bundled = process.env.PULLREAD_KOKORO_MODEL_DIR;
+  if (bundled && existsSync(bundled)) {
+    return bundled;
+  }
+  // Fall back to user cache directory (downloaded on first use)
+  return KOKORO_MODEL_DIR;
+}
+
 export interface TTSConfig {
   provider: 'browser' | 'kokoro' | 'openai' | 'elevenlabs';
   apiKey?: string;
@@ -57,8 +68,8 @@ export const TTS_VOICES: Record<string, { id: string; label: string }[]> = {
 
 export const TTS_MODELS: Record<string, { id: string; label: string }[]> = {
   kokoro: [
-    { id: 'kokoro-v1-q8', label: 'Kokoro v1 (q8, 86MB)' },
-    { id: 'kokoro-v1-q4', label: 'Kokoro v1 (q4, 47MB, faster)' },
+    { id: 'kokoro-v1-q8', label: 'Kokoro v1 (q8, 92MB)' },
+    { id: 'kokoro-v1-q4', label: 'Kokoro v1 (q4, 305MB)' },
   ],
   openai: [
     { id: 'tts-1', label: 'TTS-1 (fast)' },
@@ -245,9 +256,11 @@ function httpsPost(url: string, headers: Record<string, string>, body: string | 
 }
 
 /** Check if Kokoro model is downloaded and ready */
-export function getKokoroStatus(): { installed: boolean; modelPath: string } {
-  const installed = existsSync(KOKORO_MODEL_DIR) && readdirSync(KOKORO_MODEL_DIR).length > 0;
-  return { installed, modelPath: KOKORO_MODEL_DIR };
+export function getKokoroStatus(): { installed: boolean; modelPath: string; bundled: boolean } {
+  const modelDir = resolveKokoroModelDir();
+  const installed = existsSync(modelDir) && readdirSync(modelDir).length > 0;
+  const bundled = !!process.env.PULLREAD_KOKORO_MODEL_DIR && existsSync(process.env.PULLREAD_KOKORO_MODEL_DIR);
+  return { installed, modelPath: modelDir, bundled };
 }
 
 /**
@@ -280,9 +293,18 @@ async function getKokoroPipeline(model: string): Promise<any> {
   try {
     const { KokoroTTS } = await import('kokoro-js');
     const dtype = model === 'kokoro-v1-q4' ? 'q4' : 'q8';
+    const modelDir = resolveKokoroModelDir();
+
+    // If the model is bundled inside the app, use that path directly.
+    // Otherwise fall back to downloading from HuggingFace Hub.
+    const bundled = process.env.PULLREAD_KOKORO_MODEL_DIR && existsSync(process.env.PULLREAD_KOKORO_MODEL_DIR);
+    const modelSource = bundled
+      ? modelDir  // Local path to bundled model — no download needed
+      : 'onnx-community/Kokoro-82M-v1.0-ONNX';  // HuggingFace Hub model ID
+
     kokoroPipeline = await KokoroTTS.from_pretrained(
-      'onnx-community/Kokoro-82M-v1.0-ONNX',
-      { dtype, cache_dir: KOKORO_MODEL_DIR }
+      modelSource,
+      { dtype, cache_dir: modelDir }
     );
     return kokoroPipeline;
   } finally {

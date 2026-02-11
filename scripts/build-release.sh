@@ -98,6 +98,9 @@ build_cli() {
     fi
 
     echo "  Built: dist/pullread"
+
+    # Download Kokoro TTS model for bundling
+    bash "$ROOT_DIR/scripts/download-kokoro-model.sh"
 }
 
 # Build the app
@@ -131,7 +134,37 @@ bundle_cli() {
     # Copy binary (viewer.html is embedded in the binary at compile time)
     cp "$ROOT_DIR/dist/pullread" "$RESOURCES_PATH/"
 
+    # Bundle third-party license notices
+    if [ -d "$ROOT_DIR/Licenses" ]; then
+        cp -R "$ROOT_DIR/Licenses" "$RESOURCES_PATH/Licenses"
+    fi
+
+    # Bundle Kokoro TTS model so it works from first launch without downloads
+    if [ -d "$ROOT_DIR/dist/kokoro-model" ]; then
+        echo "  Bundling Kokoro TTS model..."
+        cp -R "$ROOT_DIR/dist/kokoro-model" "$RESOURCES_PATH/kokoro-model"
+    else
+        echo_error "Kokoro model not found at dist/kokoro-model — run scripts/download-kokoro-model.sh"
+        exit 1
+    fi
+
+    # Bundle the ONNX Runtime dylib (required for Kokoro TTS)
+    ONNX_DYLIB=$(find "$ROOT_DIR/node_modules" -name 'libonnxruntime*.dylib' -print -quit 2>/dev/null || true)
+    if [ -n "$ONNX_DYLIB" ]; then
+        echo "  Bundling ONNX Runtime dylib: $ONNX_DYLIB"
+        cp "$ONNX_DYLIB" "$RESOURCES_PATH/"
+    else
+        echo_warning "ONNX Runtime dylib not found in node_modules — Kokoro may not work"
+    fi
+
     IDENTITY="Developer ID Application"
+
+    # Sign the ONNX Runtime dylib if present
+    for dylib in "$RESOURCES_PATH"/libonnxruntime*.dylib; do
+        [ -f "$dylib" ] || continue
+        codesign --force --options runtime --timestamp \
+            --sign "$IDENTITY" "$dylib"
+    done
 
     # Sign the bundled CLI binary (hardened runtime + timestamp required for notarization)
     # Entitlements allow Kokoro's ONNX Runtime to load native libraries
@@ -147,7 +180,7 @@ bundle_cli() {
     codesign --force --options runtime --timestamp \
         --sign "$IDENTITY" "$APP_PATH"
 
-    echo "  CLI bundled and signed."
+    echo "  CLI and Kokoro model bundled and signed."
 }
 
 # Notarize the app

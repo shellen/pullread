@@ -119,16 +119,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             guard let self = self else { return }
 
-            if self.syncService.isFirstRun() {
-                // First run - show welcome/setup
-                self.showSettings(isFirstRun: true)
-            } else if !self.syncService.isConfigValid() {
-                // Config exists but is invalid
-                self.showAlert(
-                    title: "Configuration Required",
-                    message: "Your feeds.json configuration appears to be incomplete. Please configure your settings."
-                )
-                self.showSettings(isFirstRun: false)
+            if self.syncService.isFirstRun() || !self.syncService.isConfigValid() {
+                // Open the web viewer — it has a built-in onboarding wizard
+                // that handles setup (output folder, feeds, options) on first run
+                self.viewArticles()
             }
         }
     }
@@ -235,12 +229,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
-        // Settings
-        let openConfigMenuItem = NSMenuItem(title: "Settings...", action: #selector(openConfig), keyEquivalent: ",")
-        openConfigMenuItem.target = self
-        openConfigMenuItem.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: nil)
-        menu.addItem(openConfigMenuItem)
-
         // View Logs
         let logsMenuItem = NSMenuItem(title: "Logs", action: #selector(viewLogs), keyEquivalent: "l")
         logsMenuItem.target = self
@@ -262,12 +250,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(checkForUpdatesMenuItem)
 
         menu.addItem(NSMenuItem.separator())
-
-        // Welcome Guide
-        let welcomeMenuItem = NSMenuItem(title: "Welcome Guide", action: #selector(showWelcomeGuide), keyEquivalent: "")
-        welcomeMenuItem.target = self
-        welcomeMenuItem.image = NSImage(systemSymbolName: "questionmark.circle", accessibilityDescription: nil)
-        menu.addItem(welcomeMenuItem)
 
         // About
         let aboutMenuItem = NSMenuItem(title: "About PullRead", action: #selector(showAbout), keyEquivalent: "")
@@ -503,7 +485,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
-        content.sound = .default
+        if UserDefaults.standard.bool(forKey: "notificationSounds") {
+            content.sound = .default
+        }
 
         let request = UNNotificationRequest(
             identifier: UUID().uuidString,

@@ -22,18 +22,42 @@ const turndown = new TurndownService({
   codeBlockStyle: 'fenced'
 });
 
-// When <a> wraps a single <img> (Substack lightbox, etc.), emit just the image.
-// The wrapping link produces [![alt](url)](url) which marked.js chokes on for long URLs.
+// When <a> wraps an <img> — directly or inside a wrapper <div>/<figure>/<picture>
+// (Substack uses <a> > <div class="captioned-image-container"> > <img>).
+// Without this rule, Turndown produces [![alt](long-url)](long-url) which
+// marked.js cannot parse when the URL is very long (Substack CDN URLs).
+function findImgInside(node: any): any {
+  if (node.nodeName === 'IMG') return node;
+  if (node.childNodes) {
+    for (let i = 0; i < node.childNodes.length; i++) {
+      const found = findImgInside(node.childNodes[i]);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 turndown.addRule('linkedImage', {
   filter: function(node) {
-    return node.nodeName === 'A'
-      && node.childNodes.length === 1
-      && node.childNodes[0].nodeName === 'IMG';
+    return node.nodeName === 'A' && !!findImgInside(node);
   },
   replacement: function(_content, node) {
-    const img = node.childNodes[0] as any;
-    const alt = img.getAttribute?.('alt') || '';
-    const src = img.getAttribute?.('src') || '';
+    const img = findImgInside(node);
+    const alt = img?.getAttribute?.('alt') || '';
+    const src = simplifySubstackUrl(img?.getAttribute?.('src') || '');
+    return `\n\n![${alt}](${src})\n\n`;
+  }
+});
+
+// Standalone <img> tags with Substack CDN URLs — simplify at conversion time
+turndown.addRule('substackImage', {
+  filter: function(node) {
+    return node.nodeName === 'IMG'
+      && /substackcdn\.com\/image\/fetch/.test(node.getAttribute?.('src') || '');
+  },
+  replacement: function(_content, node) {
+    const alt = (node as any).getAttribute?.('alt') || '';
+    const src = simplifySubstackUrl((node as any).getAttribute?.('src') || '');
     return `\n\n![${alt}](${src})\n\n`;
   }
 });
@@ -77,6 +101,32 @@ function normalizeUrl(url: string): string {
   }
 
   return u.toString();
+}
+
+/**
+ * Simplify Substack CDN image proxy URLs.
+ * Input:  https://substackcdn.com/image/fetch/w_1456,c_limit,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fabc.png
+ * Output: https://substack-post-media.s3.amazonaws.com/public/images/abc.png
+ *
+ * These proxy URLs are extremely long and contain commas/colons that break
+ * markdown parsers. The inner URL (after the last slash-encoded https) is
+ * the actual image and works directly.
+ */
+export function simplifySubstackUrl(src: string): string {
+  if (!src.includes('substackcdn.com/image/fetch')) return src;
+
+  // The URL structure is: .../image/fetch/<transforms>/<encoded-real-url>
+  // The real URL is percent-encoded after the transforms.
+  const match = src.match(/\/image\/fetch\/[^/]*\/(https?[:%].*)/);
+  if (match) {
+    try {
+      return decodeURIComponent(match[1]);
+    } catch {
+      // If decoding fails, it might already be decoded
+      return match[1];
+    }
+  }
+  return src;
 }
 
 export function shouldSkipUrl(url: string): string | null {
@@ -131,6 +181,12 @@ export function resolveRelativeUrls(markdown: string, baseUrl: string): string {
         return `[${text}](${relPath})`;
       }
     }
+  );
+
+  // Simplify any remaining Substack CDN image URLs that survived the Turndown rules
+  markdown = markdown.replace(
+    /!\[([^\]]*)\]\((https:\/\/substackcdn\.com\/image\/fetch\/[^)]+)\)/g,
+    (_, alt, url) => `![${alt}](${simplifySubstackUrl(url)})`
   );
 
   return markdown;

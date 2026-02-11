@@ -96,7 +96,19 @@ jobs:
 
           file dist/pullread
 
-          # Free space: remove node_modules and bun cache immediately
+          # Download Kokoro TTS model for bundling into the app
+          bash scripts/download-kokoro-model.sh
+
+          # Copy ONNX Runtime dylib to dist before cleaning node_modules
+          ONNX_DYLIB=$(find node_modules -name 'libonnxruntime*.dylib' -print -quit 2>/dev/null || true)
+          if [ -n "$ONNX_DYLIB" ]; then
+            echo "Preserving ONNX Runtime dylib: $ONNX_DYLIB"
+            cp "$ONNX_DYLIB" dist/
+          else
+            echo "WARNING: ONNX Runtime dylib not found in node_modules"
+          fi
+
+          # Free space: remove node_modules and bun cache
           rm -rf node_modules
 
       - name: Check for signing secrets
@@ -239,20 +251,35 @@ jobs:
         run: |
           mkdir -p artifacts
           APP_PATH="build/Build/Products/Release/Pull Read.app"
+          RESOURCES="artifacts/Pull Read.app/Contents/Resources"
 
           # Copy app to artifacts
           cp -R "$APP_PATH" artifacts/
 
           # Bundle CLI binary into app resources
-          cp ../dist/pullread "artifacts/Pull Read.app/Contents/Resources/"
+          cp ../dist/pullread "$RESOURCES/"
 
-          # Bundle the ONNX Runtime dylib so Kokoro TTS works at runtime.
-          ONNX_DYLIB=$(find ../node_modules -name 'libonnxruntime*.dylib' -print -quit 2>/dev/null || true)
+          # Bundle third-party license notices
+          if [ -d "../Licenses" ]; then
+            cp -R ../Licenses "$RESOURCES/Licenses"
+          fi
+
+          # Bundle Kokoro TTS model so it works from first launch (no downloads needed)
+          if [ -d "../dist/kokoro-model" ]; then
+            echo "Bundling Kokoro TTS model..."
+            cp -R ../dist/kokoro-model "$RESOURCES/kokoro-model"
+            du -sh "$RESOURCES/kokoro-model"
+          else
+            echo "ERROR: Kokoro model not found — TTS will require download on first use"
+          fi
+
+          # Bundle the ONNX Runtime dylib (preserved in dist/ before node_modules cleanup)
+          ONNX_DYLIB=$(find ../dist -name 'libonnxruntime*.dylib' -print -quit 2>/dev/null || true)
           if [ -n "$ONNX_DYLIB" ]; then
             echo "Bundling ONNX Runtime dylib: $ONNX_DYLIB"
-            cp "$ONNX_DYLIB" "artifacts/Pull Read.app/Contents/Resources/"
+            cp "$ONNX_DYLIB" "$RESOURCES/"
           else
-            echo "WARNING: ONNX Runtime dylib not found in node_modules"
+            echo "WARNING: ONNX Runtime dylib not found"
           fi
 
           # Strip test artifacts from the release bundle — build-for-testing embeds
@@ -265,7 +292,7 @@ jobs:
           # Verify
           echo "App bundle contents:"
           ls -la "artifacts/Pull Read.app/Contents/"
-          ls -la "artifacts/Pull Read.app/Contents/Resources/"
+          ls -la "$RESOURCES/"
 
           # Free disk space: remove everything we no longer need
           rm -rf ../dist
