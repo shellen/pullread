@@ -769,6 +769,7 @@
   .font-literata .content-wrap { font-family: "Literata", "Georgia", serif; }
   .font-source-serif .content-wrap { font-family: "Source Serif 4", "Georgia", serif; }
   .font-work-sans .content-wrap { font-family: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .font-new-york .content-wrap { font-family: "New York", "Iowan Old Style", "Palatino Linotype", "Georgia", serif; }
 
   .content-wrap {
     line-height: 1.7;

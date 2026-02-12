@@ -442,7 +442,11 @@ function ttsSeek(event) {
 function ttsCycleSpeed() {
   const currentIdx = TTS_SPEEDS.indexOf(ttsSpeed);
   const nextIdx = (currentIdx + 1) % TTS_SPEEDS.length;
-  ttsSpeed = TTS_SPEEDS[nextIdx];
+  ttsSetSpeed(TTS_SPEEDS[nextIdx]);
+}
+
+function ttsSetSpeed(speed) {
+  ttsSpeed = speed;
 
   var _ap = _getAudioPlayer();
   if (_ap) _ap.setSpeed(ttsSpeed);
@@ -451,7 +455,6 @@ function ttsCycleSpeed() {
     ttsAudio.playbackRate = ttsSpeed;
   }
   if (ttsSynthUtterance && window.speechSynthesis.speaking) {
-    // Browser TTS doesn't support live rate change — note for user
     ttsSynthUtterance.rate = ttsSpeed;
   }
 }
@@ -764,6 +767,7 @@ function ttsSettingsProviderChanged() {
   ap.addEventListener('tts-skip-next', function() { ttsSkipNext(); });
   ap.addEventListener('tts-seek', function(e) { ttsSeek(e); });
   ap.addEventListener('tts-cycle-speed', function() { ttsCycleSpeed(); });
+  ap.addEventListener('tts-set-speed', function(e) { ttsSetSpeed(e.detail.speed); });
   ap.addEventListener('tts-play-item', function(e) { playTTSItem(e.detail.index); });
   ap.addEventListener('tts-remove-item', function(e) { removeTTSQueueItem(e.detail.index); });
   ap.addEventListener('tts-clear-queue', function() { ttsClearQueue(); });

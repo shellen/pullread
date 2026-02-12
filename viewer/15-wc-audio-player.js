@@ -26,7 +26,16 @@ var _apStyles = ''
   + '.progress { width: 100%; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }'
   + '.progress-fill { height: 100%; background: var(--link); border-radius: 2px; width: 0%; transition: width 0.2s linear; }'
   + '.time { font-size: 10px; color: var(--muted); min-width: 32px; text-align: center; flex-shrink: 0; }'
+  + '.speed-wrap { position: relative; }'
   + '.speed-btn { font-size: 10px !important; font-weight: 600; padding: 2px 6px !important; border: 1px solid var(--border) !important; border-radius: 4px; min-width: 36px; text-align: center; }'
+  // Speed slider popup
+  + '.speed-popup { position: absolute; bottom: calc(100% + 8px); right: -8px; width: 48px; background: var(--bg, #fff); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.15), 0 2px 6px rgba(0,0,0,0.08); padding: 14px 0; display: flex; flex-direction: column; align-items: center; z-index: 60; animation: speedPopIn 0.12s ease; }'
+  + '@keyframes speedPopIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }'
+  + '.speed-popup .speed-value { font-size: 11px; font-weight: 700; color: var(--fg); margin-bottom: 8px; white-space: nowrap; }'
+  + '.speed-popup .speed-slider-track { position: relative; height: 140px; width: 48px; display: flex; align-items: center; justify-content: center; }'
+  + '.speed-popup .speed-ticks { position: absolute; left: 6px; top: 0; bottom: 0; display: flex; flex-direction: column-reverse; justify-content: space-between; pointer-events: none; }'
+  + '.speed-popup .speed-tick { font-size: 9px; color: var(--muted); line-height: 1; }'
+  + '.speed-popup input[type="range"] { writing-mode: vertical-lr; direction: rtl; appearance: slider-vertical; -webkit-appearance: slider-vertical; width: 4px; height: 140px; margin: 0; cursor: pointer; accent-color: var(--link); }'
   + '.queue-section { margin-top: 6px; border-top: 1px solid var(--border); padding-top: 6px; }'
   + '.queue-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }'
   + '.queue-clear { cursor: pointer; font-size: 10px; color: var(--muted); background: none; border: none; text-transform: none; letter-spacing: 0; }'
@@ -74,7 +83,9 @@ class PrAudioPlayer extends HTMLElement {
       + '    <div class="progress"><div class="progress-fill" id="progress"></div></div>'
       + '  </div>'
       + '  <span class="time" id="time-total">0:00</span>'
-      + '  <button class="speed-btn" data-action="cycle-speed" title="Playback speed" id="speed-btn">1x</button>'
+      + '  <span class="speed-wrap" id="speed-wrap">'
+      + '    <button class="speed-btn" data-action="toggle-speed-popup" title="Playback speed" id="speed-btn">1x</button>'
+      + '  </span>'
       + '</div>'
       + '<div class="queue-section" id="queue-section" style="display:none">'
       + '  <div class="queue-header"><span>Queue</span><button class="queue-clear" data-action="clear-queue">Clear</button></div>'
@@ -91,6 +102,7 @@ class PrAudioPlayer extends HTMLElement {
       timeCurrent: this.shadowRoot.getElementById('time-current'),
       timeTotal: this.shadowRoot.getElementById('time-total'),
       speedBtn: this.shadowRoot.getElementById('speed-btn'),
+      speedWrap: this.shadowRoot.getElementById('speed-wrap'),
       queueSection: this.shadowRoot.getElementById('queue-section'),
       queueList: this.shadowRoot.getElementById('queue-list')
     };
@@ -170,6 +182,70 @@ class PrAudioPlayer extends HTMLElement {
   setSpeed(speed) {
     this._speed = speed;
     if (this._els) this._els.speedBtn.textContent = speed + 'x';
+    // Update popup slider if open
+    var popup = this.shadowRoot.querySelector('.speed-popup');
+    if (popup) {
+      var slider = popup.querySelector('input[type="range"]');
+      var label = popup.querySelector('.speed-value');
+      if (slider) slider.value = speed;
+      if (label) label.textContent = speed + 'x';
+    }
+  }
+
+  // --- Speed popup ---
+
+  _showSpeedPopup() {
+    // Close if already open
+    var existing = this.shadowRoot.querySelector('.speed-popup');
+    if (existing) { existing.remove(); return; }
+
+    var self = this;
+    var popup = document.createElement('div');
+    popup.className = 'speed-popup';
+    popup.innerHTML = ''
+      + '<div class="speed-value">' + this._speed + 'x</div>'
+      + '<div class="speed-slider-track">'
+      + '  <div class="speed-ticks">'
+      + '    <span class="speed-tick">0.5x</span>'
+      + '    <span class="speed-tick">1x</span>'
+      + '    <span class="speed-tick">1.5x</span>'
+      + '    <span class="speed-tick">2x</span>'
+      + '  </div>'
+      + '  <input type="range" min="0.5" max="2" step="0.05" value="' + this._speed + '" />'
+      + '</div>';
+
+    var slider = popup.querySelector('input[type="range"]');
+    var label = popup.querySelector('.speed-value');
+
+    slider.addEventListener('input', function() {
+      var val = parseFloat(slider.value);
+      // Round to avoid floating-point artifacts
+      val = Math.round(val * 20) / 20;
+      label.textContent = val + 'x';
+      self._speed = val;
+      self._els.speedBtn.textContent = val + 'x';
+      self.dispatchEvent(new CustomEvent('tts-set-speed', { detail: { speed: val }, bubbles: true, composed: true }));
+    });
+
+    // Prevent popup clicks from triggering parent handlers
+    popup.addEventListener('click', function(e) { e.stopPropagation(); });
+
+    this._els.speedWrap.appendChild(popup);
+
+    // Close when clicking outside
+    this._speedPopupClose = function(e) {
+      if (!popup.contains(e.target) && e.target !== self._els.speedBtn) {
+        popup.remove();
+        self.shadowRoot.removeEventListener('click', self._speedPopupClose);
+        document.removeEventListener('click', self._speedPopupClose);
+        self._speedPopupClose = null;
+      }
+    };
+    // Delay to avoid the current click event closing it immediately
+    setTimeout(function() {
+      self.shadowRoot.addEventListener('click', self._speedPopupClose);
+      document.addEventListener('click', self._speedPopupClose);
+    }, 0);
   }
 
   // --- Event handling ---
@@ -196,8 +272,8 @@ class PrAudioPlayer extends HTMLElement {
         var pct = (e.clientX - rect.left) / rect.width;
         this.dispatchEvent(new CustomEvent('tts-seek', { detail: { percent: pct }, bubbles: true, composed: true }));
         break;
-      case 'cycle-speed':
-        this.dispatchEvent(new CustomEvent('tts-cycle-speed', { bubbles: true, composed: true }));
+      case 'toggle-speed-popup':
+        this._showSpeedPopup();
         break;
       case 'play-item':
         if (index >= 0) this.dispatchEvent(new CustomEvent('tts-play-item', { detail: { index: index }, bubbles: true, composed: true }));
