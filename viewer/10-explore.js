@@ -114,7 +114,7 @@ function showTagCloud() {
       const pct = positions[f.filename]?.pct;
       const pctStr = pct ? Math.round(pct * 100) + '%' : 'Opened';
       const domain = f.domain || '';
-      const favicon = domain ? 'https://www.google.com/s2/favicons?domain=' + encodeURIComponent(domain) + '&sz=32' : '';
+      const favicon = domain ? '/favicons/' + encodeURIComponent(domain) + '.png' : '';
       viewedHtml += '<div class="most-viewed-item" onclick="jumpToArticle(\'' + escapeJsStr(f.filename) + '\')">';
       viewedHtml += '<div class="most-viewed-rank">' + (i + 1) + '</div>';
       viewedHtml += '<div class="most-viewed-info">';
@@ -147,7 +147,7 @@ function showTagCloud() {
   for (const [domain, articles] of sortedDomains.slice(0, 40)) {
     domainsHtml += '<div class="domain-group">';
     domainsHtml += '<div class="domain-group-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">';
-    domainsHtml += '<img class="file-item-favicon" src="https://www.google.com/s2/favicons?domain=' + encodeURIComponent(domain) + '&sz=32" alt="" loading="lazy" onerror="this.style.display=\'none\'">';
+    domainsHtml += '<img class="file-item-favicon" src="/favicons/' + encodeURIComponent(domain) + '.png" alt="" loading="lazy" onerror="this.style.display=\'none\'">';
     domainsHtml += '<span>' + escapeHtml(domain) + '</span><span class="domain-group-count">' + articles.length + ' article' + (articles.length !== 1 ? 's' : '') + '</span></div>';
     domainsHtml += '<div class="domain-group-articles" style="display:none">';
     for (const a of articles.slice(0, 10)) {
@@ -203,7 +203,7 @@ function buildConnectionsHtml(tagArticles, sortedTags) {
     html += '<div class="connection-group-articles">';
     for (const f of articles) {
       const domain = f.domain || '';
-      const favicon = domain ? 'https://www.google.com/s2/favicons?domain=' + encodeURIComponent(domain) + '&sz=32' : '';
+      const favicon = domain ? '/favicons/' + encodeURIComponent(domain) + '.png' : '';
       html += '<div class="connection-article" onclick="jumpToArticle(\'' + escapeJsStr(f.filename) + '\')">';
       if (favicon) html += '<img src="' + escapeHtml(favicon) + '" alt="" loading="lazy">';
       html += '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(f.title) + '</span>';

@@ -104,7 +104,7 @@ function renderDashboard() {
 function dashCardHtml(f, progressPct) {
   const onclick = 'dashLoadArticle(\'' + escapeHtml(f.filename) + '\')';
   const domain = f.domain || '';
-  const favicon = domain ? 'https://www.google.com/s2/favicons?domain=' + encodeURIComponent(domain) + '&sz=32' : '';
+  const favicon = domain ? '/favicons/' + encodeURIComponent(domain) + '.png' : '';
   const date = f.bookmarked ? f.bookmarked.slice(0, 10) : '';
 
   let html = '<div class="dash-card" onclick="' + onclick + '">';

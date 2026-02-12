@@ -79,9 +79,8 @@ function renderFileItem(f, i) {
       + '</div>';
   }
 
-  // Favicon from Google service
   const favicon = f.domain && f.domain !== 'pullread'
-    ? '<img class="file-item-favicon" src="https://www.google.com/s2/favicons?domain=' + encodeURIComponent(f.domain) + '&sz=32" alt="" loading="lazy" onerror="this.style.display=\'none\'" aria-hidden="true">'
+    ? '<img class="file-item-favicon" src="/favicons/' + encodeURIComponent(f.domain) + '.png" alt="" loading="lazy" onerror="this.style.display=\'none\'" aria-hidden="true">'
     : '';
 
   const metaParts = [];

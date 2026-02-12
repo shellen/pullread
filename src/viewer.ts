@@ -11,7 +11,7 @@ import { summarizeText, loadLLMConfig, saveLLMConfig, loadLLMSettings, saveLLMSe
 import { autotagText, autotagBatch, saveMachineTags, hasMachineTags } from './autotagger';
 import { APP_ICON } from './app-icon';
 import { fetchAndExtract } from './extractor';
-import { generateMarkdown, ArticleData } from './writer';
+import { generateMarkdown, ArticleData, downloadFavicon } from './writer';
 import { loadTTSConfig, saveTTSConfig, generateSpeech, getAudioContentType, getKokoroStatus, preloadKokoro, getCachedAudioPath, createTtsSession, generateSessionChunk, TTS_VOICES, TTS_MODELS } from './tts';
 
 interface FileMeta {
@@ -180,6 +180,17 @@ export function startViewer(outputPath: string, port = 7777): void {
     });
   } catch {}
 
+  // Backfill favicons for existing articles in the background
+  (async () => {
+    try {
+      const files = listFiles(outputPath);
+      const domains = [...new Set(files.map(f => f.domain).filter(Boolean))];
+      for (const domain of domains) {
+        await downloadFavicon(domain, outputPath).catch(() => {});
+      }
+    } catch {}
+  })();
+
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url || '/', `http://localhost:${port}`);
 
@@ -237,6 +248,24 @@ export function startViewer(outputPath: string, port = 7777): void {
         });
         res.end(cueData);
       } catch {
+        send404(res);
+      }
+      return;
+    }
+
+    // Serve locally cached favicons
+    const faviconMatch = url.pathname.match(/^\/favicons\/([a-zA-Z0-9._-]+\.png)$/);
+    if (faviconMatch) {
+      const faviconPath = join(outputPath, 'favicons', faviconMatch[1]);
+      if (existsSync(faviconPath)) {
+        const data = readFileSync(faviconPath);
+        res.writeHead(200, {
+          'Content-Type': 'image/png',
+          'Cache-Control': 'max-age=604800',
+          'Content-Length': data.length.toString(),
+        });
+        res.end(data);
+      } else {
         send404(res);
       }
       return;

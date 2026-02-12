@@ -95,5 +95,46 @@ export function writeArticle(outputPath: string, data: ArticleData): string {
   const markdown = generateMarkdown(data);
   writeFileSync(fullPath, markdown, 'utf-8');
 
+  // Download favicon in background (non-blocking)
+  if (data.domain) {
+    downloadFavicon(data.domain, outputPath).catch(() => {});
+  }
+
   return filename;
+}
+
+/** Download a site's favicon and save it locally for privacy */
+export async function downloadFavicon(domain: string, outputPath: string): Promise<void> {
+  const faviconDir = join(outputPath, 'favicons');
+  const faviconPath = join(faviconDir, domain + '.png');
+  if (existsSync(faviconPath)) return;
+
+  if (!existsSync(faviconDir)) {
+    mkdirSync(faviconDir, { recursive: true });
+  }
+
+  // Try the site's own /favicon.ico first, then fall back to Google's service
+  const sources = [
+    `https://${domain}/favicon.ico`,
+    `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32`,
+  ];
+
+  for (const url of sources) {
+    try {
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'PullRead/1.0' },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) continue;
+      const contentType = res.headers.get('content-type') || '';
+      // Skip HTML error pages served as favicon
+      if (contentType.includes('text/html')) continue;
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (buf.length < 10) continue;
+      writeFileSync(faviconPath, buf);
+      return;
+    } catch {
+      continue;
+    }
+  }
 }
