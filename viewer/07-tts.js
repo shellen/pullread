@@ -461,6 +461,8 @@ async function ttsPlayNextChunk(index) {
       clearInterval(progressInterval);
       if (session !== _ttsChunkSession) return;
       session.elapsedTime += chunkDuration;
+      // Show loading words while next chunk generates
+      if (index + 1 < session.totalChunks) startListenLoading();
       ttsPlayNextChunk(index + 1);
     };
 
