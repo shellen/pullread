@@ -368,8 +368,10 @@ function runApplePrompt(prompt: string): string {
     return result.trim();
   } catch (err: any) {
     const stderr = err.stderr || '';
-    if (stderr.includes('No such module') || stderr.includes('FoundationModels')) {
-      // Check actual macOS version to give a better error message
+    if (stderr.includes('exceededContextWindowSize')) {
+      throw new Error('Apple Intelligence context window exceeded (4096 token limit). Try a shorter article or switch to a cloud provider.');
+    }
+    if (stderr.includes('No such module')) {
       try {
         const ver = execFileSync('sw_vers', ['-productVersion'], { encoding: 'utf-8' }).trim();
         const major = parseInt(ver.split('.')[0], 10);
@@ -392,6 +394,10 @@ function runApplePrompt(prompt: string): string {
 
 const CHUNK_WORD_LIMIT = 2000;
 
+// Apple Intelligence has a 4096-token context window (~3000 words).
+// Each turn's prompt + previous context must fit within this.
+const APPLE_SECTION_WORD_LIMIT = 800;
+
 // RLM-inspired multi-turn summarization for long articles.
 // Instead of map-reduce (N separate processes, each losing context), this runs
 // ONE Swift process using LanguageModelSession's multi-turn conversation.
@@ -405,6 +411,7 @@ function runAppleRLM(articleText: string): string {
 
   writeFileSync(tmpArticle, articleText);
 
+  const sectionLimit = APPLE_SECTION_WORD_LIMIT;
   const scriptContent = [
     'import Foundation',
     'import FoundationModels',
@@ -419,13 +426,13 @@ function runAppleRLM(articleText: string): string {
     'let headings = paragraphs.filter { $0.hasPrefix("#") }',
     '    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }',
     '',
-    '// Build sections of ~1500 words on paragraph boundaries',
+    `// Build sections of ~${sectionLimit} words on paragraph boundaries (4096-token context limit)`,
     'var sections: [String] = []',
     'var current: [String] = []',
     'var wc = 0',
     'for para in paragraphs {',
     '    let w = para.split(separator: " ").count',
-    '    if wc + w > 1500 && !current.isEmpty {',
+    `    if wc + w > ${sectionLimit} && !current.isEmpty {`,
     '        sections.append(current.joined(separator: "\\n\\n"))',
     '        current = []',
     '        wc = 0',
@@ -436,20 +443,19 @@ function runAppleRLM(articleText: string): string {
     'if !current.isEmpty { sections.append(current.joined(separator: "\\n\\n")) }',
     '',
     '// Multi-turn conversation: progressive reading with session recycling',
+    '// Each new session gets a fresh 4096-token context window',
     'var session = LanguageModelSession()',
     'var turns = 0',
-    'let maxTurns = 3',
+    'let maxTurns = 2',
     'var notes = ""',
     '',
-    '// Phase 1: Structural overview — the model sees the shape of the article first',
-    'let headingList = headings.isEmpty ? "None detected" : headings.joined(separator: " | ")',
-    'let opening = String(paragraphs.first?.prefix(500) ?? "")',
-    'let closing = String(paragraphs.last?.prefix(500) ?? "")',
+    '// Phase 1: Structural overview (keep within context limit)',
+    'let headingList = headings.isEmpty ? "None" : headings.prefix(10).joined(separator: " | ")',
+    'let opening = String(paragraphs.first?.prefix(300) ?? "")',
     'let overview = "Summarize a \\(totalWords)-word article (\\(sections.count) sections).\\n"',
-    '    + "Headings: \\(headingList)\\n\\n"',
-    '    + "Opening: \\(opening)\\n\\n"',
-    '    + "Closing: \\(closing)\\n\\n"',
-    '    + "I will feed sections one at a time. After each, respond with concise bullet-point notes of key facts and arguments. Keep notes brief and factual."',
+    '    + "Headings: \\(headingList)\\n"',
+    '    + "Opening: \\(opening)\\n"',
+    '    + "I will feed sections one at a time. Respond with brief bullet-point notes of key facts."',
     '',
     'let r1 = try await session.respond(to: overview)',
     'notes = r1.content',
@@ -459,16 +465,18 @@ function runAppleRLM(articleText: string): string {
     'for (i, section) in sections.enumerated() {',
     '    if turns >= maxTurns {',
     '        session = LanguageModelSession()',
-    '        let resume = "Continuing article summarization. Key points so far:\\n\\n"',
-    '            + notes',
-    '            + "\\n\\nI will feed more sections. After each, update notes with key facts and arguments."',
+    '        // Trim notes to keep within context limit',
+    '        let trimmedNotes = notes.count > 1500 ? String(notes.suffix(1500)) : notes',
+    '        let resume = "Article summarization in progress. Notes so far:\\n"',
+    '            + trimmedNotes',
+    '            + "\\nMore sections follow. Update notes with key facts."',
     '        let rr = try await session.respond(to: resume)',
     '        notes = rr.content',
     '        turns = 1',
     '    }',
-    '    let prompt = "Section \\(i + 1) of \\(sections.count):\\n\\n"',
+    '    let prompt = "Section \\(i + 1)/\\(sections.count):\\n\\n"',
     '        + section',
-    '        + "\\n\\nUpdate your running notes with key points from this section."',
+    '        + "\\n\\nUpdate notes with key points."',
     '    let r = try await session.respond(to: prompt)',
     '    notes = r.content',
     '    turns += 1',
@@ -476,8 +484,9 @@ function runAppleRLM(articleText: string): string {
     '',
     '// Phase 3: Final summary in a clean session with just the accumulated notes',
     'let finalSession = LanguageModelSession()',
-    'let finalPrompt = "Here are notes from reading a full article:\\n\\n"',
-    '    + notes',
+    'let trimmedFinalNotes = notes.count > 2000 ? String(notes.suffix(2000)) : notes',
+    'let finalPrompt = "Notes from reading an article:\\n\\n"',
+    '    + trimmedFinalNotes',
     '    + "\\n\\nWrite a 2-3 sentence summary. State the main points directly."',
     '    + " Do not use phrases like \\"This article discusses\\"."',
     'let result = try await finalSession.respond(to: finalPrompt)',
@@ -495,7 +504,10 @@ function runAppleRLM(articleText: string): string {
     return result.trim();
   } catch (err: any) {
     const stderr = err.stderr || '';
-    if (stderr.includes('No such module') || stderr.includes('FoundationModels')) {
+    if (stderr.includes('exceededContextWindowSize')) {
+      throw new Error('Apple Intelligence context window exceeded (4096 token limit). Try a shorter article or switch to a cloud provider.');
+    }
+    if (stderr.includes('No such module')) {
       try {
         const ver = execFileSync('sw_vers', ['-productVersion'], { encoding: 'utf-8' }).trim();
         const major = parseInt(ver.split('.')[0], 10);
@@ -516,16 +528,30 @@ function runAppleRLM(articleText: string): string {
   }
 }
 
+// Apple Intelligence context limit (~3000 words, leaving room for output tokens)
+const APPLE_MAX_INPUT_WORDS = 2400;
+
 async function callApple(articleText: string): Promise<SummarizeResult> {
   const words = articleText.split(/\s+/);
 
-  if (words.length <= CHUNK_WORD_LIMIT) {
-    // Short article — single pass
+  // Try single-prompt path first (always preferred — simpler, no multi-turn overhead).
+  // Truncate to fit Apple Intelligence's 4096-token context window if needed.
+  if (words.length <= APPLE_MAX_INPUT_WORDS) {
     const prompt = `${SUMMARIZE_PROMPT}\n\n---\n\n${words.join(' ')}`;
     return { summary: runApplePrompt(prompt), model: 'apple-on-device' };
   }
 
-  // Long article — RLM-inspired multi-turn conversation
+  // Text too long for single prompt — try truncated version first
+  try {
+    const truncated = words.slice(0, APPLE_MAX_INPUT_WORDS).join(' ');
+    const prompt = `${SUMMARIZE_PROMPT}\n\n---\n\n${truncated}`;
+    return { summary: runApplePrompt(prompt), model: 'apple-on-device' };
+  } catch (err: any) {
+    // If truncated single-prompt also fails, fall back to RLM for long articles
+    if (!err.message?.includes('context window')) throw err;
+  }
+
+  // Multi-turn conversation with section recycling for very long texts
   const summary = runAppleRLM(articleText);
   return { summary, model: 'apple-on-device' };
 }
