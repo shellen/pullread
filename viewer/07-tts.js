@@ -9,6 +9,7 @@ let ttsProvider = 'browser';
 let ttsGenerating = false;
 let ttsProgressTimer = null;
 let _ttsChunkSession = null; // { id, totalChunks, currentChunk, elapsedTime }
+var _ttsNextPrefetch = null;  // { filename, sessionId, totalChunks, currentChunk, done }
 
 const TTS_SPEEDS = [0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.15, 1.2, 1.3, 1.5, 1.75, 2.0];
 
@@ -344,6 +345,8 @@ async function playCloudTTSCached(filename) {
       stopListenLoading();
       ttsPlaying = true;
       renderAudioPlayer();
+      // Cached playback means Kokoro is idle — pre-generate next queue item
+      ttsPrefetchNextQueueItem();
     });
 
     audio.addEventListener('timeupdate', function() {
@@ -356,6 +359,7 @@ async function playCloudTTSCached(filename) {
     audio.addEventListener('ended', function() {
       document.getElementById('tts-progress').style.width = '100%';
       ttsPlaying = false;
+      _ttsNextPrefetch = null;
       renderAudioPlayer();
       if (ttsCurrentIndex + 1 < ttsQueue.length) {
         setTimeout(function() { playTTSItem(ttsCurrentIndex + 1); }, 500);
@@ -406,6 +410,55 @@ function ttsPrefetchChunk(index) {
     });
 }
 
+/** Pre-generate audio for the next queue item so transition is instant */
+function ttsPrefetchNextQueueItem() {
+  if (ttsProvider === 'browser') return;
+  var nextIndex = ttsCurrentIndex + 1;
+  if (nextIndex >= ttsQueue.length) return;
+  var nextItem = ttsQueue[nextIndex];
+  // Already prefetching this item
+  if (_ttsNextPrefetch && _ttsNextPrefetch.filename === nextItem.filename) return;
+
+  fetch('/api/tts/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: nextItem.filename }),
+  })
+  .then(function(res) { return res.json(); })
+  .then(function(session) {
+    if (session.cached) {
+      _ttsNextPrefetch = { filename: nextItem.filename, done: true };
+      return;
+    }
+    _ttsNextPrefetch = {
+      filename: nextItem.filename,
+      sessionId: session.id,
+      totalChunks: session.totalChunks,
+      currentChunk: 0,
+      done: false,
+    };
+    ttsPrefetchNextQueueChunk();
+  })
+  .catch(function() { _ttsNextPrefetch = null; });
+}
+
+/** Sequentially generate chunks for the next queue item in the background */
+function ttsPrefetchNextQueueChunk() {
+  if (!_ttsNextPrefetch || _ttsNextPrefetch.done) return;
+  if (_ttsNextPrefetch.currentChunk >= _ttsNextPrefetch.totalChunks) {
+    _ttsNextPrefetch.done = true;
+    return;
+  }
+  fetch('/api/tts/chunk/' + _ttsNextPrefetch.sessionId + '/' + _ttsNextPrefetch.currentChunk)
+    .then(function(res) { return res.arrayBuffer(); })
+    .then(function() {
+      if (!_ttsNextPrefetch) return;
+      _ttsNextPrefetch.currentChunk++;
+      ttsPrefetchNextQueueChunk();
+    })
+    .catch(function() { /* non-critical */ });
+}
+
 /** Play a single TTS chunk via HTMLAudioElement (preserves pitch), then chain to the next */
 async function ttsPlayNextChunk(index, seekPct) {
   var session = _ttsChunkSession;
@@ -416,6 +469,7 @@ async function ttsPlayNextChunk(index, seekPct) {
     ttsPlaying = false;
     _ttsChunkSession = null;
     _ttsChunkBuffer.clear();
+    _ttsNextPrefetch = null;
     document.getElementById('tts-progress').style.width = '100%';
     renderAudioPlayer();
     if (ttsCurrentIndex + 1 < ttsQueue.length) {
@@ -458,6 +512,9 @@ async function ttsPlayNextChunk(index, seekPct) {
       // Pre-fetch next chunk while this one plays
       if (index + 1 < session.totalChunks) {
         ttsPrefetchChunk(index + 1);
+      } else {
+        // Last chunk playing — Kokoro is idle, pre-generate next queue item
+        ttsPrefetchNextQueueItem();
       }
     });
 
@@ -511,6 +568,7 @@ function stopTTS() {
   clearInterval(ttsProgressTimer);
   _ttsChunkSession = null;
   _ttsChunkBuffer.clear();
+  _ttsNextPrefetch = null;
   if (ttsAudio) {
     ttsAudio.pause();
     ttsAudio.src = '';
