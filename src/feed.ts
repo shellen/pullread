@@ -64,9 +64,21 @@ function parseRssFeed(rss: any): FeedEntry[] {
 
   const items = Array.isArray(channel.item) ? channel.item : [channel.item];
 
-  return items.map((item: any) => {
-    const url = item.link;
-    const domain = new URL(url).hostname.replace(/^www\./, '');
+  return items.flatMap((item: any) => {
+    // Resolve item URL: prefer <link>, fall back to <guid>, then enclosure URL
+    let url = typeof item.link === 'string' ? item.link
+      : item.link?.['@_href'] || item.link?.['#text'] || item.link?.['__cdata'] || undefined;
+    if (!url && item.guid) {
+      const guid = typeof item.guid === 'string' ? item.guid : item.guid?.['#text'];
+      if (guid && guid.startsWith('http')) url = guid;
+    }
+    if (!url && item.enclosure?.['@_url']) {
+      url = item.enclosure['@_url'];
+    }
+    if (!url) return []; // skip items with no usable URL
+
+    let domain = '';
+    try { domain = new URL(url).hostname.replace(/^www\./, ''); } catch {}
 
     const description = item.description
       ? extractTextFromHtml(extractTitle(item.description))
@@ -82,14 +94,14 @@ function parseRssFeed(rss: any): FeedEntry[] {
       };
     }
 
-    return {
+    return [{
       title: extractTitle(item.title),
       url,
       updatedAt: parseRssDate(item.pubDate),
       domain,
       annotation: description || undefined,
       enclosure
-    };
+    }];
   });
 }
 

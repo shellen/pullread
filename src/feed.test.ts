@@ -143,6 +143,109 @@ describe('parseFeed - Podcast', () => {
     expect(episode.annotation).not.toContain('CDATA');
     expect(episode.annotation).not.toContain('<p>');
   });
+
+  test('falls back to enclosure URL when item has no link', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>No-Link Podcast</title>
+    <item>
+      <title>Episode Without Link</title>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <description>An episode with no link element</description>
+      <enclosure url="https://cdn.example.com/ep1.mp3" type="audio/mpeg" length="12345678"/>
+      <itunes:duration>00:30:00</itunes:duration>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].url).toBe('https://cdn.example.com/ep1.mp3');
+    expect(entries[0].domain).toBe('cdn.example.com');
+    expect(entries[0].enclosure).toBeDefined();
+    expect(entries[0].enclosure!.url).toBe('https://cdn.example.com/ep1.mp3');
+  });
+
+  test('falls back to guid when item has no link but has guid URL', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>Guid Podcast</title>
+    <item>
+      <title>Episode With Guid</title>
+      <guid>https://podcast.com/episodes/123</guid>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <description>An episode with guid but no link</description>
+      <enclosure url="https://cdn.example.com/ep2.mp3" type="audio/mpeg"/>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].url).toBe('https://podcast.com/episodes/123');
+    expect(entries[0].domain).toBe('podcast.com');
+  });
+
+  test('handles link element parsed as object with attributes', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Object Link Feed</title>
+    <atom:link href="https://example.com/feed" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Item With Object Link</title>
+      <link>https://example.com/article</link>
+      <atom:link href="https://example.com/article" rel="alternate"/>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <description>Normal article</description>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].url).toBe('https://example.com/article');
+  });
+
+  test('handles link wrapped in CDATA', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>CDATA Link Podcast</title>
+    <item>
+      <title>CDATA Episode</title>
+      <link><![CDATA[https://podcast.example.com/ep1]]></link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <description>Episode with CDATA link</description>
+      <enclosure url="https://cdn.example.com/ep1.mp3" type="audio/mpeg"/>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].url).toBe('https://podcast.example.com/ep1');
+    expect(entries[0].domain).toBe('podcast.example.com');
+  });
+
+  test('skips items with no usable URL at all', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Bad Feed</title>
+    <item>
+      <title>No URL Item</title>
+      <description>Has no link, guid, or enclosure</description>
+    </item>
+    <item>
+      <title>Good Item</title>
+      <link>https://example.com/good</link>
+      <description>This one is fine</description>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].title).toBe('Good Item');
+  });
 });
 
 const RDF_FEED = `<?xml version="1.0" encoding="UTF-8"?>
