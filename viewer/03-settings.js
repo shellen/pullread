@@ -349,9 +349,7 @@ function showSettingsPage() {
         h += '<select id="sp-tts-voice">';
         var prov = data.provider || 'browser';
         var voices = data.voices[prov] || [];
-        for (var vi = 0; vi < voices.length; vi++) {
-          h += '<option value="' + voices[vi].id + '"' + (data.voice === voices[vi].id ? ' selected' : '') + '>' + escapeHtml(voices[vi].label) + '</option>';
-        }
+        h += settingsRenderVoiceOptions(prov, voices, data.voice);
         h += '</select></div>';
       }
 
@@ -489,6 +487,33 @@ function settingsPageLLMProviderChanged() {
   }
 }
 
+var KOKORO_VOICE_GROUPS = { af: 'American Female', am: 'American Male', bf: 'British Female', bm: 'British Male' };
+function settingsRenderVoiceOptions(provider, voices, selectedVoice) {
+  if (provider !== 'kokoro') {
+    return voices.map(function(v) {
+      return '<option value="' + v.id + '"' + (selectedVoice === v.id ? ' selected' : '') + '>' + escapeHtml(v.label) + '</option>';
+    }).join('');
+  }
+  var groups = {};
+  var order = [];
+  for (var i = 0; i < voices.length; i++) {
+    var prefix = voices[i].id.substring(0, 2);
+    if (!groups[prefix]) { groups[prefix] = []; order.push(prefix); }
+    groups[prefix].push(voices[i]);
+  }
+  var html = '';
+  for (var g = 0; g < order.length; g++) {
+    var key = order[g];
+    html += '<optgroup label="' + (KOKORO_VOICE_GROUPS[key] || key) + '">';
+    for (var j = 0; j < groups[key].length; j++) {
+      var v = groups[key][j];
+      html += '<option value="' + v.id + '"' + (selectedVoice === v.id ? ' selected' : '') + '>' + escapeHtml(v.label) + '</option>';
+    }
+    html += '</optgroup>';
+  }
+  return html;
+}
+
 function settingsPageTTSChanged() {
   var provider = document.getElementById('sp-tts-provider').value;
   var sec = document.getElementById('settings-voice');
@@ -504,9 +529,7 @@ function settingsPageTTSChanged() {
     var voiceSelect = document.getElementById('sp-tts-voice');
     var modelSelect = document.getElementById('sp-tts-model');
     if (voiceSelect && data.voices && data.voices[provider]) {
-      voiceSelect.innerHTML = data.voices[provider].map(function(v) {
-        return '<option value="' + v.id + '">' + escapeHtml(v.label) + '</option>';
-      }).join('');
+      voiceSelect.innerHTML = settingsRenderVoiceOptions(provider, data.voices[provider], '');
     } else if (voiceSelect) { voiceSelect.innerHTML = ''; }
     if (modelSelect && data.models && data.models[provider]) {
       modelSelect.innerHTML = data.models[provider].map(function(m) {

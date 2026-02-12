@@ -501,6 +501,49 @@ function wfScrollCursorToCenter(ta) {
   ta.scrollTop = targetScroll;
 }
 
+// Find the start of the sentence containing the character at pos
+function findSentenceStart(text, pos) {
+  var i = pos - 1;
+  while (i >= 0) {
+    // Sentence-ending punctuation followed by whitespace
+    if (/[.!?]/.test(text[i]) && i + 1 < text.length && /\s/.test(text[i + 1])) {
+      // Skip whitespace after punctuation to find sentence start
+      var j = i + 1;
+      while (j < pos && /\s/.test(text[j])) j++;
+      return j;
+    }
+    // Paragraph break (double newline)
+    if (text[i] === '\n' && i > 0 && text[i - 1] === '\n') {
+      var j = i + 1;
+      while (j < pos && /[ \t]/.test(text[j])) j++;
+      return j;
+    }
+    i--;
+  }
+  // Skip leading whitespace from start of text
+  var j = 0;
+  while (j < pos && /\s/.test(text[j])) j++;
+  return j;
+}
+
+// Find the end of the sentence containing the character at pos
+function findSentenceEnd(text, pos) {
+  var i = pos;
+  while (i < text.length) {
+    // Sentence-ending punctuation followed by whitespace or end
+    if (/[.!?]/.test(text[i])) {
+      // Include trailing quotes/parens that are part of the sentence
+      var end = i + 1;
+      while (end < text.length && /["'\u201D\u2019)]/.test(text[end])) end++;
+      if (end >= text.length || /\s/.test(text[end])) return end;
+    }
+    // Paragraph break
+    if (text[i] === '\n' && i + 1 < text.length && text[i + 1] === '\n') return i;
+    i++;
+  }
+  return text.length;
+}
+
 function updateWritingFocusLine() {
   if (!_writingFocusActive) return;
   // Check full-screen overlay first
@@ -512,10 +555,20 @@ function updateWritingFocusLine() {
     line = document.querySelector('.notebook-focus-line');
   }
   if (!ta || !line) return;
-  var text = ta.value.substring(0, ta.selectionStart);
-  var lineNum = text.split('\n').length - 1;
+  var text = ta.value;
+  var pos = ta.selectionStart;
   var lineHeight = parseFloat(getComputedStyle(ta).lineHeight) || 28.8;
   var paddingTop = parseFloat(getComputedStyle(ta).paddingTop) || 0;
-  line.style.top = (paddingTop + lineNum * lineHeight - ta.scrollTop) + 'px';
+
+  // Find sentence boundaries around cursor
+  var sentStart = findSentenceStart(text, pos);
+  var sentEnd = findSentenceEnd(text, pos);
+  var startLine = text.substring(0, sentStart).split('\n').length - 1;
+  var endLine = text.substring(0, sentEnd).split('\n').length - 1;
+
+  var top = paddingTop + startLine * lineHeight - ta.scrollTop;
+  var height = (endLine - startLine + 1) * lineHeight;
+  line.style.top = top + 'px';
+  line.style.height = height + 'px';
 }
 

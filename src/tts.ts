@@ -52,17 +52,17 @@ export interface TTSConfig {
 
 export const TTS_VOICES: Record<string, { id: string; label: string }[]> = {
   kokoro: [
-    { id: 'af_heart', label: 'Heart (female)' },
-    { id: 'af_bella', label: 'Bella (female)' },
-    { id: 'af_nicole', label: 'Nicole (female)' },
-    { id: 'af_sarah', label: 'Sarah (female)' },
-    { id: 'af_sky', label: 'Sky (female)' },
-    { id: 'am_adam', label: 'Adam (male)' },
-    { id: 'am_michael', label: 'Michael (male)' },
-    { id: 'bf_emma', label: 'Emma (British female)' },
-    { id: 'bf_isabella', label: 'Isabella (British female)' },
-    { id: 'bm_george', label: 'George (British male)' },
-    { id: 'bm_lewis', label: 'Lewis (British male)' },
+    { id: 'af_heart', label: 'Heart \u2014 warm, expressive' },
+    { id: 'af_bella', label: 'Bella \u2014 clear, lively' },
+    { id: 'af_nicole', label: 'Nicole \u2014 low, breathy' },
+    { id: 'af_sarah', label: 'Sarah \u2014 friendly, natural' },
+    { id: 'af_sky', label: 'Sky \u2014 light, airy' },
+    { id: 'am_adam', label: 'Adam \u2014 deep, steady' },
+    { id: 'am_michael', label: 'Michael \u2014 warm, smooth' },
+    { id: 'bf_emma', label: 'Emma \u2014 clear, polished' },
+    { id: 'bf_isabella', label: 'Isabella \u2014 refined, elegant' },
+    { id: 'bm_george', label: 'George \u2014 authoritative, rich' },
+    { id: 'bm_lewis', label: 'Lewis \u2014 measured, calm' },
   ],
   openai: [
     { id: 'alloy', label: 'Alloy' },

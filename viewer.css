@@ -2543,7 +2543,7 @@
     height: 1.8em;
     background: transparent;
     pointer-events: none;
-    transition: top 0.08s ease;
+    transition: top 0.12s ease, height 0.12s ease;
     z-index: 3;
     box-shadow: 0 -3px 0 0 var(--bg), 0 3px 0 0 var(--bg), 0 0 0 9999px color-mix(in srgb, var(--bg) 70%, transparent);
   }

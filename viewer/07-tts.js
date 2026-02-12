@@ -941,11 +941,36 @@ function showTTSSettings() {
       { id: 'elevenlabs', label: 'ElevenLabs — premium quality' },
     ];
 
-    function renderVoiceOptions(provider) {
+    function renderVoiceOptions(provider, selectedVoice) {
       if (!data.voices[provider]) return '';
-      return data.voices[provider].map(v =>
-        '<option value="' + v.id + '"' + (data.voice === v.id ? ' selected' : '') + '>' + escapeHtml(v.label) + '</option>'
+      var sel = selectedVoice || data.voice;
+      var voices = data.voices[provider];
+      if (provider === 'kokoro') return renderKokoroVoiceOptions(voices, sel);
+      return voices.map(v =>
+        '<option value="' + v.id + '"' + (sel === v.id ? ' selected' : '') + '>' + escapeHtml(v.label) + '</option>'
       ).join('');
+    }
+
+    var KOKORO_GROUPS = { af: 'American Female', am: 'American Male', bf: 'British Female', bm: 'British Male' };
+    function renderKokoroVoiceOptions(voices, sel) {
+      var groups = {};
+      var order = [];
+      for (var i = 0; i < voices.length; i++) {
+        var prefix = voices[i].id.substring(0, 2);
+        if (!groups[prefix]) { groups[prefix] = []; order.push(prefix); }
+        groups[prefix].push(voices[i]);
+      }
+      var html = '';
+      for (var g = 0; g < order.length; g++) {
+        var key = order[g];
+        html += '<optgroup label="' + (KOKORO_GROUPS[key] || key) + '">';
+        for (var j = 0; j < groups[key].length; j++) {
+          var v = groups[key][j];
+          html += '<option value="' + v.id + '"' + (sel === v.id ? ' selected' : '') + '>' + escapeHtml(v.label) + '</option>';
+        }
+        html += '</optgroup>';
+      }
+      return html;
     }
 
     function renderModelOptions(provider) {
@@ -1091,11 +1116,14 @@ function ttsSettingsProviderChanged() {
   // Update voice options
   const voiceSelect = document.getElementById('tts-voice-select');
   if (data.voices[provider]) {
-    voiceSelect.innerHTML = data.voices[provider].map(v =>
-      '<option value="' + v.id + '">' + escapeHtml(v.label) + '</option>'
-    ).join('');
+    voiceSelect.innerHTML = renderVoiceOptions(provider, '');
   } else {
     voiceSelect.innerHTML = '';
+  }
+  // Also update Kokoro voice dropdown
+  const kokoroVoice = document.getElementById('tts-kokoro-voice');
+  if (kokoroVoice && data.voices.kokoro) {
+    kokoroVoice.innerHTML = renderVoiceOptions('kokoro', '');
   }
 
   // Update model options
