@@ -50,7 +50,7 @@ function setWidth(val) {
 
 function toggleSettingsDropdown() {
   const existing = document.querySelector('.settings-dropdown-panel');
-  const btn = document.getElementById('settings-toggle-btn');
+  const btn = document.getElementById('aa-settings-btn');
   if (existing) { existing.remove(); btn.setAttribute('aria-expanded', 'false'); return; }
 
   const currentTheme = document.body.getAttribute('data-theme') || 'light';
@@ -125,7 +125,7 @@ function toggleSettingsDropdown() {
       <button onclick="reprocessCurrentArticle(this)" id="reprocess-btn" style="flex:1;text-align:center" title="Re-fetch this article from the original URL"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-cloud-download"/></svg> Re-fetch from source</button>
     </div>
   `;
-  document.querySelector('.settings-dropdown').appendChild(panel);
+  document.body.appendChild(panel);
   btn.setAttribute('aria-expanded', 'true');
 }
 
@@ -147,8 +147,10 @@ function updateDropdownState() {
 // Close settings dropdown when clicking outside
 document.addEventListener('click', function(e) {
   const panel = document.querySelector('.settings-dropdown-panel');
-  if (panel && !panel.contains(e.target) && !e.target.closest('.settings-dropdown')) {
+  if (panel && !panel.contains(e.target) && !e.target.closest('#aa-settings-btn')) {
     panel.remove();
+    var btn = document.getElementById('aa-settings-btn');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
   }
 });
 

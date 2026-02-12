@@ -27,7 +27,7 @@ pub async fn open_viewer_inner(app: &AppHandle) -> Result<(), String> {
 
         // Show in dock when viewer is open
         #[cfg(target_os = "macos")]
-        app.set_activation_policy(tauri::ActivationPolicy::Regular);
+        let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
     }
 
     Ok(())
@@ -41,7 +41,7 @@ pub fn on_viewer_closed(app: &AppHandle) {
         // Only hide dock icon if no other windows are open
         let windows: Vec<_> = app.webview_windows().into_keys().collect();
         if windows.is_empty() {
-            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
         }
     }
     let _ = app;

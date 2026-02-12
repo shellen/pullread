@@ -156,7 +156,7 @@ async function init() {
 
   // Restore hide-read
   hideRead = localStorage.getItem('pr-hide-read') === '1';
-  document.getElementById('hide-read-toggle').checked = hideRead;
+  document.getElementById('hide-read-toggle').classList.toggle('active', hideRead);
 
   try {
     const res = await fetch('/api/files');

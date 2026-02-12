@@ -12,6 +12,10 @@ let _ttsChunkSession = null; // { id, totalChunks, currentChunk, elapsedTime }
 
 const TTS_SPEEDS = [0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.15, 1.2, 1.3, 1.5, 1.75, 2.0];
 
+function playCueSound() {
+  try { new Audio('/audio/cue.webm').play(); } catch(e) {}
+}
+
 // ---- Listen button loading animation ----
 var LISTEN_WORDS = [
   'Reading', 'Processing', 'Generating', 'Preparing', 'Creating',
@@ -93,6 +97,18 @@ async function addToTTSQueue(filename) {
 function renderAudioPlayer() {
   const panel = document.getElementById('audio-player');
   if (!panel) return;
+
+  // Update mini player visibility
+  var miniPlayer = document.getElementById('mini-player');
+  if (miniPlayer) {
+    miniPlayer.style.display = (ttsQueue.length > 0 && (ttsPlaying || ttsCurrentIndex >= 0)) ? '' : 'none';
+    var miniPlayBtn = document.getElementById('mini-play-btn');
+    if (miniPlayBtn) {
+      miniPlayBtn.innerHTML = ttsPlaying
+        ? '<svg><use href="#i-pause"/></svg>'
+        : '<svg><use href="#i-play"/></svg>';
+    }
+  }
 
   if (ttsQueue.length === 0) {
     panel.classList.add('hidden');
@@ -190,8 +206,9 @@ async function playBrowserTTS(filename) {
   } catch {}
   if (!text) { ttsPlaying = false; renderAudioPlayer(); return; }
 
-  const { body } = parseFrontmatter(text);
-  const plainText = stripMarkdownForTTS(body);
+  const { meta, body } = parseFrontmatter(text);
+  const ttsText = (meta && meta.title ? meta.title + '\n\n' : '') + body;
+  const plainText = stripMarkdownForTTS(ttsText);
 
   // Cancel any existing
   synth.cancel();
@@ -207,6 +224,7 @@ async function playBrowserTTS(filename) {
   let startTime = Date.now();
 
   utterance.onstart = function() {
+    playCueSound();
     stopListenLoading();
     ttsPlaying = true;
     startTime = Date.now();
@@ -310,6 +328,7 @@ async function playCloudTTSCached(filename) {
     });
 
     audio.addEventListener('playing', function() {
+      playCueSound();
       stopListenLoading();
       ttsPlaying = true;
       renderAudioPlayer();
@@ -376,7 +395,7 @@ function ttsPrefetchChunk(index) {
 }
 
 /** Play a single TTS chunk via HTMLAudioElement (preserves pitch), then chain to the next */
-async function ttsPlayNextChunk(index) {
+async function ttsPlayNextChunk(index, seekPct) {
   var session = _ttsChunkSession;
   if (!session || session !== _ttsChunkSession) return;
 
@@ -406,14 +425,20 @@ async function ttsPlayNextChunk(index) {
       if (session !== _ttsChunkSession) return;
       var chunkDuration = audio.duration;
 
-      if (index === 0) {
+      if (index === 0 && !seekPct) {
         session.estimatedTotalDuration = chunkDuration * session.totalChunks;
         document.getElementById('tts-time-total').textContent = '~' + formatTime(session.estimatedTotalDuration);
+      }
+
+      // Seek within chunk if a seek percentage was given
+      if (seekPct && seekPct > 0 && chunkDuration) {
+        audio.currentTime = seekPct * chunkDuration;
       }
     });
 
     audio.addEventListener('playing', function() {
       if (session !== _ttsChunkSession) return;
+      if (index === 0) playCueSound();
       stopListenLoading();
       ttsPlaying = true;
       renderAudioPlayer();
@@ -450,7 +475,8 @@ async function ttsPlayNextChunk(index) {
       _ttsChunkSession = null;
       _ttsChunkBuffer.clear();
       renderAudioPlayer();
-      alert('TTS Error: Failed to load audio chunk ' + index);
+      var statusEl = document.getElementById('audio-now-status');
+      if (statusEl) statusEl.textContent = 'Playback error';
     });
 
     audio.play();
@@ -534,32 +560,107 @@ function ttsTogglePlay() {
 }
 
 function ttsSkipNext() {
-  if (ttsCurrentIndex + 1 < ttsQueue.length) {
-    playTTSItem(ttsCurrentIndex + 1);
-  }
+  skipTime(15);
 }
 
 function ttsSkipPrev() {
-  if (ttsCurrentIndex > 0) {
-    playTTSItem(ttsCurrentIndex - 1);
-  } else if (ttsCurrentIndex === 0) {
-    playTTSItem(0); // restart current
-  }
+  skipTime(-15);
 }
 
-function ttsSeek(event) {
-  // Seeking across chunks isn't supported during progressive playback
-  if (_ttsChunkSession) return;
+function skipTime(seconds) {
+  if (_ttsChunkSession) {
+    var session = _ttsChunkSession;
+    // Can't seek until we have a duration estimate from the first chunk
+    if (!session.estimatedTotalDuration) return;
+    var currentChunkTime = ttsAudio ? ttsAudio.currentTime : 0;
+    var targetTime = session.elapsedTime + currentChunkTime + seconds;
+    if (targetTime < 0) targetTime = 0;
+    var totalEst = session.estimatedTotalDuration;
+    if (targetTime >= totalEst) return;
+    var pct = targetTime / totalEst;
+    seekToChunkPosition(pct);
+    return;
+  }
+  if (ttsAudio && ttsAudio.duration) {
+    var newTime = ttsAudio.currentTime + seconds;
+    ttsAudio.currentTime = Math.max(0, Math.min(newTime, ttsAudio.duration));
+    return;
+  }
+  // Browser TTS doesn't support seeking
+}
 
-  const wrap = event.currentTarget;
-  const rect = wrap.getBoundingClientRect();
-  const pct = (event.clientX - rect.left) / rect.width;
+function seekToChunkPosition(pct) {
+  var session = _ttsChunkSession;
+  // Can't seek until we have a duration estimate from the first chunk
+  if (!session || !session.estimatedTotalDuration) return;
+  pct = Math.max(0, Math.min(1, pct));
+  var targetChunkFloat = pct * session.totalChunks;
+  var targetChunk = Math.floor(targetChunkFloat);
+  if (targetChunk >= session.totalChunks) targetChunk = session.totalChunks - 1;
+  var seekPct = targetChunkFloat - targetChunk;
 
+  // Estimate elapsed time up to target chunk
+  var avgChunkDuration = session.estimatedTotalDuration / session.totalChunks;
+  session.elapsedTime = targetChunk * avgChunkDuration;
+
+  // Stop current audio and play from target chunk
+  if (ttsAudio) {
+    ttsAudio.pause();
+    ttsAudio.src = '';
+    ttsAudio = null;
+  }
+  ttsPlayNextChunk(targetChunk, seekPct);
+}
+
+function ttsSeek(pct) {
+  if (_ttsChunkSession) {
+    seekToChunkPosition(pct);
+    return;
+  }
   if (ttsAudio && ttsAudio.duration) {
     ttsAudio.currentTime = pct * ttsAudio.duration;
   }
   // Browser TTS doesn't support seeking
 }
+
+function initProgressDrag() {
+  var wrap = document.getElementById('audio-progress-wrap');
+  if (!wrap) return;
+
+  function seekFromEvent(e) {
+    // Don't seek if nothing is playing or generating
+    if (!ttsPlaying && ttsCurrentIndex < 0) return;
+    var rect = wrap.getBoundingClientRect();
+    var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    var pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    ttsSeek(pct);
+  }
+
+  function onMove(e) { seekFromEvent(e); }
+  function onEnd() {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onEnd);
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('touchend', onEnd);
+  }
+
+  wrap.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    seekFromEvent(e);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onEnd);
+  });
+
+  wrap.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    seekFromEvent(e);
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchend', onEnd);
+  }, { passive: false });
+}
+
+// Initialize drag on the progress bar
+initProgressDrag();
 
 let _ttsSpeedPopup = null;
 
@@ -756,7 +857,18 @@ function stripMarkdownForTTS(md) {
   text = text.replace(/^\s*\d+\.\s+/gm, '');
   // Collapse whitespace
   text = text.replace(/\n{3,}/g, '\n\n');
-  return text.trim();
+  text = text.trim();
+  // Add a sentence-ending period after the title (first line) so TTS engines
+  // pause briefly before reading the body
+  var firstBreak = text.indexOf('\n\n');
+  if (firstBreak > 0) {
+    var title = text.slice(0, firstBreak).trimEnd();
+    var lastChar = title[title.length - 1];
+    if (lastChar !== '.' && lastChar !== '!' && lastChar !== '?') {
+      text = title + '.\n\n' + text.slice(firstBreak + 2);
+    }
+  }
+  return text;
 }
 
 // ---- TTS Reading Highlight ----

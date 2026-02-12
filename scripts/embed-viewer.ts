@@ -19,8 +19,8 @@ const jsModules = jsFiles.map(f => readFileSync(join(jsDir, f), 'utf-8'));
 const js = jsModules.join('\n');
 
 // Inline CSS and JS into the HTML template at the marker positions
-html = html.replace('/* INJECT:CSS */', css);
-html = html.replace('/* INJECT:JS */', js);
+html = html.replace('/* INJECT:CSS */', () => css);
+html = html.replace('/* INJECT:JS */', () => js);
 
 // JSON.stringify safely escapes all special characters (quotes, newlines,
 // backslashes, unicode, angle brackets, template literals, etc.)

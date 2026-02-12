@@ -10,15 +10,7 @@ function renderFileList() {
     displayFiles = filteredFiles;
   }
 
-  // Build notebook items from loaded notebooks, filtered by search
-  const nbs = Object.values(_notebooks).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
   const searchTerm = (document.getElementById('search').value || '').trim().toLowerCase();
-  const nbItems = nbs.filter(function(nb) {
-    if (!searchTerm) return true;
-    const title = (nb.title || '').toLowerCase();
-    const tags = (nb.tags || []).join(' ').toLowerCase();
-    return title.includes(searchTerm) || tags.includes(searchTerm);
-  });
 
   const total = filteredFiles.length;
   const shown = displayFiles.length;
@@ -35,20 +27,32 @@ function renderFileList() {
 
   let html = '';
   if (isNotebooksTab) {
-    // Notebook tab: + New Note button, notebook item, note previews, annotated articles
+    // Notebook tab: + New Note button, individual notes, annotated articles
     html += '<div class="sidebar-new-note"><button class="new-note-btn" onclick="createNote()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-plus"/></svg> New Note</button></div>';
     var nbObj = _notebooks[SINGLE_NOTEBOOK_ID];
-    if (nbObj) {
-      html += renderNotebookItem(nbObj);
+    var notes = nbObj ? (nbObj.notes || []) : [];
+    // Filter notes by search term
+    if (searchTerm) {
+      notes = notes.filter(function(n) {
+        var text = (n.content || '').toLowerCase();
+        return text.includes(searchTerm);
+      });
     }
+    for (var ni = 0; ni < notes.length; ni++) {
+      html += renderNoteItem(notes[ni], ni);
+    }
+    // Annotated articles below notes
     const annotatedFiles = displayFiles.filter(f => {
       const { hasHl, hasNote } = hasAnnotations(f.filename);
       return hasHl || hasNote;
     });
-    displayedCount = Math.min(annotatedFiles.length, PAGE_SIZE);
-    html += annotatedFiles.slice(0, displayedCount).map((f, i) => renderFileItem(f, i)).join('');
-    var noteCount = nbObj ? (nbObj.notes || []).length : 0;
-    countStr = 'Notebook \u00b7 ' + noteCount + ' note' + (noteCount !== 1 ? 's' : '');
+    if (annotatedFiles.length) {
+      html += '<div class="sidebar-section-label">Annotated Articles</div>';
+      displayedCount = Math.min(annotatedFiles.length, PAGE_SIZE);
+      html += annotatedFiles.slice(0, displayedCount).map((f, i) => renderFileItem(f, i)).join('');
+    }
+    var totalNotes = nbObj ? (nbObj.notes || []).length : 0;
+    countStr = totalNotes + ' note' + (totalNotes !== 1 ? 's' : '');
     countText.textContent = countStr;
   } else {
     // Library / Explore: show articles only
@@ -92,19 +96,28 @@ function renderFileItem(f, i) {
     + '</div>';
 }
 
-function renderNotebookItem(nb) {
-  const isActive = _activeNotebook && _activeNotebook.id === nb.id && !activeFile ? ' active' : '';
-  const date = nb.updatedAt ? new Date(nb.updatedAt).toLocaleDateString() : '';
-  var noteCount = (nb.notes || []).length;
-  return '<div class="file-item notebook-item' + isActive + '" data-notebook-id="' + escapeHtml(nb.id) + '" onclick="openNotebookInPane(\'' + escapeHtml(nb.id) + '\')" role="option" tabindex="0" onkeydown="if(event.key===\'Enter\')openNotebookInPane(\'' + escapeHtml(nb.id) + '\')">'
-    + '<div class="file-item-title"><svg class="nb-icon" aria-hidden="true"><use href="#i-book"/></svg>' + escapeHtml(nb.title || 'Untitled') + '</div>'
-    + '<div class="file-item-meta"><span>' + date + '</span><span class="meta-sep"></span><span>' + noteCount + ' note' + (noteCount !== 1 ? 's' : '') + '</span></div>'
+function renderNoteItem(note, index) {
+  var isActive = _activeNoteId === note.id ? ' active' : '';
+  var firstLine = (note.content || '').split('\n')[0].replace(/^#+\s*/, '').trim() || 'Empty note';
+  var dateStr = note.updatedAt ? new Date(note.updatedAt).toLocaleDateString() : '';
+  var metaParts = [];
+  if (dateStr) metaParts.push('<span>' + dateStr + '</span>');
+  if (note.sourceArticle) {
+    var srcFile = allFiles.find(function(f) { return f.filename === note.sourceArticle; });
+    var domain = srcFile ? srcFile.domain : '';
+    if (domain) metaParts.push('<span>' + escapeHtml(domain) + '</span>');
+  }
+  var metaHtml = metaParts.join('<span class="meta-sep"></span>');
+  return '<div class="file-item note-item' + isActive + '" data-note-id="' + escapeHtml(note.id) + '" onclick="openNoteInPane(\'' + escapeHtml(note.id) + '\')" role="option" tabindex="0" onkeydown="if(event.key===\'Enter\')openNoteInPane(\'' + escapeHtml(note.id) + '\')">'
+    + '<div class="file-item-title">' + escapeHtml(firstLine.slice(0, 120)) + '</div>'
+    + '<div class="file-item-meta">' + metaHtml + '</div>'
     + '</div>';
 }
 
 function toggleHideRead() {
-  hideRead = document.getElementById('hide-read-toggle').checked;
+  hideRead = !hideRead;
   localStorage.setItem('pr-hide-read', hideRead ? '1' : '0');
+  document.getElementById('hide-read-toggle').classList.toggle('active', hideRead);
   renderFileList();
 }
 
@@ -125,8 +138,16 @@ function markCurrentAsUnread() {
   renderFileList();
 }
 
+function clearSearch() {
+  var input = document.getElementById('search');
+  if (input) { input.value = ''; input.focus(); }
+  filterFiles();
+}
+
 function filterFiles() {
   const raw = document.getElementById('search').value.trim();
+  var clearBtn = document.getElementById('search-clear');
+  if (clearBtn) clearBtn.style.display = raw ? '' : 'none';
   if (!raw) {
     filteredFiles = allFiles;
     renderFileList();
@@ -391,10 +412,10 @@ function toggleWritingFocus() {
   overlay.className = 'writing-focus-overlay';
   overlay.id = 'writing-focus-overlay';
 
-  if (!_expandedNoteId) return;
-  var note = (_activeNotebook.notes || []).find(function(n) { return n.id === _expandedNoteId; });
+  if (!_activeNoteId) return;
+  var note = (_activeNotebook.notes || []).find(function(n) { return n.id === _activeNoteId; });
   if (!note) return;
-  var title = _activeNotebook.title || 'Untitled';
+  var title = (note.content || '').split('\n')[0].replace(/^#+\s*/, '').trim() || 'Untitled Note';
   var content = note.content || '';
   var wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
 
@@ -443,8 +464,8 @@ function exitWritingFocus() {
 
   // Sync content back from overlay textarea to the expanded note
   var ta = document.getElementById('wf-textarea');
-  if (ta && _activeNotebook && _expandedNoteId) {
-    var note = (_activeNotebook.notes || []).find(function(n) { return n.id === _expandedNoteId; });
+  if (ta && _activeNotebook && _activeNoteId) {
+    var note = (_activeNotebook.notes || []).find(function(n) { return n.id === _activeNoteId; });
     if (note) {
       note.content = ta.value;
       note.updatedAt = new Date().toISOString();
@@ -455,9 +476,9 @@ function exitWritingFocus() {
   var overlay = document.getElementById('writing-focus-overlay');
   if (overlay) overlay.remove();
 
-  // Refresh the notebook editor to show updated content
-  if (_activeNotebook) {
-    showNotebook(_activeNotebook.id);
+  // Refresh the note editor to show updated content
+  if (_activeNotebook && _activeNoteId) {
+    openNoteInPane(_activeNoteId);
   }
 }
 
@@ -468,7 +489,7 @@ function updateWritingFocusLine() {
   var line = document.getElementById('wf-focus-line');
   if (!ta || !line) {
     // Fallback to inline mode
-    ta = document.querySelector('.note-card.expanded .notebook-editor textarea');
+    ta = document.querySelector('.note-page .notebook-editor textarea');
     line = document.querySelector('.notebook-focus-line');
   }
   if (!ta || !line) return;

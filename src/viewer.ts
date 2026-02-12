@@ -225,6 +225,23 @@ export function startViewer(outputPath: string, port = 7777): void {
       return;
     }
 
+    // Serve cue sound for article start
+    if (url.pathname === '/audio/cue.webm') {
+      try {
+        const cuePath = join(__dirname, 'signature_cue.webm');
+        const cueData = readFileSync(cuePath);
+        res.writeHead(200, {
+          'Content-Type': 'audio/webm',
+          'Content-Length': cueData.length.toString(),
+          'Cache-Control': 'max-age=86400',
+        });
+        res.end(cueData);
+      } catch {
+        send404(res);
+      }
+      return;
+    }
+
     if (url.pathname === '/api/files') {
       sendJson(res, listFiles(outputPath));
       return;
@@ -913,8 +930,10 @@ export function startViewer(outputPath: string, port = 7777): void {
         }
 
         const content = readFileSync(filePath, 'utf-8');
+        const meta = parseFrontmatter(content);
         const match = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
-        const articleText = match ? match[1] : content;
+        const bodyText = match ? match[1] : content;
+        const articleText = (meta.title ? meta.title + '\n\n' : '') + bodyText;
 
         const session = createTtsSession(name, articleText, config);
         sendJson(res, { id: session.id, totalChunks: session.totalChunks, cached: false });
@@ -965,8 +984,10 @@ export function startViewer(outputPath: string, port = 7777): void {
         if (!existsSync(filePath)) { send404(res); return; }
 
         const content = readFileSync(filePath, 'utf-8');
+        const meta = parseFrontmatter(content);
         const match = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
-        const articleText = match ? match[1] : content;
+        const bodyText = match ? match[1] : content;
+        const articleText = (meta.title ? meta.title + '\n\n' : '') + bodyText;
         const audio = await generateSpeech(name, articleText, config);
 
         res.writeHead(200, {
@@ -1010,9 +1031,10 @@ export function startViewer(outputPath: string, port = 7777): void {
         }
 
         const content = readFileSync(filePath, 'utf-8');
-        // Strip frontmatter to get just the article body
+        const meta = parseFrontmatter(content);
         const match = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
-        const articleText = match ? match[1] : content;
+        const bodyText = match ? match[1] : content;
+        const articleText = (meta.title ? meta.title + '\n\n' : '') + bodyText;
 
         const audio = await generateSpeech(name, articleText, config);
 

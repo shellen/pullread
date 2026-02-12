@@ -167,7 +167,18 @@ export function stripMarkdown(md: string): string {
   // Collapse multiple newlines
   text = text.replace(/\n{3,}/g, '\n\n');
   // Trim
-  return text.trim();
+  text = text.trim();
+  // Add a sentence-ending period after the title (first line) so TTS engines
+  // pause briefly before reading the body
+  const firstBreak = text.indexOf('\n\n');
+  if (firstBreak > 0) {
+    const title = text.slice(0, firstBreak).trimEnd();
+    const lastChar = title[title.length - 1];
+    if (lastChar !== '.' && lastChar !== '!' && lastChar !== '?') {
+      text = title + '.\n\n' + text.slice(firstBreak + 2);
+    }
+  }
+  return text;
 }
 
 /** Generate a cache key for an article */

@@ -4,7 +4,7 @@
   "version": "2.0.0",
   "identifier": "com.pullread.app",
   "build": {
-    "beforeBuildCommand": "",
+    "beforeBuildCommand": "bun run scripts/bundle-kokoro.ts && bun run scripts/embed-viewer.ts",
     "beforeDevCommand": "",
     "frontendDist": "../viewer-dist"
   },
@@ -28,6 +28,10 @@
     "externalBin": [
       "binaries/pullread-cli"
     ],
+    "resources": [
+      "resources/kokoro.web.js",
+      "resources/ort-wasm"
+    ],
     "macOS": {
       "minimumSystemVersion": "13.0"
     }
@@ -37,6 +41,10 @@
       "desktop": {
         "schemes": ["pullread"]
       }
+    },
+    "updater": {
+      "endpoints": [],
+      "pubkey": ""
     }
   }
 }
