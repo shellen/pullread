@@ -373,6 +373,36 @@ async function playCloudTTSCached(filename) {
   }
 }
 
+// Pre-fetched and decoded audio buffers for upcoming chunks
+var _ttsChunkBuffer = new Map();
+
+/** Pre-fetch and decode the next chunk in the background while current one plays */
+function ttsPrefetchChunk(index) {
+  var session = _ttsChunkSession;
+  if (!session || index >= session.totalChunks) return;
+  if (_ttsChunkBuffer.has(index)) return;
+
+  // Mark as in-flight so we don't double-fetch
+  _ttsChunkBuffer.set(index, null);
+
+  fetch('/api/tts/chunk/' + session.id + '/' + index)
+    .then(function(res) { return res.ok ? res.arrayBuffer() : null; })
+    .then(function(arrayBuf) {
+      if (!arrayBuf || session !== _ttsChunkSession) return;
+      if (!window._ttsAudioCtx) return;
+      return window._ttsAudioCtx.decodeAudioData(arrayBuf.slice(0));
+    })
+    .then(function(audioBuffer) {
+      if (audioBuffer && session === _ttsChunkSession) {
+        _ttsChunkBuffer.set(index, audioBuffer);
+      }
+    })
+    .catch(function() {
+      // Prefetch failure is non-fatal — will fetch on demand
+      if (session === _ttsChunkSession) _ttsChunkBuffer.delete(index);
+    });
+}
+
 /** Fetch and play a single TTS chunk, then chain to the next */
 async function ttsPlayNextChunk(index) {
   var session = _ttsChunkSession;
@@ -382,6 +412,7 @@ async function ttsPlayNextChunk(index) {
     // All chunks played — done
     ttsPlaying = false;
     _ttsChunkSession = null;
+    _ttsChunkBuffer.clear();
     document.getElementById('tts-progress').style.width = '100%';
     renderAudioPlayer();
     if (ttsCurrentIndex + 1 < ttsQueue.length) {
@@ -394,42 +425,44 @@ async function ttsPlayNextChunk(index) {
   renderAudioPlayer();
 
   try {
-    var chunkUrl = '/api/tts/chunk/' + session.id + '/' + index;
-    var chunkRes = await fetch(chunkUrl);
-    if (!chunkRes.ok) {
-      var err = await chunkRes.json().catch(function() { return { error: 'Chunk failed' }; });
-      if (err.fallback === 'browser') {
-        console.warn('Kokoro unavailable, falling back to browser TTS:', err.error);
-        _ttsChunkSession = null;
-        await playBrowserTTS(ttsQueue[ttsCurrentIndex].filename);
-        return;
-      }
-      throw new Error(err.error || 'Chunk generation failed');
-    }
-    var arrayBuf = await chunkRes.arrayBuffer();
-
-    // Bail out if session was cancelled while we were fetching
-    if (session !== _ttsChunkSession) return;
-
-    if (!arrayBuf || arrayBuf.byteLength === 0) {
-      throw new Error('Empty audio for chunk ' + index);
-    }
-
-    // Log header for debugging WAV decode failures
-    var hdr = new Uint8Array(arrayBuf.slice(0, 44));
-    var magic = String.fromCharCode(hdr[0], hdr[1], hdr[2], hdr[3]);
-    var fmt = String.fromCharCode(hdr[8], hdr[9], hdr[10], hdr[11]);
-    console.log('TTS chunk ' + index + ': ' + arrayBuf.byteLength + ' bytes, magic=' + magic + ' fmt=' + fmt);
-
-    // Decode via Web Audio API (reliable in WKWebView, unlike blob URL + HTMLMediaElement)
     if (!window._ttsAudioCtx) {
       window._ttsAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
     var audioCtx = window._ttsAudioCtx;
-    // Resume context if suspended (autoplay policy)
     if (audioCtx.state === 'suspended') await audioCtx.resume();
 
-    var audioBuffer = await audioCtx.decodeAudioData(arrayBuf.slice(0));
+    var audioBuffer;
+
+    // Check pre-fetch buffer first
+    var buffered = _ttsChunkBuffer.get(index);
+    if (buffered instanceof AudioBuffer) {
+      audioBuffer = buffered;
+      _ttsChunkBuffer.delete(index);
+    } else {
+      // Not ready yet — fetch on demand
+      var chunkUrl = '/api/tts/chunk/' + session.id + '/' + index;
+      var chunkRes = await fetch(chunkUrl);
+      if (!chunkRes.ok) {
+        var err = await chunkRes.json().catch(function() { return { error: 'Chunk failed' }; });
+        if (err.fallback === 'browser') {
+          console.warn('Kokoro unavailable, falling back to browser TTS:', err.error);
+          _ttsChunkSession = null;
+          _ttsChunkBuffer.clear();
+          await playBrowserTTS(ttsQueue[ttsCurrentIndex].filename);
+          return;
+        }
+        throw new Error(err.error || 'Chunk generation failed');
+      }
+      var arrayBuf = await chunkRes.arrayBuffer();
+      if (session !== _ttsChunkSession) return;
+      if (!arrayBuf || arrayBuf.byteLength === 0) {
+        throw new Error('Empty audio for chunk ' + index);
+      }
+      audioBuffer = await audioCtx.decodeAudioData(arrayBuf.slice(0));
+    }
+
+    if (session !== _ttsChunkSession) return;
+
     var chunkDuration = audioBuffer.duration;
 
     if (index === 0 && session === _ttsChunkSession) {
@@ -446,6 +479,11 @@ async function ttsPlayNextChunk(index) {
     source.start();
     stopListenLoading();
 
+    // Pre-fetch next chunk while this one plays
+    if (index + 1 < session.totalChunks) {
+      ttsPrefetchChunk(index + 1);
+    }
+
     // Track progress manually since Web Audio API doesn't fire timeupdate
     var progressInterval = setInterval(function() {
       if (session !== _ttsChunkSession) { clearInterval(progressInterval); return; }
@@ -461,8 +499,9 @@ async function ttsPlayNextChunk(index) {
       clearInterval(progressInterval);
       if (session !== _ttsChunkSession) return;
       session.elapsedTime += chunkDuration;
-      // Show loading words while next chunk generates
-      if (index + 1 < session.totalChunks) startListenLoading();
+      // Show loading words only if next chunk isn't pre-buffered yet
+      var nextReady = _ttsChunkBuffer.get(index + 1) instanceof AudioBuffer;
+      if (index + 1 < session.totalChunks && !nextReady) startListenLoading();
       ttsPlayNextChunk(index + 1);
     };
 
@@ -474,6 +513,7 @@ async function ttsPlayNextChunk(index) {
     stopListenLoading();
     ttsPlaying = false;
     _ttsChunkSession = null;
+    _ttsChunkBuffer.clear();
     renderAudioPlayer();
     alert('TTS Error: ' + err.message);
   }
@@ -482,6 +522,7 @@ async function ttsPlayNextChunk(index) {
 function stopTTS() {
   clearInterval(ttsProgressTimer);
   _ttsChunkSession = null;
+  _ttsChunkBuffer.clear();
   if (ttsAudio) {
     if (ttsAudio._webAudioSource) {
       // Web Audio API source
