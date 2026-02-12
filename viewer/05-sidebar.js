@@ -435,23 +435,30 @@ function toggleWritingFocus() {
   ta.focus();
   // Move cursor to end and scroll so cursor line is vertically centered
   ta.selectionStart = ta.selectionEnd = ta.value.length;
-  var lineHeight = parseFloat(getComputedStyle(ta).lineHeight) || 28.8;
-  var cursorLine = ta.value.split('\n').length - 1;
-  var paddingTop = parseFloat(getComputedStyle(ta).paddingTop) || 0;
-  var cursorY = paddingTop + cursorLine * lineHeight;
-  var visibleHeight = ta.parentElement ? ta.parentElement.clientHeight : ta.clientHeight;
-  ta.scrollTop = cursorY - visibleHeight / 2;
+  wfScrollCursorToCenter(ta);
 
+  var _wfRafPending = false;
+  function wfScheduleUpdate() {
+    if (_wfRafPending) return;
+    _wfRafPending = true;
+    requestAnimationFrame(function() {
+      _wfRafPending = false;
+      wfScrollCursorToCenter(ta);
+      updateWritingFocusLine();
+    });
+  }
   ta.addEventListener('input', function() {
     notebookDebounceSave();
-    wfScrollCursorToCenter(ta);
-    updateWritingFocusLine();
+    wfScheduleUpdate();
     var wc = ta.value.trim() ? ta.value.trim().split(/\s+/).length : 0;
     var wcEl = document.getElementById('wf-word-count');
     if (wcEl) wcEl.textContent = wc + ' words';
   });
-  ta.addEventListener('click', function() { wfScrollCursorToCenter(ta); updateWritingFocusLine(); });
-  ta.addEventListener('keyup', function() { wfScrollCursorToCenter(ta); updateWritingFocusLine(); });
+  ta.addEventListener('click', wfScheduleUpdate);
+  ta.addEventListener('keyup', function(e) {
+    // Only update on arrow keys / home / end (cursor movement without input)
+    if (e.key.startsWith('Arrow') || e.key === 'Home' || e.key === 'End') wfScheduleUpdate();
+  });
   ta.addEventListener('scroll', updateWritingFocusLine);
 
   // Escape key to exit
@@ -482,6 +489,8 @@ function exitWritingFocus() {
 
   var overlay = document.getElementById('writing-focus-overlay');
   if (overlay) overlay.remove();
+  var mirror = document.getElementById('wf-mirror');
+  if (mirror) mirror.remove();
 
   // Refresh the note editor to show updated content
   if (_activeNotebook && _activeNoteId) {
@@ -492,10 +501,7 @@ function exitWritingFocus() {
 // Keep the cursor line vertically centered in the textarea (iA Writer style)
 function wfScrollCursorToCenter(ta) {
   var lh = parseFloat(getComputedStyle(ta).lineHeight) || 28.8;
-  var pt = parseFloat(getComputedStyle(ta).paddingTop) || 0;
-  var cursorLine = ta.value.substring(0, ta.selectionStart).split('\n').length - 1;
-  var cursorY = pt + cursorLine * lh;
-  // Use parent's visible height — ta.clientHeight includes padding and is too large
+  var cursorY = measureCharY(ta, ta.selectionStart);
   var visibleHeight = ta.parentElement ? ta.parentElement.clientHeight : ta.clientHeight;
   var targetScroll = cursorY - visibleHeight / 2 + lh / 2;
   ta.scrollTop = targetScroll;
@@ -544,13 +550,45 @@ function findSentenceEnd(text, pos) {
   return text.length;
 }
 
+// Measure the visual Y position of a character in a textarea, accounting for word wrap
+function measureCharY(ta, charIndex) {
+  var mirror = document.getElementById('wf-mirror');
+  if (!mirror) {
+    mirror = document.createElement('div');
+    mirror.id = 'wf-mirror';
+    mirror.style.position = 'absolute';
+    mirror.style.visibility = 'hidden';
+    mirror.style.whiteSpace = 'pre-wrap';
+    mirror.style.wordWrap = 'break-word';
+    mirror.style.overflowWrap = 'break-word';
+    mirror.style.wordBreak = 'break-word';
+    document.body.appendChild(mirror);
+  }
+  var cs = getComputedStyle(ta);
+  mirror.style.font = cs.font;
+  mirror.style.lineHeight = cs.lineHeight;
+  mirror.style.letterSpacing = cs.letterSpacing;
+  mirror.style.tabSize = cs.tabSize;
+  mirror.style.padding = cs.padding;
+  mirror.style.border = cs.border;
+  mirror.style.boxSizing = cs.boxSizing;
+  mirror.style.width = ta.offsetWidth + 'px';
+
+  var textBefore = ta.value.substring(0, charIndex);
+  mirror.textContent = '';
+  var beforeNode = document.createTextNode(textBefore);
+  var marker = document.createElement('span');
+  marker.textContent = '\u200b'; // zero-width space
+  mirror.appendChild(beforeNode);
+  mirror.appendChild(marker);
+  return marker.offsetTop;
+}
+
 function updateWritingFocusLine() {
   if (!_writingFocusActive) return;
-  // Check full-screen overlay first
   var ta = document.getElementById('wf-textarea');
   var line = document.getElementById('wf-focus-line');
   if (!ta || !line) {
-    // Fallback to inline mode
     ta = document.querySelector('.note-page .notebook-editor textarea');
     line = document.querySelector('.notebook-focus-line');
   }
@@ -558,16 +596,17 @@ function updateWritingFocusLine() {
   var text = ta.value;
   var pos = ta.selectionStart;
   var lineHeight = parseFloat(getComputedStyle(ta).lineHeight) || 28.8;
-  var paddingTop = parseFloat(getComputedStyle(ta).paddingTop) || 0;
 
   // Find sentence boundaries around cursor
   var sentStart = findSentenceStart(text, pos);
   var sentEnd = findSentenceEnd(text, pos);
-  var startLine = text.substring(0, sentStart).split('\n').length - 1;
-  var endLine = text.substring(0, sentEnd).split('\n').length - 1;
 
-  var top = paddingTop + startLine * lineHeight - ta.scrollTop;
-  var height = (endLine - startLine + 1) * lineHeight;
+  // Measure visual positions using mirror div (accounts for word wrap)
+  var startY = measureCharY(ta, sentStart);
+  var endY = measureCharY(ta, sentEnd > 0 ? sentEnd - 1 : 0);
+
+  var top = startY - ta.scrollTop;
+  var height = endY - startY + lineHeight;
   line.style.top = top + 'px';
   line.style.height = height + 'px';
 }
