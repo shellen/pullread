@@ -102,8 +102,7 @@ function renderDashboard() {
 }
 
 function dashCardHtml(f, progressPct) {
-  const idx = displayFiles.findIndex(d => d.filename === f.filename);
-  const onclick = idx >= 0 ? 'loadFile(' + idx + ')' : 'dashLoadArticle(\'' + escapeHtml(f.filename) + '\')';
+  const onclick = 'dashLoadArticle(\'' + escapeHtml(f.filename) + '\')';
   const domain = f.domain || '';
   const favicon = domain ? 'https://www.google.com/s2/favicons?domain=' + encodeURIComponent(domain) + '&sz=32' : '';
   const date = f.bookmarked ? f.bookmarked.slice(0, 10) : '';
@@ -180,20 +179,18 @@ function initDashChevrons() {
 }
 
 function dashLoadArticle(filename) {
-  const idx = displayFiles.findIndex(f => f.filename === filename);
+  var idx = displayFiles.findIndex(f => f.filename === filename);
   if (idx >= 0) {
     loadFile(idx);
-  } else {
-    // File might be filtered out — search all files
-    const allIdx = allFiles.findIndex(f => f.filename === filename);
-    if (allIdx >= 0) {
-      // Clear search and reload
-      document.getElementById('search').value = '';
-      filterFiles();
-      const newIdx = displayFiles.findIndex(f => f.filename === filename);
-      if (newIdx >= 0) loadFile(newIdx);
-    }
+    return;
   }
+  // Article not in current view — set activeFile so filterFiles includes it
+  // even when hide-read is on (filterFiles preserves activeFile)
+  activeFile = filename;
+  document.getElementById('search').value = '';
+  filterFiles();
+  idx = displayFiles.findIndex(f => f.filename === filename);
+  if (idx >= 0) loadFile(idx);
 }
 
 function renderArticle(text, filename) {

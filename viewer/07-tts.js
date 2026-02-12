@@ -270,45 +270,47 @@ async function playCloudTTSCached(filename) {
       return;
     }
 
-    const contentType = res.headers.get('content-type') || 'audio/wav';
-    const arrayBuf = await res.arrayBuffer();
-    const blob = new Blob([arrayBuf], { type: contentType });
-    const audioUrl = URL.createObjectURL(blob);
+    var arrayBuf = await res.arrayBuffer();
 
-    ttsAudio = new Audio(audioUrl);
-    ttsAudio.playbackRate = ttsSpeed;
-    document.getElementById('tts-time-total').textContent = '0:00';
+    // Decode via Web Audio API (HTMLMediaElement + blob URLs fail in WKWebView)
+    if (!window._ttsAudioCtx) {
+      window._ttsAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    var audioCtx = window._ttsAudioCtx;
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
 
-    ttsAudio.addEventListener('loadedmetadata', function() {
-      document.getElementById('tts-time-total').textContent = formatTime(ttsAudio.duration);
-    });
+    var audioBuffer = await audioCtx.decodeAudioData(arrayBuf.slice(0));
+    var totalDuration = audioBuffer.duration;
 
-    ttsAudio.addEventListener('timeupdate', function() {
-      if (!ttsAudio) return;
-      var pct = ttsAudio.duration ? (ttsAudio.currentTime / ttsAudio.duration) * 100 : 0;
+    document.getElementById('tts-time-total').textContent = formatTime(totalDuration);
+
+    var source = audioCtx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.playbackRate.value = ttsSpeed;
+    source.connect(audioCtx.destination);
+
+    var startCtxTime = audioCtx.currentTime;
+    source.start();
+
+    var progressInterval = setInterval(function() {
+      if (!ttsAudio || !ttsAudio._webAudioSource) { clearInterval(progressInterval); return; }
+      var elapsed = audioCtx.currentTime - startCtxTime;
+      var pct = Math.min(100, (elapsed / (totalDuration / ttsSpeed)) * 100);
       document.getElementById('tts-progress').style.width = pct + '%';
-      document.getElementById('tts-time-current').textContent = formatTime(ttsAudio.currentTime);
-    });
+      document.getElementById('tts-time-current').textContent = formatTime(elapsed * ttsSpeed);
+    }, 200);
 
-    ttsAudio.addEventListener('ended', function() {
+    source.onended = function() {
+      clearInterval(progressInterval);
+      document.getElementById('tts-progress').style.width = '100%';
       ttsPlaying = false;
       renderAudioPlayer();
       if (ttsCurrentIndex + 1 < ttsQueue.length) {
         setTimeout(function() { playTTSItem(ttsCurrentIndex + 1); }, 500);
       }
-    });
+    };
 
-    ttsAudio.addEventListener('error', function(e) {
-      console.warn('TTS cached playback error:', e);
-      ttsPlaying = false;
-      renderAudioPlayer();
-    });
-
-    ttsAudio.play().catch(function(e) {
-      console.warn('TTS cached play() rejected:', e);
-      ttsPlaying = false;
-      renderAudioPlayer();
-    });
+    ttsAudio = { _webAudioSource: source, _ctx: audioCtx, _interval: progressInterval };
     ttsPlaying = true;
     renderAudioPlayer();
   } catch (err) {
@@ -360,7 +362,11 @@ async function ttsPlayNextChunk(index) {
       throw new Error('Empty audio for chunk ' + index);
     }
 
-    console.log('TTS chunk ' + index + ': ' + arrayBuf.byteLength + ' bytes');
+    // Log header for debugging WAV decode failures
+    var hdr = new Uint8Array(arrayBuf.slice(0, 44));
+    var magic = String.fromCharCode(hdr[0], hdr[1], hdr[2], hdr[3]);
+    var fmt = String.fromCharCode(hdr[8], hdr[9], hdr[10], hdr[11]);
+    console.log('TTS chunk ' + index + ': ' + arrayBuf.byteLength + ' bytes, magic=' + magic + ' fmt=' + fmt);
 
     // Decode via Web Audio API (reliable in WKWebView, unlike blob URL + HTMLMediaElement)
     if (!window._ttsAudioCtx) {

@@ -516,16 +516,9 @@ async function kokoroTTS(text: string, config: TTSConfig): Promise<Buffer> {
       pcmChunks.push(audio.data);
       if (audio.sampling_rate) sampleRate = audio.sampling_rate;
     } else if (typeof audio.toBlob === 'function') {
-      // Fallback: extract raw PCM from the WAV blob
       const blob = await audio.toBlob();
       const arrayBuf = await blob.arrayBuffer();
-      const wavBuf = Buffer.from(arrayBuf);
-      const dataStart = 44; // WAV header size
-      const pcm = new Float32Array((wavBuf.length - dataStart) / 2);
-      for (let i = 0; i < pcm.length; i++) {
-        pcm[i] = wavBuf.readInt16LE(dataStart + i * 2) / 32767;
-      }
-      pcmChunks.push(pcm);
+      pcmChunks.push(extractPcmFromWav(Buffer.from(arrayBuf)));
     } else {
       throw new Error('Unexpected Kokoro audio output format');
     }
@@ -543,6 +536,27 @@ async function kokoroTTS(text: string, config: TTSConfig): Promise<Buffer> {
   }
 
   return encodeWav(combined, sampleRate);
+}
+
+/** Extract raw PCM int16 samples from a WAV buffer by scanning for the data chunk */
+function extractPcmFromWav(wavBuf: Buffer): Float32Array {
+  // Scan RIFF chunks starting after the 12-byte RIFF header (RIFF + size + WAVE)
+  for (let pos = 12; pos < wavBuf.length - 8; ) {
+    const chunkId = wavBuf.toString('ascii', pos, pos + 4);
+    const chunkSize = wavBuf.readUInt32LE(pos + 4);
+    if (chunkId === 'data') {
+      const dataStart = pos + 8;
+      const sampleCount = Math.min(chunkSize, wavBuf.length - dataStart) / 2;
+      const pcm = new Float32Array(sampleCount);
+      for (let i = 0; i < sampleCount; i++) {
+        pcm[i] = wavBuf.readInt16LE(dataStart + i * 2) / 32767;
+      }
+      return pcm;
+    }
+    pos += 8 + chunkSize;
+    if (chunkSize % 2 !== 0) pos++; // WAV chunks are word-aligned
+  }
+  throw new Error('Invalid WAV: no data chunk found');
 }
 
 /** Encode raw PCM float32 data as a WAV buffer */
@@ -587,26 +601,19 @@ async function kokoroSingleChunk(text: string, config: TTSConfig): Promise<Buffe
   const voice = config.voice || 'af_heart';
   const audio = await pipeline.generate(text, { voice });
 
-  let pcm: Float32Array;
-  let sampleRate = 24000;
-
   if (audio.data) {
-    pcm = audio.data;
-    if (audio.sampling_rate) sampleRate = audio.sampling_rate;
+    const pcm = audio.data;
+    const sampleRate = audio.sampling_rate || 24000;
+    return encodeWav(pcm, sampleRate);
   } else if (typeof audio.toBlob === 'function') {
+    // Return Kokoro's native WAV directly — re-encoding is lossy and
+    // produces WAVs that some decoders (WKWebView) reject
     const blob = await audio.toBlob();
     const arrayBuf = await blob.arrayBuffer();
-    const wavBuf = Buffer.from(arrayBuf);
-    const dataStart = 44;
-    pcm = new Float32Array((wavBuf.length - dataStart) / 2);
-    for (let i = 0; i < pcm.length; i++) {
-      pcm[i] = wavBuf.readInt16LE(dataStart + i * 2) / 32767;
-    }
+    return Buffer.from(arrayBuf);
   } else {
     throw new Error('Unexpected Kokoro audio output format');
   }
-
-  return encodeWav(pcm, sampleRate);
 }
 
 /** Generate a single chunk of speech using OpenAI (returns MP3) */
@@ -749,12 +756,7 @@ function finalizeSession(session: TtsSession): void {
     // Extract PCM from each WAV chunk, concatenate, re-encode as single WAV
     const pcmChunks: Float32Array[] = [];
     for (const wavBuf of buffers) {
-      const dataStart = 44;
-      const pcm = new Float32Array((wavBuf.length - dataStart) / 2);
-      for (let i = 0; i < pcm.length; i++) {
-        pcm[i] = wavBuf.readInt16LE(dataStart + i * 2) / 32767;
-      }
-      pcmChunks.push(pcm);
+      pcmChunks.push(extractPcmFromWav(wavBuf));
     }
     const totalLength = pcmChunks.reduce((sum, c) => sum + c.length, 0);
     const allPcm = new Float32Array(totalLength);
