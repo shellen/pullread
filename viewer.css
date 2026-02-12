@@ -2284,16 +2284,17 @@
     width: 100%; min-height: 400px;
     font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
     font-size: 14px; line-height: 1.7;
-    border: 1px solid var(--border); border-radius: 8px;
-    padding: 16px; background: var(--bg); color: var(--fg);
+    border: none;
+    padding: 16px 0; background: transparent; color: var(--fg);
     resize: vertical; outline: none;
     tab-size: 2;
+    overflow-wrap: break-word;
+    word-break: break-word;
   }
-  .notebook-editor textarea:focus { border-color: var(--link); }
   .notebook-preview {
-    min-height: 400px; padding: 16px;
-    border: 1px solid var(--border); border-radius: 8px;
-    background: var(--bg);
+    min-height: 400px; padding: 16px 0;
+    overflow-wrap: break-word;
+    word-break: break-word;
   }
   .notebook-toolbar {
     display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center;
