@@ -447,6 +447,9 @@ function renderArticle(text, filename) {
   if (focusModeActive) {
     setTimeout(updateFocusMode, 200);
   }
+
+  // Show "Playing" state on Listen button if this article is currently playing
+  updateListenButtonState();
 }
 
 

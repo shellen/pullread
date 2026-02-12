@@ -34,8 +34,20 @@ function startListenLoading() {
 function stopListenLoading() {
   if (_listenTimer) { clearInterval(_listenTimer); _listenTimer = null; }
   var btn = document.getElementById('listen-btn');
-  if (btn) {
-    btn.classList.remove('listen-loading');
+  if (btn) btn.classList.remove('listen-loading');
+  updateListenButtonState();
+}
+
+function updateListenButtonState() {
+  var btn = document.getElementById('listen-btn');
+  if (!btn || _listenTimer) return; // Loading animation takes precedence
+  var playingFile = ttsPlaying && ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length
+    ? ttsQueue[ttsCurrentIndex].filename : null;
+  if (playingFile && playingFile === activeFile) {
+    btn.classList.add('listen-playing');
+    btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> Playing';
+  } else {
+    btn.classList.remove('listen-playing');
     btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> Listen';
   }
 }
@@ -121,6 +133,8 @@ function renderAudioPlayer() {
   } else {
     queueSection.style.display = 'none';
   }
+
+  updateListenButtonState();
 }
 
 async function playTTSItem(index) {
