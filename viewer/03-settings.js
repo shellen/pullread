@@ -634,7 +634,7 @@ async function settingsAddFeed() {
       sec2._configData.feeds[url] = url;
     }
   }
-  showSettingsPage();
+  settingsPageSaveConfig();
 }
 
 function settingsRemoveFeed(name) {
@@ -642,7 +642,7 @@ function settingsRemoveFeed(name) {
   if (sec && sec._configData && sec._configData.feeds) {
     delete sec._configData.feeds[name];
   }
-  showSettingsPage();
+  settingsPageSaveConfig();
 }
 
 function settingsBackup() {
