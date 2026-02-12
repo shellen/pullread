@@ -285,8 +285,23 @@ function renderArticle(text, filename) {
     }
   }
 
+  // Strip YouTube thumbnail link BEFORE cleanMarkdown (which mangles the link-wrapped image)
+  var rawBody = body;
+  if (isYouTube) {
+    rawBody = rawBody.replace(/\[?!\[.*?\]\(https:\/\/img\.youtube\.com\/vi\/[^)]*\)\]?\(?[^)\n]*\)?\s*/g, '');
+    // Strip standalone YouTube image that lost its link wrapper
+    rawBody = rawBody.replace(/!\[.*?\]\(https:\/\/img\.youtube\.com\/vi\/[^)]*\)\s*/g, '');
+    // Strip channel name line (already in byline)
+    if (meta && meta.author) rawBody = rawBody.replace(new RegExp('^\\s*\\*' + meta.author.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\*\\s*$', 'm'), '');
+    // Strip description that duplicates the excerpt
+    if (meta && meta.excerpt) {
+      var excerptNorm = meta.excerpt.replace(/\.\.\.$/, '').trim();
+      rawBody = rawBody.replace(new RegExp('^\\s*' + excerptNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[^\\n]*\\s*$', 'm'), '');
+    }
+  }
+
   // Strip the leading H1 from markdown body if it matches the title (avoid duplication)
-  let articleBody = cleanMarkdown(body);
+  let articleBody = cleanMarkdown(rawBody);
   if (meta && meta.title) {
     var h1Match = articleBody.match(/^\s*#\s+(.+)\s*\n/);
     if (h1Match) {
@@ -296,11 +311,6 @@ function renderArticle(text, filename) {
         articleBody = articleBody.slice(h1Match[0].length);
       }
     }
-  }
-
-  // Strip the YouTube thumbnail link from body when we already injected an embed
-  if (isYouTube) {
-    articleBody = articleBody.replace(/\[!\[.*?\]\(https:\/\/img\.youtube\.com\/vi\/[^)]*\)\]\([^)]*\)\s*/g, '');
   }
 
   html += marked.parse(articleBody);
