@@ -862,6 +862,27 @@
   .article-actions button:hover { background: var(--sidebar-active); color: var(--fg); }
   .article-actions button.active-fav { background: color-mix(in srgb, #e91e63 12%, var(--bg)); color: #e91e63; }
   .article-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .article-actions button.listen-loading {
+    position: relative;
+    overflow: hidden;
+    color: var(--link);
+    pointer-events: none;
+  }
+  .article-actions button.listen-loading::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    background: color-mix(in srgb, var(--link) 15%, transparent);
+    border-radius: inherit;
+    animation: listen-fill 2.5s ease-in-out infinite;
+  }
+  @keyframes listen-fill {
+    0% { left: 0; right: 100%; }
+    50% { left: 0; right: 0; }
+    100% { left: 100%; right: 0; }
+  }
 
   /* Margin notes (Google Docs-style) */
   .margin-notes {

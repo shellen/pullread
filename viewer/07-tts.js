@@ -12,8 +12,37 @@ let _ttsChunkSession = null; // { id, totalChunks, currentChunk, elapsedTime }
 
 const TTS_SPEEDS = [0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.15, 1.2, 1.3, 1.5, 1.75, 2.0];
 
+// ---- Listen button loading animation ----
+var LISTEN_WORDS = ['Reading', 'Processing', 'Generating', 'Preparing', 'Creating'];
+var _listenTimer = null;
+var _listenWordIdx = 0;
+
+function startListenLoading() {
+  var btn = document.getElementById('listen-btn');
+  if (!btn) return;
+  btn.classList.add('listen-loading');
+  _listenWordIdx = 0;
+  btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> ' + LISTEN_WORDS[0] + '\u2026';
+  _listenTimer = setInterval(function() {
+    _listenWordIdx = (_listenWordIdx + 1) % LISTEN_WORDS.length;
+    var b = document.getElementById('listen-btn');
+    if (!b) { stopListenLoading(); return; }
+    b.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> ' + LISTEN_WORDS[_listenWordIdx] + '\u2026';
+  }, 2500);
+}
+
+function stopListenLoading() {
+  if (_listenTimer) { clearInterval(_listenTimer); _listenTimer = null; }
+  var btn = document.getElementById('listen-btn');
+  if (btn) {
+    btn.classList.remove('listen-loading');
+    btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> Listen';
+  }
+}
+
 function addCurrentToTTSQueue() {
   if (!activeFile) return;
+  startListenLoading();
   addToTTSQueue(activeFile);
 }
 
@@ -21,7 +50,7 @@ async function addToTTSQueue(filename) {
   const file = allFiles.find(f => f.filename === filename);
   if (!file) return;
   if (ttsQueue.some(q => q.filename === filename)) {
-    // Already queued — just play it
+    stopListenLoading();
     const idx = ttsQueue.findIndex(q => q.filename === filename);
     if (idx >= 0) playTTSItem(idx);
     return;
@@ -158,6 +187,7 @@ async function playBrowserTTS(filename) {
   let startTime = Date.now();
 
   utterance.onstart = function() {
+    stopListenLoading();
     ttsPlaying = true;
     startTime = Date.now();
     renderAudioPlayer();
@@ -213,6 +243,7 @@ async function playCloudTTS(filename) {
         await playBrowserTTS(filename);
         return;
       }
+      stopListenLoading();
       alert('TTS Error: ' + (err.error || 'Unknown error'));
       ttsPlaying = false;
       renderAudioPlayer();
@@ -264,6 +295,7 @@ async function playCloudTTSCached(filename) {
         await playBrowserTTS(filename);
         return;
       }
+      stopListenLoading();
       alert('TTS Error: ' + (err.error || 'Unknown error'));
       ttsPlaying = false;
       renderAudioPlayer();
@@ -291,6 +323,7 @@ async function playCloudTTSCached(filename) {
 
     var startCtxTime = audioCtx.currentTime;
     source.start();
+    stopListenLoading();
 
     var progressInterval = setInterval(function() {
       if (!ttsAudio || !ttsAudio._webAudioSource) { clearInterval(progressInterval); return; }
@@ -391,6 +424,7 @@ async function ttsPlayNextChunk(index) {
 
     var startCtxTime = audioCtx.currentTime;
     source.start();
+    stopListenLoading();
 
     // Track progress manually since Web Audio API doesn't fire timeupdate
     var progressInterval = setInterval(function() {
@@ -415,6 +449,7 @@ async function ttsPlayNextChunk(index) {
     ttsPlaying = true;
     renderAudioPlayer();
   } catch (err) {
+    stopListenLoading();
     ttsPlaying = false;
     _ttsChunkSession = null;
     renderAudioPlayer();
@@ -423,6 +458,7 @@ async function ttsPlayNextChunk(index) {
 }
 
 function stopTTS() {
+  stopListenLoading();
   clearInterval(ttsProgressTimer);
   _ttsChunkSession = null;
   if (ttsAudio) {

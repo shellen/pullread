@@ -238,7 +238,7 @@ function renderArticle(text, filename) {
   if (!isReviewArticle) {
     html += '<button onclick="summarizeArticle()" id="summarize-btn" aria-label="Summarize article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Summarize</button>';
   }
-  html += '<button onclick="addCurrentToTTSQueue()" aria-label="Listen to article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> Listen</button>';
+  html += '<button id="listen-btn" onclick="addCurrentToTTSQueue()" aria-label="Listen to article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> Listen</button>';
   if (meta && meta.url) {
     html += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg> Share</button></div>';
   }
