@@ -3,7 +3,8 @@
 
 import {
   extractArticle, resolveRelativeUrls, simplifySubstackUrl, isYouTubeUrl, extractYouTubeId,
-  matchPaperSource, fixPdfLigatures, stripRunningHeaders, buildParagraphs, extractPdfTitle
+  matchPaperSource, fixPdfLigatures, stripRunningHeaders, buildParagraphs, extractPdfTitle,
+  parseCaptionTracks
 } from './extractor';
 
 const SAMPLE_HTML = `
@@ -510,5 +511,42 @@ describe('extractPdfTitle', () => {
   test('falls back to Untitled PDF for bare URLs', () => {
     const lines: string[] = [];
     expect(extractPdfTitle(lines, 'https://example.com/')).toBe('Untitled PDF');
+  });
+});
+
+describe('parseCaptionTracks', () => {
+  test('extracts caption tracks from YouTube page HTML', () => {
+    const html = `some stuff "captionTracks":[{"baseUrl":"https://www.youtube.com/api/timedtext?v=abc","languageCode":"en"},{"baseUrl":"https://www.youtube.com/api/timedtext?v=abc&lang=es","languageCode":"es","kind":"asr"}] more stuff`;
+    const tracks = parseCaptionTracks(html);
+    expect(tracks).not.toBeNull();
+    expect(tracks!.length).toBe(2);
+    expect(tracks![0].languageCode).toBe('en');
+    expect(tracks![1].languageCode).toBe('es');
+    expect(tracks![1].kind).toBe('asr');
+  });
+
+  test('returns null when no captionTracks found', () => {
+    const html = '<html><body>No captions here</body></html>';
+    expect(parseCaptionTracks(html)).toBeNull();
+  });
+
+  test('returns null for empty caption tracks array', () => {
+    const html = `"captionTracks":[]`;
+    expect(parseCaptionTracks(html)).toBeNull();
+  });
+
+  test('handles captionTracks with escaped quotes in URLs', () => {
+    const html = `"captionTracks":[{"baseUrl":"https://www.youtube.com/api/timedtext?v=abc\\u0026lang=en","languageCode":"en"}]`;
+    const tracks = parseCaptionTracks(html);
+    expect(tracks).not.toBeNull();
+    expect(tracks!.length).toBe(1);
+  });
+
+  test('handles captionTracks containing brackets in values', () => {
+    const html = `"captionTracks":[{"baseUrl":"https://example.com/tt?v=x","name":{"simpleText":"English [CC]"},"languageCode":"en"}] other stuff`;
+    const tracks = parseCaptionTracks(html);
+    expect(tracks).not.toBeNull();
+    expect(tracks!.length).toBe(1);
+    expect(tracks![0].languageCode).toBe('en');
   });
 });

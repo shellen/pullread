@@ -825,22 +825,54 @@ async function fetchWithTimeout(url: string, headers: Record<string, string>, ti
 }
 
 /**
- * Fetch YouTube transcript via the timedtext/captions API.
- * Extracts caption track list from the video page, then fetches the transcript.
+ * Extract captionTracks JSON array from YouTube page HTML.
+ * Uses bracket-counting to handle nested brackets in JSON values.
  */
-async function fetchYouTubeTranscript(videoId: string): Promise<string | null> {
+export function parseCaptionTracks(html: string): Array<{ baseUrl: string; languageCode: string; kind?: string }> | null {
+  const marker = '"captionTracks":';
+  const idx = html.indexOf(marker);
+  if (idx === -1) return null;
+
+  const start = html.indexOf('[', idx + marker.length);
+  if (start === -1) return null;
+
+  // Walk forward counting brackets to find matching ]
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < html.length; i++) {
+    const ch = html[i];
+    if (escaped) { escaped = false; continue; }
+    if (ch === '\\') { escaped = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === '[') depth++;
+    if (ch === ']') {
+      depth--;
+      if (depth === 0) {
+        try {
+          const tracks = JSON.parse(html.slice(start, i + 1));
+          return tracks.length > 0 ? tracks : null;
+        } catch {
+          return null;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Fetch YouTube transcript via the timedtext/captions API.
+ * Receives pre-fetched page HTML to avoid a redundant request.
+ */
+async function fetchYouTubeTranscript(videoId: string, html: string): Promise<string | null> {
   try {
-    const pageUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    const res = await fetchWithTimeout(pageUrl, getBrowserHeaders(pageUrl), FETCH_TIMEOUT_MS);
-    if (!res.ok) return null;
-    const html = await res.text();
-
-    // Extract captionTracks from ytInitialPlayerResponse
-    const match = html.match(/"captionTracks":\s*(\[.*?\])/);
-    if (!match) return null;
-
-    const tracks = JSON.parse(match[1]) as Array<{ baseUrl: string; languageCode: string; kind?: string }>;
-    if (!tracks || tracks.length === 0) return null;
+    const tracks = parseCaptionTracks(html);
+    if (!tracks) {
+      console.log('No caption tracks found for', videoId);
+      return null;
+    }
 
     // Prefer English manual captions, then auto-generated English, then first available
     const english = tracks.find(t => t.languageCode === 'en' && t.kind !== 'asr');
@@ -868,7 +900,8 @@ async function fetchYouTubeTranscript(videoId: string): Promise<string | null> {
     }
 
     return lines.length > 0 ? lines.join('\n') : null;
-  } catch {
+  } catch (err: any) {
+    console.warn('YouTube transcript fetch failed for', videoId, err?.message || err);
     return null;
   }
 }
@@ -913,8 +946,8 @@ async function extractYouTube(url: string, videoId: string, options: FetchOption
     markdown += `${description}\n\n`;
   }
 
-  // Try to fetch transcript
-  const transcript = await fetchYouTubeTranscript(videoId);
+  // Try to fetch transcript (reuse the already-fetched page HTML)
+  const transcript = await fetchYouTubeTranscript(videoId, html);
   if (transcript) {
     markdown += `---\n\n## Transcript\n\n${transcript}\n`;
   }
