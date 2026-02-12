@@ -935,8 +935,8 @@ function showTTSSettings() {
     overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
 
     const providers = [
-      { id: 'browser', label: 'Built-in Voice — free' },
       { id: 'kokoro', label: 'Kokoro — natural voice, free & private' },
+      { id: 'browser', label: 'Built-in Voice (Apple) — free' },
       { id: 'openai', label: 'OpenAI — premium quality' },
       { id: 'elevenlabs', label: 'ElevenLabs — premium quality' },
     ];
@@ -1007,11 +1007,15 @@ function showTTSSettings() {
               ${renderVoiceOptions('kokoro')}
             </select>
           </div>
-          <div style="margin:12px 0">
+          <div style="margin:12px 0" id="tts-kokoro-quality">
             <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Quality</label>
-            <select id="tts-kokoro-model" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px">
-              ${renderModelOptions('kokoro')}
-            </select>
+            ${(data.model === 'kokoro-v1-q4')
+              ? '<div style="font-size:12px;color:#22c55e">&#10003; High quality</div>'
+              : '<div style="font-size:12px;color:var(--fg)">Standard quality'
+                + '<br><button onclick="ttsUpgradeKokoroQuality()" style="margin-top:6px;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--link);font-size:12px;cursor:pointer;font-family:inherit">Upgrade to high quality</button>'
+                + '<span style="color:var(--muted);font-size:11px;margin-left:6px">Free &middot; 305MB download</span></div>'
+            }
+            <input type="hidden" id="tts-kokoro-model" value="${escapeHtml(data.model || 'kokoro-v1-q8')}">
           </div>
         </div>
         <div id="tts-cost-info" style="display:${data.provider === 'openai' || data.provider === 'elevenlabs' ? 'block' : 'none'}">
@@ -1140,6 +1144,20 @@ function ttsSettingsProviderChanged() {
   const model = modelSelect.value;
   const costEl = document.getElementById('tts-cost-estimate');
   if (costEl) costEl.innerHTML = ttsGetCostHtml(provider, model);
+}
+
+function ttsUpgradeKokoroQuality() {
+  var hidden = document.getElementById('tts-kokoro-model');
+  if (hidden) hidden.value = 'kokoro-v1-q4';
+  var container = document.getElementById('tts-kokoro-quality');
+  if (container) {
+    var label = container.querySelector('label');
+    container.innerHTML = '';
+    if (label) container.appendChild(label);
+    container.insertAdjacentHTML('beforeend',
+      '<div style="font-size:12px;color:#22c55e">&#10003; High quality — will download on next listen</div>'
+      + '<input type="hidden" id="tts-kokoro-model" value="kokoro-v1-q4">');
+  }
 }
 
 function saveTTSSettings() {

@@ -117,7 +117,7 @@ export function loadTTSConfig(): TTSConfig {
       }
     }
   } catch {}
-  return { provider: 'browser' };
+  return { provider: 'kokoro' };
 }
 
 export function saveTTSConfig(config: TTSConfig): void {

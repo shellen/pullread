@@ -330,8 +330,8 @@ function showSettingsPage() {
       var sec = document.getElementById('settings-voice');
       if (!sec) return;
       var providers = [
-        { id: 'browser', label: 'Built-in Voice — free' },
         { id: 'kokoro', label: 'Kokoro — free, on-device' },
+        { id: 'browser', label: 'Built-in Voice (Apple) — free' },
         { id: 'openai', label: 'OpenAI — premium' },
         { id: 'elevenlabs', label: 'ElevenLabs — premium' },
       ];
@@ -353,15 +353,26 @@ function showSettingsPage() {
         h += '</select></div>';
       }
 
-      // Model select
+      // Model / quality select
       if (data.models) {
-        h += '<div class="settings-row" id="sp-tts-model-row"><label>Model</label>';
-        h += '<select id="sp-tts-model">';
-        var models = data.models[data.provider] || [];
-        for (var mi = 0; mi < models.length; mi++) {
-          h += '<option value="' + models[mi].id + '"' + (data.model === models[mi].id ? ' selected' : '') + '>' + escapeHtml(models[mi].label) + '</option>';
+        if (data.provider === 'kokoro') {
+          h += '<div class="settings-row" id="sp-tts-model-row"><label>Quality</label>';
+          if (data.model === 'kokoro-v1-q4') {
+            h += '<span style="font-size:12px;color:#22c55e">&#10003; High quality</span>';
+          } else {
+            h += '<span style="font-size:12px">Standard <button onclick="spUpgradeKokoroQuality()" style="margin-left:8px;padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--link);font-size:11px;cursor:pointer;font-family:inherit">Upgrade</button> <span style="color:var(--muted);font-size:11px">Free &middot; 305MB</span></span>';
+          }
+          h += '<input type="hidden" id="sp-tts-model" value="' + escapeHtml(data.model || 'kokoro-v1-q8') + '">';
+          h += '</div>';
+        } else {
+          h += '<div class="settings-row" id="sp-tts-model-row"><label>Model</label>';
+          h += '<select id="sp-tts-model">';
+          var models = data.models[data.provider] || [];
+          for (var mi = 0; mi < models.length; mi++) {
+            h += '<option value="' + models[mi].id + '"' + (data.model === models[mi].id ? ' selected' : '') + '>' + escapeHtml(models[mi].label) + '</option>';
+          }
+          h += '</select></div>';
         }
-        h += '</select></div>';
       }
 
       // API key for cloud providers
@@ -531,11 +542,33 @@ function settingsPageTTSChanged() {
     if (voiceSelect && data.voices && data.voices[provider]) {
       voiceSelect.innerHTML = settingsRenderVoiceOptions(provider, data.voices[provider], '');
     } else if (voiceSelect) { voiceSelect.innerHTML = ''; }
-    if (modelSelect && data.models && data.models[provider]) {
+    var modelRow = document.getElementById('sp-tts-model-row');
+    if (modelRow && provider === 'kokoro') {
+      var label = modelRow.querySelector('label');
+      modelRow.innerHTML = '';
+      if (label) modelRow.appendChild(label);
+      modelRow.insertAdjacentHTML('beforeend',
+        '<span style="font-size:12px">Standard <button onclick="spUpgradeKokoroQuality()" style="margin-left:8px;padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--link);font-size:11px;cursor:pointer;font-family:inherit">Upgrade</button> <span style="color:var(--muted);font-size:11px">Free &middot; 305MB</span></span>'
+        + '<input type="hidden" id="sp-tts-model" value="kokoro-v1-q8">');
+    } else if (modelSelect && data.models && data.models[provider]) {
       modelSelect.innerHTML = data.models[provider].map(function(m) {
         return '<option value="' + m.id + '">' + escapeHtml(m.label) + '</option>';
       }).join('');
     } else if (modelSelect) { modelSelect.innerHTML = ''; }
+  }
+}
+
+function spUpgradeKokoroQuality() {
+  var hidden = document.getElementById('sp-tts-model');
+  if (hidden) hidden.value = 'kokoro-v1-q4';
+  var row = document.getElementById('sp-tts-model-row');
+  if (row) {
+    var label = row.querySelector('label');
+    row.innerHTML = '';
+    if (label) row.appendChild(label);
+    row.insertAdjacentHTML('beforeend',
+      '<span style="font-size:12px;color:#22c55e">&#10003; High quality — save to apply</span>'
+      + '<input type="hidden" id="sp-tts-model" value="kokoro-v1-q4">');
   }
 }
 
