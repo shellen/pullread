@@ -299,71 +299,48 @@ async function playCloudTTS(filename) {
   }
 }
 
-/** Play a full cached audio file via the existing /api/tts endpoint */
+/** Play a full cached audio file via HTMLAudioElement (preserves pitch when speed changes) */
 async function playCloudTTSCached(filename) {
   try {
-    const res = await fetch('/api/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: filename }),
+    var audio = new Audio('/api/tts/play?name=' + encodeURIComponent(filename));
+    audio.playbackRate = ttsSpeed;
+
+    audio.addEventListener('loadedmetadata', function() {
+      document.getElementById('tts-time-total').textContent = formatTime(audio.duration);
     });
 
-    if (!res.ok) {
-      const err = await res.json().catch(function() { return { error: 'TTS failed' }; });
-      if (err.fallback === 'browser') {
-        console.warn('Kokoro unavailable, falling back to browser TTS:', err.error);
-        await playBrowserTTS(filename);
-        return;
-      }
+    audio.addEventListener('playing', function() {
       stopListenLoading();
-      alert('TTS Error: ' + (err.error || 'Unknown error'));
-      ttsPlaying = false;
+      ttsPlaying = true;
       renderAudioPlayer();
-      return;
-    }
+    });
 
-    var arrayBuf = await res.arrayBuffer();
-
-    // Decode via Web Audio API (HTMLMediaElement + blob URLs fail in WKWebView)
-    if (!window._ttsAudioCtx) {
-      window._ttsAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    var audioCtx = window._ttsAudioCtx;
-    if (audioCtx.state === 'suspended') await audioCtx.resume();
-
-    var audioBuffer = await audioCtx.decodeAudioData(arrayBuf.slice(0));
-    var totalDuration = audioBuffer.duration;
-
-    document.getElementById('tts-time-total').textContent = formatTime(totalDuration);
-
-    var source = audioCtx.createBufferSource();
-    source.buffer = audioBuffer;
-    source.playbackRate.value = ttsSpeed;
-    source.connect(audioCtx.destination);
-
-    var startCtxTime = audioCtx.currentTime;
-    source.start();
-    stopListenLoading();
-
-    var progressInterval = setInterval(function() {
-      if (!ttsAudio || !ttsAudio._webAudioSource) { clearInterval(progressInterval); return; }
-      var elapsed = audioCtx.currentTime - startCtxTime;
-      var pct = Math.min(100, (elapsed / (totalDuration / ttsSpeed)) * 100);
+    audio.addEventListener('timeupdate', function() {
+      if (!audio.duration) return;
+      var pct = Math.min(100, (audio.currentTime / audio.duration) * 100);
       document.getElementById('tts-progress').style.width = pct + '%';
-      document.getElementById('tts-time-current').textContent = formatTime(elapsed * ttsSpeed);
-    }, 200);
+      document.getElementById('tts-time-current').textContent = formatTime(audio.currentTime);
+    });
 
-    source.onended = function() {
-      clearInterval(progressInterval);
+    audio.addEventListener('ended', function() {
       document.getElementById('tts-progress').style.width = '100%';
       ttsPlaying = false;
       renderAudioPlayer();
       if (ttsCurrentIndex + 1 < ttsQueue.length) {
         setTimeout(function() { playTTSItem(ttsCurrentIndex + 1); }, 500);
       }
-    };
+    });
 
-    ttsAudio = { _webAudioSource: source, _ctx: audioCtx, _interval: progressInterval };
+    audio.addEventListener('error', function() {
+      stopListenLoading();
+      ttsPlaying = false;
+      renderAudioPlayer();
+      alert('TTS Error: Failed to load cached audio');
+    });
+
+    audio.play();
+
+    ttsAudio = audio;
     ttsPlaying = true;
     renderAudioPlayer();
   } catch (err) {
@@ -373,37 +350,32 @@ async function playCloudTTSCached(filename) {
   }
 }
 
-// Pre-fetched and decoded audio buffers for upcoming chunks
+// Tracks which chunks have been pre-fetched (server-side cache warming)
 var _ttsChunkBuffer = new Map();
 
-/** Pre-fetch and decode the next chunk in the background while current one plays */
+/** Pre-fetch the next chunk to warm the server cache so HTMLAudioElement loads instantly */
 function ttsPrefetchChunk(index) {
   var session = _ttsChunkSession;
   if (!session || index >= session.totalChunks) return;
   if (_ttsChunkBuffer.has(index)) return;
 
   // Mark as in-flight so we don't double-fetch
-  _ttsChunkBuffer.set(index, null);
+  _ttsChunkBuffer.set(index, 'fetching');
 
   fetch('/api/tts/chunk/' + session.id + '/' + index)
-    .then(function(res) { return res.ok ? res.arrayBuffer() : null; })
-    .then(function(arrayBuf) {
-      if (!arrayBuf || session !== _ttsChunkSession) return;
-      if (!window._ttsAudioCtx) return;
-      return window._ttsAudioCtx.decodeAudioData(arrayBuf.slice(0));
-    })
-    .then(function(audioBuffer) {
-      if (audioBuffer && session === _ttsChunkSession) {
-        _ttsChunkBuffer.set(index, audioBuffer);
+    .then(function(res) {
+      if (res.ok && session === _ttsChunkSession) {
+        _ttsChunkBuffer.set(index, 'ready');
       }
+      // Consume the body to complete the fetch (warms server cache)
+      return res.arrayBuffer();
     })
     .catch(function() {
-      // Prefetch failure is non-fatal — will fetch on demand
       if (session === _ttsChunkSession) _ttsChunkBuffer.delete(index);
     });
 }
 
-/** Fetch and play a single TTS chunk, then chain to the next */
+/** Play a single TTS chunk via HTMLAudioElement (preserves pitch), then chain to the next */
 async function ttsPlayNextChunk(index) {
   var session = _ttsChunkSession;
   if (!session || session !== _ttsChunkSession) return;
@@ -425,88 +397,66 @@ async function ttsPlayNextChunk(index) {
   renderAudioPlayer();
 
   try {
-    if (!window._ttsAudioCtx) {
-      window._ttsAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    var audioCtx = window._ttsAudioCtx;
-    if (audioCtx.state === 'suspended') await audioCtx.resume();
+    var chunkUrl = '/api/tts/chunk/' + session.id + '/' + index;
+    var audio = new Audio(chunkUrl);
+    audio.playbackRate = ttsSpeed;
+    // preservesPitch defaults to true — pitch stays constant when speed changes
 
-    var audioBuffer;
-
-    // Check pre-fetch buffer first
-    var buffered = _ttsChunkBuffer.get(index);
-    if (buffered instanceof AudioBuffer) {
-      audioBuffer = buffered;
-      _ttsChunkBuffer.delete(index);
-    } else {
-      // Not ready yet — fetch on demand
-      var chunkUrl = '/api/tts/chunk/' + session.id + '/' + index;
-      var chunkRes = await fetch(chunkUrl);
-      if (!chunkRes.ok) {
-        var err = await chunkRes.json().catch(function() { return { error: 'Chunk failed' }; });
-        if (err.fallback === 'browser') {
-          console.warn('Kokoro unavailable, falling back to browser TTS:', err.error);
-          _ttsChunkSession = null;
-          _ttsChunkBuffer.clear();
-          await playBrowserTTS(ttsQueue[ttsCurrentIndex].filename);
-          return;
-        }
-        throw new Error(err.error || 'Chunk generation failed');
-      }
-      var arrayBuf = await chunkRes.arrayBuffer();
+    audio.addEventListener('loadedmetadata', function() {
       if (session !== _ttsChunkSession) return;
-      if (!arrayBuf || arrayBuf.byteLength === 0) {
-        throw new Error('Empty audio for chunk ' + index);
+      var chunkDuration = audio.duration;
+
+      if (index === 0) {
+        session.estimatedTotalDuration = chunkDuration * session.totalChunks;
+        document.getElementById('tts-time-total').textContent = '~' + formatTime(session.estimatedTotalDuration);
       }
-      audioBuffer = await audioCtx.decodeAudioData(arrayBuf.slice(0));
-    }
+    });
 
-    if (session !== _ttsChunkSession) return;
+    audio.addEventListener('playing', function() {
+      if (session !== _ttsChunkSession) return;
+      stopListenLoading();
+      ttsPlaying = true;
+      renderAudioPlayer();
 
-    var chunkDuration = audioBuffer.duration;
+      // Pre-fetch next chunk while this one plays
+      if (index + 1 < session.totalChunks) {
+        ttsPrefetchChunk(index + 1);
+      }
+    });
 
-    if (index === 0 && session === _ttsChunkSession) {
-      session.estimatedTotalDuration = chunkDuration * session.totalChunks;
-      document.getElementById('tts-time-total').textContent = '~' + formatTime(session.estimatedTotalDuration);
-    }
-
-    var source = audioCtx.createBufferSource();
-    source.buffer = audioBuffer;
-    source.playbackRate.value = ttsSpeed;
-    source.connect(audioCtx.destination);
-
-    var startCtxTime = audioCtx.currentTime;
-    source.start();
-    stopListenLoading();
-
-    // Pre-fetch next chunk while this one plays
-    if (index + 1 < session.totalChunks) {
-      ttsPrefetchChunk(index + 1);
-    }
-
-    // Track progress manually since Web Audio API doesn't fire timeupdate
-    var progressInterval = setInterval(function() {
-      if (session !== _ttsChunkSession) { clearInterval(progressInterval); return; }
-      var elapsed = audioCtx.currentTime - startCtxTime;
-      var chunkProgress = Math.min(1, elapsed / (chunkDuration / ttsSpeed));
+    audio.addEventListener('timeupdate', function() {
+      if (session !== _ttsChunkSession) return;
+      var chunkDuration = audio.duration || 1;
+      var chunkProgress = Math.min(1, audio.currentTime / chunkDuration);
       var overallPct = ((index + chunkProgress) / session.totalChunks) * 100;
       document.getElementById('tts-progress').style.width = overallPct + '%';
-      var currentTime = session.elapsedTime + elapsed * ttsSpeed;
+      var currentTime = session.elapsedTime + audio.currentTime;
       document.getElementById('tts-time-current').textContent = formatTime(currentTime);
-    }, 200);
+    });
 
-    source.onended = function() {
-      clearInterval(progressInterval);
+    audio.addEventListener('ended', function() {
       if (session !== _ttsChunkSession) return;
-      session.elapsedTime += chunkDuration;
-      // Show loading words only if next chunk isn't pre-buffered yet
-      var nextReady = _ttsChunkBuffer.get(index + 1) instanceof AudioBuffer;
+      session.elapsedTime += audio.duration || 0;
+      // Show loading words only if next chunk isn't pre-warmed on the server yet
+      var nextReady = _ttsChunkBuffer.get(index + 1) === 'ready';
       if (index + 1 < session.totalChunks && !nextReady) startListenLoading();
       ttsPlayNextChunk(index + 1);
-    };
+    });
 
-    // Store source for stop/pause
-    ttsAudio = { _webAudioSource: source, _ctx: audioCtx, _interval: progressInterval };
+    audio.addEventListener('error', function() {
+      if (session !== _ttsChunkSession) return;
+      stopListenLoading();
+      ttsPlaying = false;
+      _ttsChunkSession = null;
+      _ttsChunkBuffer.clear();
+      renderAudioPlayer();
+      alert('TTS Error: Failed to load audio chunk ' + index);
+    });
+
+    audio.play();
+
+    // Store as plain HTMLAudioElement — existing toggle/speed/stop code handles this
+    ttsAudio = audio;
     ttsPlaying = true;
     renderAudioPlayer();
   } catch (err) {
@@ -524,15 +474,8 @@ function stopTTS() {
   _ttsChunkSession = null;
   _ttsChunkBuffer.clear();
   if (ttsAudio) {
-    if (ttsAudio._webAudioSource) {
-      // Web Audio API source
-      try { ttsAudio._webAudioSource.stop(); } catch(e) {}
-      if (ttsAudio._interval) clearInterval(ttsAudio._interval);
-    } else {
-      // HTMLAudioElement
-      ttsAudio.pause();
-      ttsAudio.src = '';
-    }
+    ttsAudio.pause();
+    ttsAudio.src = '';
     ttsAudio = null;
   }
   if (ttsSynthUtterance) {
@@ -574,25 +517,12 @@ function ttsTogglePlay() {
     }
   } else {
     if (ttsAudio) {
-      if (ttsAudio._webAudioSource) {
-        // Web Audio API — suspend/resume the context for pause/play
-        var ctx = ttsAudio._ctx;
-        if (ttsPlaying) {
-          ctx.suspend();
-          ttsPlaying = false;
-        } else {
-          ctx.resume();
-          ttsPlaying = true;
-        }
+      if (ttsPlaying) {
+        ttsAudio.pause();
+        ttsPlaying = false;
       } else {
-        // HTMLAudioElement (cached playback)
-        if (ttsPlaying) {
-          ttsAudio.pause();
-          ttsPlaying = false;
-        } else {
-          ttsAudio.play();
-          ttsPlaying = true;
-        }
+        ttsAudio.play();
+        ttsPlaying = true;
       }
     } else if (ttsCurrentIndex >= 0) {
       playTTSItem(ttsCurrentIndex);
@@ -758,11 +688,7 @@ function ttsSetSpeed(speed) {
   if (popupVal) popupVal.textContent = speed + 'x';
 
   if (ttsAudio) {
-    if (ttsAudio._webAudioSource) {
-      ttsAudio._webAudioSource.playbackRate.value = speed;
-    } else {
-      ttsAudio.playbackRate = speed;
-    }
+    ttsAudio.playbackRate = speed;
   }
   if (ttsSynthUtterance && window.speechSynthesis.speaking) {
     ttsSynthUtterance.rate = speed;
@@ -1125,12 +1051,8 @@ function saveTTSSettings() {
       // Stop current audio but keep the queue
       _ttsChunkSession = null;
       if (ttsAudio) {
-        if (ttsAudio._webAudioSource) {
-          try { ttsAudio._webAudioSource.stop(); } catch(e) {}
-          if (ttsAudio._interval) clearInterval(ttsAudio._interval);
-        } else if (ttsAudio.pause) {
-          ttsAudio.pause();
-        }
+        ttsAudio.pause();
+        ttsAudio.src = '';
         ttsAudio = null;
       }
       if (window.speechSynthesis) window.speechSynthesis.cancel();

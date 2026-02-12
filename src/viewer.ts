@@ -951,6 +951,40 @@ export function startViewer(outputPath: string, port = 7777): void {
       return;
     }
 
+    // TTS cached audio — serve pre-generated audio via GET for HTMLAudioElement playback
+    if (url.pathname === '/api/tts/play' && req.method === 'GET') {
+      try {
+        const name = url.searchParams.get('name');
+        if (!name || name.includes('..') || name.includes('/')) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'valid name is required' }));
+          return;
+        }
+        const config = loadTTSConfig();
+        const filePath = join(outputPath, name);
+        if (!existsSync(filePath)) { send404(res); return; }
+
+        const content = readFileSync(filePath, 'utf-8');
+        const match = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
+        const articleText = match ? match[1] : content;
+        const audio = await generateSpeech(name, articleText, config);
+
+        res.writeHead(200, {
+          'Content-Type': getAudioContentType(config.provider),
+          'Content-Length': audio.length.toString(),
+          'Cache-Control': 'max-age=86400',
+        });
+        res.end(audio);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'TTS generation failed';
+        const isNativeLoadError = msg.includes('Kokoro voice engine could not load') || msg.includes('not available in this build');
+        const status = isNativeLoadError ? 503 : 500;
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: msg, ...(isNativeLoadError && { fallback: 'browser' }) }));
+      }
+      return;
+    }
+
     // TTS Audio generation API (full article, for cached playback and backward compat)
     if (url.pathname === '/api/tts' && req.method === 'POST') {
       try {
