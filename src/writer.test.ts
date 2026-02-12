@@ -84,7 +84,7 @@ describe('generateMarkdown', () => {
     expect(md).toContain('feed: bookmarks');
   });
 
-  test('includes enclosure for podcasts', () => {
+  test('includes enclosure for podcasts as flat keys', () => {
     const md = generateMarkdown({
       title: 'Podcast Episode',
       url: 'https://podcast.com/ep1',
@@ -99,9 +99,28 @@ describe('generateMarkdown', () => {
       }
     });
 
-    expect(md).toContain('enclosure:');
-    expect(md).toContain('  url: https://cdn.example.com/ep1.mp3');
-    expect(md).toContain('  type: audio/mpeg');
-    expect(md).toContain('  duration: "00:45:30"');
+    expect(md).toContain('enclosure_url: https://cdn.example.com/ep1.mp3');
+    expect(md).toContain('enclosure_type: audio/mpeg');
+    expect(md).toContain('enclosure_duration: "00:45:30"');
+    // Should NOT use nested YAML
+    expect(md).not.toContain('enclosure:\n');
+  });
+
+  test('omits enclosure_duration when not provided', () => {
+    const md = generateMarkdown({
+      title: 'Podcast Episode',
+      url: 'https://podcast.com/ep1',
+      bookmarkedAt: '2024-01-29T12:00:00Z',
+      domain: 'podcast.com',
+      content: 'Episode description',
+      enclosure: {
+        url: 'https://cdn.example.com/ep1.mp3',
+        type: 'audio/mpeg',
+      }
+    });
+
+    expect(md).toContain('enclosure_url: https://cdn.example.com/ep1.mp3');
+    expect(md).toContain('enclosure_type: audio/mpeg');
+    expect(md).not.toContain('enclosure_duration');
   });
 });

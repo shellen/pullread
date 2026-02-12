@@ -67,11 +67,10 @@ domain: ${data.domain}`;
   }
 
   if (data.enclosure) {
-    frontmatter += `\nenclosure:`;
-    frontmatter += `\n  url: ${data.enclosure.url}`;
-    frontmatter += `\n  type: ${data.enclosure.type}`;
+    frontmatter += `\nenclosure_url: ${data.enclosure.url}`;
+    frontmatter += `\nenclosure_type: ${data.enclosure.type}`;
     if (data.enclosure.duration) {
-      frontmatter += `\n  duration: "${data.enclosure.duration}"`;
+      frontmatter += `\nenclosure_duration: "${data.enclosure.duration}"`;
     }
   }
 
