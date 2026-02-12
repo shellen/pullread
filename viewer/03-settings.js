@@ -78,7 +78,6 @@ function toggleSettingsDropdown() {
       <select onchange="setFont(this.value)" id="font-select" aria-label="Font family">
         <option value="serif" ${currentFont==='serif'?'selected':''}>Serif</option>
         <option value="sans" ${currentFont==='sans'?'selected':''}>Sans-serif</option>
-        <option value="new-york" ${currentFont==='new-york'?'selected':''}>New York</option>
         <option value="system" ${currentFont==='system'?'selected':''}>Charter</option>
         <option value="mono" ${currentFont==='mono'?'selected':''}>Monospace</option>
         <option value="inter" ${currentFont==='inter'?'selected':''}>Inter</option>
@@ -190,8 +189,8 @@ function showSettingsPage() {
     + themeBtn('light', 'Light') + themeBtn('dark', 'Dark') + themeBtn('sepia', 'Sepia') + themeBtn('high-contrast', 'Hi-Con')
     + '</div></div>';
   html += '<div class="settings-row"><label>Font</label><select onchange="setFont(this.value);showSettingsPage()">'
-    + opt('serif','Serif',currentFont) + opt('sans','Sans-serif',currentFont) + opt('new-york','New York',currentFont)
-    + opt('system','Charter',currentFont) + opt('mono','Monospace',currentFont) + opt('inter','Inter',currentFont)
+    + opt('serif','Serif',currentFont) + opt('sans','Sans-serif',currentFont) + opt('system','Charter',currentFont)
+    + opt('mono','Monospace',currentFont) + opt('inter','Inter',currentFont)
     + opt('lora','Lora',currentFont) + opt('literata','Literata',currentFont) + opt('source-serif','Source Serif',currentFont)
     + opt('work-sans','Work Sans',currentFont) + opt('opendyslexic','OpenDyslexic',currentFont)
     + '</select></div>';
