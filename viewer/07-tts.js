@@ -478,7 +478,6 @@ async function ttsPlayNextChunk(index) {
 }
 
 function stopTTS() {
-  stopListenLoading();
   clearInterval(ttsProgressTimer);
   _ttsChunkSession = null;
   if (ttsAudio) {
@@ -729,6 +728,7 @@ function ttsSetSpeed(speed) {
 
 function removeTTSQueueItem(index) {
   if (index === ttsCurrentIndex) {
+    stopListenLoading();
     stopTTS();
     ttsQueue.splice(index, 1);
     if (ttsQueue.length > 0) {
@@ -745,6 +745,7 @@ function removeTTSQueueItem(index) {
 }
 
 function ttsClearQueue() {
+  stopListenLoading();
   stopTTS();
   ttsQueue = [];
   ttsCurrentIndex = -1;
