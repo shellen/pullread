@@ -13,7 +13,13 @@ let _ttsChunkSession = null; // { id, totalChunks, currentChunk, elapsedTime }
 const TTS_SPEEDS = [0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.15, 1.2, 1.3, 1.5, 1.75, 2.0];
 
 // ---- Listen button loading animation ----
-var LISTEN_WORDS = ['Reading', 'Processing', 'Generating', 'Preparing', 'Creating'];
+var LISTEN_WORDS = [
+  'Reading', 'Processing', 'Generating', 'Preparing', 'Creating',
+  'Warming up', 'Clearing throat', 'Rehearsing', 'Caffeinating', 'Inhaling',
+  'Summoning', 'Channeling', 'Tuning', 'Vocalizing', 'Manifesting',
+  'Contemplating', 'Conjuring', 'Brewing', 'Stretching', 'Composing',
+  'Hydrating', 'Buffering', 'Focusing', 'Harmonizing', 'Simmering',
+];
 var _listenTimer = null;
 var _listenWordIdx = 0;
 
@@ -21,8 +27,8 @@ function startListenLoading() {
   var btn = document.getElementById('listen-btn');
   if (!btn) return;
   btn.classList.add('listen-loading');
-  _listenWordIdx = 0;
-  btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> ' + LISTEN_WORDS[0] + '\u2026';
+  _listenWordIdx = Math.floor(Math.random() * LISTEN_WORDS.length);
+  btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> ' + LISTEN_WORDS[_listenWordIdx] + '\u2026';
   _listenTimer = setInterval(function() {
     _listenWordIdx = (_listenWordIdx + 1) % LISTEN_WORDS.length;
     var b = document.getElementById('listen-btn');
