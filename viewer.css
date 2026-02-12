@@ -2421,6 +2421,41 @@
   .nb-suggest-dismiss:hover { color: var(--fg); }
 
   /* Grammar check results (LanguageTool) */
+  /* Grammar mirror overlay — positioned behind transparent textarea */
+  .grammar-mirror {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    overflow: hidden;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    color: transparent;
+    z-index: 0;
+  }
+  .notebook-editor textarea { position: relative; z-index: 1; }
+  .grammar-underline {
+    text-decoration: wavy underline #e74c3c;
+    text-decoration-skip-ink: none;
+    text-underline-offset: 2px;
+    pointer-events: auto;
+    cursor: pointer;
+    color: transparent;
+  }
+  .grammar-tooltip {
+    z-index: 1000;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    max-width: 300px;
+    font-size: 13px;
+  }
+  .grammar-tooltip-msg { margin-bottom: 6px; color: var(--fg); }
+  .grammar-tooltip-fixes { display: flex; gap: 6px; flex-wrap: wrap; }
+
   .grammar-results {
     margin-top: 12px; padding: 12px;
     background: color-mix(in srgb, var(--fg) 3%, transparent);

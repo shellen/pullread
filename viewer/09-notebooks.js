@@ -248,9 +248,10 @@ function openNoteInPane(noteId) {
     applySyntaxHighlighting();
   }
 
-  // Set up auto-grow, auto-save, and focus tracking for textarea
+  // Set up auto-grow, auto-save, focus tracking, and grammar mirror for textarea
   var ta = content.querySelector('.note-page .notebook-editor textarea');
   if (ta) {
+    setupGrammarMirror(ta);
     autoGrowTextarea(ta);
     ta.addEventListener('input', function() {
       autoGrowTextarea(ta);
@@ -318,6 +319,10 @@ function saveActiveNoteContent() {
 function autoGrowTextarea(ta) {
   ta.style.height = 'auto';
   ta.style.height = Math.max(400, ta.scrollHeight) + 'px';
+  // Keep grammar mirror height in sync
+  var wrap = ta.closest('.notebook-editor-wrap');
+  var mirror = wrap ? wrap.querySelector('.grammar-mirror') : null;
+  if (mirror) mirror.style.height = ta.offsetHeight + 'px';
 }
 
 function notebookDebounceSave() {
@@ -406,6 +411,173 @@ function acceptNotebookTagSuggestion(tag, btn) {
 
 // ---- Grammar Checking (macOS NSSpellChecker — fully on-device) ----
 
+var _grammarDebounceTimeout = null;
+var _grammarMirrorMatches = [];
+
+// Set up a grammar mirror div behind the textarea for inline underlines
+function setupGrammarMirror(textarea) {
+  var wrap = textarea.closest('.notebook-editor-wrap');
+  if (!wrap || wrap.querySelector('.grammar-mirror')) return;
+
+  var mirror = document.createElement('div');
+  mirror.className = 'grammar-mirror';
+  // Insert before .notebook-editor so it renders behind the transparent textarea
+  wrap.insertBefore(mirror, wrap.firstChild);
+
+  // Sync scroll position
+  textarea.addEventListener('scroll', function() {
+    mirror.scrollTop = textarea.scrollTop;
+  });
+
+  // Run grammar on text changes (debounced)
+  textarea.addEventListener('input', function() {
+    clearTimeout(_grammarDebounceTimeout);
+    _grammarDebounceTimeout = setTimeout(function() {
+      runInlineGrammar(textarea);
+    }, 1500);
+  });
+}
+
+// Fetch grammar results and render underlines in the mirror div
+async function runInlineGrammar(textarea) {
+  if (!textarea || !textarea.value.trim()) {
+    updateGrammarMirror(textarea, []);
+    return;
+  }
+  var text = textarea.value;
+  try {
+    var res = await fetch('/api/grammar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text })
+    });
+    if (!res.ok) return;
+    var data = await res.json();
+    var matches = (data.matches || []).map(function(m) {
+      return {
+        offset: m.offset,
+        length: m.length,
+        message: m.message || '',
+        replacements: m.replacements || []
+      };
+    });
+    _grammarMirrorMatches = matches;
+    updateGrammarMirror(textarea, matches);
+  } catch {}
+}
+
+// Render grammar errors as underlined spans in the mirror div
+function updateGrammarMirror(textarea, matches) {
+  var wrap = textarea ? textarea.closest('.notebook-editor-wrap') : null;
+  var mirror = wrap ? wrap.querySelector('.grammar-mirror') : null;
+  if (!mirror || !textarea) return;
+
+  // Sync mirror sizing from textarea computed styles
+  var cs = getComputedStyle(textarea);
+  mirror.style.font = cs.font;
+  mirror.style.lineHeight = cs.lineHeight;
+  mirror.style.letterSpacing = cs.letterSpacing;
+  mirror.style.padding = cs.padding;
+  mirror.style.tabSize = cs.tabSize;
+  mirror.style.width = textarea.offsetWidth + 'px';
+  mirror.style.height = textarea.offsetHeight + 'px';
+
+  var text = textarea.value;
+  if (!matches || !matches.length) {
+    mirror.textContent = text;
+    return;
+  }
+
+  // Sort matches by offset, build HTML with <mark> spans around errors
+  var sorted = matches.slice().sort(function(a, b) { return a.offset - b.offset; });
+  var html = '';
+  var pos = 0;
+  for (var i = 0; i < sorted.length; i++) {
+    var m = sorted[i];
+    if (m.offset < pos) continue; // skip overlapping
+    if (m.offset > pos) {
+      html += escapeHtml(text.substring(pos, m.offset));
+    }
+    var errorText = text.substring(m.offset, m.offset + m.length);
+    var fixes = (m.replacements || []).slice(0, 3).join('|');
+    html += '<mark class="grammar-underline" data-offset="' + m.offset + '" data-length="' + m.length
+      + '" data-msg="' + escapeHtml(m.message) + '" data-fixes="' + escapeHtml(fixes)
+      + '">' + escapeHtml(errorText) + '</mark>';
+    pos = m.offset + m.length;
+  }
+  if (pos < text.length) {
+    html += escapeHtml(text.substring(pos));
+  }
+  mirror.innerHTML = html;
+  mirror.scrollTop = textarea.scrollTop;
+}
+
+// Show tooltip when clicking a grammar underline
+function showGrammarTooltip(mark) {
+  // Remove any existing tooltip
+  var old = document.querySelector('.grammar-tooltip');
+  if (old) old.remove();
+
+  var msg = mark.getAttribute('data-msg');
+  var fixes = mark.getAttribute('data-fixes');
+  var offset = parseInt(mark.getAttribute('data-offset'), 10);
+  var length = parseInt(mark.getAttribute('data-length'), 10);
+
+  var tip = document.createElement('div');
+  tip.className = 'grammar-tooltip';
+  var html = '<div class="grammar-tooltip-msg">' + escapeHtml(msg) + '</div>';
+  if (fixes) {
+    html += '<div class="grammar-tooltip-fixes">';
+    var parts = fixes.split('|');
+    for (var i = 0; i < parts.length; i++) {
+      html += '<button class="grammar-fix-btn" data-offset="' + offset + '" data-length="' + length
+        + '" data-fix="' + escapeHtml(parts[i]) + '">' + escapeHtml(parts[i]) + '</button>';
+    }
+    html += '</div>';
+  }
+  tip.innerHTML = html;
+
+  // Position relative to the mark
+  var rect = mark.getBoundingClientRect();
+  tip.style.position = 'fixed';
+  tip.style.left = rect.left + 'px';
+  tip.style.top = (rect.bottom + 4) + 'px';
+  document.body.appendChild(tip);
+
+  // Handle fix button clicks
+  tip.addEventListener('click', function(e) {
+    var btn = e.target.closest('.grammar-fix-btn');
+    if (!btn) return;
+    var fixOffset = parseInt(btn.getAttribute('data-offset'), 10);
+    var fixLength = parseInt(btn.getAttribute('data-length'), 10);
+    var fixValue = btn.getAttribute('data-fix');
+    applyGrammarFix(fixOffset, fixLength, fixValue);
+    tip.remove();
+    // Re-run inline grammar after fix
+    var ta = document.querySelector('.note-page .notebook-editor textarea');
+    if (ta) {
+      clearTimeout(_grammarDebounceTimeout);
+      _grammarDebounceTimeout = setTimeout(function() { runInlineGrammar(ta); }, 300);
+    }
+  });
+
+  // Close on click outside
+  setTimeout(function() {
+    document.addEventListener('click', function close(e) {
+      if (!tip.contains(e.target)) { tip.remove(); document.removeEventListener('click', close); }
+    });
+  }, 0);
+}
+
+// Delegate click on grammar-underline marks
+document.addEventListener('click', function(e) {
+  var mark = e.target.closest('.grammar-underline');
+  if (mark) {
+    e.stopPropagation();
+    showGrammarTooltip(mark);
+  }
+});
+
 async function checkNotebookGrammar() {
   var ta = document.querySelector('.note-page .notebook-editor textarea');
   if (!ta || !ta.value.trim()) return;
@@ -426,7 +598,13 @@ async function checkNotebookGrammar() {
     var data = await res.json();
     var raw = data.matches || [];
 
-    // Normalize to the shape showGrammarResults expects
+    var normalizedForMirror = raw.map(function(m) {
+      return { offset: m.offset, length: m.length, message: m.message || '', replacements: m.replacements || [] };
+    });
+    _grammarMirrorMatches = normalizedForMirror;
+    updateGrammarMirror(ta, normalizedForMirror);
+
+    // Also show the panel below
     var matches = raw.map(function(m) {
       return {
         offset: m.offset,
@@ -498,6 +676,11 @@ function applyGrammarFix(offset, length, replacement) {
   // Remove grammar panel (results are stale after edit)
   var panel = document.getElementById('grammar-results');
   if (panel) panel.remove();
+  // Clear inline underlines (stale after edit), re-check after short delay
+  _grammarMirrorMatches = [];
+  updateGrammarMirror(ta, []);
+  clearTimeout(_grammarDebounceTimeout);
+  _grammarDebounceTimeout = setTimeout(function() { runInlineGrammar(ta); }, 500);
 }
 
 function openNotebookEditor(id) {
