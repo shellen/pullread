@@ -28,6 +28,9 @@ interface FileMeta {
   summaryModel: string;
   excerpt: string;
   image: string;
+  enclosureUrl: string;
+  enclosureType: string;
+  enclosureDuration: string;
 }
 
 function parseFrontmatter(content: string): Record<string, string> {
@@ -88,6 +91,9 @@ function listFiles(outputPath: string): FileMeta[] {
         summaryModel: meta.summaryModel || '',
         excerpt: meta.excerpt || '',
         image,
+        enclosureUrl: meta.enclosure_url || '',
+        enclosureType: meta.enclosure_type || '',
+        enclosureDuration: meta.enclosure_duration || '',
       });
     } catch {
       // Skip unreadable files
