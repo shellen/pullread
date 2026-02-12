@@ -1077,14 +1077,29 @@ function saveTTSSettings() {
   }).then(r => {
     if (r.ok) {
       ttsProvider = provider;
-      // Clear TTS queue so new voice/model takes effect
-      ttsQueue = [];
-      ttsCurrentIndex = -1;
+      var wasPlaying = ttsPlaying && ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length;
+      var resumeIdx = ttsCurrentIndex;
+      // Stop current audio but keep the queue
       _ttsChunkSession = null;
-      if (ttsAudio) { ttsAudio.pause(); ttsAudio.src = ''; ttsAudio = null; }
+      if (ttsAudio) {
+        if (ttsAudio._webAudioSource) {
+          try { ttsAudio._webAudioSource.stop(); } catch(e) {}
+          if (ttsAudio._interval) clearInterval(ttsAudio._interval);
+        } else if (ttsAudio.pause) {
+          ttsAudio.pause();
+        }
+        ttsAudio = null;
+      }
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      ttsPlaying = false;
       renderAudioPlayer();
       const overlay = document.querySelector('.modal-overlay');
       if (overlay) overlay.remove();
+      // Restart current article with the new voice
+      if (wasPlaying) {
+        startListenLoading();
+        playTTSItem(resumeIdx);
+      }
     } else {
       alert('Failed to save voice playback settings.');
     }
