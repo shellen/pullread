@@ -525,6 +525,7 @@
     opacity: 0.7;
     filter: grayscale(100%);
     transition: filter 0.2s;
+    background: #808080;
   }
   .file-item:hover .file-item-favicon,
   .file-item.active .file-item-favicon,
@@ -698,6 +699,7 @@
     border-radius: 2px;
     filter: grayscale(100%);
     transition: filter 0.2s;
+    background: #808080;
   }
   .dash-card-badge {
     font-size: 10px;
@@ -1471,7 +1473,7 @@
     max-height: 85vh;
     overflow-y: auto;
     box-shadow: 0 16px 48px rgba(0,0,0,0.2);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
   .modal-card h2 {
     font-size: 18px;
@@ -2460,11 +2462,15 @@
   }
   .hl-picker-item {
     display: flex; align-items: flex-start; gap: 8px;
-    padding: 6px 8px; border-radius: 6px; cursor: pointer;
-    transition: background 0.1s;
+    padding: 8px 10px; border-radius: 6px; cursor: pointer;
+    transition: background 0.15s, box-shadow 0.15s;
+    user-select: none;
   }
   .hl-picker-item:hover { background: var(--code-bg); }
-  .hl-picker-item input[type="checkbox"] { margin-top: 3px; }
+  .hl-picker-item.selected {
+    background: color-mix(in srgb, var(--link) 12%, transparent);
+    box-shadow: inset 0 0 0 1.5px var(--link);
+  }
   .hl-picker-item-text { font-size: 12px; color: var(--fg); line-height: 1.4; }
 
   /* Writing focus mode — iA Writer-style: current line at full brightness,

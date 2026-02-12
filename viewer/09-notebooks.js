@@ -675,11 +675,10 @@ function showHighlightPicker() {
         for (var ii = 0; ii < art.items.length; ii++) {
           var hl = art.items[ii];
           var colorDot = hl.color ? '<span class="hl-color-dot" style="background:' + escapeHtml(hl.color) + '"></span>' : '';
-          groupsHtml += '<label class="hl-picker-item">'
-            + '<input type="checkbox" data-filename="' + escapeHtml(hl.filename) + '" data-text="' + escapeHtml(hl.text) + '">'
+          groupsHtml += '<div class="hl-picker-item" data-filename="' + escapeHtml(hl.filename) + '" data-text="' + escapeHtml(hl.text) + '" onclick="this.classList.toggle(\'selected\')">'
             + colorDot
             + '<span class="hl-picker-item-text">' + escapeHtml(hl.text.slice(0, 200)) + '</span>'
-            + '</label>';
+            + '</div>';
         }
         groupsHtml += '</div>';
       }
@@ -724,14 +723,14 @@ function filterHighlightPicker(query) {
 function insertSelectedHighlights() {
   const overlay = document.querySelector('.modal-overlay');
   if (!overlay) return;
-  const checked = overlay.querySelectorAll('input[type=checkbox]:checked');
-  if (!checked.length) { overlay.remove(); return; }
+  const selected = overlay.querySelectorAll('.hl-picker-item.selected');
+  if (!selected.length) { overlay.remove(); return; }
 
   let insertText = '';
   const newSources = new Set(_activeNotebook.sources || []);
-  for (const cb of checked) {
-    const text = cb.dataset.text;
-    const filename = cb.dataset.filename;
+  for (const item of selected) {
+    const text = item.dataset.text;
+    const filename = item.dataset.filename;
     insertText += '\n> ' + text + '\n';
     newSources.add(filename);
   }

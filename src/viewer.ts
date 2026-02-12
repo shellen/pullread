@@ -2,9 +2,9 @@
 // ABOUTME: Serves viewer UI and provides API for listing/reading articles
 
 import { createServer, IncomingMessage, ServerResponse } from 'http';
-import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, mkdirSync, watch } from 'fs';
+import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, mkdirSync, watch, unlinkSync } from 'fs';
 import { join, extname, dirname } from 'path';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { homedir } from 'os';
 import { VIEWER_HTML } from './viewer-html';
 import { summarizeText, loadLLMConfig, saveLLMConfig, loadLLMSettings, saveLLMSettings, getDefaultModel, isAppleAvailable, KNOWN_MODELS, LLMConfig, LLMSettings } from './summarizer';
@@ -1236,14 +1236,16 @@ export function startViewer(outputPath: string, port = 7777): void {
 
         writeFileSync(swiftScript, scriptContent);
 
-        const { execFileSync } = require('child_process');
-        const result = execFileSync('swift', [swiftScript, tmpText], {
-          encoding: 'utf-8',
-          timeout: 30_000,
-          stdio: ['pipe', 'pipe', 'pipe']
+        const result = await new Promise<string>((resolve, reject) => {
+          execFile('swift', [swiftScript, tmpText], {
+            encoding: 'utf-8',
+            timeout: 30_000,
+          }, (err, stdout, stderr) => {
+            try { unlinkSync(tmpText); } catch {}
+            if (err) reject(new Error(stderr || err.message));
+            else resolve(stdout);
+          });
         });
-
-        try { require('fs').unlinkSync(tmpText); } catch {}
 
         const data = JSON.parse(result.trim());
         sendJson(res, data);
