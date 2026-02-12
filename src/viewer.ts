@@ -12,7 +12,7 @@ import { autotagText, autotagBatch, saveMachineTags, hasMachineTags } from './au
 import { APP_ICON } from './app-icon';
 import { fetchAndExtract } from './extractor';
 import { generateMarkdown, ArticleData } from './writer';
-import { loadTTSConfig, saveTTSConfig, generateSpeech, getAudioContentType, getKokoroStatus, preloadKokoro, TTS_VOICES, TTS_MODELS } from './tts';
+import { loadTTSConfig, saveTTSConfig, generateSpeech, getAudioContentType, getKokoroStatus, preloadKokoro, getCachedAudioPath, createTtsSession, generateSessionChunk, TTS_VOICES, TTS_MODELS } from './tts';
 
 interface FileMeta {
   filename: string;
@@ -222,6 +222,23 @@ export function startViewer(outputPath: string, port = 7777): void {
     if (url.pathname === '/icon-256.png') {
       res.writeHead(200, { 'Content-Type': 'image/png' });
       res.end(APP_ICON);
+      return;
+    }
+
+    // Serve cue sound for article start
+    if (url.pathname === '/audio/cue.webm') {
+      try {
+        const cuePath = join(__dirname, 'signature_cue.webm');
+        const cueData = readFileSync(cuePath);
+        res.writeHead(200, {
+          'Content-Type': 'audio/webm',
+          'Content-Length': cueData.length.toString(),
+          'Cache-Control': 'max-age=86400',
+        });
+        res.end(cueData);
+      } catch {
+        send404(res);
+      }
       return;
     }
 
@@ -882,7 +899,114 @@ export function startViewer(outputPath: string, port = 7777): void {
       }
     }
 
-    // TTS Audio generation API
+    // TTS progressive playback — start a chunked session
+    if (url.pathname === '/api/tts/start' && req.method === 'POST') {
+      try {
+        const body = JSON.parse(await readBody(req));
+        const { name } = body;
+        if (!name || name.includes('..') || name.includes('/')) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'valid name is required' }));
+          return;
+        }
+
+        const config = loadTTSConfig();
+        if (config.provider === 'browser') {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Browser TTS is handled client-side' }));
+          return;
+        }
+
+        // Check disk cache first
+        if (getCachedAudioPath(name, config)) {
+          sendJson(res, { cached: true });
+          return;
+        }
+
+        const filePath = join(outputPath, name);
+        if (!existsSync(filePath)) {
+          send404(res);
+          return;
+        }
+
+        const content = readFileSync(filePath, 'utf-8');
+        const meta = parseFrontmatter(content);
+        const match = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
+        const bodyText = match ? match[1] : content;
+        const articleText = (meta.title ? meta.title + '\n\n' : '') + bodyText;
+
+        const session = createTtsSession(name, articleText, config);
+        sendJson(res, { id: session.id, totalChunks: session.totalChunks, cached: false });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'TTS session creation failed';
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: msg }));
+      }
+      return;
+    }
+
+    // TTS progressive playback — generate and return a single chunk
+    const chunkMatch = url.pathname.match(/^\/api\/tts\/chunk\/([a-f0-9]+)\/(\d+)$/);
+    if (chunkMatch && req.method === 'GET') {
+      try {
+        const sessionId = chunkMatch[1];
+        const chunkIndex = parseInt(chunkMatch[2], 10);
+        const config = loadTTSConfig();
+
+        const audio = await generateSessionChunk(sessionId, chunkIndex);
+
+        res.writeHead(200, {
+          'Content-Type': getAudioContentType(config.provider),
+          'Content-Length': audio.length.toString(),
+        });
+        res.end(audio);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Chunk generation failed';
+        const isNativeLoadError = msg.includes('Kokoro voice engine could not load') || msg.includes('not available in this build');
+        const status = isNativeLoadError ? 503 : 500;
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: msg, ...(isNativeLoadError && { fallback: 'browser' }) }));
+      }
+      return;
+    }
+
+    // TTS cached audio — serve pre-generated audio via GET for HTMLAudioElement playback
+    if (url.pathname === '/api/tts/play' && req.method === 'GET') {
+      try {
+        const name = url.searchParams.get('name');
+        if (!name || name.includes('..') || name.includes('/')) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'valid name is required' }));
+          return;
+        }
+        const config = loadTTSConfig();
+        const filePath = join(outputPath, name);
+        if (!existsSync(filePath)) { send404(res); return; }
+
+        const content = readFileSync(filePath, 'utf-8');
+        const meta = parseFrontmatter(content);
+        const match = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
+        const bodyText = match ? match[1] : content;
+        const articleText = (meta.title ? meta.title + '\n\n' : '') + bodyText;
+        const audio = await generateSpeech(name, articleText, config);
+
+        res.writeHead(200, {
+          'Content-Type': getAudioContentType(config.provider),
+          'Content-Length': audio.length.toString(),
+          'Cache-Control': 'max-age=86400',
+        });
+        res.end(audio);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'TTS generation failed';
+        const isNativeLoadError = msg.includes('Kokoro voice engine could not load') || msg.includes('not available in this build');
+        const status = isNativeLoadError ? 503 : 500;
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: msg, ...(isNativeLoadError && { fallback: 'browser' }) }));
+      }
+      return;
+    }
+
+    // TTS Audio generation API (full article, for cached playback and backward compat)
     if (url.pathname === '/api/tts' && req.method === 'POST') {
       try {
         const body = JSON.parse(await readBody(req));
@@ -907,9 +1031,10 @@ export function startViewer(outputPath: string, port = 7777): void {
         }
 
         const content = readFileSync(filePath, 'utf-8');
-        // Strip frontmatter to get just the article body
+        const meta = parseFrontmatter(content);
         const match = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
-        const articleText = match ? match[1] : content;
+        const bodyText = match ? match[1] : content;
+        const articleText = (meta.title ? meta.title + '\n\n' : '') + bodyText;
 
         const audio = await generateSpeech(name, articleText, config);
 
@@ -1063,7 +1188,7 @@ export function startViewer(outputPath: string, port = 7777): void {
           '    let startIdx = text.index(text.startIndex, offsetBy: range.location)',
           '    let endIdx = text.index(startIdx, offsetBy: min(range.length, text.count - range.location))',
           '    let word = String(text[startIdx..<endIdx])',
-          '    let guesses = checker.guesses(forWordRange: range, in: text, language: nil) ?? []',
+          '    let guesses = checker.guesses(forWordRange: range, in: text, language: nil, inSpellDocumentWithTag: 0) ?? []',
           '    results.append([',
           '        "offset": range.location,',
           '        "length": range.length,',

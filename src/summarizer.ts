@@ -5,7 +5,8 @@ import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { request } from 'https';
-import { execFileSync, execSync } from 'child_process';
+import { execFileSync } from 'child_process';
+import { saveToKeychain, loadFromKeychain } from './keychain';
 
 export type Provider = 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'apple';
 
@@ -62,22 +63,6 @@ interface SummarizeResult {
 
 const SETTINGS_PATH = join(homedir(), '.config', 'pullread', 'settings.json');
 
-/**
- * Load API key from macOS Keychain. Falls back gracefully on non-macOS or if not found.
- * Uses the same pattern as src/cookies.ts for Keychain access.
- */
-function loadKeyFromKeychain(account: string): string | null {
-  if (process.platform !== 'darwin') return null;
-  try {
-    const result = execSync(
-      `security find-generic-password -w -s "com.pullread.api-keys" -a "${account}"`,
-      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
-    );
-    return result.trim() || null;
-  } catch {
-    return null;
-  }
-}
 
 // Cache macOS version check
 let _appleAvailable: boolean | null = null;
@@ -113,10 +98,8 @@ export function loadLLMSettings(): LLMSettings {
         providers: {}
       };
       for (const [p, config] of Object.entries(llm.providers as Record<string, any>)) {
-        let apiKey = config?.apiKey || '';
-        if (!apiKey && p !== 'apple') {
-          apiKey = loadKeyFromKeychain(`llm-${p}`) || '';
-        }
+        // Keychain first, then settings.json fallback
+        const apiKey = loadFromKeychain(`llm-${p}`) || config?.apiKey || '';
         result.providers[p as Provider] = { apiKey, model: config?.model || '' };
       }
       return result;
@@ -124,10 +107,7 @@ export function loadLLMSettings(): LLMSettings {
 
     // Old format: migrate { provider, apiKey, model } → new structure
     if (llm.provider) {
-      let apiKey = llm.apiKey || '';
-      if (!apiKey && llm.provider !== 'apple') {
-        apiKey = loadKeyFromKeychain(`llm-${llm.provider}`) || '';
-      }
+      const apiKey = llm.apiKey || '';
       return {
         defaultProvider: llm.provider,
         providers: {
@@ -184,11 +164,14 @@ export function saveLLMSettings(newSettings: LLMSettings): void {
     } catch {}
   }
 
-  const cleaned: Partial<Record<string, { apiKey?: string; model?: string }>> = {};
+  const cleaned: Partial<Record<string, { model?: string }>> = {};
   for (const [p, config] of Object.entries(newSettings.providers)) {
     if (config) {
-      const entry: { apiKey?: string; model?: string } = {};
-      if (config.apiKey) entry.apiKey = config.apiKey;
+      // Store API keys in Keychain, not in settings.json
+      if (config.apiKey && p !== 'apple') {
+        saveToKeychain(`llm-${p}`, config.apiKey);
+      }
+      const entry: { model?: string } = {};
       if (config.model) entry.model = config.model;
       if (Object.keys(entry).length > 0 || p === 'apple') cleaned[p] = entry;
     }

@@ -102,8 +102,7 @@ function renderDashboard() {
 }
 
 function dashCardHtml(f, progressPct) {
-  const idx = displayFiles.findIndex(d => d.filename === f.filename);
-  const onclick = idx >= 0 ? 'loadFile(' + idx + ')' : 'dashLoadArticle(\'' + escapeHtml(f.filename) + '\')';
+  const onclick = 'dashLoadArticle(\'' + escapeHtml(f.filename) + '\')';
   const domain = f.domain || '';
   const favicon = domain ? 'https://www.google.com/s2/favicons?domain=' + encodeURIComponent(domain) + '&sz=32' : '';
   const date = f.bookmarked ? f.bookmarked.slice(0, 10) : '';
@@ -180,20 +179,18 @@ function initDashChevrons() {
 }
 
 function dashLoadArticle(filename) {
-  const idx = displayFiles.findIndex(f => f.filename === filename);
+  var idx = displayFiles.findIndex(f => f.filename === filename);
   if (idx >= 0) {
     loadFile(idx);
-  } else {
-    // File might be filtered out — search all files
-    const allIdx = allFiles.findIndex(f => f.filename === filename);
-    if (allIdx >= 0) {
-      // Clear search and reload
-      document.getElementById('search').value = '';
-      filterFiles();
-      const newIdx = displayFiles.findIndex(f => f.filename === filename);
-      if (newIdx >= 0) loadFile(newIdx);
-    }
+    return;
   }
+  // Article not in current view — set activeFile so filterFiles includes it
+  // even when hide-read is on (filterFiles preserves activeFile)
+  activeFile = filename;
+  document.getElementById('search').value = '';
+  filterFiles();
+  idx = displayFiles.findIndex(f => f.filename === filename);
+  if (idx >= 0) loadFile(idx);
 }
 
 function renderArticle(text, filename) {
@@ -209,7 +206,11 @@ function renderArticle(text, filename) {
   // Article header: title, author, date, domain, actions
   html += '<div class="article-header">';
   if (meta && meta.title) {
-    html += '<h1>' + escapeHtml(meta.title) + '</h1>';
+    if (meta.url) {
+      html += '<h1><a href="' + escapeHtml(meta.url) + '" target="_blank" rel="noopener" class="title-link">' + escapeHtml(meta.title) + '<svg class="icon icon-external" aria-hidden="true"><use href="#i-external"/></svg></a></h1>';
+    } else {
+      html += '<h1>' + escapeHtml(meta.title) + '</h1>';
+    }
   }
   html += '<div class="article-byline">';
   const bylineParts = [];
@@ -241,7 +242,7 @@ function renderArticle(text, filename) {
   if (!isReviewArticle) {
     html += '<button onclick="summarizeArticle()" id="summarize-btn" aria-label="Summarize article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Summarize</button>';
   }
-  html += '<button onclick="addCurrentToTTSQueue()" aria-label="Listen to article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> Listen</button>';
+  html += '<button id="listen-btn" onclick="addCurrentToTTSQueue()" aria-label="Listen to article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> Listen</button>';
   if (meta && meta.url) {
     html += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg> Share</button></div>';
   }
@@ -450,6 +451,9 @@ function renderArticle(text, filename) {
   if (focusModeActive) {
     setTimeout(updateFocusMode, 200);
   }
+
+  // Show "Playing" state on Listen button if this article is currently playing
+  updateListenButtonState();
 }
 
 

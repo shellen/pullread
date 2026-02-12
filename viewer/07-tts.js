@@ -8,11 +8,63 @@ let ttsSpeed = 1.0;
 let ttsProvider = 'browser';
 let ttsGenerating = false;
 let ttsProgressTimer = null;
+let _ttsChunkSession = null; // { id, totalChunks, currentChunk, elapsedTime }
 
-const TTS_SPEEDS = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+const TTS_SPEEDS = [0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.15, 1.2, 1.3, 1.5, 1.75, 2.0];
+
+function playCueSound() {
+  try { new Audio('/audio/cue.webm').play(); } catch(e) {}
+}
+
+// ---- Listen button loading animation ----
+var LISTEN_WORDS = [
+  'Reading', 'Processing', 'Generating', 'Preparing', 'Creating',
+  'Warming up', 'Clearing throat', 'Rehearsing', 'Caffeinating', 'Inhaling',
+  'Summoning', 'Channeling', 'Tuning', 'Vocalizing', 'Manifesting',
+  'Contemplating', 'Conjuring', 'Brewing', 'Stretching', 'Composing',
+  'Hydrating', 'Buffering', 'Focusing', 'Harmonizing', 'Simmering',
+];
+var _listenTimer = null;
+var _listenWordIdx = 0;
+
+function startListenLoading() {
+  var btn = document.getElementById('listen-btn');
+  if (!btn) return;
+  btn.classList.add('listen-loading');
+  _listenWordIdx = Math.floor(Math.random() * LISTEN_WORDS.length);
+  btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> ' + LISTEN_WORDS[_listenWordIdx] + '\u2026';
+  _listenTimer = setInterval(function() {
+    _listenWordIdx = (_listenWordIdx + 1) % LISTEN_WORDS.length;
+    var b = document.getElementById('listen-btn');
+    if (!b) { stopListenLoading(); return; }
+    b.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> ' + LISTEN_WORDS[_listenWordIdx] + '\u2026';
+  }, 2500);
+}
+
+function stopListenLoading() {
+  if (_listenTimer) { clearInterval(_listenTimer); _listenTimer = null; }
+  var btn = document.getElementById('listen-btn');
+  if (btn) btn.classList.remove('listen-loading');
+  updateListenButtonState();
+}
+
+function updateListenButtonState() {
+  var btn = document.getElementById('listen-btn');
+  if (!btn || _listenTimer) return; // Loading animation takes precedence
+  var playingFile = ttsPlaying && ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length
+    ? ttsQueue[ttsCurrentIndex].filename : null;
+  if (playingFile && playingFile === activeFile) {
+    btn.classList.add('listen-playing');
+    btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> Playing';
+  } else {
+    btn.classList.remove('listen-playing');
+    btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> Listen';
+  }
+}
 
 function addCurrentToTTSQueue() {
   if (!activeFile) return;
+  startListenLoading();
   addToTTSQueue(activeFile);
 }
 
@@ -20,7 +72,7 @@ async function addToTTSQueue(filename) {
   const file = allFiles.find(f => f.filename === filename);
   if (!file) return;
   if (ttsQueue.some(q => q.filename === filename)) {
-    // Already queued — just play it
+    stopListenLoading();
     const idx = ttsQueue.findIndex(q => q.filename === filename);
     if (idx >= 0) playTTSItem(idx);
     return;
@@ -45,6 +97,18 @@ async function addToTTSQueue(filename) {
 function renderAudioPlayer() {
   const panel = document.getElementById('audio-player');
   if (!panel) return;
+
+  // Update mini player visibility
+  var miniPlayer = document.getElementById('mini-player');
+  if (miniPlayer) {
+    miniPlayer.style.display = (ttsQueue.length > 0 && (ttsPlaying || ttsCurrentIndex >= 0)) ? '' : 'none';
+    var miniPlayBtn = document.getElementById('mini-play-btn');
+    if (miniPlayBtn) {
+      miniPlayBtn.innerHTML = ttsPlaying
+        ? '<svg><use href="#i-pause"/></svg>'
+        : '<svg><use href="#i-play"/></svg>';
+    }
+  }
 
   if (ttsQueue.length === 0) {
     panel.classList.add('hidden');
@@ -91,6 +155,8 @@ function renderAudioPlayer() {
   } else {
     queueSection.style.display = 'none';
   }
+
+  updateListenButtonState();
 }
 
 async function playTTSItem(index) {
@@ -140,20 +206,12 @@ async function playBrowserTTS(filename) {
   } catch {}
   if (!text) { ttsPlaying = false; renderAudioPlayer(); return; }
 
-  const { body } = parseFrontmatter(text);
-  const plainText = stripMarkdownForTTS(body);
+  const { meta, body } = parseFrontmatter(text);
+  const ttsText = (meta && meta.title ? meta.title + '\n\n' : '') + body;
+  const plainText = stripMarkdownForTTS(ttsText);
 
   // Cancel any existing
   synth.cancel();
-
-  // Build paragraph map for reading highlight
-  const paragraphs = plainText.split(/\n\n+/).filter(p => p.trim());
-  let charOffset = 0;
-  const paraOffsets = paragraphs.map(function(p) {
-    var start = charOffset;
-    charOffset += p.length + 2; // account for \n\n
-    return { start: start, end: start + p.length, text: p };
-  });
 
   const utterance = new SpeechSynthesisUtterance(plainText);
   utterance.rate = ttsSpeed;
@@ -165,17 +223,11 @@ async function playBrowserTTS(filename) {
   const estimatedSeconds = estimatedWords / (150 * ttsSpeed); // ~150 wpm base
   let startTime = Date.now();
 
-  // Voice reading highlight: track boundary events for paragraph-level highlighting
-  utterance.addEventListener('boundary', function(ev) {
-    if (ev.charIndex !== undefined) {
-      ttsHighlightAtChar(ev.charIndex, paraOffsets);
-    }
-  });
-
   utterance.onstart = function() {
+    playCueSound();
+    stopListenLoading();
     ttsPlaying = true;
     startTime = Date.now();
-    ttsHighlightAtChar(0, paraOffsets);
     renderAudioPlayer();
     document.getElementById('tts-time-total').textContent = formatTime(estimatedSeconds);
     ttsProgressTimer = setInterval(() => {
@@ -183,8 +235,6 @@ async function playBrowserTTS(filename) {
       const pct = Math.min(100, (elapsed / estimatedSeconds) * 100);
       document.getElementById('tts-progress').style.width = pct + '%';
       document.getElementById('tts-time-current').textContent = formatTime(elapsed);
-      // Estimate-based highlight fallback (if no boundary events)
-      ttsHighlightByProgress(pct / 100, paraOffsets);
     }, 200);
   };
 
@@ -192,7 +242,6 @@ async function playBrowserTTS(filename) {
     clearInterval(ttsProgressTimer);
     ttsPlaying = false;
     ttsSynthUtterance = null;
-    ttsClearHighlight();
     document.getElementById('tts-progress').style.width = '100%';
     renderAudioPlayer();
     // Auto-play next
@@ -205,7 +254,6 @@ async function playBrowserTTS(filename) {
     clearInterval(ttsProgressTimer);
     ttsPlaying = false;
     ttsSynthUtterance = null;
-    ttsClearHighlight();
     renderAudioPlayer();
   };
 
@@ -216,25 +264,9 @@ async function playCloudTTS(filename) {
   ttsGenerating = true;
   renderAudioPlayer();
 
-  // Fetch article text for reading highlight
-  let _cloudParaOffsets = [];
   try {
-    const textRes = await fetch('/api/file?name=' + encodeURIComponent(filename));
-    if (textRes.ok) {
-      const rawText = await textRes.text();
-      const { body } = parseFrontmatter(rawText);
-      const plainText = stripMarkdownForTTS(body);
-      var paragraphs = plainText.split(/\n\n+/).filter(function(p) { return p.trim(); });
-      var co = 0;
-      _cloudParaOffsets = paragraphs.map(function(p) {
-        var s = co; co += p.length + 2;
-        return { start: s, end: s + p.length, text: p };
-      });
-    }
-  } catch {}
-
-  try {
-    const res = await fetch('/api/tts', {
+    // Start a chunked TTS session
+    const startRes = await fetch('/api/tts/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: filename }),
@@ -242,64 +274,222 @@ async function playCloudTTS(filename) {
 
     ttsGenerating = false;
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: 'TTS failed' }));
-      // If Kokoro native engine failed, fall back to browser TTS silently
+    if (!startRes.ok) {
+      const err = await startRes.json().catch(function() { return { error: 'TTS failed' }; });
       if (err.fallback === 'browser') {
         console.warn('Kokoro unavailable, falling back to browser TTS:', err.error);
-        ttsGenerating = false;
         await playBrowserTTS(filename);
         return;
       }
+      stopListenLoading();
       alert('TTS Error: ' + (err.error || 'Unknown error'));
       ttsPlaying = false;
       renderAudioPlayer();
       return;
     }
 
-    const blob = await res.blob();
-    const audioUrl = URL.createObjectURL(blob);
+    const session = await startRes.json();
 
-    ttsAudio = new Audio(audioUrl);
-    ttsAudio.playbackRate = ttsSpeed;
-    // Reset total time immediately; loadedmetadata will set the real value
-    document.getElementById('tts-time-total').textContent = '0:00';
+    if (session.cached) {
+      // Already cached on disk — use the full-file endpoint for instant playback
+      await playCloudTTSCached(filename);
+      return;
+    }
 
-    ttsAudio.addEventListener('loadedmetadata', () => {
-      document.getElementById('tts-time-total').textContent = formatTime(ttsAudio.duration);
-    });
+    // Progressive chunk-based playback
+    _ttsChunkSession = {
+      id: session.id,
+      totalChunks: session.totalChunks,
+      currentChunk: 0,
+      elapsedTime: 0,
+      estimatedTotalDuration: 0,
+    };
 
-    ttsAudio.addEventListener('timeupdate', () => {
-      if (!ttsAudio) return;
-      const pct = ttsAudio.duration ? (ttsAudio.currentTime / ttsAudio.duration) * 100 : 0;
-      document.getElementById('tts-progress').style.width = pct + '%';
-      document.getElementById('tts-time-current').textContent = formatTime(ttsAudio.currentTime);
-      // Reading highlight based on playback progress
-      ttsHighlightByProgress(pct / 100, _cloudParaOffsets);
-    });
-
-    ttsAudio.addEventListener('ended', () => {
-      ttsPlaying = false;
-      ttsClearHighlight();
-      renderAudioPlayer();
-      // Auto-play next
-      if (ttsCurrentIndex + 1 < ttsQueue.length) {
-        setTimeout(() => playTTSItem(ttsCurrentIndex + 1), 500);
-      }
-    });
-
-    ttsAudio.addEventListener('error', () => {
-      ttsPlaying = false;
-      ttsClearHighlight();
-      renderAudioPlayer();
-    });
-
-    ttsAudio.play();
     ttsPlaying = true;
     renderAudioPlayer();
+    ttsPlayNextChunk(0);
   } catch (err) {
     ttsGenerating = false;
     ttsPlaying = false;
+    _ttsChunkSession = null;
+    renderAudioPlayer();
+    alert('TTS Error: ' + err.message);
+  }
+}
+
+/** Play a full cached audio file via HTMLAudioElement (preserves pitch when speed changes) */
+async function playCloudTTSCached(filename) {
+  try {
+    var audio = new Audio('/api/tts/play?name=' + encodeURIComponent(filename));
+    audio.playbackRate = ttsSpeed;
+
+    audio.addEventListener('loadedmetadata', function() {
+      document.getElementById('tts-time-total').textContent = formatTime(audio.duration);
+    });
+
+    audio.addEventListener('playing', function() {
+      playCueSound();
+      stopListenLoading();
+      ttsPlaying = true;
+      renderAudioPlayer();
+    });
+
+    audio.addEventListener('timeupdate', function() {
+      if (!audio.duration) return;
+      var pct = Math.min(100, (audio.currentTime / audio.duration) * 100);
+      document.getElementById('tts-progress').style.width = pct + '%';
+      document.getElementById('tts-time-current').textContent = formatTime(audio.currentTime);
+    });
+
+    audio.addEventListener('ended', function() {
+      document.getElementById('tts-progress').style.width = '100%';
+      ttsPlaying = false;
+      renderAudioPlayer();
+      if (ttsCurrentIndex + 1 < ttsQueue.length) {
+        setTimeout(function() { playTTSItem(ttsCurrentIndex + 1); }, 500);
+      }
+    });
+
+    audio.addEventListener('error', function() {
+      stopListenLoading();
+      ttsPlaying = false;
+      renderAudioPlayer();
+      alert('TTS Error: Failed to load cached audio');
+    });
+
+    audio.play();
+
+    ttsAudio = audio;
+    ttsPlaying = true;
+    renderAudioPlayer();
+  } catch (err) {
+    ttsPlaying = false;
+    renderAudioPlayer();
+    alert('TTS Error: ' + err.message);
+  }
+}
+
+// Tracks which chunks have been pre-fetched (server-side cache warming)
+var _ttsChunkBuffer = new Map();
+
+/** Pre-fetch the next chunk to warm the server cache so HTMLAudioElement loads instantly */
+function ttsPrefetchChunk(index) {
+  var session = _ttsChunkSession;
+  if (!session || index >= session.totalChunks) return;
+  if (_ttsChunkBuffer.has(index)) return;
+
+  // Mark as in-flight so we don't double-fetch
+  _ttsChunkBuffer.set(index, 'fetching');
+
+  fetch('/api/tts/chunk/' + session.id + '/' + index)
+    .then(function(res) {
+      if (res.ok && session === _ttsChunkSession) {
+        _ttsChunkBuffer.set(index, 'ready');
+      }
+      // Consume the body to complete the fetch (warms server cache)
+      return res.arrayBuffer();
+    })
+    .catch(function() {
+      if (session === _ttsChunkSession) _ttsChunkBuffer.delete(index);
+    });
+}
+
+/** Play a single TTS chunk via HTMLAudioElement (preserves pitch), then chain to the next */
+async function ttsPlayNextChunk(index, seekPct) {
+  var session = _ttsChunkSession;
+  if (!session || session !== _ttsChunkSession) return;
+
+  if (index >= session.totalChunks) {
+    // All chunks played — done
+    ttsPlaying = false;
+    _ttsChunkSession = null;
+    _ttsChunkBuffer.clear();
+    document.getElementById('tts-progress').style.width = '100%';
+    renderAudioPlayer();
+    if (ttsCurrentIndex + 1 < ttsQueue.length) {
+      setTimeout(function() { playTTSItem(ttsCurrentIndex + 1); }, 500);
+    }
+    return;
+  }
+
+  session.currentChunk = index;
+  renderAudioPlayer();
+
+  try {
+    var chunkUrl = '/api/tts/chunk/' + session.id + '/' + index;
+    var audio = new Audio(chunkUrl);
+    audio.playbackRate = ttsSpeed;
+    // preservesPitch defaults to true — pitch stays constant when speed changes
+
+    audio.addEventListener('loadedmetadata', function() {
+      if (session !== _ttsChunkSession) return;
+      var chunkDuration = audio.duration;
+
+      if (index === 0 && !seekPct) {
+        session.estimatedTotalDuration = chunkDuration * session.totalChunks;
+        document.getElementById('tts-time-total').textContent = '~' + formatTime(session.estimatedTotalDuration);
+      }
+
+      // Seek within chunk if a seek percentage was given
+      if (seekPct && seekPct > 0 && chunkDuration) {
+        audio.currentTime = seekPct * chunkDuration;
+      }
+    });
+
+    audio.addEventListener('playing', function() {
+      if (session !== _ttsChunkSession) return;
+      if (index === 0) playCueSound();
+      stopListenLoading();
+      ttsPlaying = true;
+      renderAudioPlayer();
+
+      // Pre-fetch next chunk while this one plays
+      if (index + 1 < session.totalChunks) {
+        ttsPrefetchChunk(index + 1);
+      }
+    });
+
+    audio.addEventListener('timeupdate', function() {
+      if (session !== _ttsChunkSession) return;
+      var chunkDuration = audio.duration || 1;
+      var chunkProgress = Math.min(1, audio.currentTime / chunkDuration);
+      var overallPct = ((index + chunkProgress) / session.totalChunks) * 100;
+      document.getElementById('tts-progress').style.width = overallPct + '%';
+      var currentTime = session.elapsedTime + audio.currentTime;
+      document.getElementById('tts-time-current').textContent = formatTime(currentTime);
+    });
+
+    audio.addEventListener('ended', function() {
+      if (session !== _ttsChunkSession) return;
+      session.elapsedTime += audio.duration || 0;
+      // Show loading words only if next chunk isn't pre-warmed on the server yet
+      var nextReady = _ttsChunkBuffer.get(index + 1) === 'ready';
+      if (index + 1 < session.totalChunks && !nextReady) startListenLoading();
+      ttsPlayNextChunk(index + 1);
+    });
+
+    audio.addEventListener('error', function() {
+      if (session !== _ttsChunkSession) return;
+      stopListenLoading();
+      ttsPlaying = false;
+      _ttsChunkSession = null;
+      _ttsChunkBuffer.clear();
+      renderAudioPlayer();
+      var statusEl = document.getElementById('audio-now-status');
+      if (statusEl) statusEl.textContent = 'Playback error';
+    });
+
+    audio.play();
+
+    // Store as plain HTMLAudioElement — existing toggle/speed/stop code handles this
+    ttsAudio = audio;
+    ttsPlaying = true;
+    renderAudioPlayer();
+  } catch (err) {
+    stopListenLoading();
+    ttsPlaying = false;
+    _ttsChunkSession = null;
+    _ttsChunkBuffer.clear();
     renderAudioPlayer();
     alert('TTS Error: ' + err.message);
   }
@@ -307,6 +497,8 @@ async function playCloudTTS(filename) {
 
 function stopTTS() {
   clearInterval(ttsProgressTimer);
+  _ttsChunkSession = null;
+  _ttsChunkBuffer.clear();
   if (ttsAudio) {
     ttsAudio.pause();
     ttsAudio.src = '';
@@ -318,7 +510,6 @@ function stopTTS() {
   }
   ttsPlaying = false;
   ttsGenerating = false;
-  ttsClearHighlight();
   document.getElementById('tts-progress').style.width = '0%';
   document.getElementById('tts-time-current').textContent = '0:00';
   document.getElementById('tts-time-total').textContent = '0:00';
@@ -369,48 +560,245 @@ function ttsTogglePlay() {
 }
 
 function ttsSkipNext() {
-  if (ttsCurrentIndex + 1 < ttsQueue.length) {
-    playTTSItem(ttsCurrentIndex + 1);
-  }
+  skipTime(15);
 }
 
 function ttsSkipPrev() {
-  if (ttsCurrentIndex > 0) {
-    playTTSItem(ttsCurrentIndex - 1);
-  } else if (ttsCurrentIndex === 0) {
-    playTTSItem(0); // restart current
-  }
+  skipTime(-15);
 }
 
-function ttsSeek(event) {
-  const wrap = event.currentTarget;
-  const rect = wrap.getBoundingClientRect();
-  const pct = (event.clientX - rect.left) / rect.width;
+function skipTime(seconds) {
+  if (_ttsChunkSession) {
+    var session = _ttsChunkSession;
+    // Can't seek until we have a duration estimate from the first chunk
+    if (!session.estimatedTotalDuration) return;
+    var currentChunkTime = ttsAudio ? ttsAudio.currentTime : 0;
+    var targetTime = session.elapsedTime + currentChunkTime + seconds;
+    if (targetTime < 0) targetTime = 0;
+    var totalEst = session.estimatedTotalDuration;
+    if (targetTime >= totalEst) return;
+    var pct = targetTime / totalEst;
+    seekToChunkPosition(pct);
+    return;
+  }
+  if (ttsAudio && ttsAudio.duration) {
+    var newTime = ttsAudio.currentTime + seconds;
+    ttsAudio.currentTime = Math.max(0, Math.min(newTime, ttsAudio.duration));
+    return;
+  }
+  // Browser TTS doesn't support seeking
+}
 
+function seekToChunkPosition(pct) {
+  var session = _ttsChunkSession;
+  // Can't seek until we have a duration estimate from the first chunk
+  if (!session || !session.estimatedTotalDuration) return;
+  pct = Math.max(0, Math.min(1, pct));
+  var targetChunkFloat = pct * session.totalChunks;
+  var targetChunk = Math.floor(targetChunkFloat);
+  if (targetChunk >= session.totalChunks) targetChunk = session.totalChunks - 1;
+  var seekPct = targetChunkFloat - targetChunk;
+
+  // Estimate elapsed time up to target chunk
+  var avgChunkDuration = session.estimatedTotalDuration / session.totalChunks;
+  session.elapsedTime = targetChunk * avgChunkDuration;
+
+  // Stop current audio and play from target chunk
+  if (ttsAudio) {
+    ttsAudio.pause();
+    ttsAudio.src = '';
+    ttsAudio = null;
+  }
+  ttsPlayNextChunk(targetChunk, seekPct);
+}
+
+function ttsSeek(pct) {
+  if (_ttsChunkSession) {
+    seekToChunkPosition(pct);
+    return;
+  }
   if (ttsAudio && ttsAudio.duration) {
     ttsAudio.currentTime = pct * ttsAudio.duration;
   }
   // Browser TTS doesn't support seeking
 }
 
-function ttsCycleSpeed() {
-  const currentIdx = TTS_SPEEDS.indexOf(ttsSpeed);
-  const nextIdx = (currentIdx + 1) % TTS_SPEEDS.length;
-  ttsSpeed = TTS_SPEEDS[nextIdx];
+function initProgressDrag() {
+  var wrap = document.getElementById('audio-progress-wrap');
+  if (!wrap) return;
 
-  document.getElementById('tts-speed-btn').textContent = ttsSpeed + 'x';
+  function seekFromEvent(e) {
+    // Don't seek if nothing is playing or generating
+    if (!ttsPlaying && ttsCurrentIndex < 0) return;
+    var rect = wrap.getBoundingClientRect();
+    var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    var pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    ttsSeek(pct);
+  }
+
+  function onMove(e) { seekFromEvent(e); }
+  function onEnd() {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onEnd);
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('touchend', onEnd);
+  }
+
+  wrap.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    seekFromEvent(e);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onEnd);
+  });
+
+  wrap.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    seekFromEvent(e);
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchend', onEnd);
+  }, { passive: false });
+}
+
+// Initialize drag on the progress bar
+initProgressDrag();
+
+let _ttsSpeedPopup = null;
+
+function ttsToggleSpeedSlider() {
+  if (_ttsSpeedPopup) { ttsCloseSpeedSlider(); return; }
+
+  var btn = document.getElementById('tts-speed-btn');
+  var rect = btn.getBoundingClientRect();
+  var count = TTS_SPEEDS.length;
+
+  var popup = document.createElement('div');
+  popup.className = 'tts-speed-popup';
+
+  // Build tick labels — show value for major speeds, dot for minor ones
+  var majorSpeeds = [0.5, 1.0, 1.5, 2.0];
+  var ticksHtml = '';
+  for (var i = count - 1; i >= 0; i--) {
+    var s = TTS_SPEEDS[i];
+    if (majorSpeeds.indexOf(s) >= 0) {
+      ticksHtml += '<div class="tts-speed-tick">' + s + 'x</div>';
+    } else {
+      ticksHtml += '<div class="tts-speed-tick-dot">\u00b7</div>';
+    }
+  }
+
+  popup.innerHTML =
+    '<div class="tts-speed-popup-value" id="tts-speed-popup-val">' + ttsSpeed + 'x</div>' +
+    '<div class="tts-speed-track-wrap" id="tts-speed-track-wrap">' +
+      '<div class="tts-speed-track" id="tts-speed-track">' +
+        '<div class="tts-speed-thumb" id="tts-speed-thumb"></div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="tts-speed-ticks">' + ticksHtml + '</div>';
+
+  document.body.appendChild(popup);
+
+  // Position above the button, centered horizontally
+  var popW = popup.offsetWidth;
+  var popH = popup.offsetHeight;
+  var left = rect.left + rect.width / 2 - popW / 2;
+  var top = rect.top - popH - 6;
+  // Keep on screen
+  if (left < 4) left = 4;
+  if (top < 4) { top = rect.bottom + 6; }
+  popup.style.left = left + 'px';
+  popup.style.top = top + 'px';
+
+  // Set thumb position for current speed
+  ttsPositionThumb();
+  _ttsSpeedPopup = popup;
+
+  // Drag handling
+  var trackWrap = document.getElementById('tts-speed-track-wrap');
+
+  function onDrag(clientY) {
+    var trackRect = trackWrap.getBoundingClientRect();
+    var pct = (clientY - trackRect.top) / trackRect.height;
+    pct = Math.max(0, Math.min(1, pct));
+    // Top = fastest (last index), bottom = slowest (first index)
+    var idx = Math.round((1 - pct) * (count - 1));
+    idx = Math.max(0, Math.min(count - 1, idx));
+    ttsSetSpeed(TTS_SPEEDS[idx]);
+    ttsPositionThumb();
+  }
+
+  trackWrap.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    onDrag(e.clientY);
+    function onMove(ev) { onDrag(ev.clientY); }
+    function onUp() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  trackWrap.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    onDrag(e.touches[0].clientY);
+    function onTouchMove(ev) { ev.preventDefault(); onDrag(ev.touches[0].clientY); }
+    function onTouchEnd() {
+      document.removeEventListener('touchmove', onTouchMove);
+      document.removeEventListener('touchend', onTouchEnd);
+    }
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
+    document.addEventListener('touchend', onTouchEnd);
+  }, { passive: false });
+
+  // Close on click outside (delay to avoid catching the opening click)
+  setTimeout(function() {
+    document.addEventListener('mousedown', ttsSpeedOutsideClick);
+    document.addEventListener('touchstart', ttsSpeedOutsideClick);
+  }, 0);
+}
+
+function ttsSpeedOutsideClick(e) {
+  if (_ttsSpeedPopup && !_ttsSpeedPopup.contains(e.target) && e.target.id !== 'tts-speed-btn') {
+    ttsCloseSpeedSlider();
+  }
+}
+
+function ttsCloseSpeedSlider() {
+  if (_ttsSpeedPopup) {
+    _ttsSpeedPopup.remove();
+    _ttsSpeedPopup = null;
+  }
+  document.removeEventListener('mousedown', ttsSpeedOutsideClick);
+  document.removeEventListener('touchstart', ttsSpeedOutsideClick);
+}
+
+function ttsPositionThumb() {
+  var thumb = document.getElementById('tts-speed-thumb');
+  if (!thumb) return;
+  var idx = TTS_SPEEDS.indexOf(ttsSpeed);
+  if (idx < 0) idx = TTS_SPEEDS.indexOf(1.0);
+  // Top = fastest (last index), bottom = slowest (first index)
+  var pct = 1 - idx / (TTS_SPEEDS.length - 1);
+  thumb.style.top = (pct * 100) + '%';
+}
+
+function ttsSetSpeed(speed) {
+  ttsSpeed = speed;
+  document.getElementById('tts-speed-btn').textContent = speed + 'x';
+  var popupVal = document.getElementById('tts-speed-popup-val');
+  if (popupVal) popupVal.textContent = speed + 'x';
 
   if (ttsAudio) {
-    ttsAudio.playbackRate = ttsSpeed;
+    ttsAudio.playbackRate = speed;
   }
   if (ttsSynthUtterance && window.speechSynthesis.speaking) {
-    // Browser TTS doesn't support live rate change — note for user
-    ttsSynthUtterance.rate = ttsSpeed;
+    ttsSynthUtterance.rate = speed;
   }
 }
 
 function removeTTSQueueItem(index) {
   if (index === ttsCurrentIndex) {
+    stopListenLoading();
     stopTTS();
     ttsQueue.splice(index, 1);
     if (ttsQueue.length > 0) {
@@ -427,6 +815,7 @@ function removeTTSQueueItem(index) {
 }
 
 function ttsClearQueue() {
+  stopListenLoading();
   stopTTS();
   ttsQueue = [];
   ttsCurrentIndex = -1;
@@ -468,7 +857,18 @@ function stripMarkdownForTTS(md) {
   text = text.replace(/^\s*\d+\.\s+/gm, '');
   // Collapse whitespace
   text = text.replace(/\n{3,}/g, '\n\n');
-  return text.trim();
+  text = text.trim();
+  // Add a sentence-ending period after the title (first line) so TTS engines
+  // pause briefly before reading the body
+  var firstBreak = text.indexOf('\n\n');
+  if (firstBreak > 0) {
+    var title = text.slice(0, firstBreak).trimEnd();
+    var lastChar = title[title.length - 1];
+    if (lastChar !== '.' && lastChar !== '!' && lastChar !== '?') {
+      text = title + '.\n\n' + text.slice(firstBreak + 2);
+    }
+  }
+  return text;
 }
 
 // ---- TTS Reading Highlight ----
@@ -488,6 +888,12 @@ function ttsHighlightParagraph(paraIndex) {
   _ttsHighlightParaIndex = paraIndex;
   var content = document.getElementById('content');
   if (!content) return;
+
+  // Only highlight if the displayed article is the one being played
+  var playingFile = ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length
+    ? ttsQueue[ttsCurrentIndex].filename : null;
+  if (!playingFile || activeFile !== playingFile) return;
+
   // Remove previous highlight
   content.querySelectorAll('.tts-reading-hl').forEach(function(el) {
     el.classList.remove('tts-reading-hl');
@@ -496,7 +902,6 @@ function ttsHighlightParagraph(paraIndex) {
   var blocks = content.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote, pre');
   if (paraIndex >= 0 && paraIndex < blocks.length) {
     blocks[paraIndex].classList.add('tts-reading-hl');
-    blocks[paraIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 }
 
@@ -753,13 +1158,25 @@ function saveTTSSettings() {
   }).then(r => {
     if (r.ok) {
       ttsProvider = provider;
-      // Clear TTS queue so new voice/model takes effect
-      ttsQueue = [];
-      ttsCurrentIndex = -1;
-      if (ttsAudio) { ttsAudio.pause(); ttsAudio.src = ''; ttsAudio = null; }
+      var wasPlaying = ttsPlaying && ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length;
+      var resumeIdx = ttsCurrentIndex;
+      // Stop current audio but keep the queue
+      _ttsChunkSession = null;
+      if (ttsAudio) {
+        ttsAudio.pause();
+        ttsAudio.src = '';
+        ttsAudio = null;
+      }
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      ttsPlaying = false;
       renderAudioPlayer();
       const overlay = document.querySelector('.modal-overlay');
       if (overlay) overlay.remove();
+      // Restart current article with the new voice
+      if (wasPlaying) {
+        startListenLoading();
+        playTTSItem(resumeIdx);
+      }
     } else {
       alert('Failed to save voice playback settings.');
     }

@@ -6,11 +6,31 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { createHash } from 'crypto';
 import { request as httpsRequest } from 'https';
-import { execSync } from 'child_process';
+import { saveToKeychain, loadFromKeychain } from './keychain';
 
 const SETTINGS_PATH = join(homedir(), '.config', 'pullread', 'settings.json');
 const CACHE_DIR = join(homedir(), '.config', 'pullread', 'tts-cache');
 const KOKORO_MODEL_DIR = join(homedir(), '.config', 'pullread', 'kokoro-model');
+
+/** Active TTS generation session for progressive chunk-based playback */
+interface TtsSession {
+  id: string;
+  articleName: string;
+  config: TTSConfig;
+  chunks: string[];
+  audio: Map<number, Buffer>;
+  createdAt: number;
+}
+
+const ttsSessions = new Map<string, TtsSession>();
+
+// Clean up sessions older than 30 minutes
+setInterval(() => {
+  const cutoff = Date.now() - 30 * 60 * 1000;
+  for (const [id, session] of ttsSessions) {
+    if (session.createdAt < cutoff) ttsSessions.delete(id);
+  }
+}, 60 * 1000);
 
 /** Resolve the best Kokoro model directory — bundled (from app Resources) or user cache */
 function resolveKokoroModelDir(): string {
@@ -89,17 +109,9 @@ export function loadTTSConfig(): TTSConfig {
       const settings = JSON.parse(readFileSync(SETTINGS_PATH, 'utf-8'));
       if (settings.tts) {
         const config = settings.tts as TTSConfig;
-        // If no API key in settings, try Keychain (macOS only)
+        // Read API key from Keychain if not in settings
         if (!config.apiKey && (config.provider === 'openai' || config.provider === 'elevenlabs')) {
-          if (process.platform === 'darwin') {
-            try {
-              const key = execSync(
-                'security find-generic-password -w -s "com.pullread.api-keys" -a "tts-api-key"',
-                { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
-              ).trim();
-              if (key) config.apiKey = key;
-            } catch {}
-          }
+          config.apiKey = loadFromKeychain('tts-api-key') || '';
         }
         return config;
       }
@@ -109,13 +121,18 @@ export function loadTTSConfig(): TTSConfig {
 }
 
 export function saveTTSConfig(config: TTSConfig): void {
+  // Store API key in Keychain, strip from settings.json
+  if (config.apiKey) {
+    saveToKeychain('tts-api-key', config.apiKey);
+  }
+  const { apiKey, ...configWithoutKey } = config;
   let settings: Record<string, unknown> = {};
   if (existsSync(SETTINGS_PATH)) {
     try {
       settings = JSON.parse(readFileSync(SETTINGS_PATH, 'utf-8'));
     } catch {}
   }
-  settings.tts = config;
+  settings.tts = configWithoutKey;
   const dir = join(homedir(), '.config', 'pullread');
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2));
@@ -150,7 +167,18 @@ export function stripMarkdown(md: string): string {
   // Collapse multiple newlines
   text = text.replace(/\n{3,}/g, '\n\n');
   // Trim
-  return text.trim();
+  text = text.trim();
+  // Add a sentence-ending period after the title (first line) so TTS engines
+  // pause briefly before reading the body
+  const firstBreak = text.indexOf('\n\n');
+  if (firstBreak > 0) {
+    const title = text.slice(0, firstBreak).trimEnd();
+    const lastChar = title[title.length - 1];
+    if (lastChar !== '.' && lastChar !== '!' && lastChar !== '?') {
+      text = title + '.\n\n' + text.slice(firstBreak + 2);
+    }
+  }
+  return text;
 }
 
 /** Generate a cache key for an article */
@@ -287,7 +315,7 @@ let kokoroLoading = false;
  * (e.g. in Bun compiled binaries where module resolution is broken).
  */
 function resolveKokoroWebBuild(): string | null {
-  // 1. Explicit env var (set by SyncService.swift in the macOS app)
+  // 1. Explicit env var (set by Tauri sidecar launcher)
   const explicit = process.env.PULLREAD_KOKORO_JS_PATH;
   if (explicit && existsSync(explicit)) return explicit;
 
@@ -318,7 +346,7 @@ function resolveKokoroWebBuild(): string | null {
  * register it on globalThis for kokoro.web.js to discover.
  */
 function resolveOrtWasmDir(): string | null {
-  // 1. Explicit env var (set by SyncService.swift or build scripts)
+  // 1. Explicit env var (set by Tauri sidecar launcher)
   const explicit = process.env.PULLREAD_ORT_WASM_DIR;
   if (explicit && existsSync(join(explicit, 'ort.mjs'))) return explicit;
 
@@ -485,28 +513,61 @@ async function kokoroTTS(text: string, config: TTSConfig): Promise<Buffer> {
   const pipeline = await getKokoroPipeline(config.model || 'kokoro-v1-q8');
   const voice = config.voice || 'af_heart';
 
-  // Kokoro handles long text internally, but we chunk for safety
-  const chunks = chunkText(text, 5000);
-  const audioBuffers: Buffer[] = [];
+  // Kokoro-82M has a ~510 phoneme-token context window. At ~4-5 tokens per
+  // word that's roughly 100-125 words (~500 chars). Exceeding it silently
+  // truncates the audio output.
+  const chunks = chunkText(text, 500);
+  const pcmChunks: Float32Array[] = [];
+  let sampleRate = 24000;
 
   for (const chunk of chunks) {
     const audio = await pipeline.generate(chunk, { voice });
-    // audio.save() writes WAV; we need the raw data as a buffer
-    // The audio object has toWav() or data property depending on version
-    let wavBuffer: Buffer;
-    if (typeof audio.toBlob === 'function') {
+
+    if (audio.data) {
+      pcmChunks.push(audio.data);
+      if (audio.sampling_rate) sampleRate = audio.sampling_rate;
+    } else if (typeof audio.toBlob === 'function') {
       const blob = await audio.toBlob();
-      wavBuffer = Buffer.from(await blob.arrayBuffer());
-    } else if (audio.data) {
-      // Raw Float32Array PCM data — encode as WAV
-      wavBuffer = encodeWav(audio.data, audio.sampling_rate || 24000);
+      const arrayBuf = await blob.arrayBuffer();
+      pcmChunks.push(extractPcmFromWav(Buffer.from(arrayBuf)));
     } else {
       throw new Error('Unexpected Kokoro audio output format');
     }
-    audioBuffers.push(wavBuffer);
   }
 
-  return Buffer.concat(audioBuffers);
+  // Concatenate all raw PCM samples into a single array, then encode once.
+  // (Concatenating WAV files directly produces a corrupt file — only the
+  // first chunk plays because each WAV has its own header and data length.)
+  const totalLength = pcmChunks.reduce((sum, c) => sum + c.length, 0);
+  const combined = new Float32Array(totalLength);
+  let offset = 0;
+  for (const pcm of pcmChunks) {
+    combined.set(pcm, offset);
+    offset += pcm.length;
+  }
+
+  return encodeWav(combined, sampleRate);
+}
+
+/** Extract raw PCM int16 samples from a WAV buffer by scanning for the data chunk */
+function extractPcmFromWav(wavBuf: Buffer): Float32Array {
+  // Scan RIFF chunks starting after the 12-byte RIFF header (RIFF + size + WAVE)
+  for (let pos = 12; pos < wavBuf.length - 8; ) {
+    const chunkId = wavBuf.toString('ascii', pos, pos + 4);
+    const chunkSize = wavBuf.readUInt32LE(pos + 4);
+    if (chunkId === 'data') {
+      const dataStart = pos + 8;
+      const sampleCount = Math.min(chunkSize, wavBuf.length - dataStart) / 2;
+      const pcm = new Float32Array(sampleCount);
+      for (let i = 0; i < sampleCount; i++) {
+        pcm[i] = wavBuf.readInt16LE(dataStart + i * 2) / 32767;
+      }
+      return pcm;
+    }
+    pos += 8 + chunkSize;
+    if (chunkSize % 2 !== 0) pos++; // WAV chunks are word-aligned
+  }
+  throw new Error('Invalid WAV: no data chunk found');
 }
 
 /** Encode raw PCM float32 data as a WAV buffer */
@@ -543,6 +604,186 @@ function encodeWav(samples: Float32Array, sampleRate: number): Buffer {
   }
 
   return buf;
+}
+
+/** Generate a single chunk of speech using Kokoro (returns WAV) */
+async function kokoroSingleChunk(text: string, config: TTSConfig): Promise<Buffer> {
+  const pipeline = await getKokoroPipeline(config.model || 'kokoro-v1-q8');
+  const voice = config.voice || 'af_heart';
+  const audio = await pipeline.generate(text, { voice });
+
+  if (audio.data) {
+    const pcm = audio.data;
+    const sampleRate = audio.sampling_rate || 24000;
+    return encodeWav(pcm, sampleRate);
+  } else if (typeof audio.toBlob === 'function') {
+    // Return Kokoro's native WAV directly — re-encoding is lossy and
+    // produces WAVs that some decoders (WKWebView) reject
+    const blob = await audio.toBlob();
+    const arrayBuf = await blob.arrayBuffer();
+    return Buffer.from(arrayBuf);
+  } else {
+    throw new Error('Unexpected Kokoro audio output format');
+  }
+}
+
+/** Generate a single chunk of speech using OpenAI (returns MP3) */
+async function openaiSingleChunk(text: string, config: TTSConfig): Promise<Buffer> {
+  const body = JSON.stringify({
+    model: config.model || 'tts-1',
+    voice: config.voice || 'alloy',
+    input: text,
+    response_format: 'mp3',
+  });
+
+  return httpsPost('https://api.openai.com/v1/audio/speech', {
+    'Authorization': `Bearer ${config.apiKey}`,
+    'Content-Type': 'application/json',
+  }, body);
+}
+
+/** Generate a single chunk of speech using ElevenLabs (returns MP3) */
+async function elevenlabsSingleChunk(text: string, config: TTSConfig): Promise<Buffer> {
+  const voiceId = config.voice || 'EXAVITQu4vr4xnSDxMaL';
+  const body = JSON.stringify({
+    text,
+    model_id: config.model || 'eleven_multilingual_v2',
+    voice_settings: {
+      stability: 0.5,
+      similarity_boost: 0.75,
+    },
+  });
+
+  return httpsPost(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+    'xi-api-key': config.apiKey || '',
+    'Content-Type': 'application/json',
+    'Accept': 'audio/mpeg',
+  }, body);
+}
+
+/** Chunk size per provider */
+function chunkSizeForProvider(provider: string): number {
+  switch (provider) {
+    case 'kokoro': return 500;
+    case 'openai': return 4096;
+    case 'elevenlabs': return 5000;
+    default: return 500;
+  }
+}
+
+/** Create a TTS session for progressive chunk-based playback */
+export function createTtsSession(
+  articleName: string,
+  text: string,
+  config: TTSConfig
+): { id: string; totalChunks: number } {
+  const plainText = stripMarkdown(text);
+  if (!plainText) throw new Error('No text to speak');
+
+  const maxChars = chunkSizeForProvider(config.provider);
+  const chunks = chunkText(plainText, maxChars);
+  const id = createHash('sha256')
+    .update(articleName + '|' + Date.now() + '|' + Math.random())
+    .digest('hex')
+    .slice(0, 16);
+
+  ttsSessions.set(id, {
+    id,
+    articleName,
+    config,
+    chunks,
+    audio: new Map(),
+    createdAt: Date.now(),
+  });
+
+  return { id, totalChunks: chunks.length };
+}
+
+/**
+ * Generate audio for a single chunk within a session.
+ * Caches the result in the session and auto-finalizes when all chunks are done.
+ */
+export async function generateSessionChunk(sessionId: string, chunkIndex: number): Promise<Buffer> {
+  const session = ttsSessions.get(sessionId);
+  if (!session) throw new Error('TTS session not found');
+  if (chunkIndex < 0 || chunkIndex >= session.chunks.length) {
+    throw new Error(`Chunk index ${chunkIndex} out of range (0-${session.chunks.length - 1})`);
+  }
+
+  // Return cached chunk if already generated
+  const cached = session.audio.get(chunkIndex);
+  if (cached) return cached;
+
+  const text = session.chunks[chunkIndex];
+  let audio: Buffer;
+
+  switch (session.config.provider) {
+    case 'kokoro':
+      try {
+        audio = await kokoroSingleChunk(text, session.config);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes('dlopen') || msg.includes('code signature') || msg.includes('not valid for use')) {
+          throw new Error('Kokoro voice engine could not load. This may be a code signing issue — try reinstalling Pull Read from the latest release. (Detail: ' + (msg.length > 200 ? msg.slice(0, 200) + '…' : msg) + ')');
+        }
+        if (msg.includes('kokoro-js') || msg.includes('Cannot find module') || msg.includes('Cannot find package')) {
+          throw new Error('Kokoro voice engine is not available in this build — try reinstalling Pull Read from the latest release.');
+        }
+        throw new Error('Kokoro voice failed: ' + (msg.length > 120 ? msg.slice(0, 120) + '…' : msg));
+      }
+      break;
+    case 'openai':
+      if (!session.config.apiKey) throw new Error('OpenAI API key required for TTS');
+      audio = await openaiSingleChunk(text, session.config);
+      break;
+    case 'elevenlabs':
+      if (!session.config.apiKey) throw new Error('ElevenLabs API key required for TTS');
+      audio = await elevenlabsSingleChunk(text, session.config);
+      break;
+    default:
+      throw new Error('Unsupported provider for chunked TTS');
+  }
+
+  session.audio.set(chunkIndex, audio);
+
+  // Auto-finalize: when all chunks are generated, combine and cache to disk
+  if (session.audio.size === session.chunks.length) {
+    finalizeSession(session);
+  }
+
+  return audio;
+}
+
+/** Combine all chunk audio into a single file and save to disk cache */
+function finalizeSession(session: TtsSession): void {
+  const buffers: Buffer[] = [];
+  for (let i = 0; i < session.chunks.length; i++) {
+    const buf = session.audio.get(i);
+    if (buf) buffers.push(buf);
+  }
+
+  let combined: Buffer;
+  if (session.config.provider === 'kokoro') {
+    // Extract PCM from each WAV chunk, concatenate, re-encode as single WAV
+    const pcmChunks: Float32Array[] = [];
+    for (const wavBuf of buffers) {
+      pcmChunks.push(extractPcmFromWav(wavBuf));
+    }
+    const totalLength = pcmChunks.reduce((sum, c) => sum + c.length, 0);
+    const allPcm = new Float32Array(totalLength);
+    let offset = 0;
+    for (const pcm of pcmChunks) {
+      allPcm.set(pcm, offset);
+      offset += pcm.length;
+    }
+    combined = encodeWav(allPcm, 24000);
+  } else {
+    // MP3 frames are self-contained — simple concatenation works
+    combined = Buffer.concat(buffers);
+  }
+
+  saveCachedAudio(session.articleName, session.config, combined);
+  ttsSessions.delete(session.id);
 }
 
 /** Generate speech using OpenAI TTS */

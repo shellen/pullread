@@ -226,7 +226,7 @@ function jumpToArticle(filename) {
     // File might be hidden - clear filters
     document.getElementById('search').value = '';
     hideRead = false;
-    document.getElementById('hide-read-toggle').checked = false;
+    document.getElementById('hide-read-toggle').classList.remove('active');
     filterFiles();
     const newIdx = displayFiles.findIndex(f => f.filename === filename);
     if (newIdx >= 0) loadFile(newIdx);
