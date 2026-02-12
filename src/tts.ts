@@ -6,7 +6,7 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { createHash } from 'crypto';
 import { request as httpsRequest } from 'https';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 
 const SETTINGS_PATH = join(homedir(), '.config', 'pullread', 'settings.json');
 const CACHE_DIR = join(homedir(), '.config', 'pullread', 'tts-cache');
@@ -93,8 +93,9 @@ export function loadTTSConfig(): TTSConfig {
         if (!config.apiKey && (config.provider === 'openai' || config.provider === 'elevenlabs')) {
           if (process.platform === 'darwin') {
             try {
-              const key = execSync(
-                'security find-generic-password -w -s "com.pullread.api-keys" -a "tts-api-key"',
+              const key = execFileSync(
+                'security',
+                ['find-generic-password', '-w', '-s', 'com.pullread.api-keys', '-a', 'tts-api-key'],
                 { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
               ).trim();
               if (key) config.apiKey = key;
@@ -115,7 +116,18 @@ export function saveTTSConfig(config: TTSConfig): void {
       settings = JSON.parse(readFileSync(SETTINGS_PATH, 'utf-8'));
     } catch {}
   }
-  settings.tts = config;
+  // Save API key to macOS Keychain; strip from settings.json
+  if (config.apiKey) {
+    if (process.platform === 'darwin') {
+      try {
+        try { execFileSync('security', ['delete-generic-password', '-s', 'com.pullread.api-keys', '-a', 'tts-api-key'], { stdio: ['pipe', 'pipe', 'pipe'] }); } catch {}
+        execFileSync('security', ['add-generic-password', '-s', 'com.pullread.api-keys', '-a', 'tts-api-key', '-w', config.apiKey], { stdio: ['pipe', 'pipe', 'pipe'] });
+      } catch {}
+    }
+  }
+  const { apiKey, ...configWithoutKey } = config;
+  (configWithoutKey as Record<string, unknown>).hasKey = !!(apiKey || (settings.tts as Record<string, unknown>)?.hasKey);
+  settings.tts = configWithoutKey;
   const dir = join(homedir(), '.config', 'pullread');
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2));
@@ -485,28 +497,69 @@ async function kokoroTTS(text: string, config: TTSConfig): Promise<Buffer> {
   const pipeline = await getKokoroPipeline(config.model || 'kokoro-v1-q8');
   const voice = config.voice || 'af_heart';
 
-  // Kokoro handles long text internally, but we chunk for safety
-  const chunks = chunkText(text, 5000);
-  const audioBuffers: Buffer[] = [];
+  // Kokoro-82M has a ~510 phoneme-token context window; exceeding it
+  // silently truncates audio output.  Keep chunks well under the limit.
+  const chunks = chunkText(text, 500);
+  const pcmBuffers: Buffer[] = [];
+  let sampleRate = 24000;
 
   for (const chunk of chunks) {
     const audio = await pipeline.generate(chunk, { voice });
     // audio.save() writes WAV; we need the raw data as a buffer
     // The audio object has toWav() or data property depending on version
-    let wavBuffer: Buffer;
     if (typeof audio.toBlob === 'function') {
       const blob = await audio.toBlob();
-      wavBuffer = Buffer.from(await blob.arrayBuffer());
+      const wavBuffer = Buffer.from(await blob.arrayBuffer());
+      // Extract raw PCM data by stripping the 44-byte WAV header.
+      // Naive Buffer.concat of complete WAV files produces corrupt audio
+      // because each chunk carries its own RIFF header.
+      pcmBuffers.push(wavBuffer.subarray(44));
+      // Read sample rate from the WAV header (bytes 24-27, little-endian)
+      if (wavBuffer.length >= 28) sampleRate = wavBuffer.readUInt32LE(24);
     } else if (audio.data) {
-      // Raw Float32Array PCM data — encode as WAV
-      wavBuffer = encodeWav(audio.data, audio.sampling_rate || 24000);
+      // Raw Float32Array PCM data — convert to int16 directly
+      sampleRate = audio.sampling_rate || 24000;
+      const int16 = Buffer.alloc(audio.data.length * 2);
+      for (let i = 0; i < audio.data.length; i++) {
+        const s = Math.max(-1, Math.min(1, audio.data[i]));
+        int16.writeInt16LE(Math.round(s * 32767), i * 2);
+      }
+      pcmBuffers.push(int16);
     } else {
       throw new Error('Unexpected Kokoro audio output format');
     }
-    audioBuffers.push(wavBuffer);
   }
 
-  return Buffer.concat(audioBuffers);
+  // Concatenate all PCM data and wrap in a single WAV with one RIFF header
+  const allPcm = Buffer.concat(pcmBuffers);
+  return encodeWavFromPcm(allPcm, sampleRate);
+}
+
+/** Wrap raw int16 PCM data in a WAV container (single RIFF header) */
+function encodeWavFromPcm(pcmData: Buffer, sampleRate: number): Buffer {
+  const numChannels = 1;
+  const bitsPerSample = 16;
+  const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+  const blockAlign = numChannels * (bitsPerSample / 8);
+  const dataSize = pcmData.length;
+  const headerSize = 44;
+  const buf = Buffer.alloc(headerSize);
+
+  buf.write('RIFF', 0);
+  buf.writeUInt32LE(36 + dataSize, 4);
+  buf.write('WAVE', 8);
+  buf.write('fmt ', 12);
+  buf.writeUInt32LE(16, 16);
+  buf.writeUInt16LE(1, 20); // PCM
+  buf.writeUInt16LE(numChannels, 22);
+  buf.writeUInt32LE(sampleRate, 24);
+  buf.writeUInt32LE(byteRate, 28);
+  buf.writeUInt16LE(blockAlign, 30);
+  buf.writeUInt16LE(bitsPerSample, 32);
+  buf.write('data', 36);
+  buf.writeUInt32LE(dataSize, 40);
+
+  return Buffer.concat([buf, pcmData]);
 }
 
 /** Encode raw PCM float32 data as a WAV buffer */

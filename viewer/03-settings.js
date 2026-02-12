@@ -156,6 +156,7 @@ document.addEventListener('click', function(e) {
 function showSettingsPage() {
   activeFile = null;
   _activeNotebook = null;
+  _activeNote = null;
   const content = document.getElementById('content');
   const empty = document.getElementById('empty-state');
   empty.style.display = 'none';
@@ -190,8 +191,8 @@ function showSettingsPage() {
     + '</div></div>';
   html += '<div class="settings-row"><label>Font</label><select onchange="setFont(this.value);showSettingsPage()">'
     + opt('serif','Serif',currentFont) + opt('sans','Sans-serif',currentFont) + opt('system','Charter',currentFont)
-    + opt('mono','Monospace',currentFont) + opt('inter','Inter',currentFont) + opt('lora','Lora',currentFont)
-    + opt('literata','Literata',currentFont) + opt('source-serif','Source Serif',currentFont)
+    + opt('mono','Monospace',currentFont) + opt('inter','Inter',currentFont)
+    + opt('lora','Lora',currentFont) + opt('literata','Literata',currentFont) + opt('source-serif','Source Serif',currentFont)
     + opt('work-sans','Work Sans',currentFont) + opt('opendyslexic','OpenDyslexic',currentFont)
     + '</select></div>';
   html += '<div class="settings-row"><label>Text size</label><div class="settings-btn-group">'
@@ -449,12 +450,22 @@ function showSettingsPage() {
         var hasKey = pConfig.hasKey || false;
         var isDefault = defaultProv === cp.id;
 
-        h += '<div style="padding:10px 12px;margin-bottom:8px;background:color-mix(in srgb, var(--fg) ' + (isDefault ? '6' : '3') + '%, transparent);border-radius:8px;border:1px solid ' + (isDefault ? 'var(--link)' : 'transparent') + '">';
-        h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
-        h += '<strong style="font-size:13px">' + cp.label + '</strong>';
-        if (isDefault) h += '<span style="font-size:10px;background:var(--link);color:#fff;padding:1px 6px;border-radius:3px">DEFAULT</span>';
-        if (hasKey) h += '<span class="settings-status ok" style="font-size:11px">Key saved</span>';
-        h += '</div>';
+        // Show selected provider expanded; collapse others into a details element
+        if (isDefault) {
+          h += '<div style="padding:10px 12px;margin-bottom:8px;background:color-mix(in srgb, var(--fg) 6%, transparent);border-radius:8px;border:1px solid var(--link)">';
+          h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
+          h += '<strong style="font-size:13px">' + cp.label + '</strong>';
+          h += '<span style="font-size:10px;background:var(--link);color:#fff;padding:1px 6px;border-radius:3px">DEFAULT</span>';
+          if (hasKey) h += '<span class="settings-status ok" style="font-size:11px">Key saved</span>';
+          h += '</div>';
+        } else {
+          h += '<details style="margin-bottom:8px;background:color-mix(in srgb, var(--fg) 3%, transparent);border-radius:8px;border:1px solid transparent">';
+          h += '<summary style="padding:10px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;list-style:none">';
+          h += cp.label;
+          if (hasKey) h += '<span class="settings-status ok" style="font-size:11px;font-weight:400">Key saved</span>';
+          h += '</summary>';
+          h += '<div style="padding:0 12px 10px">';
+        }
 
         h += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">';
         h += '<label style="font-size:12px;min-width:55px;color:var(--muted)">API Key</label>';
@@ -465,7 +476,12 @@ function showSettingsPage() {
         h += '<label style="font-size:12px;min-width:55px;color:var(--muted)">Model</label>';
         h += '<input type="text" id="sp-llm-model-' + cp.id + '" value="' + escapeHtml(pConfig.model || '') + '" placeholder="default" style="flex:1;min-width:0;font-size:12px">';
         h += '</div>';
-        h += '</div>';
+
+        if (isDefault) {
+          h += '</div>';
+        } else {
+          h += '</div></details>';
+        }
       }
 
       h += '<div class="settings-row" style="justify-content:flex-end;padding-top:8px">';
@@ -627,7 +643,7 @@ async function settingsAddFeed() {
       sec2._configData.feeds[url] = url;
     }
   }
-  showSettingsPage();
+  settingsPageSaveConfig();
 }
 
 function settingsRemoveFeed(name) {
@@ -635,7 +651,7 @@ function settingsRemoveFeed(name) {
   if (sec && sec._configData && sec._configData.feeds) {
     delete sec._configData.feeds[name];
   }
-  showSettingsPage();
+  settingsPageSaveConfig();
 }
 
 function settingsBackup() {

@@ -478,6 +478,14 @@
     vertical-align: -1px; margin-right: 4px; flex-shrink: 0;
     fill: currentColor;
   }
+  .nb-annotated-header {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.5px; color: var(--muted);
+    padding: 12px 12px 4px; margin-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  .nb-annotated-item { opacity: 0.8; }
+  .nb-annotated-item:hover { opacity: 1; }
   .hide-read-toggle {
     display: flex;
     align-items: center;
@@ -827,6 +835,17 @@
     color: var(--fg);
     font-weight: 700;
   }
+  .article-title-link {
+    color: inherit;
+    text-decoration: none;
+  }
+  .article-title-link:hover { color: var(--link); }
+  .article-title-link .icon {
+    opacity: 0.3;
+    vertical-align: baseline;
+    margin-left: 2px;
+  }
+  .article-title-link:hover .icon { opacity: 0.6; }
   .article-byline {
     font-size: 14px;
     color: var(--muted);
@@ -862,6 +881,38 @@
   .article-actions button:hover { background: var(--sidebar-active); color: var(--fg); }
   .article-actions button.active-fav { background: color-mix(in srgb, #e91e63 12%, var(--bg)); color: #e91e63; }
   .article-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Listen button animated states */
+  #listen-btn { position: relative; overflow: hidden; }
+  #listen-btn.listen-loading {
+    background: var(--code-bg);
+    color: var(--link);
+  }
+  #listen-btn.listen-loading::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%; width: 200%; height: 100%;
+    background: linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--link) 15%, transparent) 50%, transparent 100%);
+    animation: listenSweep 2s ease-in-out infinite;
+  }
+  @keyframes listenSweep { to { left: 100%; } }
+  #listen-btn.listen-loading .listen-label {
+    animation: listenFade 2.5s ease-in-out infinite;
+  }
+  @keyframes listenFade {
+    0%, 100% { opacity: 1; }
+    45% { opacity: 0; }
+    55% { opacity: 0; }
+  }
+  #listen-btn.listen-playing {
+    background: color-mix(in srgb, var(--link) 12%, var(--bg));
+    color: var(--link);
+    animation: listenPulse 2s ease-in-out infinite;
+  }
+  @keyframes listenPulse {
+    0%, 100% { box-shadow: 0 0 0 0 transparent; }
+    50% { box-shadow: 0 0 8px 2px color-mix(in srgb, var(--link) 25%, transparent); }
+  }
 
   /* Margin notes (Google Docs-style) */
   .margin-notes {
@@ -2211,10 +2262,10 @@
     height: 1.7em;
     background: transparent;
     pointer-events: none;
-    transition: top 0.08s ease;
+    transition: top 0.12s ease, height 0.12s ease;
     z-index: 3;
     /* Massive inset shadow dims everything outside this element's bounds,
-       leaving the current line text at full brightness (iA Writer style) */
+       leaving the current sentence at full brightness (iA Writer style) */
     box-shadow: 0 -3px 0 0 var(--bg), 0 3px 0 0 var(--bg), 0 0 0 9999px color-mix(in srgb, var(--bg) 70%, transparent);
   }
   .writing-focus .notebook-editor textarea::selection {
@@ -2258,15 +2309,20 @@
     padding: 0 24px 48px;
     overflow-y: auto;
     position: relative;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
+  .writing-focus-overlay .wf-body::-webkit-scrollbar { display: none; }
   .writing-focus-overlay .wf-body textarea {
-    width: 100%; height: 100%;
+    width: 100%; min-height: 100%;
     font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
     font-size: 16px; line-height: 1.8;
     border: none; outline: none; resize: none;
     background: transparent;
     color: var(--fg);
     caret-color: var(--fg);
+    padding-top: 45vh;
+    padding-bottom: 45vh;
   }
   .writing-focus-overlay .wf-focus-line {
     position: absolute;
@@ -2274,7 +2330,7 @@
     height: 1.8em;
     background: transparent;
     pointer-events: none;
-    transition: top 0.08s ease;
+    transition: top 0.12s ease, height 0.12s ease;
     z-index: 3;
     box-shadow: 0 -3px 0 0 var(--bg), 0 3px 0 0 var(--bg), 0 0 0 9999px color-mix(in srgb, var(--bg) 70%, transparent);
   }

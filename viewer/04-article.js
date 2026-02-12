@@ -187,7 +187,8 @@ function dashLoadArticle(filename) {
     // File might be filtered out — search all files
     const allIdx = allFiles.findIndex(f => f.filename === filename);
     if (allIdx >= 0) {
-      // Clear search and reload
+      // Set activeFile first so hide-read filter preserves this article
+      activeFile = filename;
       document.getElementById('search').value = '';
       filterFiles();
       const newIdx = displayFiles.findIndex(f => f.filename === filename);
@@ -209,7 +210,11 @@ function renderArticle(text, filename) {
   // Article header: title, author, date, domain, actions
   html += '<div class="article-header">';
   if (meta && meta.title) {
-    html += '<h1>' + escapeHtml(meta.title) + '</h1>';
+    if (meta.url) {
+      html += '<h1><a href="' + escapeHtml(meta.url) + '" target="_blank" class="article-title-link">' + escapeHtml(meta.title) + ' <svg class="icon icon-sm" aria-hidden="true"><use href="#i-external"/></svg></a></h1>';
+    } else {
+      html += '<h1>' + escapeHtml(meta.title) + '</h1>';
+    }
   }
   html += '<div class="article-byline">';
   const bylineParts = [];
@@ -241,18 +246,20 @@ function renderArticle(text, filename) {
   if (!isReviewArticle) {
     html += '<button onclick="summarizeArticle()" id="summarize-btn" aria-label="Summarize article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Summarize</button>';
   }
-  html += '<button onclick="addCurrentToTTSQueue()" aria-label="Listen to article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> Listen</button>';
+  html += '<button onclick="addCurrentToTTSQueue()" id="listen-btn" aria-label="Listen to article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> <span class="listen-label">Listen</span></button>';
   if (meta && meta.url) {
     html += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg> Share</button></div>';
   }
   html += '<button onclick="markCurrentAsUnread()" aria-label="Mark as unread"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-eye-slash"/></svg> Unread</button>';
   html += '</div>';
-  // Show notebook back-references
-  var nbRefs = Object.values(_notebooks || {}).filter(function(nb) { return nb.sources && nb.sources.indexOf(filename) >= 0; });
-  if (nbRefs.length) {
+  // Show notebook back-references (individual notes linked to this article)
+  var nbObj = (_notebooks || {})[SINGLE_NOTEBOOK_ID];
+  var linkedNotes = (nbObj && Array.isArray(nbObj.notes)) ? nbObj.notes.filter(function(n) { return n.sourceArticle === filename; }) : [];
+  if (linkedNotes.length) {
     html += '<div style="margin-top:6px">';
-    for (var nbi = 0; nbi < nbRefs.length; nbi++) {
-      html += '<span class="notebook-ref" onclick="openNotebookEditor(\'' + nbRefs[nbi].id + '\')"><svg class="icon icon-sm" style="vertical-align:-1px"><use href="#i-pen"/></svg> ' + escapeHtml(nbRefs[nbi].title || 'Untitled notebook') + '</span>';
+    for (var nbi = 0; nbi < linkedNotes.length; nbi++) {
+      var noteTitle = extractTitleFromContent(linkedNotes[nbi].content) || 'Untitled note';
+      html += '<span class="notebook-ref" onclick="_sidebarView=\'notebooks\';syncSidebarTabs();openNoteInPane(\'' + escapeHtml(linkedNotes[nbi].id) + '\')"><svg class="icon icon-sm" style="vertical-align:-1px"><use href="#i-pen"/></svg> ' + escapeHtml(noteTitle) + '</span>';
     }
     html += '</div>';
   }

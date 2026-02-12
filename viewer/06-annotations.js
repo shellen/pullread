@@ -324,38 +324,25 @@ function removeAnnotationPopover() {
 
 function showHlToolbar(x, y) {
   removeHlToolbar();
-  const bar = document.createElement('div');
-  bar.className = 'hl-toolbar';
-  // Prevent mousedown from clearing the text selection — critical for
-  // highlight/note buttons to read the selection when their onclick fires
-  bar.addEventListener('mousedown', e => e.preventDefault());
-  bar.innerHTML = `
-    <button class="hl-yellow-btn" aria-label="Highlight yellow" onclick="createHighlight('yellow')"></button>
-    <button class="hl-green-btn" aria-label="Highlight green" onclick="createHighlight('green')"></button>
-    <button class="hl-blue-btn" aria-label="Highlight blue" onclick="createHighlight('blue')"></button>
-    <button class="hl-pink-btn" aria-label="Highlight pink" onclick="createHighlight('pink')"></button>
-    <button class="hl-note-btn" aria-label="Add note" onclick="addInlineNote()">+ Note</button>
-  `;
+  const bar = document.createElement('pr-highlight-toolbar');
+  bar.setAttribute('mode', 'create');
   bar.style.left = x + 'px';
   bar.style.top = y + 'px';
+  bar.addEventListener('hl-create', function(e) { createHighlight(e.detail.color); });
+  bar.addEventListener('hl-add-note', function() { addInlineNote(); });
   document.getElementById('content-pane').appendChild(bar);
   hlToolbarEl = bar;
 }
 
 function showHighlightContextMenu(e, hl) {
   removeHlToolbar();
-  const bar = document.createElement('div');
-  bar.className = 'hl-toolbar';
-  bar.addEventListener('mousedown', e => e.preventDefault());
-  const noteLabel = hl.note ? 'Edit Note' : 'Note';
-  bar.innerHTML = `
-    <button class="hl-yellow-btn" aria-label="Yellow" onclick="changeHighlightColor('${hl.id}','yellow')"></button>
-    <button class="hl-green-btn" aria-label="Green" onclick="changeHighlightColor('${hl.id}','green')"></button>
-    <button class="hl-blue-btn" aria-label="Blue" onclick="changeHighlightColor('${hl.id}','blue')"></button>
-    <button class="hl-pink-btn" aria-label="Pink" onclick="changeHighlightColor('${hl.id}','pink')"></button>
-    <button class="hl-note-btn" aria-label="${noteLabel}" onclick="editHighlightNote('${hl.id}', event)">${noteLabel}</button>
-    <button class="hl-note-btn" style="color:red;border-color:red" aria-label="Delete highlight" onclick="deleteHighlight('${hl.id}')">Del</button>
-  `;
+  const bar = document.createElement('pr-highlight-toolbar');
+  bar.setAttribute('mode', 'edit');
+  bar.setAttribute('highlight-id', hl.id);
+  bar.setAttribute('note-label', hl.note ? 'Edit Note' : 'Note');
+  bar.addEventListener('hl-change-color', function(ev) { changeHighlightColor(ev.detail.id, ev.detail.color); });
+  bar.addEventListener('hl-edit-note', function(ev) { editHighlightNote(ev.detail.id, e); });
+  bar.addEventListener('hl-delete', function(ev) { deleteHighlight(ev.detail.id); });
   const pane = document.getElementById('content-pane');
   bar.style.left = (e.clientX - pane.getBoundingClientRect().left) + 'px';
   bar.style.top = (e.clientY - pane.getBoundingClientRect().top + pane.scrollTop - 40) + 'px';

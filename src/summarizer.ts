@@ -69,13 +69,31 @@ const SETTINGS_PATH = join(homedir(), '.config', 'pullread', 'settings.json');
 function loadKeyFromKeychain(account: string): string | null {
   if (process.platform !== 'darwin') return null;
   try {
-    const result = execSync(
-      `security find-generic-password -w -s "com.pullread.api-keys" -a "${account}"`,
-      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
-    );
+    const result = execFileSync('security', [
+      'find-generic-password', '-w', '-s', 'com.pullread.api-keys', '-a', account
+    ], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
     return result.trim() || null;
   } catch {
     return null;
+  }
+}
+
+/** Save an API key to macOS Keychain. On non-macOS this is a no-op (key stays in memory only). */
+function saveKeyToKeychain(account: string, key: string): boolean {
+  if (process.platform !== 'darwin') return false;
+  try {
+    // Delete existing entry first (update = delete + add)
+    try {
+      execFileSync('security', [
+        'delete-generic-password', '-s', 'com.pullread.api-keys', '-a', account
+      ], { stdio: ['pipe', 'pipe', 'pipe'] });
+    } catch { /* entry may not exist yet */ }
+    execFileSync('security', [
+      'add-generic-password', '-s', 'com.pullread.api-keys', '-a', account, '-w', key
+    ], { stdio: ['pipe', 'pipe', 'pipe'] });
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -184,11 +202,20 @@ export function saveLLMSettings(newSettings: LLMSettings): void {
     } catch {}
   }
 
-  const cleaned: Partial<Record<string, { apiKey?: string; model?: string }>> = {};
+  const existingLlm = (settings.llm || {}) as Record<string, unknown>;
+  const existingProviders = (existingLlm.providers || {}) as Record<string, Record<string, unknown>>;
+  const cleaned: Partial<Record<string, { model?: string; hasKey?: boolean }>> = {};
   for (const [p, config] of Object.entries(newSettings.providers)) {
     if (config) {
-      const entry: { apiKey?: string; model?: string } = {};
-      if (config.apiKey) entry.apiKey = config.apiKey;
+      const entry: { model?: string; hasKey?: boolean } = {};
+      // Save API key to macOS Keychain; never write to settings.json
+      if (config.apiKey) {
+        saveKeyToKeychain('llm-' + p, config.apiKey);
+        entry.hasKey = true;
+      } else if (existingProviders[p]?.hasKey) {
+        // Preserve existing hasKey flag when key wasn't changed
+        entry.hasKey = true;
+      }
       if (config.model) entry.model = config.model;
       if (Object.keys(entry).length > 0 || p === 'apple') cleaned[p] = entry;
     }
