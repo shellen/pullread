@@ -2,11 +2,17 @@
 // ABOUTME: Replicates the Swift AppDelegate menu with all 12 items
 
 use crate::{commands, notifications, sidecar};
+use std::sync::Mutex;
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Manager,
 };
+
+pub struct TrayItems {
+    last_sync: Mutex<MenuItem<tauri::Wry>>,
+    next_sync: Mutex<MenuItem<tauri::Wry>>,
+}
 
 pub fn create_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let sync_now = MenuItem::with_id(app, "sync_now", "Sync Now", true, Some("CmdOrCtrl+S"))?;
@@ -130,6 +136,11 @@ pub fn create_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         })
         .build(app)?;
 
+    app.manage(TrayItems {
+        last_sync: Mutex::new(last_sync),
+        next_sync: Mutex::new(next_sync),
+    });
+
     Ok(())
 }
 
@@ -212,14 +223,25 @@ async fn handle_check_updates(app: &AppHandle) {
     }
 }
 
-/// Update the "Last sync:" tray menu item with current time.
-/// We store the last sync time in app state since Tauri 2.x doesn't expose
-/// menu item getters on TrayIcon. The menu is rebuilt lazily if needed.
+/// Update the "Last sync:" tray menu item and tooltip with current time.
 pub fn update_last_sync(app: &AppHandle) {
     let now = chrono::Local::now().format("%H:%M").to_string();
     log::info!("Last sync updated: {}", now);
-    // Store timestamp for display in tray tooltip
     if let Some(tray) = app.tray_by_id("main") {
         let _ = tray.set_tooltip(Some(&format!("PullRead — Last sync: {}", now)));
+    }
+    let items = app.state::<TrayItems>();
+    let lock = items.last_sync.lock();
+    if let Ok(item) = lock {
+        let _ = item.set_text(format!("Last sync: {}", now));
+    }
+}
+
+/// Update the "Next sync:" tray menu item.
+pub fn update_next_sync(app: &AppHandle, text: &str) {
+    let items = app.state::<TrayItems>();
+    let lock = items.next_sync.lock();
+    if let Ok(item) = lock {
+        let _ = item.set_text(format!("Next sync: {}", text));
     }
 }

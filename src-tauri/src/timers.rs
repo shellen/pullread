@@ -24,6 +24,7 @@ fn start_sync_timer(app: &AppHandle) {
     };
 
     log::info!("Starting sync timer: every {}", interval_str);
+    tray::update_next_sync(app, &interval_str);
 
     let handle = app.clone();
     tauri::async_runtime::spawn(async move {
