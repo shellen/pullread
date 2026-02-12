@@ -10,23 +10,25 @@ function renderFileList() {
     displayFiles = filteredFiles;
   }
 
-  // Build notebook items from loaded notebooks, filtered by search
-  const nbs = Object.values(_notebooks).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
   const searchTerm = (document.getElementById('search').value || '').trim().toLowerCase();
-  const nbItems = nbs.filter(function(nb) {
-    if (!searchTerm) return true;
-    const title = (nb.title || '').toLowerCase();
-    const tags = (nb.tags || []).join(' ').toLowerCase();
-    return title.includes(searchTerm) || tags.includes(searchTerm);
-  });
 
   const total = filteredFiles.length;
   const shown = displayFiles.length;
   const isNotebooksTab = _sidebarView === 'notebooks';
 
+  // Count notes for notebook tab
+  var nb = _notebooks[SINGLE_NOTEBOOK_ID];
+  var nbNotes = (nb && Array.isArray(nb.notes)) ? nb.notes : [];
+  var filteredNotes = nbNotes;
+  if (searchTerm && isNotebooksTab) {
+    filteredNotes = nbNotes.filter(function(n) {
+      return (n.content || '').toLowerCase().includes(searchTerm);
+    });
+  }
+
   let countStr;
   if (isNotebooksTab) {
-    countStr = 'Notebook';
+    countStr = filteredNotes.length + ' note' + (filteredNotes.length !== 1 ? 's' : '');
   } else {
     countStr = shown + ' article' + (shown !== 1 ? 's' : '');
     if (hideRead && shown < total) countStr += ' (' + (total - shown) + ' hidden)';
@@ -35,9 +37,23 @@ function renderFileList() {
 
   let html = '';
   if (isNotebooksTab) {
-    // Single notebook — show just the shared notebook item
-    if (_notebooks[SINGLE_NOTEBOOK_ID]) {
-      html += renderNotebookItem(_notebooks[SINGLE_NOTEBOOK_ID]);
+    // + New Note button
+    html += '<div class="new-notebook-btn" onclick="createNewNote()">+ New Note</div>';
+    // Individual notes sorted by most recently updated
+    var sorted = filteredNotes.slice().sort(function(a, b) { return new Date(b.updatedAt) - new Date(a.updatedAt); });
+    for (var ni = 0; ni < sorted.length; ni++) {
+      html += renderNoteItem(sorted[ni]);
+    }
+    // Annotated Articles section
+    var annotatedArticles = allFiles.filter(function(f) {
+      var ann = hasAnnotations(f.filename);
+      return ann.hasHl || ann.hasNote;
+    });
+    if (annotatedArticles.length) {
+      html += '<div class="nb-annotated-header">Annotated Articles</div>';
+      for (var ai = 0; ai < Math.min(annotatedArticles.length, 20); ai++) {
+        html += renderAnnotatedArticleItem(annotatedArticles[ai]);
+      }
     }
   } else {
     // Library / Explore: show articles only
@@ -81,12 +97,28 @@ function renderFileItem(f, i) {
     + '</div>';
 }
 
-function renderNotebookItem(nb) {
-  const isActive = _activeNotebook && _activeNotebook.id === nb.id && !activeFile ? ' active' : '';
-  const date = nb.updatedAt ? new Date(nb.updatedAt).toLocaleDateString() : '';
-  return '<div class="file-item notebook-item' + isActive + '" data-notebook-id="' + escapeHtml(nb.id) + '" onclick="openNotebookInPane(\'' + escapeHtml(nb.id) + '\')" role="option" tabindex="0" onkeydown="if(event.key===\'Enter\')openNotebookInPane(\'' + escapeHtml(nb.id) + '\')">'
-    + '<div class="file-item-title"><svg class="nb-icon" aria-hidden="true"><use href="#i-book"/></svg>' + escapeHtml(nb.title || 'Untitled') + '</div>'
-    + '<div class="file-item-meta"><span>' + date + '</span><span class="meta-sep"></span><span>notebook</span></div>'
+function renderNoteItem(note) {
+  var isActive = _activeNote && _activeNote.id === note.id && !activeFile ? ' active' : '';
+  var date = note.updatedAt ? new Date(note.updatedAt).toLocaleDateString() : '';
+  var title = extractTitleFromContent(note.content) || 'Untitled';
+  var sourceDomain = '';
+  if (note.sourceArticle) {
+    var f = allFiles.find(function(ff) { return ff.filename === note.sourceArticle; });
+    if (f) sourceDomain = f.domain || '';
+  }
+  var metaParts = '<span>' + date + '</span>';
+  if (sourceDomain) metaParts += '<span class="meta-sep"></span><span>' + escapeHtml(sourceDomain) + '</span>';
+  return '<div class="file-item notebook-item' + isActive + '" data-note-id="' + escapeHtml(note.id) + '" onclick="openNoteInPane(\'' + escapeHtml(note.id) + '\')" role="option" tabindex="0" onkeydown="if(event.key===\'Enter\')openNoteInPane(\'' + escapeHtml(note.id) + '\')">'
+    + '<div class="file-item-title"><svg class="nb-icon" aria-hidden="true"><use href="#i-pen"/></svg>' + escapeHtml(title) + '</div>'
+    + '<div class="file-item-meta">' + metaParts + '</div>'
+    + '</div>';
+}
+
+function renderAnnotatedArticleItem(f) {
+  var date = f.bookmarked ? f.bookmarked.slice(0, 10) : '';
+  return '<div class="file-item nb-annotated-item" onclick="jumpToArticle(\'' + escapeHtml(f.filename) + '\')" role="option" tabindex="0">'
+    + '<div class="file-item-title">' + escapeHtml(f.title) + '</div>'
+    + '<div class="file-item-meta"><span>' + date + '</span><span class="meta-sep"></span><span>' + escapeHtml(f.domain || '') + '</span></div>'
     + '</div>';
 }
 
@@ -341,7 +373,15 @@ function switchSidebarView(view) {
 
 function openSingleNotebook() {
   getOrCreateSingleNotebook().then(function(nb) {
-    openNotebookInPane(nb.id);
+    _activeNotebook = nb;
+    renderFileList();
+    if (nb.notes && nb.notes.length > 0) {
+      var sorted = nb.notes.slice().sort(function(a, b) { return new Date(b.updatedAt) - new Date(a.updatedAt); });
+      _activeNote = sorted[0];
+      openNoteInPane(_activeNote.id);
+    } else {
+      showNotebookEmpty();
+    }
   });
 }
 
@@ -371,16 +411,15 @@ function toggleWritingFocus() {
     exitWritingFocus();
     return;
   }
-  if (!_activeNotebook) return;
+  if (!_activeNote) return;
   _writingFocusActive = true;
 
-  // Create full-screen distraction-free overlay
   var overlay = document.createElement('div');
   overlay.className = 'writing-focus-overlay';
   overlay.id = 'writing-focus-overlay';
 
-  var title = _activeNotebook.title || 'Untitled';
-  var content = _activeNotebook.content || '';
+  var title = extractTitleFromContent(_activeNote.content) || 'Untitled';
+  var content = _activeNote.content || '';
   var wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
 
   overlay.innerHTML = '<div class="wf-toolbar">'
@@ -397,7 +436,6 @@ function toggleWritingFocus() {
 
   var ta = document.getElementById('wf-textarea');
   ta.focus();
-  // Move cursor to end
   ta.selectionStart = ta.selectionEnd = ta.value.length;
 
   ta.addEventListener('input', function() {
@@ -411,52 +449,126 @@ function toggleWritingFocus() {
   ta.addEventListener('keyup', updateWritingFocusLine);
   ta.addEventListener('scroll', updateWritingFocusLine);
 
-  // Escape key to exit
   overlay.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') { exitWritingFocus(); }
   });
 
   updateWritingFocusLine();
-
-  // Update the inline Focus button state
-  var btn = document.querySelector('.notebook-toolbar button[onclick="toggleWritingFocus()"]');
-  if (btn) btn.classList.add('active');
+  wfCenterScroll();
 }
 
 function exitWritingFocus() {
   _writingFocusActive = false;
 
-  // Sync content back from overlay textarea
   var ta = document.getElementById('wf-textarea');
-  if (ta && _activeNotebook) {
-    _activeNotebook.content = ta.value;
+  if (ta && _activeNote) {
+    _activeNote.content = ta.value;
     notebookDebounceSave();
   }
 
   var overlay = document.getElementById('writing-focus-overlay');
   if (overlay) overlay.remove();
 
-  // Refresh the notebook editor to show updated content
-  if (_activeNotebook) {
-    showNotebook(_activeNotebook.id);
+  if (_activeNote) {
+    openNoteInPane(_activeNote.id);
   }
+}
+
+// Sentence boundary detection for focus mode
+function findSentenceBounds(text, cursorPos) {
+  // Find sentence start: scan backward for . ! ? followed by whitespace, or \n\n, or start of text
+  var start = 0;
+  for (var i = cursorPos - 1; i >= 0; i--) {
+    var ch = text[i];
+    // Paragraph break
+    if (ch === '\n' && i > 0 && text[i - 1] === '\n') {
+      start = i + 1;
+      break;
+    }
+    // Sentence-ending punctuation followed by whitespace
+    if ((ch === '.' || ch === '!' || ch === '?') && i < text.length - 1) {
+      var next = text[i + 1];
+      if (next === ' ' || next === '\n' || next === '\t' || next === '"' || next === '\'' || next === ')') {
+        // Include trailing quotes/parens with the previous sentence
+        var sentStart = i + 1;
+        while (sentStart < text.length && (text[sentStart] === '"' || text[sentStart] === '\'' || text[sentStart] === ')')) sentStart++;
+        while (sentStart < text.length && (text[sentStart] === ' ' || text[sentStart] === '\n' || text[sentStart] === '\t')) sentStart++;
+        if (sentStart <= cursorPos) {
+          start = sentStart;
+          break;
+        }
+      }
+    }
+  }
+
+  // Find sentence end: scan forward for . ! ? followed by whitespace/end, or \n\n, or end of text
+  var end = text.length;
+  for (var j = cursorPos; j < text.length; j++) {
+    var ch2 = text[j];
+    // Paragraph break
+    if (ch2 === '\n' && j < text.length - 1 && text[j + 1] === '\n') {
+      end = j;
+      break;
+    }
+    // Sentence-ending punctuation
+    if (ch2 === '.' || ch2 === '!' || ch2 === '?') {
+      var afterPunct = j + 1;
+      // Include trailing quotes/parens
+      while (afterPunct < text.length && (text[afterPunct] === '"' || text[afterPunct] === '\'' || text[afterPunct] === ')')) afterPunct++;
+      if (afterPunct >= text.length || text[afterPunct] === ' ' || text[afterPunct] === '\n' || text[afterPunct] === '\t') {
+        end = afterPunct;
+        break;
+      }
+    }
+  }
+
+  return { start: start, end: end };
 }
 
 function updateWritingFocusLine() {
   if (!_writingFocusActive) return;
-  // Check full-screen overlay first
   var ta = document.getElementById('wf-textarea');
   var line = document.getElementById('wf-focus-line');
   if (!ta || !line) {
-    // Fallback to inline mode
     ta = document.querySelector('.notebook-editor textarea');
     line = document.querySelector('.notebook-focus-line');
   }
   if (!ta || !line) return;
-  var text = ta.value.substring(0, ta.selectionStart);
-  var lineNum = text.split('\n').length - 1;
+
+  var text = ta.value;
+  var cursorPos = ta.selectionStart;
   var lineHeight = parseFloat(getComputedStyle(ta).lineHeight) || 28.8;
-  var padding = 0;
-  line.style.top = (padding + lineNum * lineHeight - ta.scrollTop) + 'px';
+  var paddingTop = parseFloat(getComputedStyle(ta).paddingTop) || 0;
+
+  // Find sentence bounds
+  var bounds = findSentenceBounds(text, cursorPos);
+
+  // Convert character positions to line numbers
+  var textBefore = text.substring(0, bounds.start);
+  var startLine = textBefore.split('\n').length - 1;
+  var textToEnd = text.substring(0, bounds.end);
+  var endLine = textToEnd.split('\n').length - 1;
+  var lineSpan = endLine - startLine + 1;
+
+  line.style.top = (paddingTop + startLine * lineHeight - ta.scrollTop) + 'px';
+  line.style.height = (lineSpan * lineHeight) + 'px';
+
+  wfCenterScroll();
+}
+
+// Keep cursor line vertically centered in focus mode
+function wfCenterScroll() {
+  var ta = document.getElementById('wf-textarea');
+  if (!ta) return;
+  var body = ta.parentElement;
+  if (!body) return;
+  var lineHeight = parseFloat(getComputedStyle(ta).lineHeight) || 28.8;
+  var paddingTop = parseFloat(getComputedStyle(ta).paddingTop) || 0;
+  var text = ta.value.substring(0, ta.selectionStart);
+  var cursorLine = text.split('\n').length - 1;
+  var cursorY = paddingTop + cursorLine * lineHeight;
+  var visibleHeight = body.clientHeight;
+  var targetScroll = cursorY - visibleHeight / 2 + lineHeight / 2;
+  body.scrollTop = Math.max(0, targetScroll);
 }
 

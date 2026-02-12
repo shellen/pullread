@@ -156,6 +156,7 @@ document.addEventListener('click', function(e) {
 function showSettingsPage() {
   activeFile = null;
   _activeNotebook = null;
+  _activeNote = null;
   const content = document.getElementById('content');
   const empty = document.getElementById('empty-state');
   empty.style.display = 'none';

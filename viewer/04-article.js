@@ -252,12 +252,14 @@ function renderArticle(text, filename) {
   }
   html += '<button onclick="markCurrentAsUnread()" aria-label="Mark as unread"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-eye-slash"/></svg> Unread</button>';
   html += '</div>';
-  // Show notebook back-references
-  var nbRefs = Object.values(_notebooks || {}).filter(function(nb) { return nb.sources && nb.sources.indexOf(filename) >= 0; });
-  if (nbRefs.length) {
+  // Show notebook back-references (individual notes linked to this article)
+  var nbObj = (_notebooks || {})[SINGLE_NOTEBOOK_ID];
+  var linkedNotes = (nbObj && Array.isArray(nbObj.notes)) ? nbObj.notes.filter(function(n) { return n.sourceArticle === filename; }) : [];
+  if (linkedNotes.length) {
     html += '<div style="margin-top:6px">';
-    for (var nbi = 0; nbi < nbRefs.length; nbi++) {
-      html += '<span class="notebook-ref" onclick="openNotebookEditor(\'' + nbRefs[nbi].id + '\')"><svg class="icon icon-sm" style="vertical-align:-1px"><use href="#i-pen"/></svg> ' + escapeHtml(nbRefs[nbi].title || 'Untitled notebook') + '</span>';
+    for (var nbi = 0; nbi < linkedNotes.length; nbi++) {
+      var noteTitle = extractTitleFromContent(linkedNotes[nbi].content) || 'Untitled note';
+      html += '<span class="notebook-ref" onclick="_sidebarView=\'notebooks\';syncSidebarTabs();openNoteInPane(\'' + escapeHtml(linkedNotes[nbi].id) + '\')"><svg class="icon icon-sm" style="vertical-align:-1px"><use href="#i-pen"/></svg> ' + escapeHtml(noteTitle) + '</span>';
     }
     html += '</div>';
   }

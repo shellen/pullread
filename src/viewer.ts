@@ -397,6 +397,7 @@ export function startViewer(outputPath: string, port = 7777): void {
             id,
             title: body.title ?? existing.title ?? '',
             content: body.content ?? existing.content ?? '',
+            notes: body.notes ?? existing.notes ?? [],
             sources: body.sources ?? existing.sources ?? [],
             tags: body.tags ?? existing.tags ?? [],
             createdAt: existing.createdAt || new Date().toISOString(),

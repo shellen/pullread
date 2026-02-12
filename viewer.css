@@ -478,6 +478,14 @@
     vertical-align: -1px; margin-right: 4px; flex-shrink: 0;
     fill: currentColor;
   }
+  .nb-annotated-header {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.5px; color: var(--muted);
+    padding: 12px 12px 4px; margin-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  .nb-annotated-item { opacity: 0.8; }
+  .nb-annotated-item:hover { opacity: 1; }
   .hide-read-toggle {
     display: flex;
     align-items: center;
@@ -2254,10 +2262,10 @@
     height: 1.7em;
     background: transparent;
     pointer-events: none;
-    transition: top 0.08s ease;
+    transition: top 0.12s ease, height 0.12s ease;
     z-index: 3;
     /* Massive inset shadow dims everything outside this element's bounds,
-       leaving the current line text at full brightness (iA Writer style) */
+       leaving the current sentence at full brightness (iA Writer style) */
     box-shadow: 0 -3px 0 0 var(--bg), 0 3px 0 0 var(--bg), 0 0 0 9999px color-mix(in srgb, var(--bg) 70%, transparent);
   }
   .writing-focus .notebook-editor textarea::selection {
@@ -2301,15 +2309,20 @@
     padding: 0 24px 48px;
     overflow-y: auto;
     position: relative;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
+  .writing-focus-overlay .wf-body::-webkit-scrollbar { display: none; }
   .writing-focus-overlay .wf-body textarea {
-    width: 100%; height: 100%;
+    width: 100%; min-height: 100%;
     font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
     font-size: 16px; line-height: 1.8;
     border: none; outline: none; resize: none;
     background: transparent;
     color: var(--fg);
     caret-color: var(--fg);
+    padding-top: 45vh;
+    padding-bottom: 45vh;
   }
   .writing-focus-overlay .wf-focus-line {
     position: absolute;
@@ -2317,7 +2330,7 @@
     height: 1.8em;
     background: transparent;
     pointer-events: none;
-    transition: top 0.08s ease;
+    transition: top 0.12s ease, height 0.12s ease;
     z-index: 3;
     box-shadow: 0 -3px 0 0 var(--bg), 0 3px 0 0 var(--bg), 0 0 0 9999px color-mix(in srgb, var(--bg) 70%, transparent);
   }

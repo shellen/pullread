@@ -1,39 +1,90 @@
-// ---- Notebook ---- (synthesis writing surface)
+// ---- Notebook ---- (synthesis writing surface — per-note model)
 let _notebooks = {};
 let _activeNotebook = null;
+let _activeNote = null;
 let _notebookSaveTimeout = null;
 let _notebookPreviewMode = false;
 const SINGLE_NOTEBOOK_ID = 'nb-shared';
 
-// Get or create the single shared notebook
+// Generate a unique note ID
+function generateNoteId() {
+  return 'note-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+}
+
+// Extract title from first # heading in markdown content
+function extractTitleFromContent(content) {
+  if (!content) return '';
+  var match = content.match(/^#\s+(.+)$/m);
+  return match ? match[1].trim() : '';
+}
+
+// Get or create the single shared notebook, with migration support
 async function getOrCreateSingleNotebook() {
   await loadNotebooks();
-  if (_notebooks[SINGLE_NOTEBOOK_ID]) return _notebooks[SINGLE_NOTEBOOK_ID];
-  // Migrate: if there are existing notebooks, merge them into the single notebook
-  const existing = Object.values(_notebooks).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-  let content = '';
-  let sources = [];
-  let tags = [];
-  for (const nb of existing) {
-    if (nb.content) content += (content ? '\n\n---\n\n' : '') + nb.content;
-    if (nb.sources) sources = sources.concat(nb.sources);
-    if (nb.tags) tags = tags.concat(nb.tags);
+  var nb = _notebooks[SINGLE_NOTEBOOK_ID];
+
+  // If it exists and already has notes array, return as-is
+  if (nb && Array.isArray(nb.notes)) return nb;
+
+  // Migrate: collect all existing notebooks
+  var existing = Object.values(_notebooks).sort(function(a, b) { return new Date(a.createdAt) - new Date(b.createdAt); });
+  var notes = [];
+  var sources = [];
+  var tags = [];
+
+  for (var i = 0; i < existing.length; i++) {
+    var old = existing[i];
+    if (old.sources) sources = sources.concat(old.sources);
+    if (old.tags) tags = tags.concat(old.tags);
+
+    // If old notebook already has notes array, merge them in
+    if (Array.isArray(old.notes) && old.notes.length) {
+      notes = notes.concat(old.notes);
+    }
+    // If old notebook has content blob, split on --- into discrete notes
+    else if (old.content && old.content.trim()) {
+      var sections = old.content.split(/\n---\n/).filter(function(s) { return s.trim(); });
+      for (var si = 0; si < sections.length; si++) {
+        var sectionContent = sections[si].trim();
+        var title = extractTitleFromContent(sectionContent) || 'Untitled';
+        // Try to find a sourceArticle from the "Notes on:" pattern
+        var sourceMatch = sectionContent.match(/^##?\s+Notes on:\s*(.+)$/m);
+        var sourceArticle = null;
+        if (sourceMatch) {
+          var artTitle = sourceMatch[1].trim();
+          var f = (typeof allFiles !== 'undefined' ? allFiles : []).find(function(ff) { return ff.title === artTitle; });
+          if (f) sourceArticle = f.filename;
+        }
+        notes.push({
+          id: generateNoteId(),
+          content: sectionContent,
+          sourceArticle: sourceArticle,
+          createdAt: old.createdAt || new Date().toISOString(),
+          updatedAt: old.updatedAt || new Date().toISOString()
+        });
+      }
+    }
   }
-  const nb = {
+
+  nb = {
     id: SINGLE_NOTEBOOK_ID,
     title: 'Notebook',
-    content: content,
-    sources: [...new Set(sources)],
-    tags: [...new Set(tags)],
+    notes: notes,
+    sources: [].concat(new Set(sources)),
+    tags: [].concat(new Set(tags)),
     createdAt: existing.length ? existing[0].createdAt : new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
+  // Deduplicate sources and tags
+  nb.sources = nb.sources.filter(function(v, i, a) { return a.indexOf(v) === i; });
+  nb.tags = nb.tags.filter(function(v, i, a) { return a.indexOf(v) === i; });
+
   await saveNotebook(nb);
   // Clean up old notebooks
-  for (const old of existing) {
-    if (old.id && old.id !== SINGLE_NOTEBOOK_ID) {
-      try { await fetch('/api/notebooks?id=' + encodeURIComponent(old.id), { method: 'DELETE' }); } catch {}
-      delete _notebooks[old.id];
+  for (var ci = 0; ci < existing.length; ci++) {
+    if (existing[ci].id && existing[ci].id !== SINGLE_NOTEBOOK_ID) {
+      try { await fetch('/api/notebooks?id=' + encodeURIComponent(existing[ci].id), { method: 'DELETE' }); } catch(e) {}
+      delete _notebooks[existing[ci].id];
     }
   }
   return nb;
@@ -41,24 +92,24 @@ async function getOrCreateSingleNotebook() {
 
 async function loadNotebooks() {
   try {
-    const res = await fetch('/api/notebooks');
+    var res = await fetch('/api/notebooks');
     if (res.ok) _notebooks = await res.json();
-  } catch {}
+  } catch(e) {}
 }
 
 async function saveNotebook(nb) {
   try {
-    const res = await fetch('/api/notebooks', {
+    var res = await fetch('/api/notebooks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(nb)
     });
     if (res.ok) {
-      const data = await res.json();
+      var data = await res.json();
       if (!nb.id) nb.id = data.id;
       _notebooks[nb.id] = nb;
     }
-  } catch {}
+  } catch(e) {}
 }
 
 async function deleteNotebook(id) {
@@ -66,47 +117,136 @@ async function deleteNotebook(id) {
     await fetch('/api/notebooks?id=' + encodeURIComponent(id), { method: 'DELETE' });
     delete _notebooks[id];
     _activeNotebook = null;
+    _activeNote = null;
     renderFileList();
     goHome();
-  } catch {}
+  } catch(e) {}
 }
 
-// Thin wrapper — kept for backward compatibility with callers
-function showNotebook(openId) {
+// ---- Note CRUD ----
+
+function createNewNote(sourceArticle) {
   getOrCreateSingleNotebook().then(function(nb) {
-    openNotebookInPane(nb.id);
+    var note = {
+      id: generateNoteId(),
+      content: '',
+      sourceArticle: sourceArticle || null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    nb.notes.push(note);
+    nb.updatedAt = new Date().toISOString();
+    saveNotebook(nb).then(function() {
+      _activeNotebook = nb;
+      _activeNote = note;
+      _notebookPreviewMode = false;
+      _sidebarView = 'notebooks';
+      syncSidebarTabs();
+      renderFileList();
+      openNoteInPane(note.id);
+    });
   });
 }
 
-// Render a notebook in the content pane using article-like layout
-function openNotebookInPane(id) {
-  const nb = _notebooks[id];
-  if (!nb) return;
-  activeFile = null;
-  _activeNotebook = nb;
+function deleteNote(noteId) {
+  if (!_activeNotebook) return;
+  var nb = _activeNotebook;
+  var idx = nb.notes.findIndex(function(n) { return n.id === noteId; });
+  if (idx < 0) return;
+  nb.notes.splice(idx, 1);
+  nb.updatedAt = new Date().toISOString();
+  saveNotebook(nb).then(function() {
+    // Open the next note, or previous, or empty state
+    if (nb.notes.length > 0) {
+      var nextIdx = Math.min(idx, nb.notes.length - 1);
+      _activeNote = nb.notes[nextIdx];
+      openNoteInPane(_activeNote.id);
+    } else {
+      _activeNote = null;
+      renderFileList();
+      goHome();
+    }
+  });
+}
 
-  const content = document.getElementById('content');
-  const empty = document.getElementById('empty-state');
+// Find a note by ID in the active notebook
+function findNote(noteId) {
+  if (!_activeNotebook || !_activeNotebook.notes) return null;
+  return _activeNotebook.notes.find(function(n) { return n.id === noteId; });
+}
+
+// ---- Open notebook (shows notes list or opens first note) ----
+
+function showNotebook(openId) {
+  getOrCreateSingleNotebook().then(function(nb) {
+    _activeNotebook = nb;
+    renderFileList();
+    // Open the first note if there are any
+    if (nb.notes && nb.notes.length > 0) {
+      // If _activeNote is set and still valid, keep it; otherwise open the most recent
+      var valid = _activeNote && nb.notes.find(function(n) { return n.id === _activeNote.id; });
+      if (!valid) {
+        var sorted = nb.notes.slice().sort(function(a, b) { return new Date(b.updatedAt) - new Date(a.updatedAt); });
+        _activeNote = sorted[0];
+      }
+      openNoteInPane(_activeNote.id);
+    } else {
+      showNotebookEmpty();
+    }
+  });
+}
+
+function showNotebookEmpty() {
+  activeFile = null;
+  var content = document.getElementById('content');
+  var empty = document.getElementById('empty-state');
   empty.style.display = 'none';
   content.style.display = 'block';
-  document.title = (nb.title || 'Untitled') + ' — PullRead';
+  content.innerHTML = '<div class="notebook-empty">'
+    + '<svg class="icon" style="width:48px;height:48px;color:var(--muted);margin-bottom:12px" aria-hidden="true"><use href="#i-book"/></svg>'
+    + '<p style="font-size:16px;font-weight:600">No notes yet</p>'
+    + '<p>Create a note to start writing, or use "Write About This" from an article.</p>'
+    + '<button onclick="createNewNote()" style="margin-top:12px;padding:8px 20px;border:none;border-radius:8px;background:var(--link);color:#fff;font-size:13px;cursor:pointer;font-family:inherit">+ New Note</button>'
+    + '</div>';
+}
+
+// ---- Render a single note in the content pane ----
+
+function openNoteInPane(noteId) {
+  var note = findNote(noteId);
+  if (!note) return;
+  activeFile = null;
+  _activeNote = note;
+
+  var content = document.getElementById('content');
+  var empty = document.getElementById('empty-state');
+  empty.style.display = 'none';
+  content.style.display = 'block';
+
+  // Derive title from first # heading in content
+  var noteTitle = extractTitleFromContent(note.content) || 'Untitled';
+  document.title = noteTitle + ' — PullRead';
   document.getElementById('margin-notes').innerHTML = '';
   renderFileList();
 
-  let html = '';
+  var nb = _activeNotebook;
+  var html = '';
 
   // Article-style header
   html += '<div class="article-header">';
-  html += '<input class="notebook-title-input" value="' + escapeHtml(nb.title || '') + '" placeholder="Untitled notebook" oninput="notebookDebounceSave()">';
+  html += '<input class="notebook-title-input" value="' + escapeHtml(noteTitle) + '" placeholder="Untitled" oninput="syncNoteTitleFromInput(this)">';
   html += '<div class="article-byline">';
   var bylineParts = [];
-  bylineParts.push('<span>Notebook</span>');
-  if (nb.updatedAt) bylineParts.push('<span>Updated ' + new Date(nb.updatedAt).toLocaleDateString() + '</span>');
-  if (nb.createdAt) bylineParts.push('<span>Created ' + new Date(nb.createdAt).toLocaleDateString() + '</span>');
+  bylineParts.push('<span>Note</span>');
+  if (note.updatedAt) bylineParts.push('<span>Updated ' + new Date(note.updatedAt).toLocaleDateString() + '</span>');
+  if (note.sourceArticle) {
+    var srcFile = allFiles.find(function(f) { return f.filename === note.sourceArticle; });
+    if (srcFile) bylineParts.push('<span class="notebook-source-chip" onclick="jumpToArticle(\'' + escapeHtml(note.sourceArticle) + '\')">' + escapeHtml(srcFile.domain || srcFile.title) + '</span>');
+  }
   html += bylineParts.join('<span class="sep">&middot;</span>');
   html += '</div>';
 
-  // Action buttons — same row style as articles
+  // Action buttons
   html += '<div class="article-actions">';
   var previewLabel = _notebookPreviewMode ? 'Edit' : 'Preview';
   html += '<button onclick="toggleNotebookPreview()" class="' + (_notebookPreviewMode ? 'active-fav' : '') + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-pen"/></svg> ' + previewLabel + '</button>';
@@ -114,32 +254,21 @@ function openNotebookInPane(id) {
   html += '<button onclick="showHighlightPicker()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-pen"/></svg> Insert Highlights</button>';
   html += '<button onclick="checkNotebookGrammar()" id="grammar-check-btn"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Grammar</button>';
   html += '<div class="share-dropdown" style="display:inline-block"><button onclick="toggleNotebookExportDropdown(event)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg> Export\u2026</button></div>';
+  html += '<button onclick="deleteNote(\'' + escapeHtml(note.id) + '\')" style="color:var(--muted)" title="Delete this note"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-xmark"/></svg> Delete</button>';
   html += '<span class="save-hint" id="notebook-save-hint" style="font-size:11px;color:var(--muted);margin-left:auto">Saved</span>';
   html += '</div>';
   html += '</div>';
 
   // Content body
   if (_notebookPreviewMode) {
-    html += '<div class="notebook-preview">' + marked.parse(nb.content || '*Start writing...*') + '</div>';
+    html += '<div class="notebook-preview">' + marked.parse(note.content || '*Start writing...*') + '</div>';
   } else {
     html += '<div class="notebook-editor-wrap"><div class="notebook-editor">'
-      + '<textarea placeholder="Start writing... Use markdown for formatting.">' + escapeHtml(nb.content || '') + '</textarea>'
+      + '<textarea placeholder="Start writing... Use markdown for formatting.">' + escapeHtml(note.content || '') + '</textarea>'
       + '</div></div>';
   }
 
-  // Sources chips
-  var sources = (nb.sources || []);
-  if (sources.length) {
-    html += '<div class="notebook-sources"><span class="notebook-sources-label">Sources</span>';
-    for (var si = 0; si < sources.length; si++) {
-      var s = sources[si];
-      var display = s.replace(/^\d{4}-\d{2}-\d{2}-/, '').replace(/\.md$/, '').replace(/-/g, ' ');
-      html += '<span class="notebook-source-chip" onclick="jumpToArticle(\'' + escapeHtml(s) + '\')">' + escapeHtml(display) + '</span>';
-    }
-    html += '</div>';
-  }
-
-  // Tags
+  // Tags (notebook-level)
   var nbTags = (nb.tags || []);
   html += '<div class="tags-row" style="margin-top:12px">';
   for (var ti = 0; ti < nbTags.length; ti++) {
@@ -153,13 +282,13 @@ function openNotebookInPane(id) {
   content.innerHTML = html;
   document.getElementById('content-pane').scrollTop = 0;
 
-  // Render diagrams in notebook preview
+  // Render diagrams in preview mode
   if (_notebookPreviewMode) {
     renderDiagrams();
     applySyntaxHighlighting();
   }
 
-  // Set up auto-grow, auto-save, and focus tracking for textarea
+  // Set up textarea events
   var ta = content.querySelector('.notebook-editor textarea');
   if (ta) {
     autoGrowTextarea(ta);
@@ -176,44 +305,74 @@ function openNotebookInPane(id) {
   }
 }
 
+// Sync note title from the input field — updates first # heading in content
+function syncNoteTitleFromInput(input) {
+  if (!_activeNote) return;
+  var newTitle = input.value.trim();
+  var ta = document.querySelector('.notebook-editor textarea');
+  if (ta) {
+    var content = ta.value;
+    // Replace or insert first # heading
+    var headingMatch = content.match(/^(#\s+)(.*)$/m);
+    if (headingMatch) {
+      ta.value = content.replace(/^#\s+.*$/m, '# ' + newTitle);
+    } else {
+      ta.value = '# ' + newTitle + '\n\n' + content;
+    }
+    _activeNote.content = ta.value;
+    autoGrowTextarea(ta);
+  }
+  notebookDebounceSave();
+  renderFileList();
+}
+
 function autoGrowTextarea(ta) {
   ta.style.height = 'auto';
   ta.style.height = Math.max(400, ta.scrollHeight) + 'px';
 }
 
+// ---- Auto-save (debounced 800ms) ----
+
 function notebookDebounceSave() {
-  const hint = document.getElementById('notebook-save-hint');
-  if (hint) hint.textContent = 'Saving...';
+  var hint = document.getElementById('notebook-save-hint');
+  if (hint) hint.textContent = 'Saving\u2026';
   clearTimeout(_notebookSaveTimeout);
-  _notebookSaveTimeout = setTimeout(() => {
-    if (!_activeNotebook) return;
-    const titleInput = document.querySelector('.notebook-title-input');
-    // Read from full-screen focus textarea if active, else inline editor
-    const wfTa = document.getElementById('wf-textarea');
-    const ta = wfTa || document.querySelector('.notebook-editor textarea');
-    if (titleInput) _activeNotebook.title = titleInput.value;
-    if (ta) _activeNotebook.content = ta.value;
+  _notebookSaveTimeout = setTimeout(function() {
+    if (!_activeNotebook || !_activeNote) return;
+    // Read content from full-screen focus textarea if active, else inline editor
+    var wfTa = document.getElementById('wf-textarea');
+    var ta = wfTa || document.querySelector('.notebook-editor textarea');
+    if (ta) {
+      _activeNote.content = ta.value;
+      // Sync title in sidebar from first heading
+      var extracted = extractTitleFromContent(ta.value);
+      if (extracted) {
+        var titleInput = document.querySelector('.notebook-title-input');
+        if (titleInput && titleInput.value !== extracted) titleInput.value = extracted;
+      }
+    }
+    _activeNote.updatedAt = new Date().toISOString();
     _activeNotebook.updatedAt = new Date().toISOString();
-    saveNotebook(_activeNotebook).then(() => {
+    saveNotebook(_activeNotebook).then(function() {
       if (hint) hint.textContent = 'Saved';
+      renderFileList();
     });
   }, 800);
 }
 
-// AI tag suggestions for notebook content
-let _nbTagSuggestTimeout = null;
-let _nbLastSuggestedContent = '';
+// ---- AI tag suggestions ----
+
+var _nbTagSuggestTimeout = null;
+var _nbLastSuggestedContent = '';
 
 function scheduleNotebookTagSuggestion() {
   clearTimeout(_nbTagSuggestTimeout);
-  if (!_activeNotebook || !serverMode) return;
-  const ta = document.querySelector('.notebook-editor textarea');
+  if (!_activeNotebook || !_activeNote || !serverMode) return;
+  var ta = document.querySelector('.notebook-editor textarea');
   if (!ta) return;
-  const text = ta.value || '';
-  // Require 2+ paragraphs (split by double newline)
-  const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 20);
+  var text = ta.value || '';
+  var paragraphs = text.split(/\n\s*\n/).filter(function(p) { return p.trim().length > 20; });
   if (paragraphs.length < 2) return;
-  // Don't re-suggest if content hasn't changed substantially
   if (text === _nbLastSuggestedContent) return;
   _nbTagSuggestTimeout = setTimeout(function() {
     _nbLastSuggestedContent = text;
@@ -222,31 +381,30 @@ function scheduleNotebookTagSuggestion() {
 }
 
 async function fetchNotebookTagSuggestions(text) {
-  const container = document.getElementById('nb-tag-suggestions');
+  var container = document.getElementById('nb-tag-suggestions');
   if (!container || !_activeNotebook) return;
   try {
-    const res = await fetch('/api/autotag', {
+    var res = await fetch('/api/autotag', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: text })
     });
     if (!res.ok) return;
-    const data = await res.json();
-    const suggestions = (data.machineTags || []).slice(0, 3);
+    var data = await res.json();
+    var suggestions = (data.machineTags || []).slice(0, 3);
     if (!suggestions.length) { container.style.display = 'none'; return; }
-    // Filter out tags already on the notebook
-    const existing = new Set((_activeNotebook.tags || []).map(t => t.toLowerCase()));
-    const filtered = suggestions.filter(t => !existing.has(t.toLowerCase()));
+    var existing = new Set((_activeNotebook.tags || []).map(function(t) { return t.toLowerCase(); }));
+    var filtered = suggestions.filter(function(t) { return !existing.has(t.toLowerCase()); });
     if (!filtered.length) { container.style.display = 'none'; return; }
-    let html = '<span class="nb-suggest-label">Suggested tags:</span> ';
-    for (const tag of filtered) {
-      html += '<button class="nb-suggest-pill" onclick="acceptNotebookTagSuggestion(\'' + escapeHtml(tag.replace(/'/g, "\\'")) + '\',this)">'
-        + escapeHtml(tag) + ' <span class="nb-suggest-accept">+</span></button> ';
+    var html = '<span class="nb-suggest-label">Suggested tags:</span> ';
+    for (var i = 0; i < filtered.length; i++) {
+      html += '<button class="nb-suggest-pill" onclick="acceptNotebookTagSuggestion(\'' + escapeHtml(filtered[i].replace(/'/g, "\\'")) + '\',this)">'
+        + escapeHtml(filtered[i]) + ' <span class="nb-suggest-accept">+</span></button> ';
     }
     html += '<button class="nb-suggest-dismiss" onclick="this.parentElement.style.display=\'none\'" title="Dismiss">&times;</button>';
     container.innerHTML = html;
     container.style.display = '';
-  } catch {}
+  } catch(e) {}
 }
 
 function acceptNotebookTagSuggestion(tag, btn) {
@@ -255,7 +413,7 @@ function acceptNotebookTagSuggestion(tag, btn) {
   if (!_activeNotebook.tags.includes(tag)) {
     _activeNotebook.tags.push(tag);
     saveNotebook(_activeNotebook);
-    openNotebookInPane(_activeNotebook.id);
+    if (_activeNote) openNoteInPane(_activeNote.id);
   }
 }
 
@@ -280,8 +438,6 @@ async function checkNotebookGrammar() {
     }
     var data = await res.json();
     var raw = data.matches || [];
-
-    // Normalize to the shape showGrammarResults expects
     var matches = raw.map(function(m) {
       return {
         offset: m.offset,
@@ -292,14 +448,13 @@ async function checkNotebookGrammar() {
       };
     });
     showGrammarResults(matches, ta);
-  } catch (err) {
+  } catch(err) {
     alert('Grammar check failed: ' + err.message);
   }
   if (btn) btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Grammar';
 }
 
 function showGrammarResults(matches, textarea) {
-  // Remove any existing grammar panel
   var existing = document.getElementById('grammar-results');
   if (existing) existing.remove();
 
@@ -346,12 +501,11 @@ function showGrammarResults(matches, textarea) {
 
 function applyGrammarFix(offset, length, replacement) {
   var ta = document.querySelector('.notebook-editor textarea');
-  if (!ta || !_activeNotebook) return;
+  if (!ta || !_activeNote) return;
   var text = ta.value;
   ta.value = text.substring(0, offset) + replacement + text.substring(offset + length);
-  _activeNotebook.content = ta.value;
+  _activeNote.content = ta.value;
   notebookDebounceSave();
-  // Remove grammar panel (results are stale after edit)
   var panel = document.getElementById('grammar-results');
   if (panel) panel.remove();
 }
@@ -362,54 +516,85 @@ function openNotebookEditor(id) {
 }
 
 function createNewNotebook() {
-  // Single-notebook model: just open the shared notebook
   openSingleNotebook();
 }
 
 function toggleNotebookPreview() {
-  // Save current content before toggling
-  const ta = document.querySelector('.notebook-editor textarea');
-  if (ta && _activeNotebook) _activeNotebook.content = ta.value;
-  const titleInput = document.querySelector('.notebook-title-input');
-  if (titleInput && _activeNotebook) _activeNotebook.title = titleInput.value;
-
+  var ta = document.querySelector('.notebook-editor textarea');
+  if (ta && _activeNote) _activeNote.content = ta.value;
   _notebookPreviewMode = !_notebookPreviewMode;
-  showNotebook(_activeNotebook ? _activeNotebook.id : null);
+  if (_activeNote) openNoteInPane(_activeNote.id);
+  else showNotebook();
 }
+
+// ---- Export ----
 
 function exportNotebook() {
   if (!_activeNotebook) return;
-  const nb = _activeNotebook;
+  var nb = _activeNotebook;
 
-  // Build YAML frontmatter matching article format
-  let fm = '---\n';
+  var fm = '---\n';
   fm += 'title: "' + (nb.title || 'Untitled').replace(/"/g, '\\"') + '"\n';
   fm += 'type: notebook\n';
   if (nb.createdAt) fm += 'created: ' + nb.createdAt.slice(0, 10) + '\n';
   if (nb.updatedAt) fm += 'updated: ' + nb.updatedAt.slice(0, 10) + '\n';
   if (nb.tags && nb.tags.length) {
     fm += 'tags:\n';
-    for (const t of nb.tags) fm += '  - ' + t + '\n';
+    for (var i = 0; i < nb.tags.length; i++) fm += '  - ' + nb.tags[i] + '\n';
   }
   if (nb.sources && nb.sources.length) {
     fm += 'sources:\n';
-    for (const s of nb.sources) {
-      const f = allFiles.find(function(f) { return f.filename === s; });
-      const title = f ? f.title : s;
+    for (var i = 0; i < nb.sources.length; i++) {
+      var f = allFiles.find(function(ff) { return ff.filename === nb.sources[i]; });
+      var title = f ? f.title : nb.sources[i];
       fm += '  - "' + title.replace(/"/g, '\\"') + '"\n';
     }
   }
   fm += '---\n\n';
 
-  let md = fm;
-  if (nb.title) md += '# ' + nb.title + '\n\n';
-  md += (nb.content || '') + '\n';
+  var md = fm;
+  // Concatenate all notes with --- separators
+  var notes = nb.notes || [];
+  for (var ni = 0; ni < notes.length; ni++) {
+    if (ni > 0) md += '\n\n---\n\n';
+    md += (notes[ni].content || '');
+  }
+  md += '\n';
 
-  const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  var blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
   a.href = url;
   a.download = (nb.title || 'notebook').replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '.md';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function exportSingleNote() {
+  if (!_activeNote) return;
+  var note = _activeNote;
+  var title = extractTitleFromContent(note.content) || 'Untitled';
+
+  var fm = '---\n';
+  fm += 'title: "' + title.replace(/"/g, '\\"') + '"\n';
+  fm += 'type: note\n';
+  if (note.createdAt) fm += 'created: ' + note.createdAt.slice(0, 10) + '\n';
+  if (note.updatedAt) fm += 'updated: ' + note.updatedAt.slice(0, 10) + '\n';
+  if (note.sourceArticle) {
+    var f = allFiles.find(function(ff) { return ff.filename === note.sourceArticle; });
+    fm += 'source: "' + ((f ? f.title : note.sourceArticle) || '').replace(/"/g, '\\"') + '"\n';
+  }
+  fm += '---\n\n';
+
+  var md = fm + (note.content || '') + '\n';
+
+  var blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = title.replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '.md';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -425,11 +610,11 @@ function toggleNotebookExportDropdown(e) {
   panel.className = 'share-dropdown-panel nb-export-panel';
   panel.onclick = function(ev) { ev.stopPropagation(); };
   var items = '';
-  items += '<button onclick="exportNotebook();this.closest(\'.nb-export-panel\').remove()">Export .md</button>';
-  items += '<button onclick="exportNotebookPdf();this.closest(\'.nb-export-panel\').remove()">Export .pdf</button>';
+  items += '<button onclick="exportSingleNote();this.closest(\'.nb-export-panel\').remove()">Export Note .md</button>';
+  items += '<button onclick="exportNotebook();this.closest(\'.nb-export-panel\').remove()">Export All Notes .md</button>';
+  items += '<button onclick="exportNotebookPdf();this.closest(\'.nb-export-panel\').remove()">Export Note .pdf</button>';
   panel.innerHTML = items;
   btn.closest('.share-dropdown').appendChild(panel);
-  // Close when clicking elsewhere
   setTimeout(function() {
     document.addEventListener('click', function close() {
       panel.remove();
@@ -439,26 +624,18 @@ function toggleNotebookExportDropdown(e) {
 }
 
 function exportNotebookPdf() {
-  if (!_activeNotebook) return;
-  var nb = _activeNotebook;
-  // Render the notebook as a clean printable page and trigger print-to-PDF
+  if (!_activeNote) return;
+  var note = _activeNote;
+  var title = extractTitleFromContent(note.content) || 'Untitled';
   var win = window.open('', '_blank');
   if (!win) { alert('Please allow popups to export as PDF.'); return; }
-  var bodyHtml = marked.parse(nb.content || '');
-  var sources = (nb.sources || []);
-  var sourcesHtml = '';
-  if (sources.length) {
-    sourcesHtml = '<hr><p><strong>Sources:</strong></p><ul>';
-    for (var i = 0; i < sources.length; i++) {
-      var f = allFiles.find(function(ff) { return ff.filename === sources[i]; });
-      var title = f ? f.title : sources[i];
-      sourcesHtml += '<li>' + escapeHtml(title) + '</li>';
-    }
-    sourcesHtml += '</ul>';
+  var bodyHtml = marked.parse(note.content || '');
+  var sourceHtml = '';
+  if (note.sourceArticle) {
+    var f = allFiles.find(function(ff) { return ff.filename === note.sourceArticle; });
+    if (f) sourceHtml = '<hr><p><strong>Source:</strong> ' + escapeHtml(f.title) + '</p>';
   }
-  var tags = (nb.tags || []);
-  var tagsHtml = tags.length ? '<p><strong>Tags:</strong> ' + tags.map(function(t) { return escapeHtml(t); }).join(', ') + '</p>' : '';
-  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + escapeHtml(nb.title || 'Notebook') + '</title>'
+  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + escapeHtml(title) + '</title>'
     + '<style>body{font-family:Georgia,serif;max-width:700px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}'
     + 'h1{font-size:28px;margin-bottom:4px}h2,h3{margin-top:1.5em}'
     + 'blockquote{border-left:3px solid #ccc;margin:1em 0;padding:0.5em 1em;color:#555}'
@@ -466,23 +643,24 @@ function exportNotebookPdf() {
     + 'pre{background:#f5f5f5;padding:12px;border-radius:6px;overflow-x:auto}'
     + '.meta{font-size:13px;color:#888;margin-bottom:24px}'
     + '@media print{body{margin:0;max-width:none}}</style></head><body>'
-    + '<h1>' + escapeHtml(nb.title || 'Untitled') + '</h1>'
-    + '<div class="meta">Notebook' + (nb.updatedAt ? ' &middot; Updated ' + new Date(nb.updatedAt).toLocaleDateString() : '') + '</div>'
-    + bodyHtml + sourcesHtml + tagsHtml
+    + '<h1>' + escapeHtml(title) + '</h1>'
+    + '<div class="meta">Note' + (note.updatedAt ? ' &middot; Updated ' + new Date(note.updatedAt).toLocaleDateString() : '') + '</div>'
+    + bodyHtml + sourceHtml
     + '<script>window.onload=function(){window.print();}<\/script>'
     + '</body></html>');
   win.document.close();
 }
 
-function showHighlightPicker() {
-  if (!_activeNotebook) return;
+// ---- Highlight Picker ----
 
-  const overlay = document.createElement('div');
+function showHighlightPicker() {
+  if (!_activeNote) return;
+
+  var overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
 
-  // Collect all highlights with article metadata, sorted recent-first
-  const entries = Object.entries(allHighlightsIndex).filter(function(e) { return e[1] && e[1].length > 0; });
+  var entries = Object.entries(allHighlightsIndex).filter(function(e) { return e[1] && e[1].length > 0; });
   var allHlItems = [];
   for (var ei = 0; ei < entries.length; ei++) {
     var filename = entries[ei][0];
@@ -494,10 +672,8 @@ function showHighlightPicker() {
       allHlItems.push({ filename: filename, title: title, date: dateStr, color: hls[hi].color || '', text: hls[hi].text });
     }
   }
-  // Sort by date descending (recent first)
   allHlItems.sort(function(a, b) { return b.date.localeCompare(a.date); });
 
-  // Group by date then article
   var dateGroups = {};
   var dateOrder = [];
   for (var di = 0; di < allHlItems.length; di++) {
@@ -542,7 +718,7 @@ function showHighlightPicker() {
 
   overlay.innerHTML = '<div class="modal-card" onclick="event.stopPropagation()" style="max-width:580px;max-height:80vh;display:flex;flex-direction:column">'
     + '<h2>Insert Highlights</h2>'
-    + '<p style="color:var(--muted);font-size:13px;margin-bottom:12px">Select highlights to insert as blockquotes into your notebook.</p>'
+    + '<p style="color:var(--muted);font-size:13px;margin-bottom:12px">Select highlights to insert as blockquotes into your note.</p>'
     + '<input type="text" id="hl-picker-search" placeholder="Search highlights..." oninput="filterHighlightPicker(this.value)" style="width:100%;padding:6px 10px;font-size:13px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);margin-bottom:12px;font-family:inherit">'
     + '<div id="hl-picker-groups" style="overflow-y:auto;flex:1">' + groupsHtml + '</div>'
     + '<div class="modal-actions">'
@@ -560,96 +736,108 @@ function filterHighlightPicker(query) {
     var text = items[i].textContent.toLowerCase();
     items[i].style.display = !q || text.includes(q) ? '' : 'none';
   }
-  // Show/hide groups based on visible items
   var groups = document.querySelectorAll('.hl-picker-group');
   for (var g = 0; g < groups.length; g++) {
     var visible = groups[g].querySelectorAll('.hl-picker-item:not([style*="display: none"])');
     groups[g].style.display = visible.length ? '' : 'none';
   }
-  // Show/hide date groups
-  var dateGroups = document.querySelectorAll('.hl-picker-date-group');
-  for (var d = 0; d < dateGroups.length; d++) {
-    var visibleGroups = dateGroups[d].querySelectorAll('.hl-picker-group:not([style*="display: none"])');
-    dateGroups[d].style.display = visibleGroups.length ? '' : 'none';
+  var dateGroupEls = document.querySelectorAll('.hl-picker-date-group');
+  for (var d = 0; d < dateGroupEls.length; d++) {
+    var visibleGroups = dateGroupEls[d].querySelectorAll('.hl-picker-group:not([style*="display: none"])');
+    dateGroupEls[d].style.display = visibleGroups.length ? '' : 'none';
   }
 }
 
 function insertSelectedHighlights() {
-  const overlay = document.querySelector('.modal-overlay');
+  var overlay = document.querySelector('.modal-overlay');
   if (!overlay) return;
-  const checked = overlay.querySelectorAll('input[type=checkbox]:checked');
+  var checked = overlay.querySelectorAll('input[type=checkbox]:checked');
   if (!checked.length) { overlay.remove(); return; }
 
-  let insertText = '';
-  const newSources = new Set(_activeNotebook.sources || []);
-  for (const cb of checked) {
-    const text = cb.dataset.text;
-    const filename = cb.dataset.filename;
+  var insertText = '';
+  var newSources = new Set(_activeNotebook.sources || []);
+  for (var ci = 0; ci < checked.length; ci++) {
+    var text = checked[ci].dataset.text;
+    var filename = checked[ci].dataset.filename;
     insertText += '\n> ' + text + '\n';
     newSources.add(filename);
+    // Also link the source article to this note if not already set
+    if (!_activeNote.sourceArticle) _activeNote.sourceArticle = filename;
   }
 
   _activeNotebook.sources = Array.from(newSources);
 
-  const ta = document.querySelector('.notebook-editor textarea');
+  var ta = document.querySelector('.notebook-editor textarea');
   if (ta) {
-    const pos = ta.selectionStart;
-    const before = ta.value.slice(0, pos);
-    const after = ta.value.slice(pos);
+    var pos = ta.selectionStart;
+    var before = ta.value.slice(0, pos);
+    var after = ta.value.slice(pos);
     ta.value = before + insertText + '\n' + after;
-    _activeNotebook.content = ta.value;
+    _activeNote.content = ta.value;
     autoGrowTextarea(ta);
   }
 
   overlay.remove();
   notebookDebounceSave();
-  // Refresh to show updated sources
-  setTimeout(() => showNotebook(_activeNotebook.id), 900);
+  setTimeout(function() { if (_activeNote) openNoteInPane(_activeNote.id); }, 900);
 }
 
+// ---- Article → Notebook pipeline ----
+
 function startNotebookFromArticle() {
-  // Close share dropdown
-  const panel = document.querySelector('.share-dropdown-panel');
+  var panel = document.querySelector('.share-dropdown-panel');
   if (panel) panel.remove();
 
   if (!activeFile) return;
 
-  const file = allFiles.find(f => f.filename === activeFile);
-  const title = file ? file.title : activeFile;
+  var file = allFiles.find(function(f) { return f.filename === activeFile; });
+  var title = file ? file.title : activeFile;
 
-  let snippet = '## Notes on: ' + title + '\n\n';
+  var snippet = '## Notes on: ' + title + '\n\n';
   if (articleHighlights.length) {
-    for (const hl of articleHighlights) {
-      snippet += '> ' + hl.text + '\n\n';
-      if (hl.note) snippet += '*' + hl.note + '*\n\n';
+    for (var i = 0; i < articleHighlights.length; i++) {
+      snippet += '> ' + articleHighlights[i].text + '\n\n';
+      if (articleHighlights[i].note) snippet += '*' + articleHighlights[i].note + '*\n\n';
     }
   }
   if (articleNotes.articleNote) {
     snippet += articleNotes.articleNote + '\n\n';
   }
 
-  // Append to the single shared notebook
+  var sourceFilename = activeFile;
+
   getOrCreateSingleNotebook().then(function(nb) {
-    nb.content = (nb.content ? nb.content + '\n\n---\n\n' : '') + snippet;
+    // Create a new note for this article
+    var note = {
+      id: generateNoteId(),
+      content: snippet,
+      sourceArticle: sourceFilename,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    nb.notes.push(note);
     if (!nb.sources) nb.sources = [];
-    if (nb.sources.indexOf(activeFile) < 0) nb.sources.push(activeFile);
+    if (nb.sources.indexOf(sourceFilename) < 0) nb.sources.push(sourceFilename);
     nb.updatedAt = new Date().toISOString();
     saveNotebook(nb).then(function() {
       _activeNotebook = nb;
+      _activeNote = note;
       _notebookPreviewMode = false;
       _sidebarView = 'notebooks';
       syncSidebarTabs();
-      openNotebookInPane(nb.id);
+      renderFileList();
+      openNoteInPane(note.id);
     });
   });
 }
 
-// Notebook tag handlers (uses shared handleTagInput from utils)
+// ---- Tag handlers ----
+
 function handleNotebookTagKey(e) {
   if (!_activeNotebook) return;
   handleTagInput(e,
     function() { if (!_activeNotebook.tags) _activeNotebook.tags = []; return _activeNotebook.tags; },
-    function() { notebookDebounceSave(); showNotebook(_activeNotebook.id); }
+    function() { notebookDebounceSave(); if (_activeNote) openNoteInPane(_activeNote.id); else showNotebook(); }
   );
 }
 
@@ -657,6 +845,6 @@ function removeNotebookTag(tag) {
   if (!_activeNotebook || !_activeNotebook.tags) return;
   _activeNotebook.tags = _activeNotebook.tags.filter(function(t) { return t !== tag; });
   notebookDebounceSave();
-  showNotebook(_activeNotebook.id);
+  if (_activeNote) openNoteInPane(_activeNote.id);
+  else showNotebook();
 }
-
