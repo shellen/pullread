@@ -175,7 +175,7 @@ function writeSummaryToFile(filePath: string, summary: string, provider?: string
   writeFileSync(filePath, `${match[1]}${frontmatter}${match[3]}${match[4]}`);
 }
 
-export function startViewer(outputPath: string, port = 7777): void {
+export function startViewer(outputPath: string, port = 7777, openBrowser = true): void {
   // Watch output directory for .md file changes
   let filesChangedAt = Date.now();
   try {
@@ -1294,10 +1294,11 @@ export function startViewer(outputPath: string, port = 7777): void {
       });
     }
 
-    // Open browser
-    const cmd = process.platform === 'darwin' ? 'open'
-      : process.platform === 'win32' ? 'start'
-      : 'xdg-open';
-    exec(`${cmd} ${url}`);
+    if (openBrowser) {
+      const cmd = process.platform === 'darwin' ? 'open'
+        : process.platform === 'win32' ? 'start'
+        : 'xdg-open';
+      exec(`${cmd} ${url}`);
+    }
   });
 }

@@ -285,7 +285,7 @@ pub async fn ensure_viewer_running(app: &AppHandle) -> Result<u16, String> {
     let config_path = state.config_path().to_string_lossy().to_string();
     let port_str = port.to_string();
 
-    let args = vec!["view", "--config-path", &config_path, "--port", &port_str];
+    let args = vec!["view", "--config-path", &config_path, "--port", &port_str, "--no-open"];
 
     let mut cmd = app
         .shell()

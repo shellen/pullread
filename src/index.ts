@@ -307,7 +307,8 @@ if (command === 'sync') {
   const port = portIndex !== -1 && args[portIndex + 1]
     ? parseInt(args[portIndex + 1], 10)
     : 7777;
-  startViewer(config.outputPath, port);
+  const openBrowser = !args.includes('--no-open');
+  startViewer(config.outputPath, port, openBrowser);
 } else if (command === 'summarize') {
   const config = loadConfig();
   const batchMode = args.includes('--batch');

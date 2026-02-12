@@ -81,15 +81,18 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error building PullRead")
-        .run(|app_handle, event| {
-            if let tauri::RunEvent::ExitRequested { api, .. } = &event {
-                // Keep running in background when all windows close
-                api.prevent_exit();
+        .run(|app_handle, event| match &event {
+            tauri::RunEvent::ExitRequested { code, api, .. } => {
+                if code.is_none() {
+                    // Window close — keep running in background
+                    api.prevent_exit();
+                }
+                // Programmatic exit(0) from Quit — let it proceed
             }
-            if let tauri::RunEvent::Exit = &event {
-                // Clean up sidecar on quit
+            tauri::RunEvent::Exit => {
                 let state = app_handle.state::<SidecarState>();
                 state.stop_all();
             }
+            _ => {}
         });
 }

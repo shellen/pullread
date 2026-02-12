@@ -169,6 +169,23 @@ async fn handle_review(app: &AppHandle) {
     match sidecar::run_review(app, 7).await {
         Ok(output) => {
             notifications::notify(app, "Review Ready", &output);
+            // Open the review in the viewer
+            let _ = commands::open_viewer_inner(app).await;
+            // Navigate to the review file if we can extract the filename
+            if let Some(filename) = output
+                .strip_prefix("Review saved: ")
+                .map(|s| s.trim().to_string())
+            {
+                if let Some(window) = app.get_webview_window("viewer") {
+                    let port = app.state::<sidecar::SidecarState>().get_viewer_port();
+                    let nav_url = format!(
+                        "http://localhost:{}/#file={}",
+                        port,
+                        urlencoding::encode(&filename)
+                    );
+                    let _ = window.navigate(nav_url.parse().unwrap());
+                }
+            }
         }
         Err(e) => {
             notifications::notify(app, "Review Failed", &e);
