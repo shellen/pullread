@@ -6,7 +6,7 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { createHash } from 'crypto';
 import { request as httpsRequest } from 'https';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 
 const SETTINGS_PATH = join(homedir(), '.config', 'pullread', 'settings.json');
 const CACHE_DIR = join(homedir(), '.config', 'pullread', 'tts-cache');
@@ -93,8 +93,9 @@ export function loadTTSConfig(): TTSConfig {
         if (!config.apiKey && (config.provider === 'openai' || config.provider === 'elevenlabs')) {
           if (process.platform === 'darwin') {
             try {
-              const key = execSync(
-                'security find-generic-password -w -s "com.pullread.api-keys" -a "tts-api-key"',
+              const key = execFileSync(
+                'security',
+                ['find-generic-password', '-w', '-s', 'com.pullread.api-keys', '-a', 'tts-api-key'],
                 { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
               ).trim();
               if (key) config.apiKey = key;
@@ -119,8 +120,8 @@ export function saveTTSConfig(config: TTSConfig): void {
   if (config.apiKey) {
     if (process.platform === 'darwin') {
       try {
-        try { execSync('security delete-generic-password -s "com.pullread.api-keys" -a "tts-api-key"', { stdio: ['pipe', 'pipe', 'pipe'] }); } catch {}
-        execSync(`security add-generic-password -s "com.pullread.api-keys" -a "tts-api-key" -w "${config.apiKey.replace(/"/g, '\\"')}"`, { stdio: ['pipe', 'pipe', 'pipe'] });
+        try { execFileSync('security', ['delete-generic-password', '-s', 'com.pullread.api-keys', '-a', 'tts-api-key'], { stdio: ['pipe', 'pipe', 'pipe'] }); } catch {}
+        execFileSync('security', ['add-generic-password', '-s', 'com.pullread.api-keys', '-a', 'tts-api-key', '-w', config.apiKey], { stdio: ['pipe', 'pipe', 'pipe'] });
       } catch {}
     }
   }

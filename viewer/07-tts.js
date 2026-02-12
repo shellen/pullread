@@ -11,6 +11,67 @@ let ttsProgressTimer = null;
 
 const TTS_SPEEDS = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 
+// ---- Listen button loading animation ----
+var LISTEN_WORDS = [
+  'Reading', 'Processing', 'Generating', 'Preparing', 'Creating',
+  'Warming up', 'Clearing throat', 'Rehearsing', 'Caffeinating', 'Inhaling',
+  'Summoning', 'Channeling', 'Tuning', 'Vocalizing', 'Manifesting',
+  'Contemplating', 'Conjuring', 'Brewing', 'Stretching', 'Composing',
+  'Hydrating', 'Buffering', 'Focusing', 'Harmonizing', 'Simmering',
+];
+var _listenTimer = null;
+var _listenWordIdx = 0;
+
+function setListenBtnState(state) {
+  var btn = document.getElementById('listen-btn');
+  if (!btn) return;
+  var label = btn.querySelector('.listen-label');
+  if (!label) return;
+
+  // Clear any existing animation timer
+  if (_listenTimer) { clearInterval(_listenTimer); _listenTimer = null; }
+  btn.classList.remove('listen-loading', 'listen-playing');
+
+  if (state === 'loading') {
+    btn.classList.add('listen-loading');
+    _listenWordIdx = 0;
+    label.textContent = LISTEN_WORDS[0];
+    _listenTimer = setInterval(function() {
+      _listenWordIdx = (_listenWordIdx + 1) % LISTEN_WORDS.length;
+      label.textContent = LISTEN_WORDS[_listenWordIdx];
+    }, 2500);
+  } else if (state === 'playing') {
+    btn.classList.add('listen-playing');
+    label.textContent = 'Playing';
+  } else {
+    label.textContent = 'Listen';
+  }
+}
+
+// ---- Signature cue ----
+var _signatureCueUrl = null;
+var _signatureCueLoaded = false;
+
+function preloadSignatureCue() {
+  if (_signatureCueLoaded) return;
+  _signatureCueLoaded = true;
+  // Try to fetch the cue from the server; gracefully no-op if not found
+  fetch('/assets/signature_cue.webm', { method: 'HEAD' }).then(function(r) {
+    if (r.ok) _signatureCueUrl = '/assets/signature_cue.webm';
+  }).catch(function() {});
+}
+
+function playSignatureCue() {
+  if (!_signatureCueUrl) return Promise.resolve();
+  return new Promise(function(resolve) {
+    var cue = new Audio(_signatureCueUrl);
+    cue.volume = 0.4;
+    cue.addEventListener('ended', resolve);
+    cue.addEventListener('error', resolve);
+    cue.play().catch(resolve);
+  });
+}
+
 function addCurrentToTTSQueue() {
   if (!activeFile) return;
   addToTTSQueue(activeFile);
@@ -64,6 +125,8 @@ async function playTTSItem(index) {
 
   const item = ttsQueue[index];
   ttsPlaying = true;
+  setListenBtnState('loading');
+  preloadSignatureCue();
   renderAudioPlayer();
 
   // Check TTS provider
@@ -140,6 +203,7 @@ async function playBrowserTTS(filename) {
     ttsPlaying = true;
     startTime = Date.now();
     ttsHighlightAtChar(0, paraOffsets);
+    setListenBtnState('playing');
     renderAudioPlayer();
     var _ap = _getAudioPlayer();
     if (_ap) _ap.setProgress(0, '0:00', formatTime(estimatedSeconds));
@@ -262,8 +326,11 @@ async function playCloudTTS(filename) {
       renderAudioPlayer();
     });
 
+    // Play signature cue, then start main audio
+    await playSignatureCue();
     ttsAudio.play();
     ttsPlaying = true;
+    setListenBtnState('playing');
     renderAudioPlayer();
   } catch (err) {
     ttsGenerating = false;
@@ -287,6 +354,7 @@ function stopTTS() {
   ttsPlaying = false;
   ttsGenerating = false;
   ttsClearHighlight();
+  setListenBtnState('idle');
   var _ap = _getAudioPlayer();
   if (_ap) _ap.setProgress(0, '0:00', '0:00');
 }

@@ -225,6 +225,20 @@ export function startViewer(outputPath: string, port = 7777): void {
       return;
     }
 
+    // Serve TTS signature cue audio
+    if (url.pathname === '/assets/signature_cue.webm') {
+      const cuePath = join(dirname(process.argv[1] || __filename), 'signature_cue.webm');
+      if (existsSync(cuePath)) {
+        const data = readFileSync(cuePath);
+        res.writeHead(200, { 'Content-Type': 'audio/webm', 'Content-Length': data.length.toString(), 'Cache-Control': 'public, max-age=86400' });
+        res.end(data);
+      } else {
+        res.writeHead(404);
+        res.end();
+      }
+      return;
+    }
+
     if (url.pathname === '/api/files') {
       sendJson(res, listFiles(outputPath));
       return;

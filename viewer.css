@@ -874,6 +874,38 @@
   .article-actions button.active-fav { background: color-mix(in srgb, #e91e63 12%, var(--bg)); color: #e91e63; }
   .article-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
 
+  /* Listen button animated states */
+  #listen-btn { position: relative; overflow: hidden; }
+  #listen-btn.listen-loading {
+    background: var(--code-bg);
+    color: var(--link);
+  }
+  #listen-btn.listen-loading::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%; width: 200%; height: 100%;
+    background: linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--link) 15%, transparent) 50%, transparent 100%);
+    animation: listenSweep 2s ease-in-out infinite;
+  }
+  @keyframes listenSweep { to { left: 100%; } }
+  #listen-btn.listen-loading .listen-label {
+    animation: listenFade 2.5s ease-in-out infinite;
+  }
+  @keyframes listenFade {
+    0%, 100% { opacity: 1; }
+    45% { opacity: 0; }
+    55% { opacity: 0; }
+  }
+  #listen-btn.listen-playing {
+    background: color-mix(in srgb, var(--link) 12%, var(--bg));
+    color: var(--link);
+    animation: listenPulse 2s ease-in-out infinite;
+  }
+  @keyframes listenPulse {
+    0%, 100% { box-shadow: 0 0 0 0 transparent; }
+    50% { box-shadow: 0 0 8px 2px color-mix(in srgb, var(--link) 25%, transparent); }
+  }
+
   /* Margin notes (Google Docs-style) */
   .margin-notes {
     position: absolute;

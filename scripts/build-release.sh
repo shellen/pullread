@@ -157,6 +157,12 @@ bundle_cli() {
     # Copy binary (viewer.html is embedded in the binary at compile time)
     cp "$ROOT_DIR/dist/pullread" "$RESOURCES_PATH/"
 
+    # Copy TTS signature cue audio
+    if [ -f "$ROOT_DIR/assets/signature_cue.webm" ]; then
+        cp "$ROOT_DIR/assets/signature_cue.webm" "$RESOURCES_PATH/"
+        echo "  Copied signature_cue.webm"
+    fi
+
     # Bundle third-party license notices
     if [ -d "$ROOT_DIR/Licenses" ]; then
         cp -R "$ROOT_DIR/Licenses" "$RESOURCES_PATH/Licenses"

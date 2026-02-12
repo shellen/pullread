@@ -69,10 +69,9 @@ const SETTINGS_PATH = join(homedir(), '.config', 'pullread', 'settings.json');
 function loadKeyFromKeychain(account: string): string | null {
   if (process.platform !== 'darwin') return null;
   try {
-    const result = execSync(
-      `security find-generic-password -w -s "com.pullread.api-keys" -a "${account}"`,
-      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
-    );
+    const result = execFileSync('security', [
+      'find-generic-password', '-w', '-s', 'com.pullread.api-keys', '-a', account
+    ], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
     return result.trim() || null;
   } catch {
     return null;
@@ -85,15 +84,13 @@ function saveKeyToKeychain(account: string, key: string): boolean {
   try {
     // Delete existing entry first (update = delete + add)
     try {
-      execSync(
-        `security delete-generic-password -s "com.pullread.api-keys" -a "${account}"`,
-        { stdio: ['pipe', 'pipe', 'pipe'] }
-      );
+      execFileSync('security', [
+        'delete-generic-password', '-s', 'com.pullread.api-keys', '-a', account
+      ], { stdio: ['pipe', 'pipe', 'pipe'] });
     } catch { /* entry may not exist yet */ }
-    execSync(
-      `security add-generic-password -s "com.pullread.api-keys" -a "${account}" -w "${key.replace(/"/g, '\\"')}"`,
-      { stdio: ['pipe', 'pipe', 'pipe'] }
-    );
+    execFileSync('security', [
+      'add-generic-password', '-s', 'com.pullread.api-keys', '-a', account, '-w', key
+    ], { stdio: ['pipe', 'pipe', 'pipe'] });
     return true;
   } catch {
     return false;
