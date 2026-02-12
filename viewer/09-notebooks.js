@@ -89,8 +89,10 @@ function migrateContentToNotes(content, timestamp) {
   });
 }
 
-function createNote(sourceArticle) {
-  if (!_activeNotebook) return null;
+async function createNote(sourceArticle) {
+  if (!_activeNotebook) {
+    _activeNotebook = await getOrCreateSingleNotebook();
+  }
   if (!_activeNotebook.notes) _activeNotebook.notes = [];
   var now = new Date().toISOString();
   var note = { id: generateNoteId(), content: '', sourceArticle: sourceArticle || '', createdAt: now, updatedAt: now };
@@ -190,7 +192,7 @@ function openNoteInPane(noteId) {
 
   // Article-style header
   html += '<div class="article-header">';
-  html += '<h1>' + escapeHtml(firstLine) + '</h1>';
+  html += '<input type="text" class="note-title-input" value="' + escapeHtml(firstLine === 'Untitled Note' ? '' : firstLine) + '" placeholder="Untitled Note" oninput="updateNoteTitle(this.value)">';
   html += '<div class="article-byline">';
   var bylineParts = ['<span>Note</span>'];
   if (note.updatedAt) bylineParts.push('<span>' + new Date(note.updatedAt).toLocaleDateString() + '</span>');
@@ -255,12 +257,46 @@ function openNoteInPane(noteId) {
       notebookDebounceSave();
       updateWritingFocusLine();
       scheduleNotebookTagSuggestion();
+      // Sync title input from first line of content
+      var firstLine = (ta.value || '').split('\n')[0].replace(/^#+\s*/, '').trim();
+      var titleInput = document.querySelector('.note-title-input');
+      if (titleInput) titleInput.value = firstLine;
+      var sidebarItem = document.querySelector('.note-item[data-note-id="' + _activeNoteId + '"] .file-item-title');
+      if (sidebarItem) sidebarItem.textContent = firstLine || 'Empty note';
     });
     ta.addEventListener('click', updateWritingFocusLine);
     ta.addEventListener('keyup', updateWritingFocusLine);
     ta.addEventListener('scroll', updateWritingFocusLine);
     ta.focus();
   }
+}
+
+// Sync title input changes into the first line of the note content
+function updateNoteTitle(value) {
+  if (!_activeNotebook || !_activeNoteId) return;
+  var note = _activeNotebook.notes.find(function(n) { return n.id === _activeNoteId; });
+  if (!note) return;
+  var lines = (note.content || '').split('\n');
+  if (value.trim()) {
+    var heading = '# ' + value.trim();
+    if (lines.length && /^#+\s/.test(lines[0])) {
+      lines[0] = heading;
+    } else {
+      lines.unshift(heading);
+    }
+  } else if (lines.length && /^#+\s/.test(lines[0])) {
+    lines.shift();
+  }
+  note.content = lines.join('\n');
+  note.updatedAt = new Date().toISOString();
+  // Sync textarea if visible
+  var ta = document.querySelector('.note-page .notebook-editor textarea');
+  if (ta) ta.value = note.content;
+  document.title = (value.trim() || 'Untitled Note') + ' — PullRead';
+  // Update sidebar item title
+  var sidebarItem = document.querySelector('.note-item[data-note-id="' + _activeNoteId + '"] .file-item-title');
+  if (sidebarItem) sidebarItem.textContent = value.trim() || 'Empty note';
+  notebookDebounceSave();
 }
 
 function confirmDeleteNote(noteId) {

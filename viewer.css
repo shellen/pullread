@@ -2340,6 +2340,24 @@
   .note-page .notebook-editor textarea {
     min-height: 400px;
   }
+  .note-title-input {
+    display: block;
+    width: 100%;
+    font-size: 1.6em;
+    line-height: 1.25;
+    font-weight: 700;
+    color: var(--fg);
+    background: transparent;
+    border: none;
+    outline: none;
+    padding: 0;
+    margin: 0 0 8px;
+    font-family: inherit;
+  }
+  .note-title-input::placeholder {
+    color: var(--muted);
+    opacity: 0.5;
+  }
   .note-delete-btn {
     color: var(--muted) !important;
   }
@@ -2512,6 +2530,8 @@
     background: transparent;
     color: var(--fg);
     caret-color: var(--fg);
+    padding-top: 45vh;
+    padding-bottom: 45vh;
   }
   .writing-focus-overlay .wf-focus-line {
     position: absolute;
