@@ -54,12 +54,16 @@ function updateListenButtonState() {
   if (!btn || _listenTimer) return; // Loading animation takes precedence
   var playingFile = ttsPlaying && ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length
     ? ttsQueue[ttsCurrentIndex].filename : null;
+  // Use "Play" label for podcast articles, "Listen" for TTS
+  var file = activeFile && allFiles.find(function(f) { return f.filename === activeFile; });
+  var isPodcast = file && file.enclosureUrl && file.enclosureType && file.enclosureType.startsWith('audio/');
+  var idleLabel = isPodcast ? 'Play' : 'Listen';
   if (playingFile && playingFile === activeFile) {
     btn.classList.add('listen-playing');
     btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> Playing';
   } else {
     btn.classList.remove('listen-playing');
-    btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> Listen';
+    btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> ' + idleLabel;
   }
 }
 

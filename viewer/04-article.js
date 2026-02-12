@@ -242,7 +242,9 @@ function renderArticle(text, filename) {
   if (!isReviewArticle) {
     html += '<button onclick="summarizeArticle()" id="summarize-btn" aria-label="Summarize article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Summarize</button>';
   }
-  html += '<button id="listen-btn" onclick="addCurrentToTTSQueue()" aria-label="Listen to article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> Listen</button>';
+  var isPodcast = meta && meta.enclosure_url && meta.enclosure_type && meta.enclosure_type.startsWith('audio/');
+  var listenLabel = isPodcast ? 'Play' : 'Listen';
+  html += '<button id="listen-btn" onclick="addCurrentToTTSQueue()" aria-label="' + listenLabel + ' article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> ' + listenLabel + '</button>';
   if (meta && meta.url) {
     html += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg> Share</button></div>';
   }
@@ -283,6 +285,16 @@ function renderArticle(text, filename) {
       html += '<div class="yt-embed"><iframe src="https://www.youtube.com/embed/' + encodeURIComponent(ytId)
         + '" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy" title="Embedded video"></iframe></div>';
     }
+  }
+
+  // Podcast: inline audio player for articles with audio enclosures
+  if (isPodcast) {
+    html += '<div class="podcast-player">';
+    html += '<audio controls preload="metadata" src="' + escapeHtml(meta.enclosure_url) + '"></audio>';
+    if (meta.enclosure_duration) {
+      html += '<span class="podcast-duration">' + escapeHtml(meta.enclosure_duration) + '</span>';
+    }
+    html += '</div>';
   }
 
   // Strip YouTube thumbnail link BEFORE cleanMarkdown (which mangles the link-wrapped image)
