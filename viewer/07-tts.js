@@ -71,12 +71,6 @@ function addCurrentToTTSQueue() {
 async function addToTTSQueue(filename) {
   const file = allFiles.find(f => f.filename === filename);
   if (!file) return;
-  if (ttsQueue.some(q => q.filename === filename)) {
-    stopListenLoading();
-    const idx = ttsQueue.findIndex(q => q.filename === filename);
-    if (idx >= 0) playTTSItem(idx);
-    return;
-  }
 
   // Fetch current provider if not yet known
   if (serverMode && ttsProvider === 'browser') {
@@ -89,9 +83,12 @@ async function addToTTSQueue(filename) {
     } catch {}
   }
 
-  ttsQueue.push({ filename, title: file.title });
+  // Replace current playback — only one article at a time
+  stopTTS();
+  ttsQueue = [{ filename, title: file.title }];
+  ttsCurrentIndex = -1;
   renderAudioPlayer();
-  if (ttsQueue.length === 1) playTTSItem(0);
+  playTTSItem(0);
 }
 
 function renderAudioPlayer() {
@@ -122,8 +119,17 @@ function renderAudioPlayer() {
 
   if (ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length) {
     label.textContent = ttsQueue[ttsCurrentIndex].title;
+    label.style.cursor = 'pointer';
+    label.onclick = function() {
+      var fn = ttsQueue[ttsCurrentIndex] && ttsQueue[ttsCurrentIndex].filename;
+      if (!fn) return;
+      var idx = displayFiles.findIndex(function(f) { return f.filename === fn; });
+      if (idx >= 0) loadFile(idx);
+    };
   } else {
     label.textContent = 'No article playing';
+    label.style.cursor = '';
+    label.onclick = null;
   }
 
   if (ttsGenerating) {

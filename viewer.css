@@ -1169,6 +1169,9 @@
     color: var(--fg);
     font-size: 11px;
   }
+  .audio-now-label:hover {
+    text-decoration: underline;
+  }
   .audio-now-status {
     font-size: 10px;
     color: var(--muted);

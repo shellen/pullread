@@ -238,7 +238,7 @@ function renderArticle(text, filename) {
   html += '<div class="article-actions">';
   const isFav = articleNotes.isFavorite;
   html += '<button onclick="toggleFavoriteFromHeader(this)" class="' + (isFav ? 'active-fav' : '') + '" aria-label="' + (isFav ? 'Remove from favorites' : 'Add to favorites') + '" aria-pressed="' + isFav + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg> Favorite</button>';
-  html += '<button onclick="toggleNotesFromHeader()" aria-label="Toggle notes panel"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-pen"/></svg> Notes</button>';
+  html += '<button onclick="toggleNotesFromHeader()" aria-label="Toggle annotations panel"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-pen"/></svg> Annotations</button>';
   if (!isReviewArticle) {
     html += '<button onclick="summarizeArticle()" id="summarize-btn" aria-label="Summarize article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Summarize</button>';
   }

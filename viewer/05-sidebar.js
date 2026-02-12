@@ -74,7 +74,7 @@ function renderFileItem(f, i) {
     indicators = '<div class="file-item-indicators">'
       + (isFavorite ? '<span class="dot dot-favorite" aria-label="Favorite"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-heart"/></svg></span>' : '')
       + (hasHl ? '<span class="dot dot-highlight" aria-label="Has highlights"></span>' : '')
-      + (hasNote ? '<span class="dot dot-note" aria-label="Has notes"></span>' : '')
+      + (hasNote ? '<span class="dot dot-note" aria-label="Has annotations"></span>' : '')
       + (hasSummary ? '<span class="dot dot-summary" aria-label="Has summary"></span>' : '')
       + '</div>';
   }

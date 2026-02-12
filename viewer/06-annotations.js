@@ -572,7 +572,7 @@ function renderNotesPanel() {
   const hlCount = articleHighlights.length;
   const hlNoteCount = articleHighlights.filter(h => h.note).length;
 
-  let summaryText = 'Notes';
+  let summaryText = 'Annotations';
   const badges = [];
   if (hlCount) badges.push(hlCount + ' highlight' + (hlCount !== 1 ? 's' : '') + (hlNoteCount ? ' (' + hlNoteCount + ' with notes)' : ''));
   if (annCount) badges.push(annCount + ' annotation' + (annCount !== 1 ? 's' : ''));
