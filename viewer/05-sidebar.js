@@ -433,18 +433,25 @@ function toggleWritingFocus() {
 
   var ta = document.getElementById('wf-textarea');
   ta.focus();
-  // Move cursor to end
+  // Move cursor to end and scroll so cursor line is vertically centered
   ta.selectionStart = ta.selectionEnd = ta.value.length;
+  var lineHeight = parseFloat(getComputedStyle(ta).lineHeight) || 28.8;
+  var cursorLine = ta.value.split('\n').length - 1;
+  var paddingTop = parseFloat(getComputedStyle(ta).paddingTop) || 0;
+  var cursorY = paddingTop + cursorLine * lineHeight;
+  var visibleHeight = ta.parentElement ? ta.parentElement.clientHeight : ta.clientHeight;
+  ta.scrollTop = cursorY - visibleHeight / 2;
 
   ta.addEventListener('input', function() {
     notebookDebounceSave();
+    wfScrollCursorToCenter(ta);
     updateWritingFocusLine();
     var wc = ta.value.trim() ? ta.value.trim().split(/\s+/).length : 0;
     var wcEl = document.getElementById('wf-word-count');
     if (wcEl) wcEl.textContent = wc + ' words';
   });
-  ta.addEventListener('click', updateWritingFocusLine);
-  ta.addEventListener('keyup', updateWritingFocusLine);
+  ta.addEventListener('click', function() { wfScrollCursorToCenter(ta); updateWritingFocusLine(); });
+  ta.addEventListener('keyup', function() { wfScrollCursorToCenter(ta); updateWritingFocusLine(); });
   ta.addEventListener('scroll', updateWritingFocusLine);
 
   // Escape key to exit
@@ -482,6 +489,18 @@ function exitWritingFocus() {
   }
 }
 
+// Keep the cursor line vertically centered in the textarea (iA Writer style)
+function wfScrollCursorToCenter(ta) {
+  var lh = parseFloat(getComputedStyle(ta).lineHeight) || 28.8;
+  var pt = parseFloat(getComputedStyle(ta).paddingTop) || 0;
+  var cursorLine = ta.value.substring(0, ta.selectionStart).split('\n').length - 1;
+  var cursorY = pt + cursorLine * lh;
+  // Use parent's visible height — ta.clientHeight includes padding and is too large
+  var visibleHeight = ta.parentElement ? ta.parentElement.clientHeight : ta.clientHeight;
+  var targetScroll = cursorY - visibleHeight / 2 + lh / 2;
+  ta.scrollTop = targetScroll;
+}
+
 function updateWritingFocusLine() {
   if (!_writingFocusActive) return;
   // Check full-screen overlay first
@@ -496,7 +515,7 @@ function updateWritingFocusLine() {
   var text = ta.value.substring(0, ta.selectionStart);
   var lineNum = text.split('\n').length - 1;
   var lineHeight = parseFloat(getComputedStyle(ta).lineHeight) || 28.8;
-  var padding = 0;
-  line.style.top = (padding + lineNum * lineHeight - ta.scrollTop) + 'px';
+  var paddingTop = parseFloat(getComputedStyle(ta).paddingTop) || 0;
+  line.style.top = (paddingTop + lineNum * lineHeight - ta.scrollTop) + 'px';
 }
 

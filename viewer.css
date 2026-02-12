@@ -2519,7 +2519,7 @@
     width: 100%;
     max-width: 720px;
     padding: 0 24px 48px;
-    overflow-y: auto;
+    overflow: hidden;
     position: relative;
   }
   .writing-focus-overlay .wf-body textarea {
@@ -2532,6 +2532,10 @@
     caret-color: var(--fg);
     padding-top: 45vh;
     padding-bottom: 45vh;
+    scrollbar-width: none;
+  }
+  .writing-focus-overlay .wf-body textarea::-webkit-scrollbar {
+    display: none;
   }
   .writing-focus-overlay .wf-focus-line {
     position: absolute;
