@@ -827,6 +827,17 @@
     color: var(--fg);
     font-weight: 700;
   }
+  .article-title-link {
+    color: inherit;
+    text-decoration: none;
+  }
+  .article-title-link:hover { color: var(--link); }
+  .article-title-link .icon {
+    opacity: 0.3;
+    vertical-align: baseline;
+    margin-left: 2px;
+  }
+  .article-title-link:hover .icon { opacity: 0.6; }
   .article-byline {
     font-size: 14px;
     color: var(--muted);

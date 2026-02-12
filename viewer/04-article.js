@@ -209,7 +209,11 @@ function renderArticle(text, filename) {
   // Article header: title, author, date, domain, actions
   html += '<div class="article-header">';
   if (meta && meta.title) {
-    html += '<h1>' + escapeHtml(meta.title) + '</h1>';
+    if (meta.url) {
+      html += '<h1><a href="' + escapeHtml(meta.url) + '" target="_blank" class="article-title-link">' + escapeHtml(meta.title) + ' <svg class="icon icon-sm" aria-hidden="true"><use href="#i-external"/></svg></a></h1>';
+    } else {
+      html += '<h1>' + escapeHtml(meta.title) + '</h1>';
+    }
   }
   html += '<div class="article-byline">';
   const bylineParts = [];
