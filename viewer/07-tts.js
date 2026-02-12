@@ -72,6 +72,14 @@ async function addToTTSQueue(filename) {
   const file = allFiles.find(f => f.filename === filename);
   if (!file) return;
 
+  // If already in queue, jump to it
+  if (ttsQueue.some(q => q.filename === filename)) {
+    stopListenLoading();
+    const idx = ttsQueue.findIndex(q => q.filename === filename);
+    if (idx >= 0) playTTSItem(idx);
+    return;
+  }
+
   // Fetch current provider if not yet known
   if (serverMode && ttsProvider === 'browser') {
     try {
@@ -83,12 +91,10 @@ async function addToTTSQueue(filename) {
     } catch {}
   }
 
-  // Replace current playback — only one article at a time
-  stopTTS();
-  ttsQueue = [{ filename, title: file.title }];
-  ttsCurrentIndex = -1;
+  ttsQueue.push({ filename, title: file.title });
   renderAudioPlayer();
-  playTTSItem(0);
+  // Auto-play if this is the first item in the queue
+  if (ttsQueue.length === 1) playTTSItem(0);
 }
 
 function renderAudioPlayer() {
