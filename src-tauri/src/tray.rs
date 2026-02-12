@@ -56,8 +56,9 @@ pub fn create_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         ],
     )?;
 
-    TrayIconBuilder::new()
+    TrayIconBuilder::with_id("main")
         .icon(tauri::include_image!("icons/tray-icon.png"))
+        .icon_as_template(true)
         .tooltip("PullRead")
         .menu(&menu)
         .show_menu_on_left_click(true)
