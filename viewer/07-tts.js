@@ -92,7 +92,11 @@ async function addToTTSQueue(filename) {
     } catch {}
   }
 
-  ttsQueue.push({ filename, title: file.title });
+  var item = { filename, title: file.title };
+  if (file.enclosureUrl && file.enclosureType && file.enclosureType.startsWith('audio/')) {
+    item.enclosureUrl = file.enclosureUrl;
+  }
+  ttsQueue.push(item);
   renderAudioPlayer();
   // Auto-play if this is the first item in the queue
   if (ttsQueue.length === 1) playTTSItem(0);
@@ -180,6 +184,12 @@ async function playTTSItem(index) {
   const item = ttsQueue[index];
   ttsPlaying = true;
   renderAudioPlayer();
+
+  // Podcast enclosures play as native audio — no TTS synthesis needed
+  if (item.enclosureUrl) {
+    await playPodcastAudio(item);
+    return;
+  }
 
   // Check TTS provider
   await loadTTSSettings();
@@ -382,6 +392,56 @@ async function playCloudTTSCached(filename) {
     ttsPlaying = false;
     renderAudioPlayer();
     alert('TTS Error: ' + err.message);
+  }
+}
+
+/** Play a podcast episode via its enclosure URL as native audio */
+async function playPodcastAudio(item) {
+  try {
+    var audio = new Audio(item.enclosureUrl);
+    audio.playbackRate = ttsSpeed;
+
+    audio.addEventListener('loadedmetadata', function() {
+      document.getElementById('tts-time-total').textContent = formatTime(audio.duration);
+    });
+
+    audio.addEventListener('playing', function() {
+      stopListenLoading();
+      ttsPlaying = true;
+      renderAudioPlayer();
+    });
+
+    audio.addEventListener('timeupdate', function() {
+      if (!audio.duration) return;
+      var pct = Math.min(100, (audio.currentTime / audio.duration) * 100);
+      document.getElementById('tts-progress').style.width = pct + '%';
+      document.getElementById('tts-time-current').textContent = formatTime(audio.currentTime);
+    });
+
+    audio.addEventListener('ended', function() {
+      document.getElementById('tts-progress').style.width = '100%';
+      ttsPlaying = false;
+      renderAudioPlayer();
+      if (ttsCurrentIndex + 1 < ttsQueue.length) {
+        setTimeout(function() { playTTSItem(ttsCurrentIndex + 1); }, 500);
+      }
+    });
+
+    audio.addEventListener('error', function() {
+      stopListenLoading();
+      ttsPlaying = false;
+      renderAudioPlayer();
+      alert('Podcast playback error: could not load audio');
+    });
+
+    audio.play();
+    ttsAudio = audio;
+    ttsPlaying = true;
+    renderAudioPlayer();
+  } catch (err) {
+    ttsPlaying = false;
+    renderAudioPlayer();
+    alert('Podcast playback error: ' + err.message);
   }
 }
 
