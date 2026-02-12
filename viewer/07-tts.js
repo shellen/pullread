@@ -475,7 +475,6 @@ function ttsHighlightParagraph(paraIndex) {
   var blocks = content.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote, pre');
   if (paraIndex >= 0 && paraIndex < blocks.length) {
     blocks[paraIndex].classList.add('tts-reading-hl');
-    blocks[paraIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 }
 

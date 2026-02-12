@@ -187,7 +187,8 @@ function dashLoadArticle(filename) {
     // File might be filtered out — search all files
     const allIdx = allFiles.findIndex(f => f.filename === filename);
     if (allIdx >= 0) {
-      // Clear search and reload
+      // Set activeFile first so hide-read filter preserves this article
+      activeFile = filename;
       document.getElementById('search').value = '';
       filterFiles();
       const newIdx = displayFiles.findIndex(f => f.filename === filename);
