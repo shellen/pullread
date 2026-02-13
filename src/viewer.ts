@@ -11,7 +11,7 @@ import { summarizeText, loadLLMConfig, saveLLMConfig, loadLLMSettings, saveLLMSe
 import { autotagText, autotagBatch, saveMachineTags, hasMachineTags } from './autotagger';
 import { APP_ICON } from './app-icon';
 import { fetchAndExtract } from './extractor';
-import { generateMarkdown, ArticleData, downloadFavicon } from './writer';
+import { generateMarkdown, writeArticle, ArticleData, downloadFavicon } from './writer';
 import { loadTTSConfig, saveTTSConfig, generateSpeech, getAudioContentType, getKokoroStatus, preloadKokoro, getCachedAudioPath, createTtsSession, generateSessionChunk, TTS_VOICES, TTS_MODELS } from './tts';
 
 interface FileMeta {
@@ -349,19 +349,43 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
     if (url.pathname === '/api/save' && req.method === 'POST') {
       let body = '';
       req.on('data', (c: Buffer) => { body += c.toString(); });
-      req.on('end', () => {
+      req.on('end', async () => {
         try {
           const { url: articleUrl } = JSON.parse(body);
           if (!articleUrl) { res.writeHead(400); res.end('{"error":"url required"}'); return; }
-          let inbox: { url: string; addedAt: string; title?: string }[] = [];
-          if (existsSync(inboxPath)) {
-            try { inbox = JSON.parse(readFileSync(inboxPath, 'utf-8')); } catch {}
+
+          // Fetch and save the article immediately
+          try {
+            const article = await fetchAndExtract(articleUrl);
+            if (!article) {
+              res.writeHead(422);
+              res.end(JSON.stringify({ error: 'Could not extract article content' }));
+              return;
+            }
+            const domain = new URL(articleUrl).hostname.replace(/^www\./, '');
+            const filename = writeArticle(outputPath, {
+              title: article.title || articleUrl,
+              url: articleUrl,
+              bookmarkedAt: new Date().toISOString(),
+              domain,
+              content: article.markdown,
+              feed: 'inbox',
+              author: article.byline,
+              excerpt: article.excerpt,
+            });
+            sendJson(res, { ok: true, filename });
+          } catch (err) {
+            // Fetch failed — queue to inbox for retry during next sync
+            let inbox: { url: string; addedAt: string; title?: string }[] = [];
+            if (existsSync(inboxPath)) {
+              try { inbox = JSON.parse(readFileSync(inboxPath, 'utf-8')); } catch {}
+            }
+            inbox.push({ url: articleUrl, addedAt: new Date().toISOString() });
+            const dir = join(homedir(), '.config', 'pullread');
+            if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+            writeFileSync(inboxPath, JSON.stringify(inbox, null, 2));
+            sendJson(res, { ok: true, queued: true, error: err instanceof Error ? err.message : 'Fetch failed' });
           }
-          inbox.push({ url: articleUrl, addedAt: new Date().toISOString() });
-          const dir = join(homedir(), '.config', 'pullread');
-          if (!existsSync(dir)) require('fs').mkdirSync(dir, { recursive: true });
-          writeFileSync(inboxPath, JSON.stringify(inbox, null, 2));
-          sendJson(res, { ok: true });
         } catch { res.writeHead(400); res.end('{"error":"invalid json"}'); }
       });
       return;

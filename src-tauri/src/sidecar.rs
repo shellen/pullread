@@ -202,7 +202,9 @@ fn append_log(message: &str) {
     }
 }
 
-/// Run a sync operation (short-lived process)
+/// Run a sync operation using spawn + kill pattern.
+/// Bun compiled binaries don't exit when stdout is a pipe, so we watch
+/// for the "Done:" summary line and then kill the process.
 pub async fn run_sync(app: &AppHandle, retry_failed: bool) -> Result<String, String> {
     let state = app.state::<SidecarState>();
     let config_path = state.config_path().to_string_lossy().to_string();
@@ -219,57 +221,78 @@ pub async fn run_sync(app: &AppHandle, retry_failed: bool) -> Result<String, Str
         args.push("--retry-failed");
     }
 
-    let cmd = app
+    let mut cmd = app
         .shell()
         .sidecar("pullread-cli")
         .map_err(|e| format!("Failed to create sidecar: {}", e))?;
 
     // Add environment
     let env_vars = state.process_env(app);
-    let mut cmd = cmd.args(&args);
+    cmd = cmd.args(&args);
     for (key, value) in &env_vars {
         cmd = cmd.env(key, value);
     }
 
+    let (mut rx, child) = cmd
+        .spawn()
+        .map_err(|e| format!("Failed to spawn sync: {}", e))?;
+
     let timeout = std::time::Duration::from_secs(5 * 60);
-    let output = match tokio::time::timeout(timeout, cmd.output()).await {
-        Ok(result) => result.map_err(|e| format!("Sync failed to run: {}", e))?,
-        Err(_) => {
-            append_log("[sync] timed out after 5 minutes");
-            return Err("Sync timed out after 5 minutes".to_string());
+    let mut stdout_lines = Vec::new();
+    let mut stderr_lines = Vec::new();
+    let mut summary: Option<String> = None;
+
+    use tauri_plugin_shell::process::CommandEvent;
+
+    let result = tokio::time::timeout(timeout, async {
+        while let Some(event) = rx.recv().await {
+            match event {
+                CommandEvent::Stdout(line) => {
+                    let text = String::from_utf8_lossy(&line).trim().to_string();
+                    if !text.is_empty() {
+                        append_log(&format!("[sync] {}", text));
+                        if text.starts_with("Done:") {
+                            summary = Some(text.clone());
+                        }
+                        stdout_lines.push(text);
+                    }
+                }
+                CommandEvent::Stderr(line) => {
+                    let text = String::from_utf8_lossy(&line).trim().to_string();
+                    if !text.is_empty() {
+                        append_log(&format!("[sync stderr] {}", text));
+                        stderr_lines.push(text);
+                    }
+                }
+                CommandEvent::Terminated(status) => {
+                    append_log(&format!("[sync] terminated: {:?}", status));
+                    break;
+                }
+                _ => {}
+            }
+            // If we saw the "Done:" line, sync is complete — don't wait
+            // for the process to exit (Bun compiled binaries hang on pipe close)
+            if summary.is_some() {
+                break;
+            }
         }
-    };
+    })
+    .await;
 
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    // Always kill the child process — it may hang due to Bun pipe bug
+    let _ = child.kill();
 
-    // Log everything
-    if !stdout.is_empty() {
-        append_log(&format!("[sync stdout] {}", stdout.trim()));
-    }
-    if !stderr.is_empty() {
-        append_log(&format!("[sync stderr] {}", stderr.trim()));
+    if result.is_err() {
+        append_log("[sync] timed out after 5 minutes");
+        return Err("Sync timed out after 5 minutes".to_string());
     }
 
-    if output.status.success() {
-        // Extract the "Done: X saved, Y failed" summary line
-        let summary = stdout
-            .lines()
-            .rev()
-            .find(|line| line.starts_with("Done:"))
-            .unwrap_or("Sync complete")
-            .to_string();
-        Ok(summary)
+    if let Some(done_line) = summary {
+        Ok(done_line)
+    } else if !stderr_lines.is_empty() {
+        Err(stderr_lines.join("\n"))
     } else {
-        let error = if !stderr.is_empty() {
-            stderr.trim().to_string()
-        } else {
-            format!(
-                "Sync failed with exit code {}",
-                output.status.code().unwrap_or(-1)
-            )
-        };
-        Err(error)
+        Err("Sync ended without summary".to_string())
     }
 }
 
@@ -360,7 +383,7 @@ pub async fn ensure_viewer_running(app: &AppHandle) -> Result<u16, String> {
     Ok(port)
 }
 
-/// Run the review command
+/// Run the review command using spawn + kill pattern.
 pub async fn run_review(app: &AppHandle, days: u32) -> Result<String, String> {
     let state = app.state::<SidecarState>();
     let config_path = state.config_path().to_string_lossy().to_string();
@@ -388,39 +411,64 @@ pub async fn run_review(app: &AppHandle, days: u32) -> Result<String, String> {
         cmd = cmd.env(key, value);
     }
 
-    let output = cmd
-        .output()
-        .await
-        .map_err(|e| format!("Review failed to run: {}", e))?;
+    let (mut rx, child) = cmd
+        .spawn()
+        .map_err(|e| format!("Failed to spawn review: {}", e))?;
 
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    let timeout = std::time::Duration::from_secs(5 * 60);
+    let mut stdout_lines = Vec::new();
+    let mut stderr_lines = Vec::new();
+    let mut summary: Option<String> = None;
 
-    if !stdout.is_empty() {
-        append_log(&format!("[review stdout] {}", stdout.trim()));
+    use tauri_plugin_shell::process::CommandEvent;
+
+    let result = tokio::time::timeout(timeout, async {
+        while let Some(event) = rx.recv().await {
+            match event {
+                CommandEvent::Stdout(line) => {
+                    let text = String::from_utf8_lossy(&line).trim().to_string();
+                    if !text.is_empty() {
+                        append_log(&format!("[review] {}", text));
+                        if text.starts_with("Review saved:") {
+                            summary = Some(text.clone());
+                        }
+                        stdout_lines.push(text);
+                    }
+                }
+                CommandEvent::Stderr(line) => {
+                    let text = String::from_utf8_lossy(&line).trim().to_string();
+                    if !text.is_empty() {
+                        append_log(&format!("[review stderr] {}", text));
+                        stderr_lines.push(text);
+                    }
+                }
+                CommandEvent::Terminated(_) => break,
+                _ => {}
+            }
+            if summary.is_some() {
+                break;
+            }
+        }
+    })
+    .await;
+
+    let _ = child.kill();
+
+    if result.is_err() {
+        append_log("[review] timed out after 5 minutes");
+        return Err("Review timed out".to_string());
     }
-    if !stderr.is_empty() {
-        append_log(&format!("[review stderr] {}", stderr.trim()));
-    }
 
-    if output.status.success() {
-        let summary = stdout
-            .lines()
-            .find(|l| l.starts_with("Review saved:"))
-            .unwrap_or("Review generated")
-            .to_string();
-        Ok(summary)
+    if let Some(done_line) = summary {
+        Ok(done_line)
+    } else if !stderr_lines.is_empty() {
+        Err(stderr_lines.join("\n"))
     } else {
-        let err_msg = stderr.trim().to_string();
-        Err(if err_msg.is_empty() {
-            "Review failed".to_string()
-        } else {
-            err_msg
-        })
+        Ok("Review generated".to_string())
     }
 }
 
-/// Run autotag in background
+/// Run autotag using spawn + kill pattern.
 pub async fn run_autotag(app: &AppHandle) -> Result<String, String> {
     let state = app.state::<SidecarState>();
     let config_path = state.config_path().to_string_lossy().to_string();
@@ -446,13 +494,43 @@ pub async fn run_autotag(app: &AppHandle) -> Result<String, String> {
         cmd = cmd.env(key, value);
     }
 
-    let output = cmd
-        .output()
-        .await
-        .map_err(|e| format!("Autotag failed: {}", e))?;
+    let (mut rx, child) = cmd
+        .spawn()
+        .map_err(|e| format!("Failed to spawn autotag: {}", e))?;
 
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    append_log(&format!("[autotag] {}", stdout.trim()));
+    let timeout = std::time::Duration::from_secs(5 * 60);
+    let mut stdout_lines = Vec::new();
 
-    Ok(stdout)
+    use tauri_plugin_shell::process::CommandEvent;
+
+    let result = tokio::time::timeout(timeout, async {
+        while let Some(event) = rx.recv().await {
+            match event {
+                CommandEvent::Stdout(line) => {
+                    let text = String::from_utf8_lossy(&line).trim().to_string();
+                    if !text.is_empty() {
+                        append_log(&format!("[autotag] {}", text));
+                        stdout_lines.push(text);
+                    }
+                }
+                CommandEvent::Stderr(line) => {
+                    let text = String::from_utf8_lossy(&line).trim().to_string();
+                    if !text.is_empty() {
+                        append_log(&format!("[autotag stderr] {}", text));
+                    }
+                }
+                CommandEvent::Terminated(_) => break,
+                _ => {}
+            }
+        }
+    })
+    .await;
+
+    let _ = child.kill();
+
+    if result.is_err() {
+        append_log("[autotag] timed out after 5 minutes");
+    }
+
+    Ok(stdout_lines.join("\n"))
 }
