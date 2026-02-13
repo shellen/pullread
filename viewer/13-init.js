@@ -1,3 +1,6 @@
+// ABOUTME: Application initialization, article list refresh, and one-time data migrations.
+// ABOUTME: Handles sync status, auto-refresh polling, and restoring user preferences on load.
+
 // ---- Sync Status ----
 async function loadSyncStatus() {
   if (!serverMode) return;
@@ -16,7 +19,7 @@ async function loadSyncStatus() {
 // ---- One-Time Migration: frontmatter annotations to JSON ----
 async function migrateAnnotationsIfNeeded() {
   if (!serverMode) return;
-  if (localStorage.getItem('pr-migration-v1-done')) return;
+  if (localStorage.getItem('pr-migration-v2-done')) return;
 
   // Check each article's frontmatter for old-style annotation field
   let migrated = 0;
@@ -31,6 +34,12 @@ async function migrateAnnotationsIfNeeded() {
       const frontmatter = match[1];
       const annotationMatch = frontmatter.match(/^annotation:\s*"?(.*?)"?\s*$/m);
       if (!annotationMatch || !annotationMatch[1]) continue;
+
+      // Skip podcast/YouTube articles — their annotation field is the feed description
+      const hasEnclosure = frontmatter.match(/^enclosure_url:/m);
+      const domain = (frontmatter.match(/^domain:\s*(.*)$/m) || [])[1] || '';
+      const isMediaArticle = hasEnclosure || domain.includes('youtube') || domain.includes('youtu.be');
+      if (isMediaArticle) continue;
 
       // Found old-style annotation - migrate to JSON notes
       const existingNotes = allNotesIndex[file.filename] || {};
@@ -51,9 +60,40 @@ async function migrateAnnotationsIfNeeded() {
     } catch { continue; }
   }
 
-  localStorage.setItem('pr-migration-v1-done', '1');
-  if (migrated > 0) {
-    console.log('Migrated ' + migrated + ' article annotations from frontmatter to JSON');
+  // Cleanup pass: clear articleNote that duplicates the article body (already-migrated media articles)
+  let cleaned = 0;
+  for (const file of allFiles) {
+    try {
+      const notes = allNotesIndex[file.filename];
+      if (!notes || !notes.articleNote) continue;
+      const res = await fetch('/api/file?name=' + encodeURIComponent(file.filename));
+      if (!res.ok) continue;
+      const text = await res.text();
+      const bodyStart = text.indexOf('---', text.indexOf('---') + 3);
+      if (bodyStart < 0) continue;
+      const body = text.slice(bodyStart + 3).trim();
+      const bodyPrefix = body.slice(0, 200).trim();
+      const notePrefix = notes.articleNote.slice(0, 200).trim();
+      if (notePrefix && bodyPrefix.startsWith(notePrefix)) {
+        await fetch('/api/notes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: file.filename,
+            articleNote: '',
+            annotations: notes.annotations || [],
+            tags: notes.tags || [],
+            isFavorite: notes.isFavorite || false
+          })
+        });
+        cleaned++;
+      }
+    } catch { continue; }
+  }
+
+  localStorage.setItem('pr-migration-v2-done', '1');
+  if (migrated > 0 || cleaned > 0) {
+    console.log('Migration: ' + migrated + ' migrated, ' + cleaned + ' duplicates cleaned');
     await loadAnnotationsIndex(); // Refresh
     renderFileList();
   }

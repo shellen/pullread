@@ -1,4 +1,5 @@
-// ---- Highlights & Notes ----
+// ABOUTME: Highlights, inline annotations, and footnote rendering for article content.
+// ABOUTME: Manages highlight creation/deletion, footnote numbering, and the notes panel.
 
 async function preloadAnnotations(filename) {
   if (!serverMode) return;
@@ -118,6 +119,120 @@ function deleteHighlight(id) {
   renderFileList();
 }
 
+// ---- Footnotes ----
+let footnoteEntries = [];
+
+function assignFootnoteNumbers() {
+  const content = document.getElementById('content');
+  if (!content) return;
+  footnoteEntries = [];
+
+  // Collect all anchored elements (highlights and annotation markers)
+  const elements = [];
+  content.querySelectorAll('mark[data-hl-id]').forEach(el => {
+    const hl = articleHighlights.find(h => h.id === el.getAttribute('data-hl-id'));
+    if (hl) elements.push({ el, type: 'highlight', data: hl });
+  });
+  content.querySelectorAll('.annotation-marker[data-ann-id]').forEach(el => {
+    const ann = (articleNotes.annotations || []).find(a => a.id === el.getAttribute('data-ann-id'));
+    if (ann) elements.push({ el, type: 'annotation', data: ann });
+  });
+
+  // Sort by document position
+  elements.sort((a, b) => {
+    const pos = a.el.compareDocumentPosition(b.el);
+    if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+    if (pos & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+    return 0;
+  });
+
+  // Assign numbers and insert superscript markers
+  elements.forEach((item, i) => {
+    const num = i + 1;
+    const sup = document.createElement('sup');
+    sup.className = 'footnote-marker';
+    sup.id = 'fnref-' + num;
+    sup.textContent = num;
+    sup.onclick = function(e) { e.stopPropagation(); scrollToFootnote(num); };
+    item.el.after(sup);
+
+    const entry = { num, type: item.type, id: item.data.id };
+    if (item.type === 'highlight') {
+      entry.text = item.data.text;
+      entry.note = item.data.note || '';
+      entry.color = item.data.color;
+    } else {
+      entry.text = item.data.anchorText || '';
+      entry.note = item.data.note || '';
+    }
+    footnoteEntries.push(entry);
+  });
+}
+
+function renderFootnotes() {
+  const content = document.getElementById('content');
+  if (!content) return;
+  const existing = content.querySelector('.footnotes-section');
+  if (existing) existing.remove();
+
+  if (footnoteEntries.length === 0) return;
+
+  const section = document.createElement('section');
+  section.className = 'footnotes-section';
+
+  let html = '<div class="footnotes-heading">Footnotes</div><ol class="footnotes-list">';
+  for (const entry of footnoteEntries) {
+    const excerpt = escapeHtml((entry.text || '').slice(0, 80));
+    const colorClass = entry.type === 'highlight' && entry.color ? ' hl-' + entry.color : '';
+    html += '<li class="footnote-entry" id="fn-' + entry.num + '" onclick="scrollToFootnoteRef(' + entry.num + ')">';
+    html += '<span class="footnote-backref">' + entry.num + '.</span>';
+    if (excerpt) {
+      html += '<span class="footnote-quote' + (colorClass ? ' pr-highlight' + colorClass : '') + '">' + excerpt + (entry.text.length > 80 ? '...' : '') + '</span>';
+    }
+    if (entry.note) {
+      html += '<div class="footnote-note">' + escapeHtml(entry.note) + '</div>';
+    }
+    html += '</li>';
+  }
+  html += '</ol>';
+  section.innerHTML = html;
+
+  // Insert before notes panel to maintain correct order
+  const notesPanel = content.querySelector('.notes-panel');
+  if (notesPanel) {
+    content.insertBefore(section, notesPanel);
+  } else {
+    content.appendChild(section);
+  }
+}
+
+function scrollToFootnote(num) {
+  const el = document.getElementById('fn-' + num);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.classList.add('flash');
+  setTimeout(() => el.classList.remove('flash'), 1500);
+}
+
+function scrollToFootnoteRef(num) {
+  const el = document.getElementById('fnref-' + num);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.style.outline = '2px solid var(--link)';
+  setTimeout(() => { el.style.outline = ''; }, 1500);
+}
+
+function toggleGeneralNote(btn) {
+  const wrap = btn.parentElement.querySelector('.notes-textarea-wrap');
+  if (!wrap) return;
+  const isHidden = wrap.style.display === 'none';
+  wrap.style.display = isHidden ? '' : 'none';
+  if (isHidden) {
+    const ta = wrap.querySelector('textarea');
+    if (ta) ta.focus();
+  }
+}
+
 function applyHighlights() {
   const content = document.getElementById('content');
   if (!content) return;
@@ -130,9 +245,10 @@ function applyHighlights() {
     parent.normalize();
   });
 
-  // Remove annotation markers and highlight note markers
+  // Remove annotation markers, highlight note markers, and footnote markers
   content.querySelectorAll('.annotation-marker').forEach(m => m.remove());
   content.querySelectorAll('.hl-note-marker').forEach(m => m.remove());
+  content.querySelectorAll('.footnote-marker').forEach(m => m.remove());
 
   // Apply each highlight
   for (const hl of articleHighlights) {
@@ -144,71 +260,15 @@ function applyHighlights() {
     findAndMarkAnnotation(content, ann);
   }
 
-  // Render margin notes for highlights with notes and inline annotations
-  renderMarginNotes();
+  // Build footnotes from highlights and annotations
+  assignFootnoteNumbers();
+  renderFootnotes();
 }
 
 function renderMarginNotes() {
+  // Margin notes replaced by footnotes section at bottom of article
   const marginContainer = document.getElementById('margin-notes');
-  if (!marginContainer) return;
-  marginContainer.innerHTML = '';
-
-  const pane = document.getElementById('content-pane');
-  if (!pane) return;
-  const paneRect = pane.getBoundingClientRect();
-
-  const notes = [];
-
-  // Collect highlight notes
-  for (const hl of articleHighlights) {
-    if (!hl.note) continue;
-    const mark = document.querySelector('mark[data-hl-id="' + hl.id + '"]');
-    if (!mark) continue;
-    const rect = mark.getBoundingClientRect();
-    notes.push({
-      top: rect.top - paneRect.top + pane.scrollTop,
-      anchorText: hl.text.slice(0, 40),
-      body: hl.note,
-      id: hl.id,
-      type: 'highlight'
-    });
-  }
-
-  // Collect inline annotation notes
-  for (const ann of (articleNotes.annotations || [])) {
-    const matchedMarker = document.querySelector('.annotation-marker[data-ann-id="' + ann.id + '"]');
-    if (!matchedMarker) continue;
-    const rect = matchedMarker.getBoundingClientRect();
-    notes.push({
-      top: rect.top - paneRect.top + pane.scrollTop,
-      anchorText: (ann.anchorText || '').slice(0, 40),
-      body: ann.note,
-      id: ann.id,
-      type: 'annotation'
-    });
-  }
-
-  // Sort by position and spread out overlapping notes
-  notes.sort((a, b) => a.top - b.top);
-  let lastBottom = 0;
-  for (const n of notes) {
-    if (n.top < lastBottom + 8) n.top = lastBottom + 8;
-    const div = document.createElement('div');
-    div.className = 'margin-note';
-    div.style.top = n.top + 'px';
-    div.innerHTML = '<div class="mn-text">' + escapeHtml(n.anchorText) + (n.anchorText.length >= 40 ? '...' : '') + '</div>'
-      + '<div class="mn-body">' + escapeHtml(n.body) + '</div>';
-    div.onclick = function() {
-      if (n.type === 'highlight') {
-        editHighlightNote(n.id, { clientX: window.innerWidth / 2, clientY: 200 });
-      } else {
-        const ann = (articleNotes.annotations || []).find(a => a.id === n.id);
-        if (ann) showAnnotationPopover({ clientX: window.innerWidth / 2, clientY: 200 }, ann);
-      }
-    };
-    marginContainer.appendChild(div);
-    lastBottom = n.top + div.offsetHeight;
-  }
+  if (marginContainer) marginContainer.innerHTML = '';
 }
 
 function findAndWrap(container, hl) {
@@ -290,7 +350,7 @@ function findAndMarkAnnotation(container, ann) {
     const marker = document.createElement('span');
     marker.className = 'annotation-marker';
     marker.setAttribute('data-ann-id', ann.id);
-    marker.textContent = 'n';
+    marker.textContent = '';
     marker.title = ann.note;
     marker.onclick = function(e) {
       e.stopPropagation();
@@ -568,15 +628,10 @@ function renderNotesPanel() {
   const panel = document.createElement('details');
   panel.className = 'notes-panel';
   const noteText = articleNotes.articleNote || '';
-  const annCount = (articleNotes.annotations || []).length;
-  const hlCount = articleHighlights.length;
-  const hlNoteCount = articleHighlights.filter(h => h.note).length;
+  const footnoteCount = footnoteEntries.length;
 
-  let summaryText = 'Annotations';
-  const badges = [];
-  if (hlCount) badges.push(hlCount + ' highlight' + (hlCount !== 1 ? 's' : '') + (hlNoteCount ? ' (' + hlNoteCount + ' with notes)' : ''));
-  if (annCount) badges.push(annCount + ' annotation' + (annCount !== 1 ? 's' : ''));
-  if (badges.length) summaryText += ' (' + badges.join(', ') + ')';
+  let summaryText = 'Notes';
+  if (footnoteCount) summaryText += ' (' + footnoteCount + ' footnote' + (footnoteCount !== 1 ? 's' : '') + ')';
 
   const tags = articleNotes.tags || [];
   const machineTags = articleNotes.machineTags || [];
@@ -584,36 +639,8 @@ function renderNotesPanel() {
   const tagsHtml = tags.map(t => '<span class="tag">' + escapeHtml(t) + '<span class="tag-remove" onclick="removeTag(\'' + escapeHtml(t.replace(/'/g, "\\'")) + '\')">&times;</span></span>').join('')
     + machineTags.map(t => '<span class="tag tag-machine" title="Auto-generated tag">' + escapeHtml(t) + '</span>').join('');
 
-  // Build list of highlight notes and inline annotations for display
-  let hlNotesHtml = '';
-  const hlsWithNotes = articleHighlights.filter(h => h.note);
-  const annotations = articleNotes.annotations || [];
-
-  if (hlsWithNotes.length || annotations.length) {
-    hlNotesHtml += '<div style="margin-top:12px;font-size:12px">';
-
-    for (const hl of hlsWithNotes) {
-      const preview = hl.text.length > 60 ? hl.text.slice(0, 60) + '...' : hl.text;
-      hlNotesHtml += '<div style="padding:6px 0">'
-        + '<div style="color:var(--muted);font-size:11px;margin-bottom:3px">'
-        + '<span class="pr-highlight hl-' + hl.color + '" style="padding:1px 4px;border-radius:2px;cursor:pointer" onclick="scrollToHighlight(\'' + hl.id + '\')">' + escapeHtml(preview) + '</span>'
-        + '</div>'
-        + '<div style="white-space:pre-wrap;word-break:break-word">' + escapeHtml(hl.note) + '</div>'
-        + '</div>';
-    }
-
-    for (const ann of annotations) {
-      const preview = (ann.anchorText || '').slice(0, 60);
-      hlNotesHtml += '<div style="padding:6px 0">'
-        + '<div style="color:var(--muted);font-size:11px;margin-bottom:3px">'
-        + '<span style="color:var(--link);cursor:pointer">' + escapeHtml(preview) + (ann.anchorText && ann.anchorText.length > 60 ? '...' : '') + '</span>'
-        + '</div>'
-        + '<div style="white-space:pre-wrap;word-break:break-word">' + escapeHtml(ann.note) + '</div>'
-        + '</div>';
-    }
-
-    hlNotesHtml += '</div>';
-  }
+  const hideTextarea = !noteText;
+  const btnLabel = noteText ? 'General note' : '+ Add general note';
 
   panel.innerHTML = `
     <summary>${summaryText}</summary>
@@ -625,15 +652,15 @@ function renderNotesPanel() {
       ${tagsHtml}
       <input type="text" placeholder="Add tag..." onkeydown="handleTagKey(event)" />
     </div>
-    <div class="notes-textarea-wrap">
+    <button class="add-note-btn" onclick="toggleGeneralNote(this)">${btnLabel}</button>
+    <div class="notes-textarea-wrap"${hideTextarea ? ' style="display:none"' : ''}>
       <textarea placeholder="Add notes about this article...">${escapeHtml(noteText)}</textarea>
       <button class="voice-note-btn" onclick="toggleVoiceNote(this)" title="Voice note (requires microphone)"><svg aria-hidden="true"><use href="#i-mic"/></svg></button>
     </div>
     <div class="notes-save-hint">Auto-saved</div>
-    ${hlNotesHtml}
   `;
 
-  if (noteText || isFav || tags.length || machineTags.length || hlsWithNotes.length || annotations.length) panel.setAttribute('open', '');
+  if (noteText || isFav || tags.length || machineTags.length || footnoteCount) panel.setAttribute('open', '');
 
   content.appendChild(panel);
 
@@ -670,6 +697,8 @@ function toggleNotesFromHeader() {
   if (panel) {
     panel.toggleAttribute('open');
     if (panel.hasAttribute('open')) {
+      const wrap = panel.querySelector('.notes-textarea-wrap');
+      if (wrap) wrap.style.display = '';
       panel.querySelector('textarea').focus();
     }
   }

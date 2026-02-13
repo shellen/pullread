@@ -1923,21 +1923,83 @@
 
   /* Inline annotation indicator */
   .annotation-marker {
-    display: inline-block;
-    width: 14px;
-    height: 14px;
-    background: var(--link);
-    color: var(--bg);
-    border-radius: 50%;
-    font-size: 9px;
-    text-align: center;
-    line-height: 14px;
-    cursor: pointer;
-    vertical-align: super;
-    margin-left: 2px;
-    font-family: -apple-system, sans-serif;
+    display: none;
   }
-  .annotation-marker:hover { opacity: 0.8; }
+
+  /* Footnote markers — superscript numbers in article text */
+  .footnote-marker {
+    font-size: 0.75em;
+    vertical-align: super;
+    color: var(--link);
+    cursor: pointer;
+    text-decoration: none;
+    padding: 0 1px;
+    font-weight: 600;
+  }
+  .footnote-marker:hover { text-decoration: underline; }
+
+  /* Footnotes section at bottom of article */
+  .footnotes-section {
+    border-top: 1px solid var(--border);
+    margin-top: 32px;
+    padding-top: 16px;
+  }
+  .footnotes-heading {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .footnotes-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .footnote-entry {
+    padding: 8px 0;
+    font-size: 13px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+  .footnote-entry:last-child { border-bottom: none; }
+  .footnote-entry:hover { background: var(--code-bg); }
+  .footnote-entry.flash { background: var(--code-bg); }
+  .footnote-backref {
+    color: var(--link);
+    font-weight: 600;
+    cursor: pointer;
+    margin-right: 6px;
+  }
+  .footnote-backref:hover { text-decoration: underline; }
+  .footnote-quote {
+    font-style: italic;
+    color: var(--muted);
+  }
+  .footnote-quote::before { content: "\201C"; }
+  .footnote-quote::after { content: "\201D"; }
+  .footnote-note {
+    margin-top: 4px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* Collapsed textarea toggle */
+  .add-note-btn {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    text-align: left;
+  }
+  .add-note-btn:hover { border-color: var(--link); color: var(--link); }
 
   /* Annotation popover */
   .annotation-popover {
@@ -3168,7 +3230,13 @@
     .article-summary { border-left-color: #999 !important; background: #f5f5f5 !important; break-inside: avoid; }
     mark.pr-highlight { background: #ff0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
-    /* Print notes section at end */
+    /* Print footnotes and notes section at end */
+    .footnotes-section {
+      display: block !important;
+      border-top: 1px solid #ccc !important;
+      page-break-before: auto;
+    }
+    .footnote-marker { color: #333 !important; }
     .notes-panel {
       display: block !important;
       border-top: 1px solid #ccc !important;
