@@ -325,7 +325,7 @@ function renderArticle(text, filename) {
     }
   }
 
-  html += marked.parse(articleBody);
+  html += sanitizeHtml(marked.parse(articleBody));
 
   // Deduplicate images: remove consecutive/nearby img tags with the same src
   html = (function dedupeImages(h) {
@@ -647,7 +647,7 @@ function renderDiagrams() {
       body: source
     })
     .then(function(r) { return r.ok ? r.text() : Promise.reject(r.status + ' ' + r.statusText); })
-    .then(function(svg) { container.innerHTML = svg; })
+    .then(function(svg) { container.innerHTML = sanitizeHtml(svg); })
     .catch(function(err) {
       container.innerHTML = '<pre style="text-align:left"><code>' + escapeHtml(source) + '</code></pre>'
         + '<p class="diagram-error-msg">D2 rendering unavailable: ' + escapeHtml(String(err)) + '</p>';

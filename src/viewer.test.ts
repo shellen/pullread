@@ -1,5 +1,5 @@
 // ABOUTME: Tests for viewer module helpers
-// ABOUTME: Covers reprocessFile and parseFrontmatter functions
+// ABOUTME: Covers reprocessFile, parseFrontmatter, and XSS sanitization
 
 import { reprocessFile, parseFrontmatter } from './viewer';
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'fs';
@@ -161,5 +161,38 @@ bookmarked: 2025-01-15T00:00:00Z
     const result = await reprocessFile(filePath);
     expect(result.ok).toBe(false);
     expect(result.error).toBe('Network timeout');
+  });
+});
+
+describe('XSS sanitization', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('viewer.html includes DOMPurify script tag', () => {
+    const html = readFileSync(join(rootDir, 'viewer.html'), 'utf-8');
+    expect(html).toContain('dompurify');
+    expect(html).toContain('purify.min.js');
+  });
+
+  test('02-utils.js defines sanitizeHtml helper', () => {
+    const utils = readFileSync(join(rootDir, 'viewer', '02-utils.js'), 'utf-8');
+    expect(utils).toMatch(/function\s+sanitizeHtml/);
+    expect(utils).toContain('DOMPurify');
+  });
+
+  test('04-article.js sanitizes marked.parse output', () => {
+    const article = readFileSync(join(rootDir, 'viewer', '04-article.js'), 'utf-8');
+    // The main article body rendering should use sanitizeHtml(marked.parse(...))
+    expect(article).toMatch(/sanitizeHtml\s*\(\s*marked\.parse\s*\(/);
+  });
+
+  test('04-article.js sanitizes kroki SVG response', () => {
+    const article = readFileSync(join(rootDir, 'viewer', '04-article.js'), 'utf-8');
+    // The kroki.io D2 diagram response should be sanitized
+    expect(article).toMatch(/sanitizeHtml\s*\(\s*svg\s*\)/);
+  });
+
+  test('09-notebooks.js sanitizes marked.parse output in preview', () => {
+    const notebooks = readFileSync(join(rootDir, 'viewer', '09-notebooks.js'), 'utf-8');
+    expect(notebooks).toMatch(/sanitizeHtml\s*\(\s*marked\.parse\s*\(/);
   });
 });

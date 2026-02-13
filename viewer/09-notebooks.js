@@ -219,7 +219,7 @@ function openNoteInPane(noteId) {
 
   // Full-page editor or preview
   if (_notebookPreviewMode) {
-    html += '<div class="notebook-preview">' + marked.parse(note.content || '*Start writing...*') + '</div>';
+    html += '<div class="notebook-preview">' + sanitizeHtml(marked.parse(note.content || '*Start writing...*')) + '</div>';
   } else {
     html += '<div class="notebook-editor-wrap"><div class="notebook-editor">'
       + '<textarea placeholder="Start writing... Use markdown for formatting.">' + escapeHtml(note.content || '') + '</textarea>'
@@ -774,7 +774,7 @@ function exportNotebookPdf() {
   // Render the notebook as a clean printable page and trigger print-to-PDF
   var win = window.open('', '_blank');
   if (!win) { alert('Please allow popups to export as PDF.'); return; }
-  var bodyHtml = marked.parse(getAllNotesContent(nb) || '');
+  var bodyHtml = sanitizeHtml(marked.parse(getAllNotesContent(nb) || ''));
   var sources = (nb.sources || []);
   var sourcesHtml = '';
   if (sources.length) {

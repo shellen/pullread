@@ -20,6 +20,12 @@ function escapeHtml(s) {
   return d.innerHTML;
 }
 
+// Sanitize rendered HTML to prevent XSS from malicious article content
+function sanitizeHtml(html) {
+  if (typeof DOMPurify !== 'undefined') return DOMPurify.sanitize(html);
+  return html;
+}
+
 // Escape a string for safe interpolation inside single-quoted JS strings in onclick attributes
 function escapeJsStr(s) {
   return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
