@@ -27,6 +27,7 @@ var LISTEN_WORDS = [
 ];
 var _listenTimer = null;
 var _listenWordIdx = 0;
+var _listenLoadingFile = null;
 
 function startListenLoading() {
   var btn = document.getElementById('listen-btn');
@@ -36,6 +37,7 @@ function startListenLoading() {
   btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> ' + LISTEN_WORDS[_listenWordIdx] + '\u2026';
   _listenTimer = setInterval(function() {
     _listenWordIdx = (_listenWordIdx + 1) % LISTEN_WORDS.length;
+    if (activeFile !== _listenLoadingFile) return;
     var b = document.getElementById('listen-btn');
     if (!b) { stopListenLoading(); return; }
     b.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> ' + LISTEN_WORDS[_listenWordIdx] + '\u2026';
@@ -44,6 +46,7 @@ function startListenLoading() {
 
 function stopListenLoading() {
   if (_listenTimer) { clearInterval(_listenTimer); _listenTimer = null; }
+  _listenLoadingFile = null;
   var btn = document.getElementById('listen-btn');
   if (btn) btn.classList.remove('listen-loading');
   updateListenButtonState();
@@ -51,7 +54,7 @@ function stopListenLoading() {
 
 function updateListenButtonState() {
   var btn = document.getElementById('listen-btn');
-  if (!btn || _listenTimer) return; // Loading animation takes precedence
+  if (!btn || (_listenTimer && activeFile === _listenLoadingFile)) return; // Loading animation takes precedence
   var playingFile = ttsPlaying && ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length
     ? ttsQueue[ttsCurrentIndex].filename : null;
   // Use "Play" label for podcast articles, "Listen" for TTS
@@ -69,6 +72,7 @@ function updateListenButtonState() {
 
 function addCurrentToTTSQueue() {
   if (!activeFile) return;
+  _listenLoadingFile = activeFile;
   startListenLoading();
   addToTTSQueue(activeFile);
 }
@@ -178,6 +182,7 @@ function renderAudioPlayer() {
   }
 
   updateListenButtonState();
+  renderMiniMode();
 }
 
 async function playTTSItem(index) {
@@ -921,6 +926,8 @@ function ttsSetSpeed(speed) {
   document.getElementById('tts-speed-btn').textContent = speed + 'x';
   var popupVal = document.getElementById('tts-speed-popup-val');
   if (popupVal) popupVal.textContent = speed + 'x';
+  var miniSpeedBtn = document.getElementById('mini-mode-speed-btn');
+  if (miniSpeedBtn) miniSpeedBtn.textContent = speed + 'x';
 
   if (ttsAudio) {
     ttsAudio.playbackRate = speed;
@@ -928,6 +935,13 @@ function ttsSetSpeed(speed) {
   if (ttsSynthUtterance && window.speechSynthesis.speaking) {
     ttsSynthUtterance.rate = speed;
   }
+}
+
+function ttsCycleSpeed() {
+  var idx = TTS_SPEEDS.indexOf(ttsSpeed);
+  if (idx < 0) idx = TTS_SPEEDS.indexOf(1.0);
+  var next = (idx + 1) % TTS_SPEEDS.length;
+  ttsSetSpeed(TTS_SPEEDS[next]);
 }
 
 function removeTTSQueueItem(index) {
@@ -1061,143 +1075,159 @@ function showTTSSettings() {
     return;
   }
 
-  fetch('/api/tts-settings').then(r => r.json()).then(data => {
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  // Show modal immediately with loading spinner
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
 
-    const providers = [
+  overlay.innerHTML =
+    '<div class="modal-card" onclick="event.stopPropagation()" style="max-width:440px">' +
+      '<h2>Voice Settings</h2>' +
+      '<div style="display:flex;justify-content:center;padding:48px 0">' +
+        '<div class="tts-settings-spinner"></div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+
+  fetch('/api/tts-settings').then(function(r) { return r.json(); }).then(function(data) {
+    var card = overlay.querySelector('.modal-card');
+    if (!card) return;
+
+    var providers = [
       { id: 'kokoro', label: 'Kokoro — natural voice, free & private' },
       { id: 'browser', label: 'Built-in Voice (Apple) — free' },
       { id: 'openai', label: 'OpenAI — premium quality' },
       { id: 'elevenlabs', label: 'ElevenLabs — premium quality' },
     ];
 
-    function renderVoiceOptions(provider, selectedVoice) {
-      if (!data.voices[provider]) return '';
-      var sel = selectedVoice || data.voice;
-      var voices = data.voices[provider];
-      if (provider === 'kokoro') return renderKokoroVoiceOptions(voices, sel);
-      return voices.map(v =>
-        '<option value="' + v.id + '"' + (sel === v.id ? ' selected' : '') + '>' + escapeHtml(v.label) + '</option>'
-      ).join('');
-    }
-
-    var KOKORO_GROUPS = { af: 'American Female', am: 'American Male', bf: 'British Female', bm: 'British Male' };
-    function renderKokoroVoiceOptions(voices, sel) {
-      var groups = {};
-      var order = [];
-      for (var i = 0; i < voices.length; i++) {
-        var prefix = voices[i].id.substring(0, 2);
-        if (!groups[prefix]) { groups[prefix] = []; order.push(prefix); }
-        groups[prefix].push(voices[i]);
-      }
-      var html = '';
-      for (var g = 0; g < order.length; g++) {
-        var key = order[g];
-        html += '<optgroup label="' + (KOKORO_GROUPS[key] || key) + '">';
-        for (var j = 0; j < groups[key].length; j++) {
-          var v = groups[key][j];
-          html += '<option value="' + v.id + '"' + (sel === v.id ? ' selected' : '') + '>' + escapeHtml(v.label) + '</option>';
-        }
-        html += '</optgroup>';
-      }
-      return html;
-    }
-
-    function renderModelOptions(provider) {
-      if (!data.models[provider]) return '';
-      return data.models[provider].map(m =>
-        '<option value="' + m.id + '"' + (data.model === m.id ? ' selected' : '') + '>' + escapeHtml(m.label) + '</option>'
-      ).join('');
-    }
-
-    overlay.innerHTML = `
-      <div class="modal-card" onclick="event.stopPropagation()" style="max-width:440px">
-        <h2>Listen to Articles</h2>
-        <p>Have your articles read aloud while you do other things.</p>
-        <div style="margin:12px 0">
-          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Provider</label>
-          <select id="tts-provider-select" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px" onchange="ttsSettingsProviderChanged()">
-            ${providers.map(p => '<option value="' + p.id + '"' + (data.provider === p.id ? ' selected' : '') + '>' + p.label + '</option>').join('')}
-          </select>
-        </div>
-        <div id="tts-kokoro-settings" style="display:${data.provider === 'kokoro' ? 'block' : 'none'}">
-          <div style="background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin:10px 0;font-size:12px;line-height:1.6">
-            <strong style="color:var(--fg)">Kokoro — natural-sounding voice, completely free</strong><br>
-            <span style="color:var(--muted)">Runs entirely on your Mac using the Kokoro voice engine — your articles stay private and never leave your machine.</span><br>
-            <span style="color:var(--muted)">Sets itself up automatically the first time you listen (~86MB download).</span>
-            <div id="kokoro-status" style="margin-top:6px">
-              ${data.kokoro?.installed
-                ? '<span style="color:#22c55e">&#10003; Ready to go</span>'
-                : '<span style="color:var(--muted)">Will set up automatically on first listen</span>'}
-            </div>
-          </div>
-          <div style="margin:12px 0">
-            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Voice</label>
-            <select id="tts-kokoro-voice" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px">
-              ${renderVoiceOptions('kokoro')}
-            </select>
-          </div>
-          <div style="margin:12px 0" id="tts-kokoro-quality">
-            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Quality</label>
-            ${(data.model === 'kokoro-v1-q4')
-              ? '<div style="font-size:12px;color:#22c55e">&#10003; High quality</div>'
-              : '<div style="font-size:12px;color:var(--fg)">Standard quality'
-                + '<br><button onclick="ttsUpgradeKokoroQuality()" style="margin-top:6px;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--link);font-size:12px;cursor:pointer;font-family:inherit">Upgrade to high quality</button>'
-                + '<span style="color:var(--muted);font-size:11px;margin-left:6px">Free &middot; 305MB download</span></div>'
-            }
-            <input type="hidden" id="tts-kokoro-model" value="${escapeHtml(data.model || 'kokoro-v1-q8')}">
-          </div>
-        </div>
-        <div id="tts-cost-info" style="display:${data.provider === 'openai' || data.provider === 'elevenlabs' ? 'block' : 'none'}">
-          <div id="tts-cost-estimate" style="background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin:10px 0;font-size:12px;line-height:1.5">
-            ${ttsGetCostHtml(data.provider, data.model)}
-          </div>
-        </div>
-        <div id="tts-cloud-settings" style="display:${data.provider === 'openai' || data.provider === 'elevenlabs' ? 'block' : 'none'}">
-          <div style="margin:12px 0">
-            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">API Key</label>
-            <input type="password" id="tts-api-key" placeholder="${data.hasKey && (data.provider === 'openai' || data.provider === 'elevenlabs') ? '••••••••••••••••' : 'Paste your key here'}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px" />
-            ${data.hasKey && (data.provider === 'openai' || data.provider === 'elevenlabs')
-              ? '<div style="font-size:11px;color:#22c55e;margin-top:3px">&#10003; API key saved. Leave blank to keep current key.</div>'
-              : '<div style="font-size:11px;color:var(--muted);margin-top:3px">You can get a key from your provider\'s website. This key is only used for reading articles aloud.</div>'}
-          </div>
-          <div style="margin:12px 0" id="tts-voice-row">
-            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Voice</label>
-            <select id="tts-voice-select" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px" onchange="ttsSettingsModelChanged()">
-              ${renderVoiceOptions(data.provider)}
-            </select>
-          </div>
-          <div style="margin:12px 0" id="tts-model-row">
-            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Model</label>
-            <select id="tts-model-select" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px" onchange="ttsSettingsModelChanged()">
-              ${renderModelOptions(data.provider)}
-            </select>
-          </div>
-          <div style="margin:14px 0;padding:10px 12px;background:var(--code-bg);border:1px solid var(--border);border-radius:6px">
-            <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;cursor:pointer;line-height:1.5">
-              <input type="checkbox" id="tts-consent" style="margin-top:3px;width:16px;height:16px;accent-color:var(--link);flex-shrink:0" />
-              <span>Articles will be sent to this provider to create audio. Your API key will be charged a small amount per article — audio is saved locally so you only pay once per article.</span>
-            </label>
-          </div>
-        </div>
-        <div class="modal-actions">
-          <button class="btn-secondary" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
-          <button class="btn-primary" onclick="saveTTSSettings()" id="tts-save-btn">Save</button>
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(overlay);
-
-    // Store full settings data for dynamic updates
+    // Store data on overlay so module-scope render helpers can access it
     overlay._ttsData = data;
-  }).catch(() => {
+
+    var isCloud = data.provider === 'openai' || data.provider === 'elevenlabs';
+    var kokoroInstalled = data.kokoro && data.kokoro.installed;
+
+    card.innerHTML =
+      '<h2>Voice Settings</h2>' +
+      '<div style="margin:12px 0">' +
+        '<label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Provider</label>' +
+        '<select id="tts-provider-select" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px" onchange="ttsSettingsProviderChanged()">' +
+          providers.map(function(p) { return '<option value="' + p.id + '"' + (data.provider === p.id ? ' selected' : '') + '>' + p.label + '</option>'; }).join('') +
+        '</select>' +
+      '</div>' +
+      '<div id="tts-kokoro-settings" style="display:' + (data.provider === 'kokoro' ? 'block' : 'none') + '">' +
+        '<div style="background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin:10px 0;font-size:12px;line-height:1.6">' +
+          '<strong style="color:var(--fg)">Kokoro — natural-sounding voice, completely free</strong><br>' +
+          '<span style="color:var(--muted)">Runs entirely on your Mac using the Kokoro voice engine — your articles stay private and never leave your machine.</span><br>' +
+          '<span style="color:var(--muted)">Sets itself up automatically the first time you listen (~86MB download).</span>' +
+          '<div id="kokoro-status" style="margin-top:6px">' +
+            (kokoroInstalled
+              ? '<span style="color:#22c55e">&#10003; Ready to go</span>'
+              : '<span style="color:var(--muted)">Will set up automatically on first listen</span>') +
+          '</div>' +
+        '</div>' +
+        '<div style="margin:12px 0">' +
+          '<label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Voice</label>' +
+          '<select id="tts-kokoro-voice" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px">' +
+            renderVoiceOptions('kokoro') +
+          '</select>' +
+        '</div>' +
+        '<div style="margin:12px 0" id="tts-kokoro-quality">' +
+          '<label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Quality</label>' +
+          ((data.model === 'kokoro-v1-q4')
+            ? '<div style="font-size:12px;color:#22c55e">&#10003; High quality</div>'
+            : '<div style="font-size:12px;color:var(--fg)">Standard quality'
+              + '<br><button onclick="ttsUpgradeKokoroQuality()" style="margin-top:6px;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--link);font-size:12px;cursor:pointer;font-family:inherit">Upgrade to high quality</button>'
+              + '<span style="color:var(--muted);font-size:11px;margin-left:6px">Free &middot; 305MB download</span></div>'
+          ) +
+          '<input type="hidden" id="tts-kokoro-model" value="' + escapeHtml(data.model || 'kokoro-v1-q8') + '">' +
+        '</div>' +
+      '</div>' +
+      '<div id="tts-cost-info" style="display:' + (isCloud ? 'block' : 'none') + '">' +
+        '<div id="tts-cost-estimate" style="background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin:10px 0;font-size:12px;line-height:1.5">' +
+          ttsGetCostHtml(data.provider, data.model) +
+        '</div>' +
+      '</div>' +
+      '<div id="tts-cloud-settings" style="display:' + (isCloud ? 'block' : 'none') + '">' +
+        '<div style="margin:12px 0">' +
+          '<label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">API Key</label>' +
+          '<input type="password" id="tts-api-key" placeholder="' + (data.hasKey && isCloud ? '••••••••••••••••' : 'Paste your key here') + '" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px" />' +
+          (data.hasKey && isCloud
+            ? '<div style="font-size:11px;color:#22c55e;margin-top:3px">&#10003; API key saved. Leave blank to keep current key.</div>'
+            : '<div style="font-size:11px;color:var(--muted);margin-top:3px">You can get a key from your provider\'s website. This key is only used for reading articles aloud.</div>') +
+        '</div>' +
+        '<div style="margin:12px 0" id="tts-voice-row">' +
+          '<label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Voice</label>' +
+          '<select id="tts-voice-select" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px" onchange="ttsSettingsModelChanged()">' +
+            renderVoiceOptions(data.provider) +
+          '</select>' +
+        '</div>' +
+        '<div style="margin:12px 0" id="tts-model-row">' +
+          '<label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Model</label>' +
+          '<select id="tts-model-select" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px" onchange="ttsSettingsModelChanged()">' +
+            renderModelOptions(data.provider) +
+          '</select>' +
+        '</div>' +
+        '<div style="margin:14px 0;padding:10px 12px;background:var(--code-bg);border:1px solid var(--border);border-radius:6px">' +
+          '<label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;cursor:pointer;line-height:1.5">' +
+            '<input type="checkbox" id="tts-consent" style="margin-top:3px;width:16px;height:16px;accent-color:var(--link);flex-shrink:0" />' +
+            '<span>Articles will be sent to this provider to create audio. Your API key will be charged a small amount per article — audio is saved locally so you only pay once per article.</span>' +
+          '</label>' +
+        '</div>' +
+      '</div>' +
+      '<div class="modal-actions">' +
+        '<button class="btn-secondary" onclick="this.closest(\'.modal-overlay\').remove()">Cancel</button>' +
+        '<button class="btn-primary" onclick="saveTTSSettings()" id="tts-save-btn">Save</button>' +
+      '</div>';
+  }).catch(function() {
+    overlay.remove();
     alert('Could not load voice playback settings.');
   });
+}
+
+var _KOKORO_GROUPS = { af: 'American Female', am: 'American Male', bf: 'British Female', bm: 'British Male' };
+
+function renderKokoroVoiceOptions(voices, sel) {
+  var groups = {};
+  var order = [];
+  for (var i = 0; i < voices.length; i++) {
+    var prefix = voices[i].id.substring(0, 2);
+    if (!groups[prefix]) { groups[prefix] = []; order.push(prefix); }
+    groups[prefix].push(voices[i]);
+  }
+  var html = '';
+  for (var g = 0; g < order.length; g++) {
+    var key = order[g];
+    html += '<optgroup label="' + (_KOKORO_GROUPS[key] || key) + '">';
+    for (var j = 0; j < groups[key].length; j++) {
+      var v = groups[key][j];
+      html += '<option value="' + v.id + '"' + (sel === v.id ? ' selected' : '') + '>' + escapeHtml(v.label) + '</option>';
+    }
+    html += '</optgroup>';
+  }
+  return html;
+}
+
+function renderVoiceOptions(provider, selectedVoice) {
+  var overlay = document.querySelector('.modal-overlay');
+  var data = overlay && overlay._ttsData;
+  if (!data || !data.voices[provider]) return '';
+  var sel = selectedVoice || data.voice;
+  var voices = data.voices[provider];
+  if (provider === 'kokoro') return renderKokoroVoiceOptions(voices, sel);
+  return voices.map(function(v) {
+    return '<option value="' + v.id + '"' + (sel === v.id ? ' selected' : '') + '>' + escapeHtml(v.label) + '</option>';
+  }).join('');
+}
+
+function renderModelOptions(provider) {
+  var overlay = document.querySelector('.modal-overlay');
+  var data = overlay && overlay._ttsData;
+  if (!data || !data.models[provider]) return '';
+  return data.models[provider].map(function(m) {
+    return '<option value="' + m.id + '"' + (data.model === m.id ? ' selected' : '') + '>' + escapeHtml(m.label) + '</option>';
+  }).join('');
 }
 
 // Cost estimates per model ($ per 1K characters, based on a ~2000-word / 10K char article)
@@ -1331,15 +1361,20 @@ function saveTTSSettings() {
     }
   }
 
+  // Close modal immediately for responsive feel
+  var settingsOverlay = document.querySelector('.modal-overlay');
+  if (settingsOverlay) settingsOverlay.remove();
+
+  var wasPlaying = ttsPlaying && ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length;
+  var resumeIdx = ttsCurrentIndex;
+
   fetch('/api/tts-settings', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(config),
-  }).then(r => {
+  }).then(function(r) {
     if (r.ok) {
       ttsProvider = provider;
-      var wasPlaying = ttsPlaying && ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length;
-      var resumeIdx = ttsCurrentIndex;
       // Stop current audio but keep the queue
       _ttsChunkSession = null;
       if (ttsAudio) {
@@ -1350,8 +1385,6 @@ function saveTTSSettings() {
       if (window.speechSynthesis) window.speechSynthesis.cancel();
       ttsPlaying = false;
       renderAudioPlayer();
-      const overlay = document.querySelector('.modal-overlay');
-      if (overlay) overlay.remove();
       // Restart current article with the new voice
       if (wasPlaying) {
         startListenLoading();
@@ -1361,5 +1394,142 @@ function saveTTSSettings() {
       alert('Failed to save voice playback settings.');
     }
   });
+}
+
+// ---- Mini Mode ----
+
+var _miniModeSyncTimer = null;
+function startMiniModeSync() {
+  if (_miniModeSyncTimer) return;
+  _miniModeSyncTimer = setInterval(function() {
+    if (!miniMode) { stopMiniModeSync(); return; }
+    var fill = document.getElementById('mini-mode-progress-fill');
+    var cur = document.getElementById('mini-mode-time-current');
+    var tot = document.getElementById('mini-mode-time-total');
+    var mainFill = document.getElementById('tts-progress');
+    var mainCur = document.getElementById('tts-time-current');
+    var mainTot = document.getElementById('tts-time-total');
+    if (fill && mainFill) fill.style.width = mainFill.style.width;
+    if (cur && mainCur) cur.textContent = mainCur.textContent;
+    if (tot && mainTot) tot.textContent = mainTot.textContent;
+  }, 250);
+}
+function stopMiniModeSync() {
+  if (_miniModeSyncTimer) { clearInterval(_miniModeSyncTimer); _miniModeSyncTimer = null; }
+}
+
+function toggleMiniMode() {
+  miniMode = !miniMode;
+  document.body.classList.toggle('mini-mode', miniMode);
+  var container = document.getElementById('mini-mode-container');
+  if (container) container.style.display = miniMode ? '' : 'none';
+  if (miniMode) {
+    renderMiniMode();
+    initMiniModeProgressDrag();
+    startMiniModeSync();
+  } else {
+    stopMiniModeSync();
+  }
+  localStorage.setItem('pr-mini-mode', miniMode ? '1' : '0');
+}
+
+function renderMiniMode() {
+  var container = document.getElementById('mini-mode-container');
+  if (!container || !miniMode) return;
+
+  var titleEl = document.getElementById('mini-mode-title');
+  var statusEl = document.getElementById('mini-mode-status');
+  var playBtn = document.getElementById('mini-mode-play-btn');
+  var speedBtn = document.getElementById('mini-mode-speed-btn');
+  var queueEl = document.getElementById('mini-mode-queue');
+
+  if (ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length) {
+    titleEl.textContent = ttsQueue[ttsCurrentIndex].title;
+  } else {
+    titleEl.textContent = 'No article playing';
+  }
+
+  if (ttsGenerating) {
+    statusEl.textContent = 'Generating...';
+  } else if (ttsPlaying) {
+    statusEl.textContent = 'Playing';
+  } else if (ttsCurrentIndex >= 0) {
+    statusEl.textContent = 'Paused';
+  } else {
+    statusEl.textContent = '';
+  }
+
+  playBtn.innerHTML = ttsPlaying
+    ? '<svg><use href="#i-pause"/></svg>'
+    : '<svg><use href="#i-play"/></svg>';
+
+  speedBtn.textContent = ttsSpeed + 'x';
+
+  // Sync progress from main player
+  var mainProgress = document.getElementById('tts-progress');
+  var mainCurrent = document.getElementById('tts-time-current');
+  var mainTotal = document.getElementById('tts-time-total');
+  if (mainProgress) document.getElementById('mini-mode-progress-fill').style.width = mainProgress.style.width;
+  if (mainCurrent) document.getElementById('mini-mode-time-current').textContent = mainCurrent.textContent;
+  if (mainTotal) document.getElementById('mini-mode-time-total').textContent = mainTotal.textContent;
+
+  // Render queue
+  if (ttsQueue.length > 1) {
+    queueEl.innerHTML = ttsQueue.map(function(item, i) {
+      return '<div class="mini-mode-queue-item' + (i === ttsCurrentIndex ? ' playing' : '') + '" onclick="playTTSItem(' + i + ')">'
+        + '<span style="font-size:10px;color:var(--muted);width:14px;text-align:center">' + (i === ttsCurrentIndex ? '&#9654;' : (i + 1)) + '</span>'
+        + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(item.title) + '</span>'
+        + '</div>';
+    }).join('');
+  } else {
+    queueEl.innerHTML = '';
+  }
+
+  // Auto-exit mini mode when queue empties
+  if (ttsQueue.length === 0) {
+    miniMode = false;
+    document.body.classList.remove('mini-mode');
+    container.style.display = 'none';
+    localStorage.setItem('pr-mini-mode', '0');
+  }
+}
+
+var _miniModeProgressDragInit = false;
+function initMiniModeProgressDrag() {
+  if (_miniModeProgressDragInit) return;
+  _miniModeProgressDragInit = true;
+
+  var wrap = document.getElementById('mini-mode-progress-wrap');
+  if (!wrap) return;
+
+  function seekFromEvent(e) {
+    if (!ttsPlaying && ttsCurrentIndex < 0) return;
+    var rect = wrap.getBoundingClientRect();
+    var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    var pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    ttsSeek(pct);
+  }
+
+  function onMove(e) { seekFromEvent(e); }
+  function onEnd() {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onEnd);
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('touchend', onEnd);
+  }
+
+  wrap.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    seekFromEvent(e);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onEnd);
+  });
+
+  wrap.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    seekFromEvent(e);
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchend', onEnd);
+  }, { passive: false });
 }
 

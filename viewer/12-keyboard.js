@@ -87,6 +87,16 @@ document.addEventListener('keydown', e => {
     return;
   }
 
+  // m to toggle mini mode (when audio is playing/queued)
+  if (e.key === 'm' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+    var hasAudio = ttsQueue.length > 0 || miniMode;
+    if (hasAudio) {
+      e.preventDefault();
+      toggleMiniMode();
+      return;
+    }
+  }
+
   // j/k navigate file list (next/prev)
   if ((e.key === 'j' || e.key === 'k') && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
     e.preventDefault();

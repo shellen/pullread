@@ -121,7 +121,10 @@
           </div>
           <div id="audio-queue-list"></div>
         </div>
-        <button class="audio-settings-link" onclick="showTTSSettings()">Voice Playback Settings</button>
+        <div class="audio-bottom-row">
+          <button class="audio-settings-link" onclick="showTTSSettings()">Voice Playback Settings</button>
+          <button class="audio-mini-mode-btn" onclick="toggleMiniMode()" title="Mini mode (m)">Mini</button>
+        </div>
       </div>
       <div class="sidebar-footer">
         <button class="sidebar-footer-btn" onclick="showShortcutsModal()" aria-label="Keyboard shortcuts"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-keyboard"/></svg> Shortcuts</button>
@@ -137,6 +140,33 @@
     <div class="mini-player" id="mini-player" style="display:none">
       <button onclick="ttsTogglePlay()" title="Play/Pause" id="mini-play-btn"><svg><use href="#i-play"/></svg></button>
       <button onclick="ttsSkipNext()" title="Forward 15s"><svg><use href="#i-forward"/></svg></button>
+    </div>
+
+    <div class="mini-mode-container" id="mini-mode-container" style="display:none">
+      <div class="mini-mode-header">
+        <span class="mini-mode-brand">PullRead</span>
+        <button class="mini-mode-expand" onclick="toggleMiniMode()" title="Exit mini mode">
+          <svg class="icon icon-sm" aria-hidden="true"><use href="#i-bars"/></svg>
+        </button>
+      </div>
+      <div class="mini-mode-now">
+        <div class="mini-mode-title" id="mini-mode-title">No article playing</div>
+        <div class="mini-mode-status" id="mini-mode-status"></div>
+      </div>
+      <div class="mini-mode-controls">
+        <button onclick="ttsSkipPrev()" title="Rewind 15s"><svg><use href="#i-backward"/></svg></button>
+        <button class="mini-mode-play-btn" onclick="ttsTogglePlay()" title="Play/Pause" id="mini-mode-play-btn"><svg><use href="#i-play"/></svg></button>
+        <button onclick="ttsSkipNext()" title="Forward 15s"><svg><use href="#i-forward"/></svg></button>
+      </div>
+      <div class="mini-mode-progress">
+        <span class="mini-mode-time" id="mini-mode-time-current">0:00</span>
+        <div class="mini-mode-progress-wrap" id="mini-mode-progress-wrap">
+          <div class="mini-mode-progress-bar"><div class="mini-mode-progress-fill" id="mini-mode-progress-fill"></div></div>
+        </div>
+        <span class="mini-mode-time" id="mini-mode-time-total">0:00</span>
+        <button class="mini-mode-speed-btn" onclick="ttsCycleSpeed()" title="Cycle speed" id="mini-mode-speed-btn">1x</button>
+      </div>
+      <div class="mini-mode-queue" id="mini-mode-queue"></div>
     </div>
 
     <main class="content-pane" id="content-pane" aria-label="Article content">
