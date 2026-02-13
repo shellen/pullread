@@ -231,10 +231,14 @@ pub async fn run_sync(app: &AppHandle, retry_failed: bool) -> Result<String, Str
         cmd = cmd.env(key, value);
     }
 
-    let output = cmd
-        .output()
-        .await
-        .map_err(|e| format!("Sync failed to run: {}", e))?;
+    let timeout = std::time::Duration::from_secs(5 * 60);
+    let output = match tokio::time::timeout(timeout, cmd.output()).await {
+        Ok(result) => result.map_err(|e| format!("Sync failed to run: {}", e))?,
+        Err(_) => {
+            append_log("[sync] timed out after 5 minutes");
+            return Err("Sync timed out after 5 minutes".to_string());
+        }
+    };
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -281,7 +285,12 @@ pub async fn ensure_viewer_running(app: &AppHandle) -> Result<u16, String> {
         }
     }
 
-    let port = portpicker::pick_unused_port().unwrap_or(7777);
+    // Use a fixed port so WebView localStorage persists across launches
+    let port = if portpicker::is_free_tcp(7777) {
+        7777
+    } else {
+        portpicker::pick_unused_port().unwrap_or(7778)
+    };
     let config_path = state.config_path().to_string_lossy().to_string();
     let port_str = port.to_string();
 

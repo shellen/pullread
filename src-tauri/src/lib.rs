@@ -49,8 +49,9 @@ pub fn run() {
                 } else if state.is_config_valid() {
                     // Wait 2 seconds then run initial sync
                     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                    let _ = sidecar::run_sync(&handle, false).await;
-                    tray::update_last_sync(&handle);
+                    if sidecar::run_sync(&handle, false).await.is_ok() {
+                        tray::update_last_sync(&handle);
+                    }
 
                     // Start scheduled timers
                     timers::start_timers(&handle);

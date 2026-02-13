@@ -841,6 +841,15 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
             return;
           }
           const content = readFileSync(filePath, 'utf-8');
+
+          // Block summarization of review articles
+          const fm = parseFrontmatter(content);
+          if (fm.feed === 'weekly-review' || fm.feed === 'daily-review') {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Reviews cannot be summarized' }));
+            return;
+          }
+
           // Strip frontmatter
           const match = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
           articleText = match ? match[1] : content;
