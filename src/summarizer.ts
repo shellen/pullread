@@ -394,9 +394,9 @@ function runApplePrompt(prompt: string): string {
 
 const CHUNK_WORD_LIMIT = 2000;
 
-// Apple Intelligence has a 4096-token context window (~3000 words).
-// Each turn's prompt + previous context must fit within this.
-const APPLE_SECTION_WORD_LIMIT = 800;
+// Apple Intelligence has a 4096-token context window.
+// Each turn needs room for prompt overhead + response, so sections must be small.
+const APPLE_SECTION_WORD_LIMIT = 600;
 
 // RLM-inspired multi-turn summarization for long articles.
 // Instead of map-reduce (N separate processes, each losing context), this runs
@@ -528,8 +528,9 @@ function runAppleRLM(articleText: string): string {
   }
 }
 
-// Apple Intelligence context limit (~3000 words, leaving room for output tokens)
-const APPLE_MAX_INPUT_WORDS = 2400;
+// Apple Intelligence context limit: 4096 tokens total (input + output).
+// URLs and code tokenize at ~2 tokens/word, so use conservative limit.
+const APPLE_MAX_INPUT_WORDS = 1500;
 
 async function callApple(articleText: string): Promise<SummarizeResult> {
   const words = articleText.split(/\s+/);
