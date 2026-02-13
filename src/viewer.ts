@@ -33,7 +33,7 @@ interface FileMeta {
   enclosureDuration: string;
 }
 
-function parseFrontmatter(content: string): Record<string, string> {
+export function parseFrontmatter(content: string): Record<string, string> {
   const match = content.match(/^---\n([\s\S]*?)\n---/);
   if (!match) return {};
   const meta: Record<string, string> = {};
@@ -173,6 +173,50 @@ function writeSummaryToFile(filePath: string, summary: string, provider?: string
   if (model) frontmatter += `\nsummaryModel: ${model}`;
 
   writeFileSync(filePath, `${match[1]}${frontmatter}${match[3]}${match[4]}`);
+}
+
+export async function reprocessFile(filePath: string): Promise<{ ok: boolean; title?: string; error?: string }> {
+  try {
+    if (!existsSync(filePath)) {
+      return { ok: false, error: 'File not found' };
+    }
+
+    const existing = readFileSync(filePath, 'utf-8');
+    const meta = parseFrontmatter(existing);
+    if (!meta.url) {
+      return { ok: false, error: 'Article has no source URL in frontmatter' };
+    }
+
+    const article = await fetchAndExtract(meta.url);
+    if (!article) {
+      return { ok: false, error: 'Could not extract article from URL' };
+    }
+
+    const data: ArticleData = {
+      title: meta.title || article.title,
+      url: meta.url,
+      bookmarkedAt: meta.bookmarked || new Date().toISOString(),
+      domain: meta.domain || '',
+      content: article.markdown,
+      feed: meta.feed || undefined,
+      author: article.byline || meta.author || undefined,
+      excerpt: article.excerpt || meta.excerpt || undefined,
+    };
+    const markdown = generateMarkdown(data);
+
+    if (meta.summary) {
+      const escaped = meta.summary.replace(/"/g, '\\"').replace(/\n/g, ' ');
+      const withSummary = markdown.replace(/\n---\n/, `\nsummary: "${escaped}"\n---\n`);
+      writeFileSync(filePath, withSummary, 'utf-8');
+    } else {
+      writeFileSync(filePath, markdown, 'utf-8');
+    }
+
+    return { ok: true, title: data.title };
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : 'Reprocessing failed';
+    return { ok: false, error: msg };
+  }
 }
 
 export function startViewer(outputPath: string, port = 7777, openBrowser = true): void {
@@ -847,56 +891,77 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         }
 
         const filePath = join(outputPath, name);
-        if (!existsSync(filePath)) {
-          send404(res);
-          return;
-        }
-
-        // Read existing file to get frontmatter metadata
-        const existing = readFileSync(filePath, 'utf-8');
-        const meta = parseFrontmatter(existing);
-        if (!meta.url) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Article has no source URL in frontmatter' }));
-          return;
-        }
-
-        // Re-fetch and extract
-        const article = await fetchAndExtract(meta.url);
-        if (!article) {
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Could not extract article from URL' }));
-          return;
-        }
-
-        // Rebuild the markdown file preserving original frontmatter fields
-        const data: ArticleData = {
-          title: meta.title || article.title,
-          url: meta.url,
-          bookmarkedAt: meta.bookmarked || new Date().toISOString(),
-          domain: meta.domain || '',
-          content: article.markdown,
-          feed: meta.feed || undefined,
-          author: article.byline || meta.author || undefined,
-          excerpt: article.excerpt || meta.excerpt || undefined,
-        };
-        const markdown = generateMarkdown(data);
-
-        // Preserve summary if it existed
-        if (meta.summary) {
-          const escaped = meta.summary.replace(/"/g, '\\"').replace(/\n/g, ' ');
-          const withSummary = markdown.replace(/\n---\n/, `\nsummary: "${escaped}"\n---\n`);
-          writeFileSync(filePath, withSummary, 'utf-8');
+        const result = await reprocessFile(filePath);
+        if (result.ok) {
+          sendJson(res, { ok: true, title: result.title });
         } else {
-          writeFileSync(filePath, markdown, 'utf-8');
+          const status = result.error === 'File not found' ? 404 : result.error?.includes('no source URL') ? 400 : 500;
+          res.writeHead(status, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: result.error }));
         }
-
-        sendJson(res, { ok: true, title: data.title });
       } catch (err: any) {
         const msg = err instanceof Error ? err.message : 'Reprocessing failed';
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: msg }));
       }
+      return;
+    }
+
+    // Reimport all articles — SSE progress stream
+    if (url.pathname === '/api/reimport-all' && req.method === 'POST') {
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      });
+
+      const allFiles = existsSync(outputPath) ? readdirSync(outputPath).filter(f => f.endsWith('.md')) : [];
+
+      // Parse frontmatter to get URLs; skip files without a source URL
+      const filesWithUrls: { name: string; domain: string }[] = [];
+      for (const name of allFiles) {
+        try {
+          const content = readFileSync(join(outputPath, name), 'utf-8');
+          const meta = parseFrontmatter(content);
+          if (meta.url) {
+            let domain = '';
+            try { domain = new URL(meta.url).hostname; } catch {}
+            filesWithUrls.push({ name, domain });
+          }
+        } catch {}
+      }
+
+      // Sort by domain to batch same-host requests
+      filesWithUrls.sort((a, b) => a.domain.localeCompare(b.domain));
+
+      const total = filesWithUrls.length;
+      let succeeded = 0;
+      let failed = 0;
+      let lastDomain = '';
+
+      for (let i = 0; i < filesWithUrls.length; i++) {
+        const { name, domain } = filesWithUrls[i];
+
+        // 1-second delay between requests to the same host
+        if (domain && domain === lastDomain) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        lastDomain = domain;
+
+        const result = await reprocessFile(join(outputPath, name));
+        const done = i + 1;
+
+        if (result.ok) {
+          succeeded++;
+          res.write(`data: ${JSON.stringify({ done, total, current: name, ok: true })}\n\n`);
+        } else {
+          failed++;
+          res.write(`data: ${JSON.stringify({ done, total, current: name, ok: false, error: result.error })}\n\n`);
+        }
+      }
+
+      res.write(`data: ${JSON.stringify({ complete: true, succeeded, failed })}\n\n`);
+      res.end();
       return;
     }
 

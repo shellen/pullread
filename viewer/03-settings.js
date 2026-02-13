@@ -248,6 +248,11 @@ function showSettingsPage() {
   html += '<button style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer" onclick="settingsRestore()">Restore from File\u2026</button>';
   html += '</div>';
   html += '<div id="backup-status" style="font-size:12px;color:var(--muted);padding-top:8px"></div>';
+  html += '<hr style="border:none;border-top:1px solid var(--border);margin:16px 0 12px">';
+  html += '<div class="settings-row" style="gap:12px">';
+  html += '<button id="reimport-all-btn" style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer" onclick="reimportAllArticles()"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-cloud-download"/></svg>Reimport All Articles</button>';
+  html += '</div>';
+  html += '<div id="reimport-status" style="font-size:12px;color:var(--muted);padding-top:8px"></div>';
   html += '</div>';
 
   content.innerHTML = html;
@@ -762,5 +767,54 @@ function settingsRestore() {
     reader.readAsText(input.files[0]);
   };
   input.click();
+}
+
+function reimportAllArticles() {
+  var btn = document.getElementById('reimport-all-btn');
+  var status = document.getElementById('reimport-status');
+
+  // Fetch article count for confirmation
+  fetch('/api/files').then(function(r) { return r.json(); }).then(function(files) {
+    var count = files.length;
+    if (!confirm('This will re-fetch all ' + count + ' articles from their original URLs. Continue?')) return;
+
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
+    if (status) status.textContent = 'Reimporting... 0/' + count;
+
+    fetch('/api/reimport-all', { method: 'POST' }).then(function(response) {
+      var reader = response.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = '';
+
+      function read() {
+        reader.read().then(function(result) {
+          if (result.done) return;
+          buffer += decoder.decode(result.value, { stream: true });
+
+          var lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (var i = 0; i < lines.length; i++) {
+            var line = lines[i];
+            if (!line.startsWith('data: ')) continue;
+            try {
+              var evt = JSON.parse(line.slice(6));
+              if (evt.complete) {
+                if (status) status.textContent = 'Done! ' + evt.succeeded + ' succeeded, ' + evt.failed + ' failed.';
+                if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+                return;
+              }
+              if (status) status.textContent = 'Reimporting... ' + evt.done + '/' + evt.total + (evt.ok ? '' : ' (failed: ' + evt.current + ')');
+            } catch(e) {}
+          }
+          read();
+        });
+      }
+      read();
+    }).catch(function(e) {
+      if (status) status.textContent = 'Reimport failed: ' + e.message;
+      if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+    });
+  });
 }
 
