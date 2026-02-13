@@ -80,17 +80,11 @@ document.addEventListener('keydown', e => {
     }
   }
 
-  // n to toggle notes panel — not on Guide/Explore pages
+  // n to scroll to annotations panel — not on Guide/Explore pages
   if (e.key === 'n' && activeFile && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-    const panel = document.querySelector('.notes-panel');
-    if (panel) {
-      e.preventDefault();
-      panel.toggleAttribute('open');
-      if (panel.hasAttribute('open')) {
-        panel.querySelector('textarea').focus();
-      }
-      return;
-    }
+    e.preventDefault();
+    toggleNotesFromHeader();
+    return;
   }
 
   // j/k navigate file list (next/prev)

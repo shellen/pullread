@@ -222,17 +222,6 @@ function scrollToFootnoteRef(num) {
   setTimeout(() => { el.style.outline = ''; }, 1500);
 }
 
-function toggleGeneralNote(btn) {
-  const wrap = btn.parentElement.querySelector('.notes-textarea-wrap');
-  if (!wrap) return;
-  const isHidden = wrap.style.display === 'none';
-  wrap.style.display = isHidden ? '' : 'none';
-  if (isHidden) {
-    const ta = wrap.querySelector('textarea');
-    if (ta) ta.focus();
-  }
-}
-
 function applyHighlights() {
   const content = document.getElementById('content');
   if (!content) return;
@@ -616,51 +605,35 @@ function updateAnnotation(id, btn) {
   removeAnnotationPopover();
 }
 
-// Article-level notes panel
+// Article-level annotations panel
 function renderNotesPanel() {
-  // Remove existing panel
   const existing = document.querySelector('.notes-panel');
   if (existing) existing.remove();
 
   const content = document.getElementById('content');
   if (!content || content.style.display === 'none') return;
 
-  const panel = document.createElement('details');
+  const panel = document.createElement('div');
   panel.className = 'notes-panel';
   const noteText = articleNotes.articleNote || '';
-  const footnoteCount = footnoteEntries.length;
-
-  let summaryText = 'Notes';
-  if (footnoteCount) summaryText += ' (' + footnoteCount + ' footnote' + (footnoteCount !== 1 ? 's' : '') + ')';
 
   const tags = articleNotes.tags || [];
   const machineTags = articleNotes.machineTags || [];
-  const isFav = articleNotes.isFavorite || false;
   const tagsHtml = tags.map(t => '<span class="tag">' + escapeHtml(t) + '<span class="tag-remove" onclick="removeTag(\'' + escapeHtml(t.replace(/'/g, "\\'")) + '\')">&times;</span></span>').join('')
-    + machineTags.map(t => '<span class="tag tag-machine" title="Auto-generated tag">' + escapeHtml(t) + '</span>').join('');
-
-  const hideTextarea = !noteText;
-  const btnLabel = noteText ? 'General note' : '+ Add general note';
+    + machineTags.map(t => '<span class="tag tag-machine" title="Auto-generated">' + escapeHtml(t) + '</span>').join('');
 
   panel.innerHTML = `
-    <summary>${summaryText}</summary>
-    <div class="favorite-row">
-      <button class="favorite-btn${isFav ? ' active' : ''}" onclick="toggleFavorite(this)" title="Mark as favorite"><svg class="icon"><use href="#i-${isFav ? 'heart' : 'heart-o'}"/></svg></button>
-      <span style="color:var(--muted);font-size:12px">${isFav ? 'Favorited' : 'Mark favorite'}</span>
-    </div>
+    <div class="annotations-heading">Annotations</div>
     <div class="tags-row">
       ${tagsHtml}
       <input type="text" placeholder="Add tag..." onkeydown="handleTagKey(event)" />
     </div>
-    <button class="add-note-btn" onclick="toggleGeneralNote(this)">${btnLabel}</button>
-    <div class="notes-textarea-wrap"${hideTextarea ? ' style="display:none"' : ''}>
-      <textarea placeholder="Add notes about this article...">${escapeHtml(noteText)}</textarea>
-      <button class="voice-note-btn" onclick="toggleVoiceNote(this)" title="Voice note (requires microphone)"><svg aria-hidden="true"><use href="#i-mic"/></svg></button>
+    <div class="notes-textarea-wrap">
+      <textarea placeholder="Write a note...">${escapeHtml(noteText)}</textarea>
+      <button class="voice-note-btn" onclick="toggleVoiceNote(this)" title="Voice note"><svg aria-hidden="true"><use href="#i-mic"/></svg></button>
     </div>
     <div class="notes-save-hint">Auto-saved</div>
   `;
-
-  if (noteText || isFav || tags.length || machineTags.length || footnoteCount) panel.setAttribute('open', '');
 
   content.appendChild(panel);
 
@@ -695,12 +668,9 @@ var toggleFavoriteFromHeader = toggleFavorite;
 function toggleNotesFromHeader() {
   const panel = document.querySelector('.notes-panel');
   if (panel) {
-    panel.toggleAttribute('open');
-    if (panel.hasAttribute('open')) {
-      const wrap = panel.querySelector('.notes-textarea-wrap');
-      if (wrap) wrap.style.display = '';
-      panel.querySelector('textarea').focus();
-    }
+    panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const ta = panel.querySelector('textarea');
+    if (ta) ta.focus();
   }
 }
 
