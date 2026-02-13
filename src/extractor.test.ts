@@ -4,7 +4,8 @@
 import {
   extractArticle, resolveRelativeUrls, simplifySubstackUrl, isYouTubeUrl, extractYouTubeId,
   matchPaperSource, fixPdfLigatures, stripRunningHeaders, buildParagraphs, extractPdfTitle,
-  parseCaptionTracks
+  parseCaptionTracks, extractTweetId, isThreadsUrl, formatTweetMarkdown, fetchAndExtract,
+  type FxTweet
 } from './extractor';
 
 const SAMPLE_HTML = `
@@ -548,5 +549,251 @@ describe('parseCaptionTracks', () => {
     expect(tracks).not.toBeNull();
     expect(tracks!.length).toBe(1);
     expect(tracks![0].languageCode).toBe('en');
+  });
+});
+
+// ── Twitter/X tweet ID extraction ───────────────────────────────────
+
+describe('extractTweetId', () => {
+  test('extracts from standard x.com URL', () => {
+    const result = extractTweetId('https://x.com/naval/status/1002103360646823936');
+    expect(result).toEqual({ username: 'naval', statusId: '1002103360646823936' });
+  });
+
+  test('extracts from twitter.com URL', () => {
+    const result = extractTweetId('https://twitter.com/user/status/123456789');
+    expect(result).toEqual({ username: 'user', statusId: '123456789' });
+  });
+
+  test('extracts from www.twitter.com URL', () => {
+    const result = extractTweetId('https://www.twitter.com/user/status/123');
+    expect(result).toEqual({ username: 'user', statusId: '123' });
+  });
+
+  test('extracts from mobile.x.com URL', () => {
+    const result = extractTweetId('https://mobile.x.com/user/status/123');
+    expect(result).toEqual({ username: 'user', statusId: '123' });
+  });
+
+  test('handles URL with trailing query params', () => {
+    const result = extractTweetId('https://x.com/user/status/123?s=20&t=abc');
+    expect(result).toEqual({ username: 'user', statusId: '123' });
+  });
+
+  test('returns null for profile URL', () => {
+    expect(extractTweetId('https://x.com/naval')).toBeNull();
+  });
+
+  test('returns null for followers page', () => {
+    expect(extractTweetId('https://x.com/naval/followers')).toBeNull();
+  });
+
+  test('returns null for non-numeric status ID', () => {
+    expect(extractTweetId('https://x.com/user/status/not-a-number')).toBeNull();
+  });
+
+  test('returns null for non-Twitter URL', () => {
+    expect(extractTweetId('https://example.com/user/status/123')).toBeNull();
+  });
+
+  test('returns null for invalid URL', () => {
+    expect(extractTweetId('not-a-url')).toBeNull();
+  });
+});
+
+// ── Threads.net URL detection ───────────────────────────────────────
+
+describe('isThreadsUrl', () => {
+  test('detects www.threads.net', () => {
+    expect(isThreadsUrl('https://www.threads.net/@user/post/xxx')).toBe(true);
+  });
+
+  test('detects threads.net without www', () => {
+    expect(isThreadsUrl('https://threads.net/@user/post/xxx')).toBe(true);
+  });
+
+  test('detects threads.com', () => {
+    expect(isThreadsUrl('https://threads.com/@user/post/xxx')).toBe(true);
+  });
+
+  test('detects www.threads.com', () => {
+    expect(isThreadsUrl('https://www.threads.com/@user/post/xxx')).toBe(true);
+  });
+
+  test('rejects non-Threads URLs', () => {
+    expect(isThreadsUrl('https://example.com')).toBe(false);
+    expect(isThreadsUrl('https://x.com/user/status/123')).toBe(false);
+  });
+
+  test('returns false for invalid URL', () => {
+    expect(isThreadsUrl('not-a-url')).toBe(false);
+  });
+});
+
+// ── Tweet markdown formatting ───────────────────────────────────────
+
+describe('formatTweetMarkdown', () => {
+  const baseTweet: FxTweet = {
+    text: 'Seek wealth, not money or status.',
+    author: { name: 'Naval', screen_name: 'naval' },
+    created_at: 'Thu May 31 08:23:54 +0000 2018',
+  };
+
+  test('formats basic tweet with author and date', () => {
+    const md = formatTweetMarkdown(baseTweet);
+    expect(md).toContain('**@naval**');
+    expect(md).toContain('May 31, 2018');
+    expect(md).toContain('Seek wealth, not money or status.');
+  });
+
+  test('includes photos as markdown images', () => {
+    const tweet: FxTweet = {
+      ...baseTweet,
+      media: {
+        photos: [
+          { url: 'https://pbs.twimg.com/media/abc.jpg', alt_text: 'A photo' },
+        ],
+      },
+    };
+    const md = formatTweetMarkdown(tweet);
+    expect(md).toContain('![A photo](https://pbs.twimg.com/media/abc.jpg)');
+  });
+
+  test('includes videos as linked thumbnails', () => {
+    const tweet: FxTweet = {
+      ...baseTweet,
+      media: {
+        videos: [
+          { url: 'https://video.twimg.com/v1.mp4', thumbnail_url: 'https://pbs.twimg.com/thumb.jpg' },
+        ],
+      },
+    };
+    const md = formatTweetMarkdown(tweet);
+    expect(md).toContain('[![](https://pbs.twimg.com/thumb.jpg)](https://video.twimg.com/v1.mp4)');
+  });
+
+  test('includes quoted tweet as blockquote', () => {
+    const tweet: FxTweet = {
+      ...baseTweet,
+      quote: {
+        text: 'Original thought here',
+        author: { name: 'Other', screen_name: 'other' },
+        created_at: 'Wed May 30 12:00:00 +0000 2018',
+      },
+    };
+    const md = formatTweetMarkdown(tweet);
+    expect(md).toContain('> **@other**');
+    expect(md).toContain('Original thought here');
+  });
+
+  test('handles tweet with no media gracefully', () => {
+    const md = formatTweetMarkdown(baseTweet);
+    expect(md).not.toContain('![');
+    expect(md).not.toContain('[![');
+  });
+});
+
+// ── Tweet extraction integration (mocked fetch) ────────────────────
+
+describe('extractTweet via fetchAndExtract', () => {
+  let fetchSpy: jest.SpyInstance;
+
+  afterEach(() => {
+    fetchSpy?.mockRestore();
+  });
+
+  function mockFxTwitter(tweet: any) {
+    return new Response(JSON.stringify({ code: 200, message: 'OK', tweet }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  }
+
+  test('extracts single tweet via fxtwitter API', async () => {
+    fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(async (input: any) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('api.fxtwitter.com')) {
+        return mockFxTwitter({
+          text: 'Hello world!',
+          author: { name: 'TestUser', screen_name: 'testuser' },
+          created_at: 'Mon Jan 01 12:00:00 +0000 2024',
+          replying_to_status: null,
+        });
+      }
+      throw new Error('Unexpected fetch');
+    });
+
+    const result = await fetchAndExtract('https://x.com/testuser/status/123456789');
+    expect(result).not.toBeNull();
+    expect(result!.markdown).toContain('**@testuser**');
+    expect(result!.markdown).toContain('Hello world!');
+    expect(result!.title).toBeTruthy();
+  });
+
+  test('stitches thread by walking reply chain', async () => {
+    const tweet1 = {
+      id: '100',
+      text: 'Thread start',
+      author: { name: 'A', screen_name: 'user' },
+      created_at: 'Mon Jan 01 12:00:00 +0000 2024',
+      replying_to_status: null,
+    };
+    const tweet2 = {
+      id: '200',
+      text: 'Thread middle',
+      author: { name: 'A', screen_name: 'user' },
+      created_at: 'Mon Jan 01 12:01:00 +0000 2024',
+      replying_to_status: '100',
+    };
+    const tweet3 = {
+      id: '300',
+      text: 'Thread end',
+      author: { name: 'A', screen_name: 'user' },
+      created_at: 'Mon Jan 01 12:02:00 +0000 2024',
+      replying_to_status: '200',
+    };
+
+    fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(async (input: any) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('status/300')) return mockFxTwitter(tweet3);
+      if (url.includes('status/200')) return mockFxTwitter(tweet2);
+      if (url.includes('status/100')) return mockFxTwitter(tweet1);
+      throw new Error('Unexpected fetch: ' + url);
+    });
+
+    const result = await fetchAndExtract('https://x.com/user/status/300');
+    expect(result).not.toBeNull();
+    // Thread should be in chronological order (oldest first)
+    const md = result!.markdown;
+    const startIdx = md.indexOf('Thread start');
+    const midIdx = md.indexOf('Thread middle');
+    const endIdx = md.indexOf('Thread end');
+    expect(startIdx).toBeGreaterThanOrEqual(0);
+    expect(midIdx).toBeGreaterThan(startIdx);
+    expect(endIdx).toBeGreaterThan(midIdx);
+    // Thread tweets separated by horizontal rules
+    expect(md).toContain('---');
+  });
+
+  test('falls back to generic extraction on fxtwitter 404', async () => {
+    fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(async (input: any) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('api.fxtwitter.com')) {
+        return new Response('Not Found', { status: 404 });
+      }
+      // Generic HTML fallback
+      return new Response(`<html><head><title>X Post</title>
+        <meta property="og:description" content="Fallback tweet text" />
+        </head><body><article><p>Fallback tweet text with enough content for extraction.</p>
+        <p>More content to satisfy readability requirements for article parsing.</p>
+        <p>Third paragraph so the article is long enough for readability to work.</p></article></body></html>`, {
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+      });
+    });
+
+    const result = await fetchAndExtract('https://x.com/user/status/999');
+    expect(result).not.toBeNull();
+    expect(result!.markdown).toContain('Fallback tweet text');
   });
 });

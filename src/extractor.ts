@@ -193,6 +193,113 @@ export function resolveRelativeUrls(markdown: string, baseUrl: string): string {
 }
 
 /**
+ * Extract tweet ID and username from a Twitter/X status URL.
+ * Returns null for non-status URLs (profiles, search, etc.)
+ */
+export function extractTweetId(url: string): { username: string; statusId: string } | null {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname;
+    const isTwitter = host === 'x.com' || host === 'www.x.com' ||
+                      host === 'twitter.com' || host === 'www.twitter.com' ||
+                      host === 'mobile.twitter.com' || host === 'mobile.x.com';
+    if (!isTwitter) return null;
+
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    // Pattern: /username/status/1234567890
+    if (parts.length >= 3 && parts[1] === 'status' && /^\d+$/.test(parts[2])) {
+      return { username: parts[0], statusId: parts[2] };
+    }
+  } catch {}
+  return null;
+}
+
+/**
+ * Shape of a tweet from the fxtwitter API (relevant fields only)
+ */
+export interface FxTweet {
+  text: string;
+  author: {
+    name: string;
+    screen_name: string;
+  };
+  created_at: string;       // "Thu May 31 08:23:54 +0000 2018"
+  media?: {
+    photos?: Array<{ url: string; alt_text?: string }>;
+    videos?: Array<{ url: string; thumbnail_url: string }>;
+  };
+  quote?: FxTweet;
+  replying_to_status?: string | null;
+}
+
+/**
+ * Format a fxtwitter created_at timestamp to a readable date string.
+ * Input: "Thu May 31 08:23:54 +0000 2018" → "May 31, 2018"
+ */
+function formatTweetDate(createdAt: string): string {
+  try {
+    const d = new Date(createdAt);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Format a single fxtwitter API tweet object as markdown.
+ */
+export function formatTweetMarkdown(tweet: FxTweet): string {
+  const parts: string[] = [];
+
+  // Byline: **@handle** · May 31, 2018
+  const date = formatTweetDate(tweet.created_at);
+  parts.push(`**@${tweet.author.screen_name}**${date ? ` · ${date}` : ''}`);
+
+  // Tweet text
+  parts.push('');
+  parts.push(tweet.text);
+
+  // Photos
+  if (tweet.media?.photos) {
+    for (const photo of tweet.media.photos) {
+      const alt = photo.alt_text || '';
+      parts.push('');
+      parts.push(`![${alt}](${photo.url})`);
+    }
+  }
+
+  // Videos as linked thumbnails
+  if (tweet.media?.videos) {
+    for (const video of tweet.media.videos) {
+      parts.push('');
+      parts.push(`[![](${video.thumbnail_url})](${video.url})`);
+    }
+  }
+
+  // Quoted tweet as blockquote
+  if (tweet.quote) {
+    parts.push('');
+    parts.push(`> **@${tweet.quote.author.screen_name}**: ${tweet.quote.text}`);
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Detect if a URL is from Threads.net
+ */
+export function isThreadsUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return host === 'www.threads.net' || host === 'threads.net' ||
+           host === 'www.threads.com' || host === 'threads.com';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Detect if a URL is from X.com/Twitter
  */
 function isTwitterUrl(url: string): boolean {
@@ -384,7 +491,7 @@ export function matchPaperSource(url: string): { source: PaperSource; htmlUrl: s
  * Detect if a URL is a social post (any platform)
  */
 function isSocialPostUrl(url: string): boolean {
-  return isTwitterUrl(url) || isBlueskyUrl(url) || isMastodonUrl(url);
+  return isTwitterUrl(url) || isBlueskyUrl(url) || isMastodonUrl(url) || isThreadsUrl(url);
 }
 
 /**
@@ -415,6 +522,10 @@ function generateSocialTitle(html: string, url: string): string {
     } else if (isMastodonUrl(url)) {
       platform = 'Mastodon';
       if (parts[0]?.startsWith('@')) username = parts[0];
+    } else if (isThreadsUrl(url)) {
+      platform = 'Threads';
+      // threads.net/@username/post/xxx
+      if (parts[0]?.startsWith('@')) username = parts[0];
     }
   } catch {}
 
@@ -431,34 +542,6 @@ function generateSocialTitle(html: string, url: string): string {
   return `A post on ${platform}`;
 }
 
-/**
- * Generate a friendly title for X.com/Twitter posts
- */
-function generateTwitterTitle(html: string, url: string): string {
-  const { document } = parseHTML(html);
-  // Try og:description for tweet text
-  const desc = document.querySelector('meta[property="og:description"]')?.getAttribute('content')
-    || document.querySelector('meta[name="description"]')?.getAttribute('content')
-    || '';
-
-  if (desc) {
-    // Truncate to first sentence or 80 chars
-    const clean = desc.replace(/\n/g, ' ').trim();
-    const short = clean.length > 80 ? clean.slice(0, 77) + '...' : clean;
-    return short;
-  }
-
-  // Extract username from URL like x.com/username/status/123
-  try {
-    const path = new URL(url).pathname;
-    const parts = path.split('/').filter(Boolean);
-    if (parts.length >= 1) {
-      return `A post by @${parts[0]} on X`;
-    }
-  } catch {}
-
-  return 'A post on X';
-}
 
 /**
  * Extract article using Readability. If that fails, try fallback extraction
@@ -481,8 +564,6 @@ export function extractArticle(html: string, url: string): ExtractedArticle | nu
     // For social posts, "Untitled" is common — generate a better title
     if ((title === 'Untitled' || !title.trim()) && isSocialPostUrl(url)) {
       title = generateSocialTitle(html, url);
-    } else if (isTwitterUrl(url) && (title === 'Untitled' || !title.trim())) {
-      title = generateTwitterTitle(html, url);
     }
 
     return {
@@ -532,9 +613,6 @@ function extractFallback(document: any, url: string): ExtractedArticle | null {
   if (!finalTitle.trim() || finalTitle === 'Untitled') {
     if (isSocialPostUrl(url)) {
       finalTitle = generateSocialTitle(`<html><head><meta property="og:description" content="${description}"></head></html>`, url);
-    } else if (isTwitterUrl(url)) {
-      const clean = description.replace(/\n/g, ' ').trim();
-      finalTitle = clean.length > 80 ? clean.slice(0, 77) + '...' : (clean || 'A post on X');
     }
   }
 
@@ -962,6 +1040,64 @@ async function extractYouTube(url: string, videoId: string, options: FetchOption
   };
 }
 
+const MAX_THREAD_TWEETS = 50;
+
+/**
+ * Handle Twitter/X URLs: fetch tweet data via fxtwitter API and build markdown.
+ * Walks the reply chain upward to stitch threads.
+ */
+async function extractTweet(url: string, username: string, statusId: string): Promise<ExtractedArticle> {
+  // Fetch the target tweet
+  const targetTweet = await fetchFxTweet(username, statusId);
+
+  // Walk the reply chain upward to find thread start
+  const tweets: FxTweet[] = [targetTweet];
+  let current = targetTweet;
+  let walked = 0;
+
+  while (current.replying_to_status && walked < MAX_THREAD_TWEETS) {
+    try {
+      const parent = await fetchFxTweet(username, current.replying_to_status);
+      tweets.unshift(parent);
+      current = parent;
+      walked++;
+    } catch {
+      break;
+    }
+  }
+
+  // Build markdown
+  const markdown = tweets.map(t => formatTweetMarkdown(t)).join('\n\n---\n\n');
+
+  // Title: first tweet text truncated to 80 chars
+  const titleSource = tweets[0].text;
+  const title = titleSource.length > 80 ? titleSource.slice(0, 77) + '...' : titleSource;
+
+  return {
+    title,
+    content: `<p>${tweets.map(t => t.text).join(' ')}</p>`,
+    markdown,
+    byline: `@${tweets[0].author.screen_name}`,
+    excerpt: titleSource.slice(0, 200),
+  };
+}
+
+/**
+ * Fetch a single tweet from the fxtwitter API.
+ */
+async function fetchFxTweet(username: string, statusId: string): Promise<FxTweet> {
+  const apiUrl = `https://api.fxtwitter.com/${username}/status/${statusId}`;
+  const response = await fetchWithTimeout(apiUrl, {}, FETCH_TIMEOUT_MS);
+  if (!response.ok) {
+    throw new Error(`fxtwitter API returned ${response.status} for ${statusId}`);
+  }
+  const data = await response.json() as any;
+  if (!data.tweet) {
+    throw new Error(`fxtwitter API returned no tweet data for ${statusId}`);
+  }
+  return data.tweet as FxTweet;
+}
+
 /**
  * Detect Apple News URLs (apple.news shortlinks)
  */
@@ -1159,6 +1295,19 @@ export async function fetchAndExtract(
     const videoId = extractYouTubeId(url);
     if (videoId) {
       return extractYouTube(url, videoId, options);
+    }
+  }
+
+  // Twitter/X posts get clean extraction via fxtwitter API
+  if (isTwitterUrl(url)) {
+    const tweetInfo = extractTweetId(url);
+    if (tweetInfo) {
+      try {
+        return await extractTweet(url, tweetInfo.username, tweetInfo.statusId);
+      } catch (err: any) {
+        console.log('fxtwitter extraction failed, falling back to generic:', err?.message);
+        // Fall through to generic extraction
+      }
     }
   }
 
