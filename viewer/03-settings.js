@@ -124,6 +124,10 @@ function toggleSettingsDropdown() {
     <div class="setting-row">
       <button onclick="reprocessCurrentArticle(this)" id="reprocess-btn" style="flex:1;text-align:center" title="Re-fetch this article from the original URL"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-cloud-download"/></svg> Re-fetch from source</button>
     </div>
+    <hr style="border:none;border-top:1px solid var(--border);margin:12px 0 8px">
+    <div class="setting-row">
+      <button onclick="var p=document.querySelector('.settings-dropdown-panel');if(p)p.remove();var b=document.getElementById('aa-settings-btn');if(b)b.setAttribute('aria-expanded','false');showShortcutsModal()" style="flex:1;text-align:center"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-keyboard"/></svg> Keyboard Shortcuts</button>
+    </div>
   `;
   document.body.appendChild(panel);
   btn.setAttribute('aria-expanded', 'true');

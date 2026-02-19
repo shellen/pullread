@@ -783,6 +783,30 @@
   .dash-empty-hint .subhint {
     font-size: 13px;
   }
+  .dash-footer {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    padding: 24px 0 8px;
+  }
+  .dash-footer button {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 14px;
+    font-size: 12px;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: color 0.12s, border-color 0.12s;
+  }
+  .dash-footer button:hover {
+    color: var(--fg);
+    border-color: color-mix(in srgb, var(--fg) 20%, transparent);
+  }
 
   /* Typography classes */
   .font-sans .content-wrap { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, sans-serif; }
@@ -1109,7 +1133,7 @@
     outline-offset: 2px;
   }
   .sidebar-header-actions button:focus-visible,
-  .sidebar-footer-btn:focus-visible {
+  .sidebar-settings-btn:focus-visible {
     outline: 2px solid var(--link);
     outline-offset: 1px;
     border-radius: 4px;
@@ -1145,27 +1169,30 @@
     word-spacing: 0.1em;
   }
 
-  /* Sidebar footer buttons */
+  /* Sidebar footer */
   .sidebar-footer {
-    display: flex;
-    gap: 2px;
     padding: 6px 8px;
   }
-  .sidebar-footer-btn {
-    flex: 1;
-    padding: 5px 0;
-    font-size: 11px;
+  .sidebar-settings-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 7px 0;
+    font-size: 12px;
     color: var(--muted);
     background: transparent;
-    border: none;
+    border: 1px solid var(--border);
     border-radius: 6px;
     cursor: pointer;
     font-family: inherit;
-    transition: color 0.12s, background 0.12s;
+    transition: color 0.12s, background 0.12s, border-color 0.12s;
   }
-  .sidebar-footer-btn:hover {
+  .sidebar-settings-btn:hover {
     color: var(--fg);
     background: color-mix(in srgb, var(--fg) 6%, transparent);
+    border-color: color-mix(in srgb, var(--fg) 15%, transparent);
   }
 
   /* Audio player panel */

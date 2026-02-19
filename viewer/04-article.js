@@ -96,6 +96,12 @@ function renderDashboard() {
     html += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
   }
 
+  // Footer links
+  html += '<div class="dash-footer">';
+  html += '<button onclick="showTagCloud()"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px"><use href="#i-search"/></svg> Explore</button>';
+  html += '<button onclick="showGuideModal()"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px"><use href="#i-book"/></svg> Guide</button>';
+  html += '</div>';
+
   dash.innerHTML = html;
   // Initialize chevron visibility after DOM is populated
   requestAnimationFrame(initDashChevrons);
@@ -143,7 +149,7 @@ function dashCardHtml(f, progressPct) {
 }
 
 function goHome() {
-  _sidebarView = 'library'; syncSidebarTabs();
+  _sidebarView = 'home'; syncSidebarTabs();
   activeFile = null;
   document.title = 'PullRead';
   renderDashboard();

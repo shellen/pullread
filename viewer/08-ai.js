@@ -416,8 +416,8 @@ async function batchAutotagAll(force) {
       // Refresh annotations index to pick up new tags
       await loadAnnotationsIndex();
       renderFileList();
-      // Refresh the explore page to show updated tag counts
-      setTimeout(function() { if (_sidebarView === 'explore') showTagCloud(); }, 2000);
+      // Refresh the explore page if open
+      setTimeout(function() { var ep = document.querySelector('.explore-tabs'); if (ep) showTagCloud(); }, 2000);
     }
   } catch (err) {
     alert('Auto-tag request failed.');

@@ -1,6 +1,6 @@
 // ---- Tag Cloud / Explore ---- (renders as inline page like Guide)
 function showTagCloud() {
-  _sidebarView = 'explore'; syncSidebarTabs();
+  _sidebarView = 'home'; syncSidebarTabs();
   const content = document.getElementById('content');
   const empty = document.getElementById('empty-state');
   empty.style.display = 'none';

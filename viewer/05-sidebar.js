@@ -225,7 +225,7 @@ var _loadFileAbort = null;
 async function loadFile(index) {
   const file = displayFiles[index];
   if (!file) return;
-  _sidebarView = 'library'; syncSidebarTabs();
+  _sidebarView = 'home'; syncSidebarTabs();
   activeFile = file.filename;
   markAsRead(file.filename);
   renderFileList();
@@ -376,16 +376,14 @@ function quickAddUrl() {
 }
 
 // ---- Sidebar nav view switching ----
-let _sidebarView = 'library';
+let _sidebarView = 'home';
 
 function switchSidebarView(view) {
   _sidebarView = view;
   syncSidebarTabs();
 
-  // Trigger the appropriate view in the content area
-  if (view === 'explore') showTagCloud();
-  else if (view === 'notebooks') { openSingleNotebook(); }
-  else if (view === 'library') goHome();
+  if (view === 'notebooks') { openSingleNotebook(); }
+  else if (view === 'home') goHome();
 }
 
 function openSingleNotebook() {
@@ -407,8 +405,7 @@ function syncSidebarTabs() {
   // Update search placeholder contextually
   var search = document.getElementById('search');
   if (search) {
-    if (_sidebarView === 'explore') search.placeholder = 'Search articles, tags, sources...';
-    else if (_sidebarView === 'notebooks') search.placeholder = 'Search notebooks...';
+    if (_sidebarView === 'notebooks') search.placeholder = 'Search notebooks...';
     else search.placeholder = 'Search... try is:favorite or tag:tech';
   }
 }
