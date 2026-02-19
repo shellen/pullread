@@ -252,7 +252,7 @@ function renderArticle(text, filename) {
   var listenLabel = isPodcast ? 'Play' : 'Listen';
   html += '<div class="play-next-menu" id="play-next-menu">';
   html += '<button id="listen-btn" onclick="addCurrentToTTSQueue()" aria-label="' + listenLabel + ' article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> ' + listenLabel + '</button>';
-  html += '<button class="play-next-trigger" id="play-next-trigger" onclick="togglePlayNextMenu(event)" aria-label="Queue options" style="display:none"><svg viewBox="0 0 10 6" width="8" height="5" aria-hidden="true" style="fill:currentColor"><path d="M1 1l4 4 4-4"/></svg></button>';
+  html += '<button class="play-next-trigger" id="play-next-trigger" onclick="togglePlayNextMenu(event)" aria-label="Queue options" style="display:none"><svg class="icon icon-sm" aria-hidden="true" style="width:8px;height:8px"><use href="#i-chevron-down"/></svg></button>';
   html += '</div>';
   if (meta && meta.url) {
     html += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg> Share</button></div>';
