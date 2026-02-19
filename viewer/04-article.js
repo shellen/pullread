@@ -301,7 +301,16 @@ function renderArticle(text, filename) {
     }
     html += '<button onclick="addCurrentToTTSQueue()" style="margin-left:auto;padding:4px 12px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--link);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">Play in player</button>';
     html += '</div>';
+    // Show podcast description in a collapsible section instead of as article body
+    if (body && body.trim()) {
+      html += '<details class="podcast-description"><summary>Episode description</summary>';
+      html += '<div>' + sanitizeHtml(marked.parse(cleanMarkdown(body))) + '</div>';
+      html += '</details>';
+    }
   }
+
+  // Podcast body is already rendered in the collapsible description above
+  if (isPodcast) body = '';
 
   // Strip YouTube thumbnail link BEFORE cleanMarkdown (which mangles the link-wrapped image)
   var rawBody = body;
