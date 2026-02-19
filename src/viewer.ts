@@ -1396,7 +1396,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
       const cmd = process.platform === 'darwin' ? 'open'
         : process.platform === 'win32' ? 'start'
         : 'xdg-open';
-      exec(`${cmd} ${url}`);
+      execFile(cmd, [url]);
     }
   });
 }
