@@ -2370,6 +2370,28 @@
     font-style: normal;
   }
 
+  /* Open Questions — hover to start a note */
+  .review-content li { position: relative; }
+  .oq-note-btn {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0;
+    transition: opacity 0.15s;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 11px;
+    color: var(--muted);
+    cursor: pointer;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+  .oq-note-btn:hover { color: var(--link); border-color: var(--link); }
+  .review-content li:hover .oq-note-btn { opacity: 1; }
+
   /* Notebook */
   .notebook-header {
     display: flex; align-items: center; justify-content: space-between;

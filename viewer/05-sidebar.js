@@ -220,6 +220,8 @@ function filterFiles() {
   renderFileList();
 }
 
+var _loadFileAbort = null;
+
 async function loadFile(index) {
   const file = displayFiles[index];
   if (!file) return;
@@ -236,14 +238,29 @@ async function loadFile(index) {
   }
 
   if (serverMode) {
+    // Abort any in-flight article fetch so stale responses don't overwrite
+    if (_loadFileAbort) _loadFileAbort.abort();
+    var controller = new AbortController();
+    _loadFileAbort = controller;
+    var targetFile = file.filename;
+
     // Load annotations first so favorite state is available for header render
     await preloadAnnotations(file.filename);
-    const res = await fetch('/api/file?name=' + encodeURIComponent(file.filename));
-    if (res.ok) {
-      const text = await res.text();
-      renderArticle(text, file.filename);
-      applyHighlights();
-      renderNotesPanel();
+    if (activeFile !== targetFile) return;
+
+    try {
+      const res = await fetch('/api/file?name=' + encodeURIComponent(file.filename), { signal: controller.signal });
+      if (activeFile !== targetFile) return;
+      if (res.ok) {
+        const text = await res.text();
+        if (activeFile !== targetFile) return;
+        renderArticle(text, file.filename);
+        applyHighlights();
+        renderNotesPanel();
+      }
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      throw e;
     }
   }
 }

@@ -837,6 +837,8 @@ bash scripts/prepare-sidecar.sh
 cd src-tauri && cargo tauri dev
 ```
 
+> **Note:** PullRead is a menu-bar (tray) app — it has no main window. `cargo tauri dev` opens a default empty window showing the viewer placeholder; this is expected. The actual viewer windows are created by the sidecar at runtime. For a full local build with TTS model bundling, use `bash scripts/build-tauri.sh` instead.
+
 ### Code Style
 
 - TypeScript with strict mode enabled (CLI engine)

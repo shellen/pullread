@@ -376,6 +376,7 @@ function renderArticle(text, filename) {
   // Apply review-content class for link-blog styling on review articles
   if (isReviewArticle) {
     content.classList.add('review-content');
+    enhanceOpenQuestions(content, filename);
   } else {
     content.classList.remove('review-content');
   }
@@ -484,6 +485,43 @@ function renderArticle(text, filename) {
   updateListenButtonState();
 }
 
+
+// Add "start a note" buttons to Open Questions in review articles
+function enhanceOpenQuestions(container, filename) {
+  var headings = container.querySelectorAll('h2');
+  var oqHeading = null;
+  for (var i = 0; i < headings.length; i++) {
+    if (/open questions/i.test(headings[i].textContent)) {
+      oqHeading = headings[i];
+      break;
+    }
+  }
+  if (!oqHeading) return;
+
+  var list = oqHeading.nextElementSibling;
+  if (!list || (list.tagName !== 'UL' && list.tagName !== 'OL')) return;
+
+  var items = list.querySelectorAll('li');
+  for (var j = 0; j < items.length; j++) {
+    var li = items[j];
+    var questionText = li.textContent.trim();
+    var btn = document.createElement('button');
+    btn.className = 'oq-note-btn';
+    btn.textContent = 'Note';
+    btn.setAttribute('aria-label', 'Start a note from this question');
+    (function(q) {
+      btn.onclick = function(e) {
+        e.stopPropagation();
+        var content = '# ' + q + '\n\n';
+        createNote(filename, content);
+        _sidebarView = 'notebooks';
+        syncSidebarTabs();
+        renderFileList();
+      };
+    })(questionText);
+    li.appendChild(btn);
+  }
+}
 
 // ---- Reading Progress Bar ----
 function updateReadingProgress() {

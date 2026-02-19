@@ -155,7 +155,7 @@ document.addEventListener('click', function(e) {
 });
 
 // ---- Full Settings Page ----
-function showSettingsPage() {
+function showSettingsPage(scrollToSection) {
   activeFile = null;
   _activeNotebook = null;
   const content = document.getElementById('content');
@@ -257,6 +257,11 @@ function showSettingsPage() {
 
   content.innerHTML = html;
   document.getElementById('content-pane').scrollTop = 0;
+
+  if (scrollToSection) {
+    var target = document.getElementById(scrollToSection);
+    if (target) setTimeout(function() { target.scrollIntoView({ behavior: 'smooth' }); }, 50);
+  }
 
   // Load Feeds & Sync config async
   if (serverMode) {
