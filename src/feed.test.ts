@@ -326,6 +326,43 @@ describe('parseFeedTitle', () => {
   });
 });
 
+describe('parseFeed - Atom with multiple link elements', () => {
+  test('extracts related URL from entry with alternate and related links', () => {
+    const feed = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Bookmarks</title>
+  <entry>
+    <title>Test Bookmark</title>
+    <link rel="alternate" href="https://www.drafty.com/@user/links"/>
+    <link rel="related" href="https://example.com/bookmarked-article"/>
+    <id>abc123</id>
+    <updated>2024-01-29T19:05:18.441Z</updated>
+  </entry>
+</feed>`;
+    const entries = parseFeed(feed);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].url).toBe('https://example.com/bookmarked-article');
+    expect(entries[0].domain).toBe('example.com');
+  });
+
+  test('falls back to alternate link when no related link exists', () => {
+    const feed = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Bookmarks</title>
+  <entry>
+    <title>Test Entry</title>
+    <link rel="alternate" href="https://example.com/article"/>
+    <link rel="self" href="https://example.com/feed/entry/1"/>
+    <id>def456</id>
+    <updated>2024-01-29T19:05:18.441Z</updated>
+  </entry>
+</feed>`;
+    const entries = parseFeed(feed);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].url).toBe('https://example.com/article');
+  });
+});
+
 describe('parseFeed - Error handling', () => {
   test('throws on unknown feed format', () => {
     const invalidXml = '<?xml version="1.0"?><unknown><item/></unknown>';

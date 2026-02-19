@@ -28,6 +28,17 @@ function detectFeedType(parsed: any): FeedType {
   throw new Error('Unknown feed format: expected RSS, Atom, or RDF');
 }
 
+function resolveAtomLink(link: any): string {
+  if (typeof link === 'string') return link;
+  if (!Array.isArray(link)) return link?.['@_href'] || '';
+  // Multiple <link> elements: prefer rel="related", then rel="alternate", then first href
+  const related = link.find((l: any) => l['@_rel'] === 'related');
+  if (related) return related['@_href'];
+  const alternate = link.find((l: any) => l['@_rel'] === 'alternate');
+  if (alternate) return alternate['@_href'];
+  return link[0]?.['@_href'] || '';
+}
+
 function parseAtomFeed(feed: any): FeedEntry[] {
   if (!feed || !feed.entry) {
     return [];
@@ -36,7 +47,7 @@ function parseAtomFeed(feed: any): FeedEntry[] {
   const entries = Array.isArray(feed.entry) ? feed.entry : [feed.entry];
 
   return entries.map((entry: any) => {
-    const url = entry.link?.['@_href'] || entry.link;
+    const url = resolveAtomLink(entry.link);
     const domain = new URL(url).hostname.replace(/^www\./, '');
 
     let annotation: string | undefined;
