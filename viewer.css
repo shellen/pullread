@@ -934,11 +934,13 @@
   .article-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
   .play-next-menu { display: inline-flex; align-items: center; gap: 0; position: relative; }
   .play-next-trigger {
-    padding: 4px 6px !important;
+    padding: 4px 5px !important;
     border-radius: 0 6px 6px 0 !important;
-    border-left: 1px solid var(--border) !important;
-    margin-left: -2px;
+    border-left: 1px solid color-mix(in srgb, var(--fg) 12%, transparent) !important;
+    margin-left: -1px;
+    opacity: 0.7;
   }
+  .play-next-trigger:hover { opacity: 1; }
   .play-next-menu #listen-btn { border-radius: 6px; }
   .play-next-menu:has(.play-next-trigger:not([style*="display: none"])) #listen-btn {
     border-radius: 6px 0 0 6px;
