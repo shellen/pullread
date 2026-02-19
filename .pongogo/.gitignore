@@ -1,0 +1,10 @@
+# Pongogo local state (not version controlled)
+# Main database with routing events, observations, artifacts
+pongogo.db
+pongogo.db-wal
+pongogo.db-shm
+
+# PI system database (user guidance, improvements)
+potential_improvements.db
+potential_improvements.db-wal
+potential_improvements.db-shm
