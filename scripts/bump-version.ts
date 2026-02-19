@@ -1,16 +1,14 @@
 #!/usr/bin/env bun
-// ABOUTME: Propagates the version from package.json to site/index.html and the Xcode project
-// ABOUTME: Run via `bun scripts/bump-version.ts` (or `bun scripts/bump-version.ts 1.4.0` to set a new version)
+// ABOUTME: Propagates the version from package.json to site/index.html and tauri.conf.json
+// ABOUTME: Run via `bun scripts/bump-version.ts` (or `bun scripts/bump-version.ts 2.1.0` to set a version)
 
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 const ROOT = join(import.meta.dir, '..');
 const PKG_PATH = join(ROOT, 'package.json');
 const SITE_PATH = join(ROOT, 'site', 'index.html');
-const XCPROJ_PATH = join(ROOT, 'PullReadTray', 'PullReadTray.xcodeproj', 'project.pbxproj');
-const APP_PLIST_PATH = join(ROOT, 'PullReadTray', 'PullReadTray', 'Info.plist');
-const SHARE_EXT_PLIST_PATH = join(ROOT, 'PullReadTray', 'PullReadShareExtension', 'Info.plist');
+const TAURI_CONF_PATH = join(ROOT, 'src-tauri', 'tauri.conf.json');
 
 // If a version argument is provided, update package.json first
 const newVersion = process.argv[2];
@@ -41,45 +39,12 @@ if (!siteHasVersion) {
   console.log(`site/index.html → ${version}`);
 }
 
-// Update main app Info.plist version
-if (existsSync(APP_PLIST_PATH)) {
-  const appPlist = readFileSync(APP_PLIST_PATH, 'utf-8');
-  const appUpdated = appPlist.replace(
-    /(<key>CFBundleShortVersionString<\/key>\s*<string>)\d+\.\d+\.\d+(<\/string>)/,
-    `$1${version}$2`
-  );
-  if (appPlist === appUpdated) {
-    console.log(`PullReadTray/Info.plist — already ${version}`);
-  } else {
-    writeFileSync(APP_PLIST_PATH, appUpdated);
-    console.log(`PullReadTray/Info.plist → ${version}`);
-  }
-}
-
-// Update Share Extension Info.plist version
-if (existsSync(SHARE_EXT_PLIST_PATH)) {
-  const extPlist = readFileSync(SHARE_EXT_PLIST_PATH, 'utf-8');
-  const extUpdated = extPlist.replace(
-    /(<key>CFBundleShortVersionString<\/key>\s*<string>)\d+\.\d+\.\d+(<\/string>)/,
-    `$1${version}$2`
-  );
-  if (extPlist === extUpdated) {
-    console.log(`PullReadShareExtension/Info.plist — already ${version}`);
-  } else {
-    writeFileSync(SHARE_EXT_PLIST_PATH, extUpdated);
-    console.log(`PullReadShareExtension/Info.plist → ${version}`);
-  }
-}
-
-// Update Xcode project: all MARKETING_VERSION entries
-const xcproj = readFileSync(XCPROJ_PATH, 'utf-8');
-const xcprojUpdated = xcproj.replace(/MARKETING_VERSION = \d+\.\d+\.\d+;/g, `MARKETING_VERSION = ${version};`);
-const count = (xcproj.match(/MARKETING_VERSION = \d+\.\d+\.\d+;/g) || []).length;
-if (count === 0) {
-  console.log('project.pbxproj — no MARKETING_VERSION found, skipping');
-} else if (xcproj === xcprojUpdated) {
-  console.log(`project.pbxproj — already ${version} (${count} occurrences)`);
+// Update tauri.conf.json version
+const tauriConf = JSON.parse(readFileSync(TAURI_CONF_PATH, 'utf-8'));
+if (tauriConf.version === version) {
+  console.log(`tauri.conf.json — already ${version}`);
 } else {
-  writeFileSync(XCPROJ_PATH, xcprojUpdated);
-  console.log(`project.pbxproj → ${version} (${count} occurrences)`);
+  tauriConf.version = version;
+  writeFileSync(TAURI_CONF_PATH, JSON.stringify(tauriConf, null, 2) + '\n');
+  console.log(`tauri.conf.json → ${version}`);
 }
