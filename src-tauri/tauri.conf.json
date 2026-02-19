@@ -2,9 +2,9 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "PullRead",
   "version": "2.0.0",
-  "identifier": "com.pullread.app",
+  "identifier": "com.pullread.desktop",
   "build": {
-    "beforeBuildCommand": "bun run scripts/bundle-kokoro.ts && bun run scripts/embed-viewer.ts",
+    "beforeBuildCommand": "bun run scripts/bundle-kokoro.ts && bun run scripts/embed-viewer.ts && bash scripts/download-kokoro-model.sh && mkdir -p src-tauri/resources/kokoro-model && cp -R dist/kokoro-model/* src-tauri/resources/kokoro-model/",
     "beforeDevCommand": "",
     "frontendDist": "../viewer-dist"
   },
