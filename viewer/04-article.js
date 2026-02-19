@@ -244,7 +244,11 @@ function renderArticle(text, filename) {
   }
   var isPodcast = meta && meta.enclosure_url && meta.enclosure_type && meta.enclosure_type.startsWith('audio/');
   var listenLabel = isPodcast ? 'Play' : 'Listen';
+  html += '<div class="play-next-menu" id="play-next-menu">';
   html += '<button id="listen-btn" onclick="addCurrentToTTSQueue()" aria-label="' + listenLabel + ' article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> ' + listenLabel + '</button>';
+  // Show "Play Next" option if queue is active
+  html += '<button class="play-next-trigger" id="play-next-trigger" onclick="togglePlayNextMenu(event)" aria-label="Queue options" style="display:none"><svg class="icon icon-sm" aria-hidden="true" style="width:8px;height:8px"><use href="#i-queue"/></svg></button>';
+  html += '</div>';
   if (meta && meta.url) {
     html += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg> Share</button></div>';
   }
@@ -287,13 +291,15 @@ function renderArticle(text, filename) {
     }
   }
 
-  // Podcast: inline audio player for articles with audio enclosures
+  // Podcast: show podcast info banner (audio plays through unified bottom bar)
   if (isPodcast) {
     html += '<div class="podcast-player">';
-    html += '<audio controls preload="metadata" src="' + escapeHtml(meta.enclosure_url) + '"></audio>';
+    html += '<svg style="width:16px;height:16px;fill:var(--muted);flex-shrink:0"><use href="#i-mic"/></svg>';
+    html += '<span style="font-size:13px;color:var(--fg)">Podcast episode</span>';
     if (meta.enclosure_duration) {
       html += '<span class="podcast-duration">' + escapeHtml(meta.enclosure_duration) + '</span>';
     }
+    html += '<button onclick="addCurrentToTTSQueue()" style="margin-left:auto;padding:4px 12px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--link);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">Play in player</button>';
     html += '</div>';
   }
 

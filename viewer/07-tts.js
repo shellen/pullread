@@ -68,6 +68,38 @@ function updateListenButtonState() {
     btn.classList.remove('listen-playing');
     btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> ' + idleLabel;
   }
+  // Show/hide Play Next trigger when queue is active
+  var trigger = document.getElementById('play-next-trigger');
+  if (trigger) {
+    trigger.style.display = ttsQueue.length > 0 ? '' : 'none';
+  }
+}
+
+function togglePlayNextMenu(e) {
+  e.stopPropagation();
+  var existing = document.querySelector('.play-next-dropdown');
+  if (existing) { existing.remove(); return; }
+  var menu = document.getElementById('play-next-menu');
+  if (!menu) return;
+  var dropdown = document.createElement('div');
+  dropdown.className = 'play-next-dropdown';
+
+  var isQueued = ttsQueue.some(function(q) { return q.filename === activeFile; });
+  if (!isQueued) {
+    dropdown.innerHTML =
+      '<button onclick="playNextFromArticle();this.closest(\'.play-next-dropdown\').remove()"><svg class="icon icon-sm" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px"><use href="#i-forward"/></svg> Play next</button>'
+      + '<button onclick="addCurrentToTTSQueue();this.closest(\'.play-next-dropdown\').remove()"><svg class="icon icon-sm" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px"><use href="#i-queue"/></svg> Add to queue</button>';
+  } else {
+    dropdown.innerHTML = '<button onclick="this.closest(\'.play-next-dropdown\').remove()" style="color:var(--muted)">Already in queue</button>';
+  }
+  menu.appendChild(dropdown);
+  // Close on click outside
+  setTimeout(function() {
+    document.addEventListener('click', function closePlayNext() {
+      dropdown.remove();
+      document.removeEventListener('click', closePlayNext);
+    });
+  }, 0);
 }
 
 function addCurrentToTTSQueue() {
@@ -75,6 +107,32 @@ function addCurrentToTTSQueue() {
   _listenLoadingFile = activeFile;
   startListenLoading();
   addToTTSQueue(activeFile);
+}
+
+function playNextFromArticle(filename) {
+  if (!filename) filename = activeFile;
+  if (!filename) return;
+  // Insert after current playing item
+  var file = allFiles.find(function(f) { return f.filename === filename; });
+  if (!file) return;
+  // If already in queue, just move it
+  var existingIdx = ttsQueue.findIndex(function(q) { return q.filename === filename; });
+  if (existingIdx >= 0) {
+    var item = ttsQueue.splice(existingIdx, 1)[0];
+    if (existingIdx < ttsCurrentIndex) ttsCurrentIndex--;
+    var insertAt = ttsCurrentIndex + 1;
+    ttsQueue.splice(insertAt, 0, item);
+    renderAudioPlayer();
+    return;
+  }
+  var newItem = { filename: filename, title: file.title };
+  if (file.enclosureUrl && file.enclosureType && file.enclosureType.startsWith('audio/')) {
+    newItem.enclosureUrl = file.enclosureUrl;
+  }
+  var insertAt = ttsCurrentIndex >= 0 ? ttsCurrentIndex + 1 : 0;
+  ttsQueue.splice(insertAt, 0, newItem);
+  renderAudioPlayer();
+  if (ttsQueue.length === 1) playTTSItem(0);
 }
 
 async function addToTTSQueue(filename) {
@@ -114,23 +172,17 @@ function renderAudioPlayer() {
   const panel = document.getElementById('audio-player');
   if (!panel) return;
 
-  // Update mini player visibility
-  var miniPlayer = document.getElementById('mini-player');
-  if (miniPlayer) {
-    miniPlayer.style.display = (ttsQueue.length > 0 && (ttsPlaying || ttsCurrentIndex >= 0)) ? '' : 'none';
-    var miniPlayBtn = document.getElementById('mini-play-btn');
-    if (miniPlayBtn) {
-      miniPlayBtn.innerHTML = ttsPlaying
-        ? '<svg><use href="#i-pause"/></svg>'
-        : '<svg><use href="#i-play"/></svg>';
-    }
-  }
+  var app = document.querySelector('.app');
 
   if (ttsQueue.length === 0) {
     panel.classList.add('hidden');
+    if (app) app.classList.remove('has-bottom-bar');
+    updateSidebarAudioIndicators();
+    updateArticleNowPlaying();
     return;
   }
   panel.classList.remove('hidden');
+  if (app) app.classList.add('has-bottom-bar');
 
   const label = document.getElementById('audio-now-label');
   const status = document.getElementById('audio-now-status');
@@ -138,21 +190,12 @@ function renderAudioPlayer() {
 
   if (ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length) {
     label.textContent = ttsQueue[ttsCurrentIndex].title;
-    label.style.cursor = 'pointer';
-    label.onclick = function() {
-      var fn = ttsQueue[ttsCurrentIndex] && ttsQueue[ttsCurrentIndex].filename;
-      if (!fn) return;
-      var idx = displayFiles.findIndex(function(f) { return f.filename === fn; });
-      if (idx >= 0) loadFile(idx);
-    };
   } else {
     label.textContent = 'No article playing';
-    label.style.cursor = '';
-    label.onclick = null;
   }
 
   if (ttsGenerating) {
-    status.textContent = 'Generating...';
+    status.textContent = 'Generating\u2026';
   } else if (ttsPlaying) {
     status.textContent = 'Playing';
   } else if (ttsCurrentIndex >= 0) {
@@ -168,8 +211,9 @@ function renderAudioPlayer() {
   // Render queue
   const queueSection = document.getElementById('audio-queue-section');
   const queueList = document.getElementById('audio-queue-list');
+  var queueToggle = document.getElementById('bottom-bar-queue-toggle');
   if (ttsQueue.length > 1) {
-    queueSection.style.display = '';
+    if (queueToggle) queueToggle.classList.add('active');
     queueList.innerHTML = ttsQueue.map((item, i) =>
       '<div class="audio-queue-item' + (i === ttsCurrentIndex ? ' playing' : '') + '" onclick="playTTSItem(' + i + ')">'
       + '<span style="font-size:10px;color:var(--muted);width:14px;text-align:center">' + (i === ttsCurrentIndex ? '&#9654;' : (i + 1)) + '</span>'
@@ -178,11 +222,130 @@ function renderAudioPlayer() {
       + '</div>'
     ).join('');
   } else {
+    if (queueToggle) queueToggle.classList.remove('active');
     queueSection.style.display = 'none';
   }
 
   updateListenButtonState();
+  updateSidebarAudioIndicators();
+  updateArticleNowPlaying();
   renderMiniMode();
+  saveTTSState();
+}
+
+/** Navigate to the currently playing article */
+function bottomBarGoToArticle() {
+  var fn = ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length
+    ? ttsQueue[ttsCurrentIndex].filename : null;
+  if (!fn) return;
+  var idx = displayFiles.findIndex(function(f) { return f.filename === fn; });
+  if (idx >= 0) loadFile(idx);
+}
+
+/** Toggle queue visibility in bottom bar */
+function toggleBottomBarQueue() {
+  var qs = document.getElementById('audio-queue-section');
+  if (!qs) return;
+  if (ttsQueue.length <= 1) { qs.style.display = 'none'; return; }
+  qs.style.display = qs.style.display === 'none' ? '' : 'none';
+}
+
+/** Show playing/queued indicators on sidebar file items */
+function updateSidebarAudioIndicators() {
+  // Remove all existing indicators first
+  document.querySelectorAll('.file-item-audio').forEach(function(el) { el.remove(); });
+  if (ttsQueue.length === 0) return;
+
+  var playingFile = ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length
+    ? ttsQueue[ttsCurrentIndex].filename : null;
+
+  ttsQueue.forEach(function(item, i) {
+    var el = document.querySelector('.file-item[data-filename="' + CSS.escape(item.filename) + '"]');
+    if (!el) return;
+    var meta = el.querySelector('.file-item-meta');
+    if (!meta) return;
+    var indicator = document.createElement('span');
+    indicator.className = 'file-item-audio';
+    if (item.filename === playingFile && ttsPlaying) {
+      indicator.innerHTML = '<span class="eq-bars"><span></span><span></span><span></span></span>';
+    } else if (item.filename === playingFile) {
+      indicator.innerHTML = '<svg><use href="#i-pause"/></svg>';
+    } else {
+      indicator.innerHTML = '<span class="queue-pos">' + (i + 1) + '</span>';
+    }
+    meta.appendChild(indicator);
+  });
+}
+
+/** Show inline now-playing bar in article view when that article is playing */
+function updateArticleNowPlaying() {
+  // Remove any existing
+  var existing = document.getElementById('article-now-playing');
+  if (existing) existing.remove();
+
+  if (ttsQueue.length === 0 || ttsCurrentIndex < 0) return;
+
+  var playingFile = ttsQueue[ttsCurrentIndex].filename;
+  if (activeFile !== playingFile) return;
+
+  var actions = document.querySelector('.article-actions');
+  if (!actions) return;
+
+  var bar = document.createElement('div');
+  bar.className = 'article-now-playing';
+  bar.id = 'article-now-playing';
+  bar.innerHTML =
+    '<button class="article-play-btn" onclick="ttsTogglePlay()" title="Play/Pause">'
+    + (ttsPlaying ? '<svg><use href="#i-pause"/></svg>' : '<svg><use href="#i-play"/></svg>')
+    + '</button>'
+    + '<button onclick="ttsSkipPrev()" title="Rewind 15s"><svg><use href="#i-backward"/></svg></button>'
+    + '<div class="anp-progress" id="anp-progress"><div class="anp-progress-bar"><div class="anp-progress-fill" id="anp-progress-fill"></div></div></div>'
+    + '<button onclick="ttsSkipNext()" title="Forward 15s"><svg><use href="#i-forward"/></svg></button>'
+    + '<span class="anp-time" id="anp-time"></span>'
+    + '<button class="anp-speed" onclick="ttsCycleSpeed()">' + ttsSpeed + 'x</button>';
+
+  actions.parentNode.insertBefore(bar, actions.nextSibling);
+
+  // Initialize progress drag for inline bar
+  initArticleProgressDrag();
+  syncArticleNowPlaying();
+}
+
+var _anpSyncTimer = null;
+function syncArticleNowPlaying() {
+  if (_anpSyncTimer) clearInterval(_anpSyncTimer);
+  _anpSyncTimer = setInterval(function() {
+    var fill = document.getElementById('anp-progress-fill');
+    var time = document.getElementById('anp-time');
+    var mainFill = document.getElementById('tts-progress');
+    var mainCur = document.getElementById('tts-time-current');
+    if (!fill || !mainFill) { clearInterval(_anpSyncTimer); return; }
+    fill.style.width = mainFill.style.width;
+    if (time && mainCur) time.textContent = mainCur.textContent;
+  }, 250);
+}
+
+function initArticleProgressDrag() {
+  var wrap = document.getElementById('anp-progress');
+  if (!wrap) return;
+  function seekFromEvent(e) {
+    if (!ttsPlaying && ttsCurrentIndex < 0) return;
+    var rect = wrap.getBoundingClientRect();
+    var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    var pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    ttsSeek(pct);
+  }
+  function onMove(e) { seekFromEvent(e); }
+  function onEnd() {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onEnd);
+  }
+  wrap.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    seekFromEvent(e);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onEnd);
+  });
 }
 
 async function playTTSItem(index) {
@@ -635,6 +798,7 @@ async function ttsPlayNextChunk(index, seekPct) {
 
 function stopTTS() {
   clearInterval(ttsProgressTimer);
+  if (_anpSyncTimer) { clearInterval(_anpSyncTimer); _anpSyncTimer = null; }
   _ttsChunkSession = null;
   _ttsChunkBuffer.clear();
   _ttsNextPrefetch = null;
@@ -649,9 +813,12 @@ function stopTTS() {
   }
   ttsPlaying = false;
   ttsGenerating = false;
-  document.getElementById('tts-progress').style.width = '0%';
-  document.getElementById('tts-time-current').textContent = '0:00';
-  document.getElementById('tts-time-total').textContent = '0:00';
+  var prog = document.getElementById('tts-progress');
+  if (prog) prog.style.width = '0%';
+  var cur = document.getElementById('tts-time-current');
+  if (cur) cur.textContent = '0:00';
+  var tot = document.getElementById('tts-time-total');
+  if (tot) tot.textContent = '0:00';
 }
 
 function ttsTogglePlay() {
@@ -923,11 +1090,15 @@ function ttsPositionThumb() {
 
 function ttsSetSpeed(speed) {
   ttsSpeed = speed;
-  document.getElementById('tts-speed-btn').textContent = speed + 'x';
+  var speedBtn = document.getElementById('tts-speed-btn');
+  if (speedBtn) speedBtn.textContent = speed + 'x';
   var popupVal = document.getElementById('tts-speed-popup-val');
   if (popupVal) popupVal.textContent = speed + 'x';
   var miniSpeedBtn = document.getElementById('mini-mode-speed-btn');
   if (miniSpeedBtn) miniSpeedBtn.textContent = speed + 'x';
+  // Update article inline speed button
+  var anpSpeed = document.querySelector('.article-now-playing .anp-speed');
+  if (anpSpeed) anpSpeed.textContent = speed + 'x';
 
   if (ttsAudio) {
     ttsAudio.playbackRate = speed;
@@ -935,6 +1106,7 @@ function ttsSetSpeed(speed) {
   if (ttsSynthUtterance && window.speechSynthesis.speaking) {
     ttsSynthUtterance.rate = speed;
   }
+  saveTTSState();
 }
 
 function ttsCycleSpeed() {
@@ -967,6 +1139,7 @@ function ttsClearQueue() {
   stopTTS();
   ttsQueue = [];
   ttsCurrentIndex = -1;
+  localStorage.removeItem('pr-tts-state');
   renderAudioPlayer();
 }
 
@@ -1394,6 +1567,52 @@ function saveTTSSettings() {
       alert('Failed to save voice playback settings.');
     }
   });
+}
+
+// ---- Playback State Persistence ----
+function saveTTSState() {
+  try {
+    var state = {
+      queue: ttsQueue,
+      currentIndex: ttsCurrentIndex,
+      speed: ttsSpeed,
+      timestamp: Date.now(),
+    };
+    // Save current playback position
+    if (ttsAudio && ttsAudio.duration) {
+      state.currentTime = ttsAudio.currentTime;
+      state.duration = ttsAudio.duration;
+    }
+    localStorage.setItem('pr-tts-state', JSON.stringify(state));
+  } catch(e) {}
+}
+
+function restoreTTSState() {
+  try {
+    var raw = localStorage.getItem('pr-tts-state');
+    if (!raw) return;
+    var state = JSON.parse(raw);
+    // Only restore if saved within last 24 hours
+    if (!state || !state.queue || !state.queue.length) return;
+    if (Date.now() - state.timestamp > 24 * 60 * 60 * 1000) {
+      localStorage.removeItem('pr-tts-state');
+      return;
+    }
+    ttsQueue = state.queue;
+    ttsCurrentIndex = state.currentIndex;
+    if (state.speed) ttsSpeed = state.speed;
+    // Don't auto-play — just show the queue and position
+    ttsPlaying = false;
+    renderAudioPlayer();
+    var speedBtn = document.getElementById('tts-speed-btn');
+    if (speedBtn) speedBtn.textContent = ttsSpeed + 'x';
+  } catch(e) {}
+}
+
+// Restore on load (called externally after DOM is ready)
+if (typeof _ttsStateRestored === 'undefined') {
+  var _ttsStateRestored = true;
+  setTimeout(restoreTTSState, 500);
 }
 
 // ---- Mini Mode ----

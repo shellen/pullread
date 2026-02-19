@@ -138,9 +138,9 @@ document.addEventListener('keydown', e => {
     if (currentIdx >= 0) loadFile(currentIdx);
   }
 
-  // Audio playback shortcuts (only when audio player is visible)
+  // Audio playback shortcuts (when queue has items)
   const audioPanel = document.getElementById('audio-player');
-  const audioVisible = audioPanel && !audioPanel.classList.contains('hidden');
+  const audioVisible = ttsQueue && ttsQueue.length > 0;
   if (audioVisible && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
     // Space = play/pause
     if (e.key === ' ' && !e.ctrlKey && !e.metaKey) {

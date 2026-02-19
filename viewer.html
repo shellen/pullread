@@ -97,35 +97,6 @@
         <span class="hide-read-toggle" id="hide-read-toggle" onclick="toggleHideRead()" title="Hide viewed articles">Hide read</span>
       </div>
       <div class="file-list" id="file-list" role="listbox" aria-label="Articles"></div>
-      <div class="audio-player-panel hidden" id="audio-player">
-        <div class="audio-now-playing">
-          <svg style="width:12px;height:12px;fill:currentColor;flex-shrink:0;opacity:0.5"><use href="#i-volume"/></svg>
-          <span class="audio-now-label" id="audio-now-label">No article queued</span>
-          <span class="audio-now-status" id="audio-now-status"></span>
-        </div>
-        <div class="audio-controls">
-          <button onclick="ttsSkipPrev()" title="Rewind 15s" id="tts-prev-btn"><svg><use href="#i-backward"/></svg></button>
-          <button onclick="ttsTogglePlay()" title="Play/Pause" id="tts-play-btn"><svg><use href="#i-play"/></svg></button>
-          <button onclick="ttsSkipNext()" title="Forward 15s" id="tts-next-btn"><svg><use href="#i-forward"/></svg></button>
-          <span class="audio-time" id="tts-time-current">0:00</span>
-          <div class="audio-progress-wrap" id="audio-progress-wrap">
-            <div class="audio-progress"><div class="audio-progress-fill" id="tts-progress"></div></div>
-          </div>
-          <span class="audio-time" id="tts-time-total">0:00</span>
-          <button class="audio-speed-btn" onclick="ttsToggleSpeedSlider()" title="Playback speed" id="tts-speed-btn">1x</button>
-        </div>
-        <div class="audio-queue-section" id="audio-queue-section" style="display:none">
-          <div class="audio-queue-header">
-            <span>Queue</span>
-            <button class="audio-queue-clear" onclick="ttsClearQueue()">Clear</button>
-          </div>
-          <div id="audio-queue-list"></div>
-        </div>
-        <div class="audio-bottom-row">
-          <button class="audio-settings-link" onclick="showTTSSettings()">Voice Playback Settings</button>
-          <button class="audio-mini-mode-btn" onclick="toggleMiniMode()" title="Mini mode (m)">Mini</button>
-        </div>
-      </div>
       <div class="sidebar-footer">
         <button class="sidebar-footer-btn" onclick="showShortcutsModal()" aria-label="Keyboard shortcuts"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-keyboard"/></svg> Shortcuts</button>
         <button class="sidebar-footer-btn" onclick="showGuideModal()" aria-label="Features guide"><svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-book"/></svg> Guide</button>
@@ -137,9 +108,40 @@
 
     <button class="aa-settings-btn" id="aa-settings-btn" onclick="toggleSettingsDropdown()" aria-label="Reader settings" aria-expanded="false">Aa</button>
 
-    <div class="mini-player" id="mini-player" style="display:none">
-      <button onclick="ttsTogglePlay()" title="Play/Pause" id="mini-play-btn"><svg><use href="#i-play"/></svg></button>
-      <button onclick="ttsSkipNext()" title="Forward 15s"><svg><use href="#i-forward"/></svg></button>
+    <div class="bottom-bar hidden" id="audio-player">
+      <div class="bottom-bar-inner">
+        <div class="bottom-bar-now" id="bottom-bar-now" onclick="bottomBarGoToArticle()">
+          <svg class="bottom-bar-icon" aria-hidden="true"><use href="#i-volume"/></svg>
+          <div class="bottom-bar-info">
+            <span class="bottom-bar-title" id="audio-now-label">No article queued</span>
+            <span class="bottom-bar-status" id="audio-now-status"></span>
+          </div>
+        </div>
+        <div class="bottom-bar-controls">
+          <button onclick="ttsSkipPrev()" title="Rewind 15s" id="tts-prev-btn"><svg><use href="#i-backward"/></svg></button>
+          <button class="bottom-bar-play" onclick="ttsTogglePlay()" title="Play/Pause" id="tts-play-btn"><svg><use href="#i-play"/></svg></button>
+          <button onclick="ttsSkipNext()" title="Forward 15s" id="tts-next-btn"><svg><use href="#i-forward"/></svg></button>
+        </div>
+        <div class="bottom-bar-progress-row">
+          <span class="audio-time" id="tts-time-current">0:00</span>
+          <div class="audio-progress-wrap" id="audio-progress-wrap">
+            <div class="audio-progress"><div class="audio-progress-fill" id="tts-progress"></div></div>
+          </div>
+          <span class="audio-time" id="tts-time-total">0:00</span>
+        </div>
+        <div class="bottom-bar-right">
+          <button class="audio-speed-btn" onclick="ttsToggleSpeedSlider()" title="Playback speed" id="tts-speed-btn">1x</button>
+          <button class="bottom-bar-queue-btn" onclick="toggleBottomBarQueue()" title="Queue" id="bottom-bar-queue-toggle"><svg><use href="#i-queue"/></svg></button>
+          <button class="bottom-bar-settings-btn" onclick="showTTSSettings()" title="Voice settings"><svg><use href="#i-gear"/></svg></button>
+        </div>
+      </div>
+      <div class="bottom-bar-queue" id="audio-queue-section" style="display:none">
+        <div class="audio-queue-header">
+          <span>Queue</span>
+          <button class="audio-queue-clear" onclick="ttsClearQueue()">Clear</button>
+        </div>
+        <div id="audio-queue-list"></div>
+      </div>
     </div>
 
     <div class="mini-mode-container" id="mini-mode-container" style="display:none">
