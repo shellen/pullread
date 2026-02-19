@@ -12,8 +12,8 @@ PullRead connects to bookmark services like Instapaper, Pinboard, Raindrop, and 
 
 | Platform | Download | Architecture |
 |----------|----------|-------------|
-| **macOS (Tauri)** | [PullRead.dmg](https://github.com/shellen/pullread/releases/latest/download/PullRead.dmg) | Cross-platform shell with bundled CLI |
-| **macOS (Swift)** | [PullRead-Swift.dmg](https://github.com/shellen/pullread/releases/latest/download/PullRead-Swift.dmg) | Native Swift menu bar app (legacy) |
+| **macOS (Apple Silicon)** | [PullRead_aarch64.dmg](https://github.com/shellen/pullread/releases/latest) | ARM64 (M1/M2/M3/M4) |
+| **macOS (Intel)** | [PullRead_x64.dmg](https://github.com/shellen/pullread/releases/latest) | x86_64 |
 | **CLI** | Clone this repo | For development, Linux, or Windows |
 
 > **Quick install:** Download the DMG, open it, drag PullRead to your Applications folder, and launch it. The app is fully self-contained — no Node.js or other dependencies required. Configure your feeds in Settings and start syncing.
@@ -154,24 +154,6 @@ Or use the all-in-one build script:
 
 ```bash
 bash scripts/build-tauri.sh
-```
-
-### Legacy Swift App (macOS only)
-
-The original native Swift menu bar app is still available for macOS users who prefer it:
-
-```bash
-# Build the CLI binary (requires Bun)
-npm install
-./scripts/build-release.sh
-
-# Build the Xcode project
-cd PullReadTray
-xcodebuild -project PullReadTray.xcodeproj \
-  -scheme PullReadTray \
-  -configuration Release \
-  -derivedDataPath build \
-  build
 ```
 
 ---
@@ -746,28 +728,17 @@ pullread/
 ├── viewer.css                     # Viewer styles
 ├── viewer-dist/                   # Tauri frontend placeholder (loading screen)
 │
-├── PullReadTray/                  # Legacy Swift menu bar app (macOS only)
-│   ├── PullReadTray/
-│   │   ├── AppDelegate.swift      # Menu bar, notifications, scheduling
-│   │   ├── SyncService.swift      # CLI binary execution
-│   │   ├── SettingsView.swift     # Native SwiftUI settings
-│   │   ├── KeychainService.swift  # macOS Keychain integration
-│   │   ├── SpotlightIndexer.swift # CoreSpotlight indexing
-│   │   └── Intents/               # Siri Shortcuts
-│   ├── PullReadTrayTests/         # XCTest unit tests
-│   └── PullReadTrayUITests/       # XCTest UI tests
-│
 ├── scripts/
 │   ├── build-tauri.sh             # Full Tauri build pipeline
 │   ├── prepare-sidecar.sh         # Copy Bun binary with target triple naming
-│   ├── build-release.sh           # Legacy: builds universal CLI binary
+│   ├── download-kokoro-model.sh   # Downloads Kokoro TTS model for bundling
+│   ├── bundle-kokoro.ts           # Copies Kokoro runtime files to Tauri resources
 │   ├── embed-viewer.ts            # Inlines viewer modules into viewer-html.ts
-│   └── sync-swift-models.ts       # Updates Swift settings from models.json
+│   └── setup-signing-secrets.sh   # Configures GitHub Actions signing secrets
 │
 ├── .github/workflows/
-│   ├── build-tauri.yml            # CI: Tauri app build (macOS ARM + Intel)
-│   ├── build-macos-app.yml        # CI: Legacy Swift app build
-│   ├── release.yml                # CI: Full release workflow
+│   ├── build-tauri.yml            # CI/CD: build, sign, notarize, release (ARM + Intel)
+│   ├── deploy-site.yml            # CI: GitHub Pages deployment
 │   └── check-models.yml           # CI: Scheduled LLM model checks
 │
 ├── docs/plans/                    # Architecture and migration plans
@@ -922,8 +893,7 @@ PullRead supports five LLM providers for article summarization, auto-tagging, an
 Models change frequently. To update:
 
 1. Edit `models.json` — add/remove models, update defaults, note deprecation dates
-2. Run `bun run sync:models` — this updates `SettingsView.swift` from models.json and warns about upcoming deprecations
-3. The CLI (`summarizer.ts`) reads `models.json` at runtime, no code changes needed
+2. The CLI (`summarizer.ts`) and viewer read `models.json` at runtime, no code changes needed
 
 Provider API docs for checking latest models:
 - [Anthropic Models](https://docs.anthropic.com/en/docs/about-claude/models)
@@ -976,29 +946,28 @@ npm test
 
 ## Code Signing & Distribution
 
-### Tauri App
+The CI/CD pipeline (`.github/workflows/build-tauri.yml`) handles building, signing, notarization, and releasing via `tauri-apps/tauri-action`. It builds for both ARM64 and Intel in a matrix, producing signed, notarized DMGs.
 
-The Tauri build pipeline handles signing, notarization, and packaging via `tauri-apps/tauri-action`. When the required secrets are configured, the CI workflow produces a signed, notarized DMG.
+**Important:** The sidecar binary (Bun CLI) is code-signed with entitlements *before* the Tauri build step, because the sidecar needs `com.apple.security.cs.disable-library-validation` to load native ONNX Runtime addons at runtime.
 
-**Important:** The sidecar binary (Bun CLI) must be code-signed separately *before* the Tauri build step, due to a [known Tauri issue](https://github.com/tauri-apps/tauri/issues/11992) with notarization of external binaries.
-
-#### Required Secrets
+### Required GitHub Secrets
 
 | Secret | Purpose |
 |--------|---------|
-| `APPLE_CERTIFICATE` | Base64-encoded .p12 signing certificate |
+| `APPLE_CERTIFICATE_BASE64` | Base64-encoded .p12 signing certificate |
 | `APPLE_CERTIFICATE_PASSWORD` | Certificate password |
-| `APPLE_SIGNING_IDENTITY` | Certificate common name |
 | `APPLE_ID` | Apple ID for notarization |
-| `APPLE_APP_SPECIFIC_PASSWORD` | App-specific password for notarization |
+| `APPLE_ID_PASSWORD` | App-specific password for notarization |
 | `APPLE_TEAM_ID` | Developer team ID |
-| `TAURI_SIGNING_KEY` | Ed25519 private key for update signatures |
-| `TAURI_SIGNING_KEY_PASSWORD` | Key password (optional) |
+| `TAURI_SIGNING_PRIVATE_KEY` | Tauri updater signing private key |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password for the signing key |
 
-#### Build Pipeline
+Use `scripts/setup-signing-secrets.sh` to configure all secrets at once.
+
+### Build Pipeline
 
 ```bash
-# Full build:
+# Full local build:
 bash scripts/build-tauri.sh
 
 # Steps:
@@ -1006,57 +975,34 @@ bash scripts/build-tauri.sh
 # 2. Embed viewer HTML
 # 3. Compile Bun CLI binary
 # 4. Copy to src-tauri/binaries/ with target triple naming
-# 5. Code-sign sidecar (macOS, if APPLE_SIGNING_IDENTITY set)
-# 6. cargo tauri build (compiles Rust, packages DMG)
+# 5. Download Kokoro TTS model (~92MB)
+# 6. Code-sign sidecar with entitlements (macOS, if APPLE_SIGNING_IDENTITY set)
+# 7. cargo tauri build (compiles Rust, packages DMG)
 ```
 
-### Legacy Swift App
+### CI/CD Triggers
 
-The original Swift app uses Xcode signing and Sparkle for updates. See [docs/code-signing.md](docs/code-signing.md) for the Xcode-based workflow.
+| Trigger | Behavior |
+|---------|----------|
+| Push to `main` | Build + upload artifacts, update rolling "latest" pre-release |
+| Pull request | Build + upload artifacts (no release) |
+| Tag `v*` | Build + create draft GitHub Release with DMGs |
+| `workflow_dispatch` | Manual build with optional version/debug inputs |
 
 ---
 
 ## Auto-Updates
 
-### Tauri App
+The Tauri app uses `tauri-plugin-updater` with Ed25519 signatures for update verification. When a tagged release is created, `tauri-apps/tauri-action` generates a `latest.json` manifest with download URLs and signatures, attached to the GitHub Release.
 
-The Tauri app uses `tauri-plugin-updater` with Ed25519 signatures for update verification. The update endpoint returns a JSON manifest with download URLs and signatures per platform.
+The app checks `https://github.com/shellen/pullread/releases/latest/download/latest.json` for updates. Users can also check manually via the **Check for Updates...** menu item.
 
-**Setup:**
+**Key generation (one-time):**
 ```bash
-# Generate signing keys (one-time)
-npx tauri signer generate -- -w ~/.tauri/pullread.key
+bunx @tauri-apps/cli signer generate -w ~/.tauri/keys
 ```
 
-The public key goes in `tauri.conf.json` under `plugins.updater.pubkey`. The private key is stored as a GitHub secret (`TAURI_SIGNING_KEY`) and used at build time.
-
-Users can check for updates via the **Check for Updates...** menu item. The app also checks periodically in the background.
-
-### Legacy Swift App (Sparkle)
-
-The Swift app uses [Sparkle 2](https://sparkle-project.org/) for automatic updates. See the [Sparkle setup guide](#legacy-sparkle-setup) below for configuration details.
-
-<details>
-<summary><strong>Legacy Sparkle Setup</strong></summary>
-
-Sparkle requires an Ed25519 keypair. The **public key** is shipped in the app bundle (`SUPublicEDKey` in Info.plist). The **private key** stays in GitHub Secrets (`SPARKLE_PRIVATE_KEY`).
-
-1. Run the **Sparkle Key Generation** workflow in GitHub Actions
-2. Copy both keys from the workflow output
-3. Store the private key as the `SPARKLE_PRIVATE_KEY` secret
-4. Verify `SUPublicEDKey` in Info.plist matches the public key
-5. Enable GitHub Pages for appcast hosting
-
-The release workflow automatically builds, signs, notarizes, and publishes the appcast.
-
-| Info.plist Key | Value | Purpose |
-|----------------|-------|---------|
-| `SUFeedURL` | `https://pullread.com/appcast.xml` | Appcast feed URL |
-| `SUPublicEDKey` | *(base64 Ed25519 key)* | Update signature verification |
-| `SUEnableAutomaticChecks` | `true` | Check on launch |
-| `SUScheduledCheckInterval` | `86400` | Check interval (24 hours) |
-
-</details>
+The public key goes in `tauri.conf.json` (`plugins.updater.pubkey`). The private key is set as the `TAURI_SIGNING_PRIVATE_KEY` GitHub secret.
 
 ---
 
