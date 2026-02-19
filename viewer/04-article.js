@@ -377,6 +377,7 @@ function renderArticle(text, filename) {
   if (isReviewArticle) {
     content.classList.add('review-content');
     enhanceOpenQuestions(content, filename);
+    localizeReviewLinks(content);
   } else {
     content.classList.remove('review-content');
   }
@@ -521,6 +522,39 @@ function enhanceOpenQuestions(container, filename) {
     })(questionText);
     li.appendChild(btn);
   }
+}
+
+// Rewrite review article links to open in PullRead when the article exists locally
+function localizeReviewLinks(container) {
+  var urlMap = {};
+  for (var i = 0; i < allFiles.length; i++) {
+    if (allFiles[i].url) urlMap[allFiles[i].url] = allFiles[i].filename;
+  }
+
+  container.querySelectorAll('li > a[href]').forEach(function(a) {
+    var href = a.getAttribute('href');
+    var localFile = urlMap[href];
+    if (!localFile) return;
+
+    a.removeAttribute('target');
+    a.removeAttribute('rel');
+    a.onclick = function(e) {
+      e.preventDefault();
+      dashLoadArticle(localFile);
+    };
+
+    // Add small external link affordance on hover
+    var ext = document.createElement('a');
+    ext.href = href;
+    ext.target = '_blank';
+    ext.rel = 'noopener noreferrer';
+    ext.className = 'review-ext-link';
+    ext.title = 'Open original';
+    ext.setAttribute('aria-label', 'Open original article');
+    ext.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-external"/></svg>';
+    ext.onclick = function(e) { e.stopPropagation(); };
+    a.parentElement.appendChild(ext);
+  });
 }
 
 // ---- Reading Progress Bar ----

@@ -572,9 +572,15 @@ async function playPodcastAudio(item) {
   try {
     var audio = new Audio(item.enclosureUrl);
     audio.playbackRate = ttsSpeed;
+    var resumeTime = item.savedTime || 0;
 
     audio.addEventListener('loadedmetadata', function() {
       document.getElementById('tts-time-total').textContent = formatTime(audio.duration);
+      // Resume from saved position
+      if (resumeTime > 0 && resumeTime < audio.duration - 5) {
+        audio.currentTime = resumeTime;
+        resumeTime = 0;
+      }
     });
 
     audio.addEventListener('playing', function() {
@@ -583,11 +589,17 @@ async function playPodcastAudio(item) {
       renderAudioPlayer();
     });
 
+    var _lastProgressSave = 0;
     audio.addEventListener('timeupdate', function() {
       if (!audio.duration) return;
       var pct = Math.min(100, (audio.currentTime / audio.duration) * 100);
       document.getElementById('tts-progress').style.width = pct + '%';
       document.getElementById('tts-time-current').textContent = formatTime(audio.currentTime);
+      // Save progress every 5 seconds
+      if (Date.now() - _lastProgressSave > 5000) {
+        _lastProgressSave = Date.now();
+        saveTTSState();
+      }
     });
 
     audio.addEventListener('ended', function() {
@@ -1572,13 +1584,17 @@ function saveTTSSettings() {
 // ---- Playback State Persistence ----
 function saveTTSState() {
   try {
+    // Save position on the current queue item so it persists with the queue
+    if (ttsAudio && ttsAudio.duration && ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length) {
+      ttsQueue[ttsCurrentIndex].savedTime = ttsAudio.currentTime;
+      ttsQueue[ttsCurrentIndex].savedDuration = ttsAudio.duration;
+    }
     var state = {
       queue: ttsQueue,
       currentIndex: ttsCurrentIndex,
       speed: ttsSpeed,
       timestamp: Date.now(),
     };
-    // Save current playback position
     if (ttsAudio && ttsAudio.duration) {
       state.currentTime = ttsAudio.currentTime;
       state.duration = ttsAudio.duration;
@@ -1606,8 +1622,23 @@ function restoreTTSState() {
     renderAudioPlayer();
     var speedBtn = document.getElementById('tts-speed-btn');
     if (speedBtn) speedBtn.textContent = ttsSpeed + 'x';
+    // Show saved playback position in the progress bar
+    if (state.currentTime && state.duration && state.duration > 0) {
+      var pct = Math.min(100, (state.currentTime / state.duration) * 100);
+      var bar = document.getElementById('tts-progress');
+      var timeEl = document.getElementById('tts-time-current');
+      var totalEl = document.getElementById('tts-time-total');
+      if (bar) bar.style.width = pct + '%';
+      if (timeEl) timeEl.textContent = formatTime(state.currentTime);
+      if (totalEl) totalEl.textContent = formatTime(state.duration);
+    }
   } catch(e) {}
 }
+
+// Save state when the page is closing so progress isn't lost
+window.addEventListener('beforeunload', function() {
+  if (ttsQueue.length > 0) saveTTSState();
+});
 
 // Restore on load (called externally after DOM is ready)
 if (typeof _ttsStateRestored === 'undefined') {

@@ -1017,7 +1017,8 @@
     .content-wrap {
       padding: 24px 20px 80px;
     }
-    .sidebar.collapsed ~ .content-pane .content-wrap {
+    .sidebar.collapsed ~ .content-pane .content-wrap,
+    .sidebar.collapsed ~ .content-pane .dashboard {
       padding-top: 52px;
     }
     .article-header h1 {
@@ -1057,7 +1058,8 @@
     .content-wrap {
       padding: 16px 14px 72px;
     }
-    .sidebar.collapsed ~ .content-pane .content-wrap {
+    .sidebar.collapsed ~ .content-pane .content-wrap,
+    .sidebar.collapsed ~ .content-pane .dashboard {
       padding-top: 56px;
     }
     .article-header h1 {
@@ -2391,6 +2393,17 @@
   }
   .oq-note-btn:hover { color: var(--link); border-color: var(--link); }
   .review-content li:hover .oq-note-btn { opacity: 1; }
+
+  /* Review links — external link affordance */
+  .review-ext-link {
+    opacity: 0;
+    transition: opacity 0.15s;
+    margin-left: 6px;
+    color: var(--muted);
+    vertical-align: middle;
+  }
+  .review-ext-link:hover { color: var(--link); }
+  .review-content li:hover .review-ext-link { opacity: 1; }
 
   /* Notebook */
   .notebook-header {
