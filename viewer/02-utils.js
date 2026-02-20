@@ -119,6 +119,22 @@ function cleanMarkdown(md) {
   return md;
 }
 
+// Show a brief non-blocking toast message (auto-dismisses)
+function showToast(message, durationMs) {
+  if (!durationMs) durationMs = 4000;
+  var el = document.getElementById('toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'toast';
+    el.className = 'toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = message;
+  el.classList.add('visible');
+  clearTimeout(el._timer);
+  el._timer = setTimeout(function() { el.classList.remove('visible'); }, durationMs);
+}
+
 // Shared tag input handler: parses comma/Enter, adds tag, calls callbacks
 function handleTagInput(e, getTagsArray, onAdd) {
   if (e.key === 'Enter' || e.key === ',') {

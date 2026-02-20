@@ -110,13 +110,13 @@ function listFiles(outputPath: string): FileMeta[] {
   return files;
 }
 
-// Annotations storage path
-const ANNOTATIONS_DIR = join(homedir(), '.config', 'pullread');
-const FEEDS_PATH = join(ANNOTATIONS_DIR, 'feeds.json');
-const HIGHLIGHTS_PATH = join(ANNOTATIONS_DIR, 'highlights.json');
-const NOTES_PATH = join(ANNOTATIONS_DIR, 'notes.json');
-const APP_SETTINGS_PATH = join(ANNOTATIONS_DIR, 'settings.json');
-const NOTEBOOKS_PATH = join(ANNOTATIONS_DIR, 'notebooks.json');
+// App config and data paths
+const CONFIG_DIR = join(homedir(), '.config', 'pullread');
+const FEEDS_PATH = join(CONFIG_DIR, 'feeds.json');
+const HIGHLIGHTS_PATH = join(CONFIG_DIR, 'highlights.json');
+const NOTES_PATH = join(CONFIG_DIR, 'notes.json');
+const APP_SETTINGS_PATH = join(CONFIG_DIR, 'settings.json');
+const NOTEBOOKS_PATH = join(CONFIG_DIR, 'notebooks.json');
 const APP_VERSION = '2.0.0';
 
 function loadJsonFile(path: string): Record<string, unknown> {
@@ -1273,13 +1273,13 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         _createdAt: new Date().toISOString(),
       };
       for (const f of backupFiles) {
-        const p = join(ANNOTATIONS_DIR, f);
+        const p = join(CONFIG_DIR, f);
         if (existsSync(p)) {
           try { backup[f] = JSON.parse(readFileSync(p, 'utf-8')); } catch {}
         }
       }
       // Include sync database if it exists
-      const dbPath = join(ANNOTATIONS_DIR, 'pullread.json');
+      const dbPath = join(CONFIG_DIR, 'pullread.json');
       if (existsSync(dbPath)) {
         try { backup['pullread.json'] = JSON.parse(readFileSync(dbPath, 'utf-8')); } catch {}
       }
@@ -1306,7 +1306,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         let restored = 0;
         for (const f of restorableFiles) {
           if (body[f] && typeof body[f] === 'object') {
-            saveJsonFile(join(ANNOTATIONS_DIR, f), body[f]);
+            saveJsonFile(join(CONFIG_DIR, f), body[f]);
             restored++;
           }
         }

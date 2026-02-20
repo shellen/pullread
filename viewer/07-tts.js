@@ -125,7 +125,7 @@ function playNextFromArticle(filename) {
     renderAudioPlayer();
     return;
   }
-  var newItem = { filename: filename, title: file.title };
+  var newItem = { filename: filename, title: file.title, image: file.image || '', domain: file.domain || '' };
   if (file.enclosureUrl && file.enclosureType && file.enclosureType.startsWith('audio/')) {
     newItem.enclosureUrl = file.enclosureUrl;
   }
@@ -158,7 +158,7 @@ async function addToTTSQueue(filename) {
     } catch {}
   }
 
-  var item = { filename, title: file.title };
+  var item = { filename, title: file.title, image: file.image || '', domain: file.domain || '' };
   if (file.enclosureUrl && file.enclosureType && file.enclosureType.startsWith('audio/')) {
     item.enclosureUrl = file.enclosureUrl;
   }
@@ -188,10 +188,28 @@ function renderAudioPlayer() {
   const status = document.getElementById('audio-now-status');
   const playBtn = document.getElementById('tts-play-btn');
 
-  if (ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length) {
-    label.textContent = ttsQueue[ttsCurrentIndex].title;
-  } else {
-    label.textContent = 'No article playing';
+  var currentItem = (ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length) ? ttsQueue[ttsCurrentIndex] : null;
+  label.textContent = currentItem ? currentItem.title : 'No article playing';
+
+  // Update artwork: article image > favicon > volume icon
+  var artworkEl = document.getElementById('bottom-bar-artwork');
+  if (artworkEl) {
+    var artSrc = '';
+    if (currentItem) {
+      if (currentItem.image) artSrc = currentItem.image;
+      else if (currentItem.domain) artSrc = '/favicons/' + encodeURIComponent(currentItem.domain) + '.png';
+    }
+    var fallbackIcon = '<svg class="bottom-bar-icon" aria-hidden="true"><use href="#i-volume"/></svg>';
+    if (artSrc) {
+      var img = new Image();
+      img.src = artSrc;
+      img.alt = '';
+      img.onerror = function() { artworkEl.innerHTML = fallbackIcon; };
+      artworkEl.innerHTML = '';
+      artworkEl.appendChild(img);
+    } else {
+      artworkEl.innerHTML = fallbackIcon;
+    }
   }
 
   if (ttsGenerating) {
@@ -322,7 +340,7 @@ async function loadTTSSettings() {
 async function playBrowserTTS(filename) {
   const synth = window.speechSynthesis;
   if (!synth) {
-    alert('Speech synthesis not available in this browser.');
+    showToast('Speech synthesis not available in this browser.');
     ttsPlaying = false;
     renderAudioPlayer();
     return;
@@ -412,7 +430,7 @@ async function playCloudTTS(filename) {
         return;
       }
       stopListenLoading();
-      alert('TTS Error: ' + (err.error || 'Unknown error'));
+      showToast('TTS Error: ' + (err.error || 'Unknown error'));
       ttsPlaying = false;
       renderAudioPlayer();
       return;
@@ -443,7 +461,7 @@ async function playCloudTTS(filename) {
     ttsPlaying = false;
     _ttsChunkSession = null;
     renderAudioPlayer();
-    alert('TTS Error: ' + err.message);
+    showToast('TTS Error: ' + err.message);
   }
 }
 
@@ -474,6 +492,7 @@ async function playCloudTTSCached(filename) {
     });
 
     audio.addEventListener('ended', function() {
+      if (ttsAudio !== audio) return;
       document.getElementById('tts-progress').style.width = '100%';
       ttsPlaying = false;
       _ttsNextPrefetch = null;
@@ -484,21 +503,21 @@ async function playCloudTTSCached(filename) {
     });
 
     audio.addEventListener('error', function() {
+      if (ttsAudio !== audio) return;
       stopListenLoading();
       ttsPlaying = false;
       renderAudioPlayer();
-      alert('TTS Error: Failed to load cached audio');
+      showToast('Could not load cached audio');
     });
-
-    audio.play();
 
     ttsAudio = audio;
     ttsPlaying = true;
+    audio.play();
     renderAudioPlayer();
   } catch (err) {
     ttsPlaying = false;
     renderAudioPlayer();
-    alert('TTS Error: ' + err.message);
+    showToast('TTS Error: ' + err.message);
   }
 }
 
@@ -520,6 +539,7 @@ async function playPodcastAudio(item) {
 
     var _cuePlayed = false;
     audio.addEventListener('playing', function() {
+      if (ttsAudio !== audio) return;
       stopListenLoading();
       if (!_cuePlayed) { _cuePlayed = true; playCueSound(); }
       ttsPlaying = true;
@@ -528,6 +548,7 @@ async function playPodcastAudio(item) {
 
     var _lastProgressSave = 0;
     audio.addEventListener('timeupdate', function() {
+      if (ttsAudio !== audio) return;
       if (!audio.duration) return;
       var pct = Math.min(100, (audio.currentTime / audio.duration) * 100);
       document.getElementById('tts-progress').style.width = pct + '%';
@@ -540,6 +561,7 @@ async function playPodcastAudio(item) {
     });
 
     audio.addEventListener('ended', function() {
+      if (ttsAudio !== audio) return;
       document.getElementById('tts-progress').style.width = '100%';
       ttsPlaying = false;
       renderAudioPlayer();
@@ -549,20 +571,21 @@ async function playPodcastAudio(item) {
     });
 
     audio.addEventListener('error', function() {
+      if (ttsAudio !== audio) return;
       stopListenLoading();
       ttsPlaying = false;
       renderAudioPlayer();
-      alert('Podcast playback error: could not load audio');
+      showToast('Could not load podcast audio');
     });
 
-    audio.play();
     ttsAudio = audio;
     ttsPlaying = true;
+    audio.play();
     renderAudioPlayer();
   } catch (err) {
     ttsPlaying = false;
     renderAudioPlayer();
-    alert('Podcast playback error: ' + err.message);
+    showToast('Podcast error: ' + err.message);
   }
 }
 
@@ -741,7 +764,7 @@ async function ttsPlayNextChunk(index, seekPct) {
     _ttsChunkSession = null;
     _ttsChunkBuffer.clear();
     renderAudioPlayer();
-    alert('TTS Error: ' + err.message);
+    showToast('TTS Error: ' + err.message);
   }
 }
 
@@ -1110,6 +1133,10 @@ function ttsClearQueue() {
   renderAudioPlayer();
 }
 
+function ttsDismissPlayer() {
+  ttsClearQueue();
+}
+
 function formatTime(seconds) {
   if (!seconds || isNaN(seconds)) return '0:00';
   const m = Math.floor(seconds / 60);
@@ -1211,7 +1238,7 @@ function ttsHighlightByProgress(progress, paraOffsets) {
 
 function showTTSSettings() {
   if (!serverMode) {
-    alert('Voice playback settings are only available in server mode.');
+    showToast('Voice settings are only available in server mode.');
     return;
   }
 
@@ -1322,7 +1349,7 @@ function showTTSSettings() {
       '</div>';
   }).catch(function() {
     overlay.remove();
-    alert('Could not load voice playback settings.');
+    showToast('Could not load voice settings.');
   });
 }
 
@@ -1496,7 +1523,7 @@ function saveTTSSettings() {
     const overlay = document.querySelector('.modal-overlay');
     const hasExistingKey = overlay?._ttsData?.hasKey;
     if (!apiKeyInput && !hasExistingKey) {
-      alert('Please enter an API key for TTS.');
+      showToast('Please enter an API key for TTS.');
       return;
     }
   }
@@ -1531,7 +1558,7 @@ function saveTTSSettings() {
         playTTSItem(resumeIdx);
       }
     } else {
-      alert('Failed to save voice playback settings.');
+      showToast('Failed to save voice settings.');
     }
   });
 }

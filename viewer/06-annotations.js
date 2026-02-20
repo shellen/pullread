@@ -623,7 +623,6 @@ function renderNotesPanel() {
     + machineTags.map(t => '<span class="tag tag-machine" title="Auto-generated">' + escapeHtml(t) + '</span>').join('');
 
   panel.innerHTML = `
-    <div class="annotations-heading">Annotations</div>
     <div class="tags-row">
       ${tagsHtml}
       <input type="text" placeholder="Add tag..." onkeydown="handleTagKey(event)" />
