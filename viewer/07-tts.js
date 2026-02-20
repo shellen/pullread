@@ -277,75 +277,10 @@ function updateSidebarAudioIndicators() {
   });
 }
 
-/** Show inline now-playing bar in article view when that article is playing */
+/** Clean up any stale inline player elements */
 function updateArticleNowPlaying() {
-  // Remove any existing
   var existing = document.getElementById('article-now-playing');
   if (existing) existing.remove();
-
-  if (ttsQueue.length === 0 || ttsCurrentIndex < 0) return;
-
-  var playingFile = ttsQueue[ttsCurrentIndex].filename;
-  if (activeFile !== playingFile) return;
-
-  var actions = document.querySelector('.article-actions');
-  if (!actions) return;
-
-  var bar = document.createElement('div');
-  bar.className = 'article-now-playing';
-  bar.id = 'article-now-playing';
-  bar.innerHTML =
-    '<button class="article-play-btn" onclick="ttsTogglePlay()" title="Play/Pause">'
-    + (ttsPlaying ? '<svg><use href="#i-pause"/></svg>' : '<svg><use href="#i-play"/></svg>')
-    + '</button>'
-    + '<button onclick="ttsSkipPrev()" title="Rewind 15s"><svg><use href="#i-backward"/></svg></button>'
-    + '<div class="anp-progress" id="anp-progress"><div class="anp-progress-bar"><div class="anp-progress-fill" id="anp-progress-fill"></div></div></div>'
-    + '<button onclick="ttsSkipNext()" title="Forward 15s"><svg><use href="#i-forward"/></svg></button>'
-    + '<span class="anp-time" id="anp-time"></span>'
-    + '<button class="anp-speed" onclick="ttsCycleSpeed()">' + ttsSpeed + 'x</button>';
-
-  actions.parentNode.insertBefore(bar, actions.nextSibling);
-
-  // Initialize progress drag for inline bar
-  initArticleProgressDrag();
-  syncArticleNowPlaying();
-}
-
-var _anpSyncTimer = null;
-function syncArticleNowPlaying() {
-  if (_anpSyncTimer) clearInterval(_anpSyncTimer);
-  _anpSyncTimer = setInterval(function() {
-    var fill = document.getElementById('anp-progress-fill');
-    var time = document.getElementById('anp-time');
-    var mainFill = document.getElementById('tts-progress');
-    var mainCur = document.getElementById('tts-time-current');
-    if (!fill || !mainFill) { clearInterval(_anpSyncTimer); return; }
-    fill.style.width = mainFill.style.width;
-    if (time && mainCur) time.textContent = mainCur.textContent;
-  }, 250);
-}
-
-function initArticleProgressDrag() {
-  var wrap = document.getElementById('anp-progress');
-  if (!wrap) return;
-  function seekFromEvent(e) {
-    if (!ttsPlaying && ttsCurrentIndex < 0) return;
-    var rect = wrap.getBoundingClientRect();
-    var clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    var pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    ttsSeek(pct);
-  }
-  function onMove(e) { seekFromEvent(e); }
-  function onEnd() {
-    document.removeEventListener('mousemove', onMove);
-    document.removeEventListener('mouseup', onEnd);
-  }
-  wrap.addEventListener('mousedown', function(e) {
-    e.preventDefault();
-    seekFromEvent(e);
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onEnd);
-  });
 }
 
 async function playTTSItem(index) {
@@ -810,7 +745,6 @@ async function ttsPlayNextChunk(index, seekPct) {
 
 function stopTTS() {
   clearInterval(ttsProgressTimer);
-  if (_anpSyncTimer) { clearInterval(_anpSyncTimer); _anpSyncTimer = null; }
   _ttsChunkSession = null;
   _ttsChunkBuffer.clear();
   _ttsNextPrefetch = null;

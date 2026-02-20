@@ -115,6 +115,7 @@ const ANNOTATIONS_DIR = join(homedir(), '.config', 'pullread');
 const FEEDS_PATH = join(ANNOTATIONS_DIR, 'feeds.json');
 const HIGHLIGHTS_PATH = join(ANNOTATIONS_DIR, 'highlights.json');
 const NOTES_PATH = join(ANNOTATIONS_DIR, 'notes.json');
+const APP_SETTINGS_PATH = join(ANNOTATIONS_DIR, 'settings.json');
 const NOTEBOOKS_PATH = join(ANNOTATIONS_DIR, 'notebooks.json');
 
 function loadJsonFile(path: string): Record<string, unknown> {
@@ -674,18 +675,29 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
             model: config?.model || getDefaultModel(p)
           };
         }
+        const appSettings = loadJsonFile(APP_SETTINGS_PATH);
         sendJson(res, {
           llm: {
             defaultProvider: settings.defaultProvider,
             providers,
             appleAvailable: isAppleAvailable()
-          }
+          },
+          viewerMode: (appSettings.viewerMode as string) || 'app'
         });
         return;
       }
       if (req.method === 'POST') {
         try {
           const body = JSON.parse(await readBody(req));
+
+          // Viewer mode preference (app window vs default browser)
+          if (body.viewerMode !== undefined) {
+            const appSettings = loadJsonFile(APP_SETTINGS_PATH);
+            appSettings.viewerMode = body.viewerMode === 'browser' ? 'browser' : 'app';
+            saveJsonFile(APP_SETTINGS_PATH, appSettings);
+            sendJson(res, { ok: true });
+            return;
+          }
 
           // New multi-provider format: { defaultProvider, providers: { ... } }
           if (body.defaultProvider) {

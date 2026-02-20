@@ -9,6 +9,13 @@ pub async fn open_viewer_inner(app: &AppHandle) -> Result<(), String> {
     let port = sidecar::ensure_viewer_running(app).await?;
     let url = format!("http://localhost:{}", port);
 
+    // Check if user prefers default browser over the built-in WebView
+    let state = app.state::<sidecar::SidecarState>();
+    if state.should_open_in_browser() {
+        let _ = open::that(&url);
+        return Ok(());
+    }
+
     // Reuse existing window or create new
     if let Some(window) = app.get_webview_window("viewer") {
         let _ = window.show();

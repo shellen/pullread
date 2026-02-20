@@ -215,6 +215,16 @@ function showSettingsPage(scrollToSection) {
     + '</select></div>';
   html += '</div>';
 
+  // ---- Open In section (Tauri only) ----
+  html += '<div class="settings-section" id="settings-viewer-mode" style="display:none">';
+  html += '<h2>Open In</h2>';
+  html += '<div class="settings-row"><div><label>Viewer window</label><div class="settings-desc">Where PullRead opens when you click View Articles</div></div>';
+  html += '<select id="sp-viewer-mode" onchange="settingsPageSaveViewerMode()">';
+  html += '<option value="app">PullRead window</option>';
+  html += '<option value="browser">Default browser</option>';
+  html += '</select></div>';
+  html += '</div>';
+
   // ---- Feeds & Sync section (placeholder, loaded async) ----
   html += '<div class="settings-section" id="settings-feeds">';
   html += '<h2>Bookmarks &amp; Sync</h2>';
@@ -265,6 +275,18 @@ function showSettingsPage(scrollToSection) {
   if (scrollToSection) {
     var target = document.getElementById(scrollToSection);
     if (target) setTimeout(function() { target.scrollIntoView({ behavior: 'smooth' }); }, 50);
+  }
+
+  // Load viewer mode setting (show section when running inside Tauri or always for server mode)
+  if (serverMode) {
+    fetch('/api/settings').then(function(r) { return r.json(); }).then(function(data) {
+      var sec = document.getElementById('settings-viewer-mode');
+      var sel = document.getElementById('sp-viewer-mode');
+      if (sec && sel) {
+        sel.value = data.viewerMode || 'app';
+        sec.style.display = '';
+      }
+    }).catch(function() {});
   }
 
   // Load Feeds & Sync config async
@@ -499,6 +521,15 @@ function showSettingsPage(scrollToSection) {
       if (sec) sec.innerHTML = '<h2>AI Summaries &amp; Tagging</h2><p style="color:var(--muted);font-size:13px">Could not load AI settings. Configure in the menu bar app.</p>';
     });
   }
+}
+
+function settingsPageSaveViewerMode() {
+  var mode = document.getElementById('sp-viewer-mode').value;
+  fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ viewerMode: mode }),
+  });
 }
 
 function settingsPageLLMProviderChanged() {
