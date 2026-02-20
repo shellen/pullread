@@ -275,19 +275,18 @@ export interface SiteLoginCookie {
 
 const KEYCHAIN_SERVICE = 'PullRead';
 
+function assertSafeDomain(domain: string): void {
+  if (!/^[a-zA-Z0-9.\-]+$/.test(domain)) {
+    throw new Error(`Invalid domain: ${domain}`);
+  }
+}
+
 /**
  * Stores site login cookies as JSON in macOS Keychain.
  */
 export function saveSiteLoginCookies(domain: string, cookies: SiteLoginCookie[]): void {
+  assertSafeDomain(domain);
   const json = JSON.stringify(cookies);
-  try {
-    execSync(
-      `security delete-generic-password -s "${KEYCHAIN_SERVICE}" -a "${domain}"`,
-      { stdio: ['pipe', 'pipe', 'pipe'] }
-    );
-  } catch {
-    // Entry didn't exist yet
-  }
   execSync(
     `security add-generic-password -s "${KEYCHAIN_SERVICE}" -a "${domain}" -w "${json.replace(/"/g, '\\"')}" -U`,
     { stdio: ['pipe', 'pipe', 'pipe'] }
@@ -299,6 +298,7 @@ export function saveSiteLoginCookies(domain: string, cookies: SiteLoginCookie[])
  * Filters out expired cookies. Returns null if no valid cookies found.
  */
 export function getSiteLoginCookies(domain: string): string | null {
+  assertSafeDomain(domain);
   try {
     const result = execSync(
       `security find-generic-password -w -s "${KEYCHAIN_SERVICE}" -a "${domain}"`,
@@ -318,6 +318,7 @@ export function getSiteLoginCookies(domain: string): string | null {
  * Removes stored site login cookies for a domain from Keychain.
  */
 export function removeSiteLogin(domain: string): boolean {
+  assertSafeDomain(domain);
   try {
     execSync(
       `security delete-generic-password -s "${KEYCHAIN_SERVICE}" -a "${domain}"`,
@@ -335,14 +336,25 @@ export function removeSiteLogin(domain: string): boolean {
 export function listSiteLogins(): string[] {
   try {
     const result = execSync(
-      `security dump-keychain | grep -A4 '"PullRead"'`,
+      'security dump-keychain',
       { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
     );
     const domains: string[] = [];
-    const lines = result.split('\n');
-    for (const line of lines) {
-      const match = line.match(/"acct"<blob>="([^"]+)"/);
-      if (match) domains.push(match[1]);
+    let inPullReadEntry = false;
+    for (const line of result.split('\n')) {
+      if (line.startsWith('keychain:') || line.match(/^    "keyc"/)) {
+        inPullReadEntry = false;
+      }
+      if (line.includes(`"svce"<blob>="${KEYCHAIN_SERVICE}"`)) {
+        inPullReadEntry = true;
+      }
+      if (inPullReadEntry) {
+        const match = line.match(/"acct"<blob>="([^"]+)"/);
+        if (match) {
+          domains.push(match[1]);
+          inPullReadEntry = false;
+        }
+      }
     }
     return [...new Set(domains)];
   } catch {

@@ -22,6 +22,7 @@ describe('Site login cookies', () => {
       { name: 'session', value: 'abc123', domain: '.medium.com', path: '/', expires: 0, secure: true, httpOnly: true }
     ];
     saveSiteLoginCookies('medium.com', cookies);
+    expect(mockExecSync).toHaveBeenCalledTimes(1);
     expect(mockExecSync).toHaveBeenCalledWith(
       expect.stringContaining('security add-generic-password'),
       expect.any(Object)
@@ -32,6 +33,10 @@ describe('Site login cookies', () => {
     );
     expect(mockExecSync).toHaveBeenCalledWith(
       expect.stringContaining('-a "medium.com"'),
+      expect.any(Object)
+    );
+    expect(mockExecSync).toHaveBeenCalledWith(
+      expect.stringContaining('abc123'),
       expect.any(Object)
     );
   });
@@ -75,11 +80,33 @@ describe('Site login cookies', () => {
     expect(removeSiteLogin('unknown.com')).toBe(false);
   });
 
+  test('getSiteLoginCookies returns null when all cookies are expired', () => {
+    const cookies = [
+      { name: 'old1', value: 'expired', domain: '.x.com', path: '/', expires: 1000, secure: true, httpOnly: true },
+      { name: 'old2', value: 'also-expired', domain: '.x.com', path: '/', expires: 2000, secure: false, httpOnly: false }
+    ];
+    mockExecSync.mockReturnValue(JSON.stringify(cookies));
+    expect(getSiteLoginCookies('x.com')).toBeNull();
+  });
+
+  test('saveSiteLoginCookies rejects domains with shell metacharacters', () => {
+    expect(() => saveSiteLoginCookies('evil.com$(whoami)', [])).toThrow('Invalid domain');
+  });
+
   test('listSiteLogins parses security dump output', () => {
     mockExecSync.mockReturnValue(
       '    "svce"<blob>="PullRead"\n    "acct"<blob>="medium.com"\n' +
       '    "svce"<blob>="PullRead"\n    "acct"<blob>="x.com"\n'
     );
     expect(listSiteLogins()).toEqual(['medium.com', 'x.com']);
+  });
+
+  test('listSiteLogins ignores acct values from non-PullRead entries', () => {
+    mockExecSync.mockReturnValue(
+      '    "svce"<blob>="OtherApp"\n    "acct"<blob>="should-skip.com"\n' +
+      'keychain: "/Users/test/Library/Keychains/login.keychain-db"\n' +
+      '    "svce"<blob>="PullRead"\n    "acct"<blob>="keep.com"\n'
+    );
+    expect(listSiteLogins()).toEqual(['keep.com']);
   });
 });
