@@ -211,6 +211,16 @@ function showSettingsPage(scrollToSection) {
   html += '<p style="color:var(--muted);font-size:13px">Loading feed configuration...</p>';
   html += '</div>';
 
+  // ---- Site Logins section (Tauri only) ----
+  if (window.PR_TAURI) {
+    html += '<div class="settings-section" id="settings-site-logins">';
+    html += '<h2>Site Logins</h2>';
+    html += '<p style="color:var(--muted);font-size:13px;margin-bottom:12px">Log in to sites for paywalled or authenticated content.</p>';
+    html += '<div id="site-logins-list"><p style="color:var(--muted);font-size:12px">Loading\u2026</p></div>';
+    html += '<button class="btn-primary" onclick="addSiteLogin()" style="font-size:13px;padding:6px 14px;margin-top:8px">+ Add site login</button>';
+    html += '</div>';
+  }
+
   // ---- Voice Playback section (placeholder, loaded async) ----
   html += '<div class="settings-section" id="settings-voice">';
   html += '<h2>Voice Playback</h2>';
@@ -381,6 +391,11 @@ function showSettingsPage(scrollToSection) {
       var sec = document.getElementById('settings-feeds');
       if (sec) sec.innerHTML = '<h2>Bookmarks &amp; Sync</h2><p style="color:var(--muted);font-size:13px">Could not load feed configuration.</p>';
     });
+  }
+
+  // Load Site Logins
+  if (window.PR_TAURI) {
+    loadSiteLogins();
   }
 
   // Load TTS settings async
@@ -988,5 +1003,72 @@ function reimportAllArticles() {
       if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
     });
   });
+}
+
+// ---- Site Logins ----
+async function loadSiteLogins() {
+  var container = document.getElementById('site-logins-list');
+  if (!container) return;
+  try {
+    var res = await fetch('/api/site-logins');
+    var data = await res.json();
+    if (!data.domains || data.domains.length === 0) {
+      container.innerHTML = '<p style="color:var(--muted);font-size:12px">No site logins yet.</p>';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < data.domains.length; i++) {
+      var d = data.domains[i];
+      html += '<div class="settings-row" style="padding:6px 0"><span style="font-size:13px">' + escapeHtml(d) + '</span>';
+      html += '<button style="font-size:11px;padding:3px 10px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit" onclick="removeSiteLoginUI(\'' + escapeJsStr(d) + '\')">Log out</button></div>';
+    }
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = '<p style="color:var(--muted);font-size:12px">Could not load site logins.</p>';
+  }
+}
+
+async function addSiteLogin() {
+  var domain = prompt('Enter the domain to log in to (e.g. medium.com, nytimes.com):');
+  if (!domain) return;
+  domain = domain.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '').toLowerCase();
+  if (!domain || !domain.includes('.')) {
+    showToast('Please enter a valid domain like medium.com');
+    return;
+  }
+  try {
+    await window.__TAURI__.core.invoke('open_site_login', { domain: domain });
+    showToast('Log in, then click "Done \u2014 Save Login" when finished');
+    // Poll for the login to complete (check if domain appears in list)
+    var poll = setInterval(async function() {
+      try {
+        var res = await fetch('/api/site-logins');
+        var data = await res.json();
+        if (data.domains && data.domains.includes(domain)) {
+          clearInterval(poll);
+          loadSiteLogins();
+          showToast('Logged in to ' + domain);
+        }
+      } catch(e) {}
+    }, 2000);
+    // Stop polling after 5 minutes
+    setTimeout(function() { clearInterval(poll); }, 300000);
+  } catch (e) {
+    showToast('Failed to open login window: ' + e);
+  }
+}
+
+async function removeSiteLoginUI(domain) {
+  try {
+    await fetch('/api/site-logins', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ domain: domain })
+    });
+    loadSiteLogins();
+    showToast('Logged out of ' + domain);
+  } catch (e) {
+    showToast('Failed to remove login: ' + e);
+  }
 }
 
