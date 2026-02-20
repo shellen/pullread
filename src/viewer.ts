@@ -13,6 +13,7 @@ import { APP_ICON } from './app-icon';
 import { fetchAndExtract } from './extractor';
 import { generateMarkdown, writeArticle, ArticleData, downloadFavicon } from './writer';
 import { loadTTSConfig, saveTTSConfig, generateSpeech, getAudioContentType, getKokoroStatus, preloadKokoro, getCachedAudioPath, createTtsSession, generateSessionChunk, TTS_VOICES, TTS_MODELS } from './tts';
+import { listSiteLogins, removeSiteLogin } from './cookies';
 
 interface FileMeta {
   filename: string;
@@ -858,6 +859,20 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         sendJson(res, { status: 'idle' });
       }
       return;
+    }
+
+    // Site login management
+    if (url.pathname === '/api/site-logins') {
+      if (req.method === 'GET') {
+        sendJson(res, { domains: listSiteLogins() });
+        return;
+      }
+      if (req.method === 'DELETE') {
+        const body = JSON.parse(await readBody(req));
+        const removed = removeSiteLogin(body.domain);
+        sendJson(res, { ok: removed });
+        return;
+      }
     }
 
     // Auto-tag API
