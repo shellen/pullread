@@ -1609,11 +1609,7 @@
     animation: spin 0.8s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
-  /* Play Next button in article actions */
-  .play-next-menu {
-    position: relative;
-    display: inline-block;
-  }
+  /* Play Next dropdown menu positioning */
   .play-next-dropdown {
     position: absolute;
     top: 100%;

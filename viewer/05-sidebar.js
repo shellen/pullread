@@ -411,6 +411,12 @@ function syncSidebarTabs() {
     if (_sidebarView === 'notebooks') search.placeholder = 'Search notebooks...';
     else search.placeholder = 'Search... try is:favorite or tag:tech';
   }
+
+  // Pinned filters only apply to articles (home view)
+  var pinnedContainer = document.getElementById('pinned-filters');
+  if (pinnedContainer) pinnedContainer.style.display = _sidebarView === 'home' ? '' : 'none';
+  var pinBtn = document.getElementById('search-pin');
+  if (pinBtn && _sidebarView !== 'home') pinBtn.style.display = 'none';
 }
 
 let _writingFocusActive = false;
