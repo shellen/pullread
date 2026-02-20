@@ -2353,6 +2353,7 @@
   .dot-note { background: var(--link); }
   .dot-summary { background: var(--muted); opacity: 0.6; }
   .dot-favorite { color: #d97706; font-size: 8px; line-height: 6px; }
+  .dot-podcast { color: var(--muted); font-size: 8px; line-height: 6px; }
 
   /* Highlight note marker (small icon after highlighted text) */
   .hl-note-marker {

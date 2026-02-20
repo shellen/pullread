@@ -69,10 +69,12 @@ function renderFileItem(f, i) {
   const isRead = readArticles.has(f.filename);
   const { hasHl, hasNote, isFavorite } = hasAnnotations(f.filename);
   const hasSummary = f.hasSummary;
+  const isPodcast = !!(f.enclosureUrl && f.enclosureType && f.enclosureType.startsWith('audio/'));
   let indicators = '';
-  if (hasHl || hasNote || hasSummary || isFavorite) {
+  if (hasHl || hasNote || hasSummary || isFavorite || isPodcast) {
     indicators = '<div class="file-item-indicators">'
       + (isFavorite ? '<span class="dot dot-favorite" aria-label="Favorite"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-heart"/></svg></span>' : '')
+      + (isPodcast ? '<span class="dot dot-podcast" aria-label="Podcast"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-headphones"/></svg></span>' : '')
       + (hasHl ? '<span class="dot dot-highlight" aria-label="Has highlights"></span>' : '')
       + (hasNote ? '<span class="dot dot-note" aria-label="Has annotations"></span>' : '')
       + (hasSummary ? '<span class="dot dot-summary" aria-label="Has summary"></span>' : '')
@@ -179,6 +181,8 @@ function filterFiles() {
         if (tl === 'is:read') return readArticles.has(f.filename);
         // Operator: is:unread
         if (tl === 'is:unread') return !readArticles.has(f.filename);
+        // Operator: is:podcast / has:audio
+        if (tl === 'is:podcast' || tl === 'has:audio') return !!(f.enclosureUrl && f.enclosureType && f.enclosureType.startsWith('audio/'));
         // Operator: has:summary
         if (tl === 'has:summary') return f.hasSummary;
         // Operator: has:highlights

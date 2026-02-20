@@ -442,6 +442,11 @@ function showSettingsPage(scrollToSection) {
       h += '</div>';
 
       // Kokoro status
+      // Auto-play next podcast toggle
+      h += '<div class="settings-row"><div><label>Auto-play next podcast</label><div class="settings-desc">When a podcast ends, automatically play the next one</div></div>';
+      h += '<input type="checkbox" id="sp-podcast-autoplay"' + (podcastAutoplay ? ' checked' : '') + ' onchange="podcastAutoplay=this.checked;localStorage.setItem(\'pr-podcast-autoplay\',this.checked?\'1\':\'0\')">';
+      h += '</div>';
+
       h += '<div id="sp-kokoro-status" style="display:' + (data.provider === 'kokoro' ? 'block' : 'none') + ';padding:8px 0">';
       if (data.kokoro && data.kokoro.bundled) {
         h += '<div style="font-size:12px;color:var(--muted)"><span class="settings-status ok">Kokoro bundled</span> Runs on-device, no API key or download needed</div>';

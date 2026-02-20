@@ -10,6 +10,7 @@ let ttsGenerating = false;
 let ttsProgressTimer = null;
 let _ttsChunkSession = null; // { id, totalChunks, currentChunk, elapsedTime }
 var _ttsNextPrefetch = null;  // { filename, sessionId, totalChunks, currentChunk, done }
+var podcastAutoplay = localStorage.getItem('pr-podcast-autoplay') === '1';
 
 const TTS_SPEEDS = [0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.15, 1.2, 1.3, 1.5, 1.75, 2.0];
 
@@ -567,6 +568,8 @@ async function playPodcastAudio(item) {
       renderAudioPlayer();
       if (ttsCurrentIndex + 1 < ttsQueue.length) {
         setTimeout(function() { playTTSItem(ttsCurrentIndex + 1); }, 500);
+      } else if (podcastAutoplay) {
+        autoplayNextPodcast(item.filename);
       }
     });
 
@@ -587,6 +590,17 @@ async function playPodcastAudio(item) {
     renderAudioPlayer();
     showToast('Podcast error: ' + err.message);
   }
+}
+
+/** Find and play the next podcast after the current one finishes */
+function autoplayNextPodcast(currentFilename) {
+  var podcasts = allFiles.filter(function(f) {
+    return f.enclosureUrl && f.enclosureType && f.enclosureType.startsWith('audio/');
+  });
+  var currentIdx = podcasts.findIndex(function(f) { return f.filename === currentFilename; });
+  var next = currentIdx >= 0 && currentIdx + 1 < podcasts.length ? podcasts[currentIdx + 1] : null;
+  if (!next) return;
+  setTimeout(function() { addToTTSQueue(next.filename); }, 500);
 }
 
 // Tracks which chunks have been pre-fetched (server-side cache warming)
