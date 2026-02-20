@@ -152,6 +152,7 @@ function goHome() {
   _sidebarView = 'home'; syncSidebarTabs();
   activeFile = null;
   document.title = 'PullRead';
+  renderFileList();
   renderDashboard();
 }
 
