@@ -217,7 +217,10 @@ function showSettingsPage(scrollToSection) {
     html += '<h2>Site Logins</h2>';
     html += '<p style="color:var(--muted);font-size:13px;margin-bottom:12px">Log in to sites for paywalled or authenticated content.</p>';
     html += '<div id="site-logins-list"><p style="color:var(--muted);font-size:12px">Loading\u2026</p></div>';
-    html += '<button class="btn-primary" onclick="addSiteLogin()" style="font-size:13px;padding:6px 14px;margin-top:8px">+ Add site login</button>';
+    html += '<div style="display:flex;gap:8px;margin-top:8px">';
+    html += '<input type="text" id="site-login-domain" placeholder="Domain (e.g. medium.com, nytimes.com)" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;font-family:inherit" onkeydown="if(event.key===\'Enter\')addSiteLogin()">';
+    html += '<button class="btn-primary" onclick="addSiteLogin()" style="font-size:13px;padding:6px 14px">Log in</button>';
+    html += '</div>';
     html += '</div>';
   }
 
@@ -1029,15 +1032,16 @@ async function loadSiteLogins() {
 }
 
 async function addSiteLogin() {
-  var domain = prompt('Enter the domain to log in to (e.g. medium.com, nytimes.com):');
-  if (!domain) return;
-  domain = domain.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '').toLowerCase();
+  var input = document.getElementById('site-login-domain');
+  var domain = (input ? input.value : '').trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '').toLowerCase();
+  if (!domain) { showToast('Enter a domain first'); return; }
   if (!domain || !domain.includes('.')) {
     showToast('Please enter a valid domain like medium.com');
     return;
   }
   try {
     await window.__TAURI__.core.invoke('open_site_login', { domain: domain });
+    if (input) input.value = '';
     showToast('Log in, then click "Done \u2014 Save Login" when finished');
     // Poll for the login to complete (check if domain appears in list)
     var poll = setInterval(async function() {
