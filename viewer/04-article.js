@@ -96,10 +96,12 @@ function renderDashboard() {
     html += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
   }
 
-  // Footer links
-  html += '<div class="dash-footer">';
-  html += '<button onclick="showTagCloud()"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px"><use href="#i-search"/></svg> Explore</button>';
-  html += '<button onclick="showGuideModal()"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px"><use href="#i-book"/></svg> Guide</button>';
+  // Quick actions
+  html += '<div class="dash-actions">';
+  html += '<button onclick="dashGenerateReview(1)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Daily Review</button>';
+  html += '<button onclick="dashGenerateReview(7)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Weekly Review</button>';
+  html += '<button onclick="showTagCloud()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-search"/></svg> Explore</button>';
+  html += '<button onclick="showGuideModal()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-book"/></svg> Guide</button>';
   html += '</div>';
 
   dash.innerHTML = html;
@@ -146,6 +148,32 @@ function dashCardHtml(f, progressPct) {
 
   html += '</div></div>';
   return html;
+}
+
+function dashGenerateReview(days) {
+  if (!serverMode) return;
+  var label = days === 1 ? 'Daily' : 'Weekly';
+  showToast('Generating ' + label + ' Review\u2026');
+  fetch('/api/review', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ days: days })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.error) {
+      showToast(data.error, true);
+      return;
+    }
+    showToast(label + ' Review ready');
+    refreshArticleList(false);
+    if (data.filename) {
+      setTimeout(function() {
+        var idx = displayFiles.findIndex(function(f) { return f.filename === data.filename; });
+        if (idx >= 0) loadFile(idx);
+      }, 500);
+    }
+  }).catch(function(err) {
+    showToast('Review failed: ' + err.message, true);
+  });
 }
 
 function goHome() {

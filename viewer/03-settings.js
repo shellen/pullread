@@ -261,8 +261,11 @@ function showSettingsPage(scrollToSection) {
   html += '<button id="sp-check-updates-btn" style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer" onclick="settingsCheckForUpdates()">Check for Updates</button>';
   html += '<span id="sp-update-status" style="font-size:12px;color:var(--muted);align-self:center"></span>';
   html += '</div>';
-  html += '<div class="settings-row"><a href="https://pullread.com" target="_blank" rel="noopener" style="font-size:13px;color:var(--link)">pullread.com</a>';
-  html += '<span style="color:var(--muted);font-size:12px">\u00A9 A Little Drive LLC</span></div>';
+  html += '<div class="settings-row" style="gap:12px">';
+  html += '<a href="https://pullread.com" target="_blank" rel="noopener" style="font-size:13px;color:var(--link)">pullread.com</a>';
+  html += '<a href="/api/log" target="_blank" style="font-size:13px;color:var(--link)">View Logs</a>';
+  html += '</div>';
+  html += '<div class="settings-row"><span style="color:var(--muted);font-size:12px">\u00A9 A Little Drive LLC</span></div>';
   html += '</div>';
 
   content.innerHTML = html;
@@ -314,6 +317,7 @@ function showSettingsPage(scrollToSection) {
       h += '<div style="display:flex;gap:8px;align-items:center">';
       h += '<input type="text" id="sp-output-path" value="' + escapeHtml(cfg.outputPath || '') + '" placeholder="~/Documents/PullRead" style="min-width:200px">';
       h += '<button onclick="pickOutputFolder(\'sp-output-path\')" style="white-space:nowrap;padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;cursor:pointer;font-family:inherit">Choose\u2026</button>';
+      h += '<button onclick="revealOutputFolder()" style="white-space:nowrap;padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;cursor:pointer;font-family:inherit" title="Open in Finder">Reveal</button>';
       h += '</div></div>';
 
       // Sync interval
@@ -748,6 +752,10 @@ function pickOutputFolder(inputId) {
       }
     })
     .catch(function() { /* osascript not available — user can type manually */ });
+}
+
+function revealOutputFolder() {
+  fetch('/api/reveal-folder', { method: 'POST' }).catch(function() {});
 }
 
 function settingsPageSaveConfig() {

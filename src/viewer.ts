@@ -1443,6 +1443,31 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
       return;
     }
 
+    // Log viewer — serves the sidecar log file as plain text
+    if (url.pathname === '/api/log' && req.method === 'GET') {
+      const logFile = '/tmp/pullread.log';
+      if (existsSync(logFile)) {
+        const content = readFileSync(logFile, 'utf-8');
+        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end(content);
+      } else {
+        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('No log file found.');
+      }
+      return;
+    }
+
+    // Reveal output folder in Finder
+    if (url.pathname === '/api/reveal-folder' && req.method === 'POST') {
+      const folder = outputPath.startsWith('~')
+        ? join(homedir(), outputPath.slice(1))
+        : outputPath;
+      exec(`open "${folder}"`, (err) => {
+        sendJson(res, { ok: !err });
+      });
+      return;
+    }
+
     send404(res);
   });
 

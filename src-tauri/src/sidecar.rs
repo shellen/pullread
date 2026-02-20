@@ -70,6 +70,7 @@ impl SidecarState {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_output_path(&self) -> Option<String> {
         let content = std::fs::read_to_string(self.config_path()).ok()?;
         let config: Value = serde_json::from_str(&content).ok()?;

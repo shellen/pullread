@@ -1,5 +1,5 @@
 // ABOUTME: System tray (menu bar) setup and event handling
-// ABOUTME: Replicates the Swift AppDelegate menu with all 12 items
+// ABOUTME: Provides sync, view, settings, update check, and quit actions
 
 use crate::{commands, notifications, sidecar};
 use std::sync::Mutex;
@@ -18,31 +18,20 @@ pub struct TrayItems {
 
 pub fn create_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let sync_now = MenuItem::with_id(app, "sync_now", "Sync Now", true, Some("CmdOrCtrl+S"))?;
-    let last_sync = MenuItem::with_id(app, "last_sync", "Last sync: Never", false, None::<&str>)?;
+    let last_sync =
+        MenuItem::with_id(app, "last_sync", "Last sync: Never", false, None::<&str>)?;
     let next_sync =
         MenuItem::with_id(app, "next_sync", "Next sync: —", false, None::<&str>)?;
     let sep1 = PredefinedMenuItem::separator(app)?;
 
     let view_articles =
         MenuItem::with_id(app, "view", "View Articles", true, Some("CmdOrCtrl+D"))?;
-    let open_folder =
-        MenuItem::with_id(app, "open_folder", "Open Folder", true, Some("CmdOrCtrl+O"))?;
+    let check_updates =
+        MenuItem::with_id(app, "updates", "Check for Updates\u{2026}", true, None::<&str>)?;
     let sep2 = PredefinedMenuItem::separator(app)?;
-
-    let retry_failed =
-        MenuItem::with_id(app, "retry", "Retry Failed", true, Some("CmdOrCtrl+R"))?;
-    let gen_review =
-        MenuItem::with_id(app, "review", "Generate Review", true, None::<&str>)?;
-    let sep3 = PredefinedMenuItem::separator(app)?;
 
     let settings =
         MenuItem::with_id(app, "settings", "Settings\u{2026}", true, Some("CmdOrCtrl+,"))?;
-    let logs = MenuItem::with_id(app, "logs", "Logs", true, Some("CmdOrCtrl+L"))?;
-    let check_updates =
-        MenuItem::with_id(app, "updates", "Check for Updates\u{2026}", true, None::<&str>)?;
-    let sep4 = PredefinedMenuItem::separator(app)?;
-
-    let about = MenuItem::with_id(app, "about", "About Pull Read", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit Pull Read", true, Some("CmdOrCtrl+Q"))?;
 
     let menu = Menu::with_items(
@@ -53,16 +42,9 @@ pub fn create_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             &next_sync,
             &sep1,
             &view_articles,
-            &open_folder,
-            &sep2,
-            &retry_failed,
-            &gen_review,
-            &sep3,
-            &settings,
-            &logs,
             &check_updates,
-            &sep4,
-            &about,
+            &sep2,
+            &settings,
             &quit,
         ],
     )?;
@@ -87,44 +69,12 @@ pub fn create_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                         let _ = commands::open_viewer_inner(&handle).await;
                     });
                 }
-                "open_folder" => {
-                    let state = handle.state::<sidecar::SidecarState>();
-                    if let Some(path) = state.get_output_path() {
-                        let _ = open::that(&path);
-                    }
-                }
-                "retry" => {
-                    tauri::async_runtime::spawn(async move {
-                        handle_sync(&handle, true).await;
-                    });
-                }
-                "review" => {
-                    tauri::async_runtime::spawn(async move {
-                        handle_review(&handle).await;
-                    });
-                }
-                "logs" => {
-                    let log_path = sidecar::log_path();
-                    let _ = open::that(&log_path);
-                }
                 "updates" => {
                     tauri::async_runtime::spawn(async move {
                         handle_check_updates(&handle).await;
                     });
                 }
                 "settings" => {
-                    tauri::async_runtime::spawn(async move {
-                        let _ = commands::open_viewer_inner(&handle).await;
-                        if let Some(window) = handle.get_webview_window("viewer") {
-                            let port =
-                                handle.state::<sidecar::SidecarState>().get_viewer_port();
-                            let nav_url =
-                                format!("http://localhost:{}/#tab=settings", port);
-                            let _ = window.navigate(nav_url.parse().unwrap());
-                        }
-                    });
-                }
-                "about" => {
                     tauri::async_runtime::spawn(async move {
                         let _ = commands::open_viewer_inner(&handle).await;
                         if let Some(window) = handle.get_webview_window("viewer") {
@@ -151,7 +101,6 @@ pub fn create_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                 ..
             } = event
             {
-                // Left click opens the menu (default behavior with menu_on_left_click)
                 let _ = tray;
             }
         })
@@ -167,7 +116,6 @@ pub fn create_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn handle_sync(app: &AppHandle, retry_failed: bool) {
-    // Show syncing state in tray
     set_sync_active(app, true);
 
     match sidecar::run_sync(app, retry_failed).await {
@@ -176,7 +124,6 @@ async fn handle_sync(app: &AppHandle, retry_failed: bool) {
             update_last_sync(app);
             notifications::notify_sync_complete(app, &summary);
 
-            // Run autotag if enabled
             let state = app.state::<sidecar::SidecarState>();
             if state.is_autotag_enabled() {
                 let _ = sidecar::run_autotag(app).await;
@@ -193,51 +140,20 @@ async fn handle_sync(app: &AppHandle, retry_failed: bool) {
 fn set_sync_active(app: &AppHandle, active: bool) {
     let items = app.state::<TrayItems>();
 
-    // Disable/enable "Sync Now" menu item
     if let Ok(item) = items.sync_now.lock() {
         let _ = item.set_enabled(!active);
         let _ = item.set_text(if active { "Syncing\u{2026}" } else { "Sync Now" });
     }
 
-    // Update tooltip
     if let Some(tray) = app.tray_by_id("main") {
         if active {
             let _ = tray.set_tooltip(Some("Pull Read — Syncing\u{2026}"));
         }
     }
 
-    // Update "Last sync" text during sync
     if active {
         if let Ok(item) = items.last_sync.lock() {
             let _ = item.set_text("Syncing\u{2026}");
-        }
-    }
-}
-
-async fn handle_review(app: &AppHandle) {
-    match sidecar::run_review(app, 7).await {
-        Ok(output) => {
-            notifications::notify(app, "Review Ready", &output);
-            // Open the review in the viewer
-            let _ = commands::open_viewer_inner(app).await;
-            // Navigate to the review file if we can extract the filename
-            if let Some(filename) = output
-                .strip_prefix("Review saved: ")
-                .map(|s| s.trim().to_string())
-            {
-                if let Some(window) = app.get_webview_window("viewer") {
-                    let port = app.state::<sidecar::SidecarState>().get_viewer_port();
-                    let nav_url = format!(
-                        "http://localhost:{}/#file={}",
-                        port,
-                        urlencoding::encode(&filename)
-                    );
-                    let _ = window.navigate(nav_url.parse().unwrap());
-                }
-            }
-        }
-        Err(e) => {
-            notifications::notify(app, "Review Failed", &e);
         }
     }
 }
@@ -268,7 +184,9 @@ async fn handle_check_updates(app: &AppHandle) {
                                     Ok(_) => {
                                         let app3 = app2.clone();
                                         app2.dialog()
-                                            .message("Pull Read will restart to apply the update.")
+                                            .message(
+                                                "Pull Read will restart to apply the update.",
+                                            )
                                             .title("Update Installed")
                                             .kind(MessageDialogKind::Info)
                                             .show(move |_| {

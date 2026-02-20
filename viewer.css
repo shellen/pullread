@@ -864,29 +864,34 @@
   .dash-empty-hint .subhint {
     font-size: 13px;
   }
-  .dash-footer {
+  .dash-actions {
     display: flex;
-    gap: 12px;
-    justify-content: center;
-    padding: 24px 0 8px;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 4px 0 16px;
   }
-  .dash-footer button {
+  .dash-actions button {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 6px 14px;
-    font-size: 12px;
-    color: var(--muted);
-    background: transparent;
+    gap: 6px;
+    padding: 8px 16px;
+    font-size: 13px;
+    color: var(--fg);
+    background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 8px;
     cursor: pointer;
     font-family: inherit;
-    transition: color 0.12s, border-color 0.12s;
+    transition: background 0.12s, border-color 0.12s;
   }
-  .dash-footer button:hover {
-    color: var(--fg);
-    border-color: color-mix(in srgb, var(--fg) 20%, transparent);
+  .dash-actions button:hover {
+    background: color-mix(in srgb, var(--fg) 5%, var(--bg));
+    border-color: color-mix(in srgb, var(--fg) 25%, transparent);
+  }
+  .dash-actions button svg {
+    width: 14px;
+    height: 14px;
+    fill: var(--muted);
   }
 
   /* Typography classes */
