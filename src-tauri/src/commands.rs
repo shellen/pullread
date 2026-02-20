@@ -7,14 +7,19 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 /// Open the viewer window, starting the sidecar server if needed
 pub async fn open_viewer_inner(app: &AppHandle) -> Result<(), String> {
     let port = sidecar::ensure_viewer_running(app).await?;
-    let url = format!("http://localhost:{}", port);
 
     // Check if user prefers default browser over the built-in WebView
     let state = app.state::<sidecar::SidecarState>();
     if state.should_open_in_browser() {
-        let _ = open::that(&url);
+        // Use 127.0.0.1 (not localhost) — the server binds IPv4 only and
+        // browsers may try IPv6 ::1 first, causing a long connection timeout.
+        let browser_url = format!("http://127.0.0.1:{}", port);
+        let _ = open::that(&browser_url);
         return Ok(());
     }
+
+    // Keep localhost for WebView to preserve localStorage across launches
+    let url = format!("http://localhost:{}", port);
 
     // Reuse existing window or create new
     if let Some(window) = app.get_webview_window("viewer") {

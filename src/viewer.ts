@@ -117,6 +117,7 @@ const HIGHLIGHTS_PATH = join(ANNOTATIONS_DIR, 'highlights.json');
 const NOTES_PATH = join(ANNOTATIONS_DIR, 'notes.json');
 const APP_SETTINGS_PATH = join(ANNOTATIONS_DIR, 'settings.json');
 const NOTEBOOKS_PATH = join(ANNOTATIONS_DIR, 'notebooks.json');
+const APP_VERSION = '2.0.0';
 
 function loadJsonFile(path: string): Record<string, unknown> {
   if (!existsSync(path)) return {};
@@ -755,6 +756,30 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         }
         return;
       }
+    }
+
+    // Version and update check
+    if (url.pathname === '/api/check-updates' && req.method === 'GET') {
+      try {
+        const resp = await fetch('https://api.github.com/repos/shellen/pullread/releases/latest', {
+          headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'PullRead/' + APP_VERSION }
+        });
+        if (!resp.ok) {
+          sendJson(res, { currentVersion: APP_VERSION, error: 'Could not reach GitHub' });
+          return;
+        }
+        const data = await resp.json() as { tag_name?: string; html_url?: string };
+        const latest = (data.tag_name || '').replace(/^v/, '');
+        sendJson(res, {
+          currentVersion: APP_VERSION,
+          latestVersion: latest,
+          updateAvailable: latest !== '' && latest !== APP_VERSION,
+          releaseUrl: data.html_url || ''
+        });
+      } catch {
+        sendJson(res, { currentVersion: APP_VERSION, error: 'Network error' });
+      }
+      return;
     }
 
     // Sync status API

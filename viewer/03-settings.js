@@ -171,19 +171,8 @@ function showSettingsPage(scrollToSection) {
   renderFileList();
 
   var currentTheme = document.body.getAttribute('data-theme') || 'light';
-  var currentFont = localStorage.getItem('pr-font') || 'serif';
-  var currentSize = localStorage.getItem('pr-size') || 'medium';
-  var currentLeading = localStorage.getItem('pr-leading') || 'default';
-  var currentSpacing = localStorage.getItem('pr-spacing') || 'default';
-  var currentWidth = localStorage.getItem('pr-width') || 'default';
   function themeBtn(val, label) {
     return '<button class="' + (currentTheme === val ? 'active' : '') + '" onclick="setTheme(\'' + val + '\');showSettingsPage()">' + label + '</button>';
-  }
-  function sizeBtn(val, label, style) {
-    return '<button class="' + (currentSize === val ? 'active' : '') + '" onclick="setSize(\'' + val + '\');showSettingsPage()"' + (style ? ' style="' + style + '"' : '') + '>' + label + '</button>';
-  }
-  function opt(val, label, current) {
-    return '<option value="' + val + '"' + (current === val ? ' selected' : '') + '>' + label + '</option>';
   }
 
   var html = '<div class="article-header"><h1>Settings</h1></div>';
@@ -194,25 +183,9 @@ function showSettingsPage(scrollToSection) {
   html += '<div class="settings-row"><label>Theme</label><div class="settings-btn-group">'
     + themeBtn('light', 'Light') + themeBtn('dark', 'Dark') + themeBtn('sepia', 'Sepia') + themeBtn('high-contrast', 'Hi-Con')
     + '</div></div>';
-  html += '<div class="settings-row"><label>Font</label><select onchange="setFont(this.value);showSettingsPage()">'
-    + opt('serif','Serif',currentFont) + opt('sans','Sans-serif',currentFont) + opt('system','Charter',currentFont)
-    + opt('mono','Monospace',currentFont) + opt('inter','Inter',currentFont) + opt('lora','Lora',currentFont)
-    + opt('literata','Literata',currentFont) + opt('source-serif','Source Serif',currentFont)
-    + opt('work-sans','Work Sans',currentFont) + opt('opendyslexic','OpenDyslexic',currentFont)
-    + '</select></div>';
-  html += '<div class="settings-row"><label>Text size</label><div class="settings-btn-group">'
-    + sizeBtn('small','A','font-size:12px') + sizeBtn('medium','A','font-size:14px') + sizeBtn('large','A','font-size:17px')
-    + '</div></div>';
-  html += '<div class="settings-row"><label>Line height</label><select onchange="setLineHeight(this.value)">'
-    + opt('default','Default',currentLeading) + opt('compact','Compact',currentLeading)
-    + opt('relaxed','Relaxed',currentLeading) + opt('loose','Loose',currentLeading)
-    + '</select></div>';
-  html += '<div class="settings-row"><label>Letter spacing</label><select onchange="setSpacing(this.value)">'
-    + opt('default','Default',currentSpacing) + opt('wide','Wide',currentSpacing) + opt('wider','Wider',currentSpacing)
-    + '</select></div>';
-  html += '<div class="settings-row"><label>Content width</label><select onchange="setWidth(this.value)">'
-    + opt('narrow','Narrow',currentWidth) + opt('default','Default',currentWidth) + opt('wide','Wide',currentWidth)
-    + '</select></div>';
+  html += '<div class="settings-row"><div><label>Article font &amp; layout</label><div class="settings-desc">Font, text size, line height, spacing, and content width</div></div>';
+  html += '<button onclick="settingsOpenAa()" style="font-size:13px;padding:6px 14px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit;white-space:nowrap">Open Aa reader settings</button>';
+  html += '</div>';
   html += '</div>';
 
   // ---- Open In section (Tauri only) ----
@@ -269,6 +242,16 @@ function showSettingsPage(scrollToSection) {
   html += '<div id="reimport-status" style="font-size:12px;color:var(--muted);padding-top:8px"></div>';
   html += '</div>';
 
+  // ---- About section ----
+  html += '<div class="settings-section" id="settings-about">';
+  html += '<h2>About</h2>';
+  html += '<div class="settings-row"><label>Version</label><span id="sp-version" style="color:var(--muted);font-size:13px">Checking\u2026</span></div>';
+  html += '<div class="settings-row" style="gap:12px">';
+  html += '<button id="sp-check-updates-btn" style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer" onclick="settingsCheckForUpdates()">Check for Updates</button>';
+  html += '<span id="sp-update-status" style="font-size:12px;color:var(--muted);align-self:center"></span>';
+  html += '</div>';
+  html += '</div>';
+
   content.innerHTML = html;
   document.getElementById('content-pane').scrollTop = 0;
 
@@ -287,6 +270,17 @@ function showSettingsPage(scrollToSection) {
         sec.style.display = '';
       }
     }).catch(function() {});
+  }
+
+  // Load current version
+  if (serverMode) {
+    fetch('/api/check-updates').then(function(r) { return r.json(); }).then(function(data) {
+      var el = document.getElementById('sp-version');
+      if (el) el.textContent = data.currentVersion || 'unknown';
+    }).catch(function() {
+      var el = document.getElementById('sp-version');
+      if (el) el.textContent = 'unknown';
+    });
   }
 
   // Load Feeds & Sync config async
@@ -530,6 +524,33 @@ function settingsPageSaveViewerMode() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ viewerMode: mode }),
   });
+}
+
+function settingsCheckForUpdates() {
+  var btn = document.getElementById('sp-check-updates-btn');
+  var status = document.getElementById('sp-update-status');
+  if (btn) btn.disabled = true;
+  if (status) status.textContent = 'Checking\u2026';
+  fetch('/api/check-updates').then(function(r) { return r.json(); }).then(function(data) {
+    if (btn) btn.disabled = false;
+    if (!status) return;
+    if (data.error) {
+      status.textContent = data.error;
+    } else if (data.updateAvailable) {
+      status.innerHTML = 'v' + escapeHtml(data.latestVersion) + ' available \u2014 <a href="' + escapeHtml(data.releaseUrl) + '" target="_blank" style="color:var(--link)">View release</a>';
+    } else {
+      status.textContent = 'You\u2019re up to date.';
+    }
+  }).catch(function() {
+    if (btn) btn.disabled = false;
+    if (status) status.textContent = 'Could not check for updates.';
+  });
+}
+
+function settingsOpenAa() {
+  // Navigate to dashboard/last article so the Aa button is in context, then open the dropdown
+  renderDashboard();
+  setTimeout(function() { toggleSettingsDropdown(); }, 100);
 }
 
 function settingsPageLLMProviderChanged() {

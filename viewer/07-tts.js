@@ -518,8 +518,10 @@ async function playPodcastAudio(item) {
       }
     });
 
+    var _cuePlayed = false;
     audio.addEventListener('playing', function() {
       stopListenLoading();
+      if (!_cuePlayed) { _cuePlayed = true; playCueSound(); }
       ttsPlaying = true;
       renderAudioPlayer();
     });

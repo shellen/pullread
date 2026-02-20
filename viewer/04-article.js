@@ -200,7 +200,8 @@ function dashLoadArticle(filename) {
 }
 
 function renderArticle(text, filename) {
-  const { meta, body } = parseFrontmatter(text);
+  const { meta, body: rawBodyText } = parseFrontmatter(text);
+  let body = rawBodyText;
   const content = document.getElementById('content');
   const empty = document.getElementById('empty-state');
 
