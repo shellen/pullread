@@ -66,6 +66,7 @@
   <symbol id="i-chevron-down" viewBox="0 0 512 512"><path d="M233.4 406.6c12.5 12.5 32.8 12.5 45.3 0l192-192c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L256 338.7 86.6 169.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l192 192z"/></symbol>
   <symbol id="i-sliders" viewBox="0 0 512 512"><path d="M0 416c0 17.7 14.3 32 32 32l54.7 0c12.3 28.3 40.5 48 73.3 48s61-19.7 73.3-48L480 448c17.7 0 32-14.3 32-32s-14.3-32-32-32l-246.7 0c-12.3-28.3-40.5-48-73.3-48s-61 19.7-73.3 48L32 384c-17.7 0-32 14.3-32 32zm128 0a32 32 0 1 1 64 0 32 32 0 1 1 -64 0zM320 256a32 32 0 1 1 64 0 32 32 0 1 1 -64 0zm32-80c-32.8 0-61 19.7-73.3 48L32 224c-17.7 0-32 14.3-32 32s14.3 32 32 32l246.7 0c12.3 28.3 40.5 48 73.3 48s61-19.7 73.3-48l54.7 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-54.7 0c-12.3-28.3-40.5-48-73.3-48zM192 128a32 32 0 1 1 0-64 32 32 0 1 1 0 64zm73.3-64C253 35.7 224.8 16 192 16s-61 19.7-73.3 48L32 64C14.3 64 0 78.3 0 96s14.3 32 32 32l86.7 0c12.3 28.3 40.5 48 73.3 48s61-19.7 73.3-48L480 128c17.7 0 32-14.3 32-32s-14.3-32-32-32L265.3 64z"/></symbol>
   <symbol id="i-plus" viewBox="0 0 448 512"><path d="M256 80c0-17.7-14.3-32-32-32s-32 14.3-32 32V224H48c-17.7 0-32 14.3-32 32s14.3 32 32 32H192V432c0 17.7 14.3 32 32 32s32-14.3 32-32V288H400c17.7 0 32-14.3 32-32s-14.3-32-32-32H256V80z"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 384 512"><path d="M32 32C32 14.3 46.3 0 64 0H320c17.7 0 32 14.3 32 32s-14.3 32-32 32H290.5l11.4 148.2c36.7 19.9 65.3 53.2 79.5 93.8H2.6c14.1-40.6 42.8-73.9 79.5-93.8L93.5 64H64C46.3 64 32 49.7 32 32zM224 384v96c0 17.7-14.3 32-32 32s-32-14.3-32-32V384H224z"/></symbol>
 </svg>
 <div class="app" role="application" aria-label="PullRead article reader">
 
@@ -88,7 +89,11 @@
         <label for="search" class="sr-only">Search articles</label>
         <input type="text" id="search" placeholder="Search... try is:favorite or tag:tech" oninput="filterFiles()" />
         <button class="search-clear" id="search-clear" onclick="clearSearch()" aria-label="Clear search">&times;</button>
+        <button class="search-pin" id="search-pin" onclick="pinCurrentSearch()" aria-label="Pin this filter" title="Pin this filter">
+          <svg class="icon icon-sm" aria-hidden="true"><use href="#i-pin"/></svg>
+        </button>
       </div>
+      <div class="pinned-filters" id="pinned-filters"></div>
       <div class="quick-add-row" id="quick-add-row" style="display:none">
         <input type="url" id="quick-add-input" placeholder="Paste article URL and press Enter" onkeydown="if(event.key==='Enter')quickAddUrl()" />
         <button class="btn-primary" onclick="quickAddUrl()" id="quick-add-save" style="font-size:12px;padding:4px 10px;white-space:nowrap">Save</button>

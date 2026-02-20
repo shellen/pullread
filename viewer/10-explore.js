@@ -9,6 +9,8 @@ function showTagCloud() {
   // Deselect sidebar — disables highlights/notes on this page
   activeFile = null;
   document.getElementById('margin-notes').innerHTML = '';
+  var toc = document.getElementById('toc-container');
+  if (toc) toc.innerHTML = '';
   renderFileList();
 
   // Collect all tags (user + machine), domain groupings, feed counts
@@ -135,7 +137,7 @@ function showTagCloud() {
   if (sortedTags.length > 0) {
     tagsHtml = '<div class="tag-cloud">';
     for (const [tag, count] of sortedTags) {
-      tagsHtml += '<button class="tag-pill" onclick="document.getElementById(\'search\').value=\'' + escapeJsStr(tag) + '\';filterFiles()">' + escapeHtml(tag) + '<span class="tag-count">' + count + '</span></button>';
+      tagsHtml += '<button class="tag-pill" onclick="document.getElementById(\'search\').value=\'tag:' + escapeJsStr(tag) + '\';filterFiles()">' + escapeHtml(tag) + '<span class="tag-count">' + count + '</span></button>';
     }
     tagsHtml += '</div>';
   } else {
@@ -146,7 +148,7 @@ function showTagCloud() {
   let domainsHtml = '';
   for (const [domain, articles] of sortedDomains.slice(0, 40)) {
     domainsHtml += '<div class="domain-group">';
-    domainsHtml += '<div class="domain-group-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">';
+    domainsHtml += '<div class="domain-group-header" onclick="document.getElementById(\'search\').value=\'domain:' + escapeJsStr(domain) + '\';filterFiles();this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">';
     domainsHtml += '<img class="file-item-favicon" src="/favicons/' + encodeURIComponent(domain) + '.png" alt="" loading="lazy" onerror="this.style.display=\'none\'">';
     domainsHtml += '<span>' + escapeHtml(domain) + '</span><span class="domain-group-count">' + articles.length + ' article' + (articles.length !== 1 ? 's' : '') + '</span></div>';
     domainsHtml += '<div class="domain-group-articles" style="display:none">';
@@ -211,7 +213,7 @@ function buildConnectionsHtml(tagArticles, sortedTags) {
       html += '</div>';
     }
     if (tagArticles[tag].length > 5) {
-      html += '<div style="padding:4px 8px;font-size:11px"><a href="#" style="color:var(--link);text-decoration:none" onclick="event.preventDefault();document.getElementById(\'search\').value=\'' + escapeJsStr(tag) + '\';filterFiles()">View all ' + count + ' &rsaquo;</a></div>';
+      html += '<div style="padding:4px 8px;font-size:11px"><a href="#" style="color:var(--link);text-decoration:none" onclick="event.preventDefault();document.getElementById(\'search\').value=\'tag:' + escapeJsStr(tag) + '\';filterFiles()">View all ' + count + ' &rsaquo;</a></div>';
     }
     html += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
   }

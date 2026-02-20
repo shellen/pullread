@@ -259,6 +259,7 @@ async function init() {
       await Promise.all([loadAnnotationsIndex(), checkLLMConfig(), loadNotebooks()]);
 
       renderFileList();
+      renderPinnedFilters();
 
       // Run one-time migration and load sync status in background
       migrateAnnotationsIfNeeded();

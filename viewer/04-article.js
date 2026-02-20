@@ -154,6 +154,8 @@ function goHome() {
   document.title = 'PullRead';
   renderFileList();
   renderDashboard();
+  var toc = document.getElementById('toc-container');
+  if (toc) toc.innerHTML = '';
 }
 
 function dashScrollLeft(btn) {

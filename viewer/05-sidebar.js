@@ -146,7 +146,10 @@ function clearSearch() {
 function filterFiles() {
   const raw = document.getElementById('search').value.trim();
   var clearBtn = document.getElementById('search-clear');
-  if (clearBtn) clearBtn.style.display = raw ? '' : 'none';
+  if (clearBtn) clearBtn.style.display = raw ? 'block' : 'none';
+  var pinBtn = document.getElementById('search-pin');
+  if (pinBtn) pinBtn.style.display = raw ? 'block' : 'none';
+  updatePinnedFilterActive();
   if (!raw) {
     filteredFiles = allFiles;
     renderFileList();
@@ -622,5 +625,76 @@ function updateWritingFocusLine() {
   var height = endY - startY + lineHeight;
   line.style.top = top + 'px';
   line.style.height = height + 'px';
+}
+
+// ---- Pinned filters ----
+var MAX_PINNED = 3;
+
+function getPinnedFilters() {
+  try { return JSON.parse(localStorage.getItem('pr-pinned-filters') || '[]'); }
+  catch { return []; }
+}
+
+function savePinnedFilters(pins) {
+  localStorage.setItem('pr-pinned-filters', JSON.stringify(pins));
+}
+
+function renderPinnedFilters() {
+  var container = document.getElementById('pinned-filters');
+  if (!container) return;
+  var pins = getPinnedFilters();
+  if (!pins.length) { container.innerHTML = ''; return; }
+  var currentQuery = (document.getElementById('search').value || '').trim();
+  container.innerHTML = pins.map(function(q, i) {
+    var isActive = currentQuery === q ? ' active' : '';
+    return '<button class="pinned-filter' + isActive + '" onclick="applyPinnedFilter(' + i + ')" title="' + escapeHtml(q) + '">'
+      + '<span class="pinned-filter-label">' + escapeHtml(q) + '</span>'
+      + '<span class="pinned-filter-unpin" onclick="event.stopPropagation();unpinFilter(' + i + ')" title="Unpin">&times;</span>'
+      + '</button>';
+  }).join('');
+}
+
+function updatePinnedFilterActive() {
+  var container = document.getElementById('pinned-filters');
+  if (!container) return;
+  var currentQuery = (document.getElementById('search').value || '').trim();
+  var buttons = container.querySelectorAll('.pinned-filter');
+  var pins = getPinnedFilters();
+  for (var i = 0; i < buttons.length; i++) {
+    buttons[i].classList.toggle('active', pins[i] === currentQuery);
+  }
+}
+
+function pinCurrentSearch() {
+  var input = document.getElementById('search');
+  var query = (input.value || '').trim();
+  if (!query) { showToast('Type a search query first'); return; }
+  var pins = getPinnedFilters();
+  if (pins.indexOf(query) !== -1) { showToast('Already pinned'); return; }
+  pins.push(query);
+  if (pins.length > MAX_PINNED) pins.shift();
+  savePinnedFilters(pins);
+  renderPinnedFilters();
+}
+
+function unpinFilter(index) {
+  var pins = getPinnedFilters();
+  pins.splice(index, 1);
+  savePinnedFilters(pins);
+  renderPinnedFilters();
+}
+
+function applyPinnedFilter(index) {
+  var pins = getPinnedFilters();
+  var query = pins[index];
+  if (!query) return;
+  var input = document.getElementById('search');
+  if (input.value.trim() === query) {
+    input.value = '';
+  } else {
+    input.value = query;
+  }
+  filterFiles();
+  renderPinnedFilters();
 }
 

@@ -328,6 +328,7 @@
   .sidebar-search {
     padding: 12px 12px 8px;
     position: relative;
+    overflow: hidden;
   }
   .search-clear {
     position: absolute;
@@ -348,9 +349,24 @@
     border-radius: 50%;
   }
   .search-clear:hover { background: color-mix(in srgb, var(--fg) 16%, transparent); color: var(--fg); }
+  .search-pin {
+    position: absolute;
+    right: 40px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 2px;
+    display: none;
+    line-height: 1;
+    border-radius: 4px;
+  }
+  .search-pin:hover { color: var(--link); }
   .sidebar-search input {
     width: 100%;
-    padding: 7px 28px 7px 12px;
+    padding: 7px 52px 7px 12px;
     border: none;
     border-radius: 6px;
     background: var(--bg);
@@ -366,6 +382,55 @@
   .sidebar-search input::placeholder {
     color: var(--muted);
   }
+
+  .pinned-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 12px;
+  }
+  .pinned-filters:empty { display: none; }
+  .pinned-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 500;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: var(--fg);
+    background: var(--code-bg);
+    border: 1px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    max-width: 140px;
+    transition: background 0.15s, border-color 0.15s;
+    line-height: 1.4;
+  }
+  .pinned-filter:hover {
+    background: var(--sidebar-active);
+  }
+  .pinned-filter.active {
+    border-color: var(--link);
+    color: var(--link);
+    background: color-mix(in srgb, var(--link) 10%, var(--bg));
+  }
+  .pinned-filter-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .pinned-filter-unpin {
+    font-size: 13px;
+    line-height: 1;
+    color: var(--muted);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+  }
+  .pinned-filter:hover .pinned-filter-unpin { opacity: 1; }
+  .pinned-filter-unpin:hover { color: var(--fg); }
 
   .quick-add-row {
     display: flex;
