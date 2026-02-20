@@ -260,3 +260,92 @@ export function getDomainFromUrl(url: string): string {
     return '';
   }
 }
+
+// --- Site login cookie storage via macOS Keychain ---
+
+export interface SiteLoginCookie {
+  name: string;
+  value: string;
+  domain: string;
+  path: string;
+  expires: number;
+  secure: boolean;
+  httpOnly: boolean;
+}
+
+const KEYCHAIN_SERVICE = 'PullRead';
+
+/**
+ * Stores site login cookies as JSON in macOS Keychain.
+ */
+export function saveSiteLoginCookies(domain: string, cookies: SiteLoginCookie[]): void {
+  const json = JSON.stringify(cookies);
+  try {
+    execSync(
+      `security delete-generic-password -s "${KEYCHAIN_SERVICE}" -a "${domain}"`,
+      { stdio: ['pipe', 'pipe', 'pipe'] }
+    );
+  } catch {
+    // Entry didn't exist yet
+  }
+  execSync(
+    `security add-generic-password -s "${KEYCHAIN_SERVICE}" -a "${domain}" -w "${json.replace(/"/g, '\\"')}" -U`,
+    { stdio: ['pipe', 'pipe', 'pipe'] }
+  );
+}
+
+/**
+ * Reads site login cookies from Keychain and returns a formatted Cookie header string.
+ * Filters out expired cookies. Returns null if no valid cookies found.
+ */
+export function getSiteLoginCookies(domain: string): string | null {
+  try {
+    const result = execSync(
+      `security find-generic-password -w -s "${KEYCHAIN_SERVICE}" -a "${domain}"`,
+      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
+    );
+    const cookies: SiteLoginCookie[] = JSON.parse(result.trim());
+    const now = Date.now();
+    const valid = cookies.filter(c => c.expires === 0 || c.expires > now);
+    if (valid.length === 0) return null;
+    return valid.map(c => `${c.name}=${c.value}`).join('; ');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Removes stored site login cookies for a domain from Keychain.
+ */
+export function removeSiteLogin(domain: string): boolean {
+  try {
+    execSync(
+      `security delete-generic-password -s "${KEYCHAIN_SERVICE}" -a "${domain}"`,
+      { stdio: ['pipe', 'pipe', 'pipe'] }
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Lists all domains with stored site login cookies in Keychain.
+ */
+export function listSiteLogins(): string[] {
+  try {
+    const result = execSync(
+      `security dump-keychain | grep -A4 '"PullRead"'`,
+      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
+    );
+    const domains: string[] = [];
+    const lines = result.split('\n');
+    for (const line of lines) {
+      const match = line.match(/"acct"<blob>="([^"]+)"/);
+      if (match) domains.push(match[1]);
+    }
+    return [...new Set(domains)];
+  } catch {
+    return [];
+  }
+}
