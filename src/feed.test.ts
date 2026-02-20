@@ -139,6 +139,28 @@ describe('parseFeed - RSS', () => {
     expect(entries[1].title).toBe('Rock & Roll Hall of Fame');
     expect(entries[2].title).toBe("Tom's Diner \u2013 A Classic");
   });
+
+  test('strips HTML tags from titles', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Tag Feed</title>
+    <item>
+      <title>Grace Ives Announces New Album &lt;em&gt;Girlfriend&lt;/em&gt;: Hear &#8220;Stupid&#8221;</title>
+      <link>https://example.com/grace</link>
+      <pubDate>Thu, 20 Feb 2026 12:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Best &lt;b&gt;New&lt;/b&gt; Music: February 2026</title>
+      <link>https://example.com/best</link>
+      <pubDate>Thu, 20 Feb 2026 11:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].title).toBe('Grace Ives Announces New Album Girlfriend: Hear \u201cStupid\u201d');
+    expect(entries[1].title).toBe('Best New Music: February 2026');
+  });
 });
 
 describe('parseFeed - Podcast', () => {
