@@ -809,6 +809,32 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
       return;
     }
 
+    // Live sync progress (written by CLI during sync)
+    if (url.pathname === '/api/sync-progress' && req.method === 'GET') {
+      const progressPath = join(homedir(), '.config', 'pullread', '.sync-progress');
+      try {
+        if (existsSync(progressPath)) {
+          const data = JSON.parse(readFileSync(progressPath, 'utf-8'));
+          // Treat as stale if not updated in 60 seconds (CLI died or timed out)
+          const timestamp = data.updatedAt || data.startedAt;
+          if (timestamp) {
+            const age = Date.now() - new Date(timestamp).getTime();
+            if (age > 60000) {
+              try { unlinkSync(progressPath); } catch {}
+              sendJson(res, { status: 'idle' });
+              return;
+            }
+          }
+          sendJson(res, data);
+        } else {
+          sendJson(res, { status: 'idle' });
+        }
+      } catch {
+        sendJson(res, { status: 'idle' });
+      }
+      return;
+    }
+
     // Auto-tag API
     if (url.pathname === '/api/autotag' && req.method === 'POST') {
       try {

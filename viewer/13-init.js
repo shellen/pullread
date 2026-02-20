@@ -145,22 +145,51 @@ async function refreshArticleList(silent) {
 let _autoRefreshTimer = null;
 let _lastKnownChangeAt = 0;
 let _syncSpinTimeout = null;
+let _wasSyncing = false;
 function startAutoRefresh() {
   if (_autoRefreshTimer) return;
   _autoRefreshTimer = setInterval(async () => {
     try {
-      const res = await fetch('/api/files-changed');
+      // Poll sync progress
+      var progressRes = await fetch('/api/sync-progress');
+      if (progressRes.ok) {
+        var progress = await progressRes.json();
+        var btn = document.getElementById('refresh-btn');
+        var statusEl = document.getElementById('sync-status');
+        if (progress.status === 'syncing') {
+          _wasSyncing = true;
+          if (btn) {
+            btn.classList.add('spinning');
+            btn.title = 'Syncing ' + progress.feed + '... (' + progress.feedIndex + '/' + progress.totalFeeds + ')';
+          }
+          if (statusEl) {
+            statusEl.textContent = 'Syncing ' + progress.feed + ' (' + progress.feedIndex + '/' + progress.totalFeeds + ')';
+            statusEl.classList.add('visible');
+          }
+        } else if (_wasSyncing) {
+          _wasSyncing = false;
+          if (btn) btn.classList.remove('spinning');
+          if (statusEl) statusEl.classList.remove('visible');
+          loadSyncStatus();
+          refreshArticleList(true);
+        }
+      }
+
+      // Poll for file changes
+      var res = await fetch('/api/files-changed');
       if (!res.ok) return;
-      const data = await res.json();
+      var data = await res.json();
       if (data.changedAt > _lastKnownChangeAt) {
         _lastKnownChangeAt = data.changedAt;
-        var btn = document.getElementById('refresh-btn');
-        if (btn) btn.classList.add('spinning');
-        clearTimeout(_syncSpinTimeout);
-        _syncSpinTimeout = setTimeout(function() {
-          if (btn) btn.classList.remove('spinning');
-          loadSyncStatus();
-        }, 8000);
+        if (!_wasSyncing) {
+          var btn2 = document.getElementById('refresh-btn');
+          if (btn2) btn2.classList.add('spinning');
+          clearTimeout(_syncSpinTimeout);
+          _syncSpinTimeout = setTimeout(function() {
+            if (btn2) btn2.classList.remove('spinning');
+            loadSyncStatus();
+          }, 8000);
+        }
         refreshArticleList(true);
       }
     } catch {}
