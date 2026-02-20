@@ -8,8 +8,10 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Manager,
 };
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
 pub struct TrayItems {
+    sync_now: Mutex<MenuItem<tauri::Wry>>,
     last_sync: Mutex<MenuItem<tauri::Wry>>,
     next_sync: Mutex<MenuItem<tauri::Wry>>,
 }
@@ -33,6 +35,8 @@ pub fn create_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         MenuItem::with_id(app, "review", "Generate Review", true, None::<&str>)?;
     let sep3 = PredefinedMenuItem::separator(app)?;
 
+    let settings =
+        MenuItem::with_id(app, "settings", "Settings\u{2026}", true, Some("CmdOrCtrl+,"))?;
     let logs = MenuItem::with_id(app, "logs", "Logs", true, Some("CmdOrCtrl+L"))?;
     let check_updates =
         MenuItem::with_id(app, "updates", "Check for Updates\u{2026}", true, None::<&str>)?;
@@ -54,6 +58,7 @@ pub fn create_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             &retry_failed,
             &gen_review,
             &sep3,
+            &settings,
             &logs,
             &check_updates,
             &sep4,
@@ -107,13 +112,29 @@ pub fn create_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                         handle_check_updates(&handle).await;
                     });
                 }
+                "settings" => {
+                    tauri::async_runtime::spawn(async move {
+                        let _ = commands::open_viewer_inner(&handle).await;
+                        if let Some(window) = handle.get_webview_window("viewer") {
+                            let port =
+                                handle.state::<sidecar::SidecarState>().get_viewer_port();
+                            let nav_url =
+                                format!("http://localhost:{}/#tab=settings", port);
+                            let _ = window.navigate(nav_url.parse().unwrap());
+                        }
+                    });
+                }
                 "about" => {
                     let version = env!("CARGO_PKG_VERSION");
-                    notifications::notify(
-                        &handle,
-                        "About Pull Read",
-                        &format!("Pull Read v{}\nSync articles to searchable markdown files.", version),
-                    );
+                    handle
+                        .dialog()
+                        .message(format!(
+                            "Pull Read v{}\n\nSync articles to searchable markdown files.\n\n\u{00A9} A Little Drive LLC",
+                            version
+                        ))
+                        .title("About Pull Read")
+                        .kind(MessageDialogKind::Info)
+                        .show(|_| {});
                 }
                 "quit" => {
                     let state = handle.state::<sidecar::SidecarState>();
@@ -137,6 +158,7 @@ pub fn create_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         .build(app)?;
 
     app.manage(TrayItems {
+        sync_now: Mutex::new(sync_now),
         last_sync: Mutex::new(last_sync),
         next_sync: Mutex::new(next_sync),
     });
@@ -145,11 +167,12 @@ pub fn create_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn handle_sync(app: &AppHandle, retry_failed: bool) {
-    // Update tray to show syncing state
-    notifications::notify(app, "Pull Read", "Syncing...");
+    // Show syncing state in tray
+    set_sync_active(app, true);
 
     match sidecar::run_sync(app, retry_failed).await {
         Ok(summary) => {
+            set_sync_active(app, false);
             update_last_sync(app);
             notifications::notify_sync_complete(app, &summary);
 
@@ -160,7 +183,33 @@ async fn handle_sync(app: &AppHandle, retry_failed: bool) {
             }
         }
         Err(e) => {
+            set_sync_active(app, false);
             notifications::notify(app, "Sync Failed", &e);
+        }
+    }
+}
+
+/// Toggle tray state to show sync activity.
+fn set_sync_active(app: &AppHandle, active: bool) {
+    let items = app.state::<TrayItems>();
+
+    // Disable/enable "Sync Now" menu item
+    if let Ok(item) = items.sync_now.lock() {
+        let _ = item.set_enabled(!active);
+        let _ = item.set_text(if active { "Syncing\u{2026}" } else { "Sync Now" });
+    }
+
+    // Update tooltip
+    if let Some(tray) = app.tray_by_id("main") {
+        if active {
+            let _ = tray.set_tooltip(Some("Pull Read — Syncing\u{2026}"));
+        }
+    }
+
+    // Update "Last sync" text during sync
+    if active {
+        if let Ok(item) = items.last_sync.lock() {
+            let _ = item.set_text("Syncing\u{2026}");
         }
     }
 }
@@ -200,38 +249,58 @@ async fn handle_check_updates(app: &AppHandle) {
         Ok(updater) => match updater.check().await {
             Ok(Some(update)) => {
                 let version = update.version.clone();
-                notifications::notify(
-                    app,
-                    "Update Available",
-                    &format!("Pull Read v{} is available. Downloading...", version),
-                );
-                match update.download_and_install(|_, _| {}, || {}).await {
-                    Ok(_) => {
-                        notifications::notify(
-                            app,
-                            "Update Installed",
-                            "Pull Read will restart to apply the update.",
-                        );
-                        app.restart();
-                    }
-                    Err(e) => {
-                        notifications::notify(
-                            app,
-                            "Update Failed",
-                            &format!("Download failed: {}", e),
-                        );
-                    }
-                }
+                let app2 = app.clone();
+                app.dialog()
+                    .message(format!(
+                        "Pull Read v{} is available.\n\nWould you like to download and install it?",
+                        version
+                    ))
+                    .title("Update Available")
+                    .kind(MessageDialogKind::Info)
+                    .buttons(MessageDialogButtons::OkCancelCustom(
+                        "Update".into(),
+                        "Later".into(),
+                    ))
+                    .show(move |confirmed| {
+                        if confirmed {
+                            tauri::async_runtime::spawn(async move {
+                                match update.download_and_install(|_, _| {}, || {}).await {
+                                    Ok(_) => {
+                                        let app3 = app2.clone();
+                                        app2.dialog()
+                                            .message("Pull Read will restart to apply the update.")
+                                            .title("Update Installed")
+                                            .kind(MessageDialogKind::Info)
+                                            .show(move |_| {
+                                                app3.restart();
+                                            });
+                                    }
+                                    Err(e) => {
+                                        app2.dialog()
+                                            .message(format!("Download failed: {}", e))
+                                            .title("Update Failed")
+                                            .kind(MessageDialogKind::Error)
+                                            .show(|_| {});
+                                    }
+                                }
+                            });
+                        }
+                    });
             }
             Ok(None) => {
-                notifications::notify(app, "Pull Read", "You're up to date.");
+                let version = env!("CARGO_PKG_VERSION");
+                app.dialog()
+                    .message(format!("Pull Read v{} is the latest version.", version))
+                    .title("No Updates Available")
+                    .kind(MessageDialogKind::Info)
+                    .show(|_| {});
             }
             Err(e) => {
-                notifications::notify(
-                    app,
-                    "Update Check Failed",
-                    &format!("Could not check for updates: {}", e),
-                );
+                app.dialog()
+                    .message(format!("Could not check for updates: {}", e))
+                    .title("Update Check Failed")
+                    .kind(MessageDialogKind::Error)
+                    .show(|_| {});
             }
         },
         Err(e) => {
