@@ -251,12 +251,18 @@ function showSettingsPage(scrollToSection) {
 
   // ---- About section ----
   html += '<div class="settings-section" id="settings-about">';
-  html += '<h2>About</h2>';
+  html += '<div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">';
+  html += '<img src="/icon-256.png" alt="Pull Read" style="width:64px;height:64px;border-radius:14px">';
+  html += '<div><h2 style="margin:0">Pull Read</h2>';
+  html += '<div style="color:var(--muted);font-size:13px;margin-top:2px">Sync articles to searchable markdown files.</div></div>';
+  html += '</div>';
   html += '<div class="settings-row"><label>Version</label><span id="sp-version" style="color:var(--muted);font-size:13px">Checking\u2026</span></div>';
   html += '<div class="settings-row" style="gap:12px">';
   html += '<button id="sp-check-updates-btn" style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer" onclick="settingsCheckForUpdates()">Check for Updates</button>';
   html += '<span id="sp-update-status" style="font-size:12px;color:var(--muted);align-self:center"></span>';
   html += '</div>';
+  html += '<div class="settings-row"><a href="https://pullread.com" target="_blank" rel="noopener" style="font-size:13px;color:var(--link)">pullread.com</a>';
+  html += '<span style="color:var(--muted);font-size:12px">\u00A9 A Little Drive LLC</span></div>';
   html += '</div>';
 
   content.innerHTML = html;

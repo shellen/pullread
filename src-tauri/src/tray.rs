@@ -125,16 +125,16 @@ pub fn create_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     });
                 }
                 "about" => {
-                    let version = env!("CARGO_PKG_VERSION");
-                    handle
-                        .dialog()
-                        .message(format!(
-                            "Pull Read v{}\n\nSync articles to searchable markdown files.\n\n\u{00A9} A Little Drive LLC",
-                            version
-                        ))
-                        .title("About Pull Read")
-                        .kind(MessageDialogKind::Info)
-                        .show(|_| {});
+                    tauri::async_runtime::spawn(async move {
+                        let _ = commands::open_viewer_inner(&handle).await;
+                        if let Some(window) = handle.get_webview_window("viewer") {
+                            let port =
+                                handle.state::<sidecar::SidecarState>().get_viewer_port();
+                            let nav_url =
+                                format!("http://localhost:{}/#tab=settings", port);
+                            let _ = window.navigate(nav_url.parse().unwrap());
+                        }
+                    });
                 }
                 "quit" => {
                     let state = handle.state::<sidecar::SidecarState>();

@@ -290,4 +290,35 @@ async function init() {
   document.getElementById('file-count').textContent = 'Drop files or use pullread view';
 }
 
-init();
+// ---- Hash-based navigation (for tray menu and deep links) ----
+function handleHashNavigation() {
+  var hash = location.hash.slice(1);
+  if (!hash) return;
+
+  var params = {};
+  hash.split('&').forEach(function(part) {
+    var eq = part.indexOf('=');
+    if (eq > 0) {
+      params[part.slice(0, eq)] = decodeURIComponent(part.slice(eq + 1));
+    } else {
+      params[part] = '';
+    }
+  });
+
+  if ('tab' in params && params.tab === 'settings') {
+    showSettingsPage();
+    history.replaceState(null, '', location.pathname);
+  } else if ('file' in params) {
+    var idx = displayFiles.findIndex(function(f) { return f.filename === params.file; });
+    if (idx >= 0) loadFile(idx);
+    history.replaceState(null, '', location.pathname);
+  } else if ('notebook' in params) {
+    var nb = _notebooks.find(function(n) { return n.id === params.notebook; });
+    if (nb) openNotebook(nb.id);
+    history.replaceState(null, '', location.pathname);
+  }
+}
+
+window.addEventListener('hashchange', handleHashNavigation);
+
+init().then(function() { handleHashNavigation(); }).catch(function() {});
