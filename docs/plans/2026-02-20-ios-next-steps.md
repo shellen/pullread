@@ -6,10 +6,60 @@ Based on the existing build spec (`2026-02-12-ios-companion-app.md`), here's the
 
 ## Current State
 
-- **Existing spec**: A complete Expo + WebView architecture is designed
-- **Viewer**: Self-contained HTML/JS viewer (~400KB) already works in any WebView
-- **Architecture**: Fetch bridge intercepts `/api/*` calls → routes to native Swift module → reads local `.md` files
+- **Desktop app**: Tauri 2.0 (Rust) with a bundled Bun CLI sidecar for sync/extraction. The viewer is served via a localhost HTTP server inside a Tauri WebView window.
+- **Existing spec**: A complete Expo + WebView architecture is designed for the iOS companion app.
+- **Viewer**: Self-contained HTML/JS viewer (~400KB) already works in any WebView.
+- **Architecture**: Fetch bridge intercepts `/api/*` calls → routes to an Expo native Swift module → reads local `.md` files.
 - **Scope**: Read-only companion app. No sync, no accounts, no server.
+
+> **Note**: The iOS app's Swift code (the `FolderAccessModule` Expo native module) is completely separate from the desktop app's Tauri/Rust shell. The desktop app does not use Swift.
+
+---
+
+## How Articles Get to Your Phone
+
+The iOS app is a **reader only** — the desktop PullRead app (Tauri) does all the RSS syncing and article extraction. The `.md` files need to reach your phone via a **shared folder** using a cloud or sync service.
+
+### How iOS folder access works
+
+iOS provides a system-wide **Files** framework. Any app that registers as a "File Provider" (iCloud Drive, Dropbox, Google Drive, OneDrive, etc.) exposes its files through the standard iOS folder picker (`UIDocumentPickerViewController`). PullRead iOS uses this picker.
+
+When you tap "Choose Folder" in the app:
+
+1. iOS presents the system folder picker (same UI as the Files app)
+2. You see all installed File Providers — iCloud Drive, Dropbox, Google Drive, On My iPhone, etc.
+3. You navigate to the folder containing your PullRead `.md` files and select it
+4. iOS grants the app a **security-scoped bookmark** — a persistent permission token that survives app restarts
+5. PullRead reads the `.md` files from that folder and displays them in the viewer
+
+### Recommended workflows
+
+**iCloud Drive (simplest for Mac users):**
+1. On Mac, set PullRead's `outputPath` in `feeds.json` to a folder inside iCloud Drive:
+   `~/Library/Mobile Documents/com~apple~CloudDocs/PullRead/`
+2. macOS syncs this folder to iCloud automatically
+3. On iPhone, open PullRead iOS → "Choose Folder" → iCloud Drive → PullRead
+4. New articles synced on Mac appear on iPhone automatically
+
+**Dropbox:**
+1. Set desktop `outputPath` to `~/Dropbox/PullRead/`
+2. Install Dropbox app on iPhone (it registers as a File Provider)
+3. In PullRead iOS → "Choose Folder" → Dropbox → PullRead
+
+**Google Drive:**
+1. Set desktop `outputPath` to a Google Drive folder
+2. Install Google Drive app on iPhone
+3. In PullRead iOS → "Choose Folder" → Google Drive → your folder
+
+**Syncthing (self-hosted, no cloud):**
+1. Use Möbius Sync (iOS Syncthing client) to sync the articles folder directly between Mac and iPhone
+2. In PullRead iOS → "Choose Folder" → Möbius Sync → your folder
+
+### Caveats
+
+- **Cloud providers may not pre-download files.** Dropbox/Google Drive keep files "cloud-only" until accessed. PullRead only reads the first 3KB per file for the article list (fast), and downloads the full file when you tap to read. This works transparently.
+- **The security-scoped bookmark persists.** You pick the folder once; the app remembers it across launches.
+- **No background sync in the iOS app.** It reads whatever files are in the folder at the time. The cloud service handles syncing; PullRead polls the folder modification time every 5 seconds and auto-refreshes when files change.
 
 ---
 
