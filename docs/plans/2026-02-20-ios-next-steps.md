@@ -159,6 +159,139 @@ Option (a) is simpler for v1.
 
 ---
 
+## Phase 6: Manual Sync (On-Device Article Fetching)
+
+**Goal**: Let users sync RSS feeds directly from iOS, without needing the desktop app.
+
+The extraction pipeline is almost entirely pure JavaScript — the core libraries (`fast-xml-parser`, `@mozilla/readability`, `linkedom`, `turndown`) have zero platform dependencies. This phase ports the sync logic to run in the React Native JS runtime, writing `.md` files directly to the user's selected folder.
+
+### Why this works
+
+| Component | Desktop (Bun) | iOS (React Native) | Portability |
+|-----------|---------------|---------------------|-------------|
+| Feed parsing | `fast-xml-parser` | Same library | Pure JS — zero changes |
+| HTTP fetching | `fetch()` | `fetch()` | Works in Hermes runtime |
+| DOM + Readability | `linkedom` + `@mozilla/readability` | Same libraries | Pure JS — zero changes |
+| HTML→Markdown | `turndown` | Same library | Pure JS — zero changes |
+| URL tracking DB | `bun:sqlite` | `expo-sqlite` | Same SQLite, different wrapper |
+| File writing | Node `fs` | `FolderAccessModule.writeFile()` | New native method |
+| Chrome cookies | macOS Keychain decryption | N/A — see WKWebView login below | Different mechanism |
+| YouTube transcripts | `fetch()` + XML parsing | Same | Pure JS |
+| Twitter/X via fxtwitter | `fetch()` + JSON | Same | Pure JS |
+| PDF extraction | `unpdf` (PDF.js/Wasm) | Needs testing — may need fallback | Medium risk |
+
+### Architecture
+
+```
+User taps "Sync Now"
+        │
+        ▼
+┌─────────────────────────────────────────────┐
+│  sync-engine.ts (React Native JS runtime)   │
+│                                              │
+│  1. Read feed config (expo-sqlite or JSON)   │
+│  2. For each feed URL:                       │
+│     a. fetch() the RSS/Atom XML              │
+│     b. Parse with fast-xml-parser            │
+│     c. For each new article URL:             │
+│        - Check expo-sqlite (already synced?) │
+│        - fetch() the article page            │
+│        - linkedom → Readability → extract    │
+│        - turndown → markdown                 │
+│        - FolderAccess.writeFile() → .md      │
+│        - Record in expo-sqlite               │
+│  3. Update UI with sync progress             │
+└──────────────┬──────────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────────┐
+│  FolderAccessModule.swift                    │
+│  (existing module + new writeFile method)    │
+│                                              │
+│  writeFile(filename, content) → writes .md   │
+│  to the security-scoped bookmarked folder    │
+└─────────────────────────────────────────────┘
+               │
+               ▼
+      iCloud Drive / Dropbox / etc.
+      (syncs back to desktop too)
+```
+
+### Implementation steps
+
+1. **Add `writeFile` to `FolderAccessModule.swift`**
+   ```swift
+   AsyncFunction("writeFile") { (filename: String, content: String) in
+       guard let folderURL = Self.resolveBookmark() else { throw ... }
+       let fileURL = folderURL.appendingPathComponent(filename)
+       try content.write(to: fileURL, atomically: true, encoding: .utf8)
+   }
+   ```
+
+2. **Add `expo-sqlite` for URL tracking**
+   - Same schema as the desktop's `pullread.db`: `processed_urls(url TEXT PRIMARY KEY, filename TEXT, synced_at TEXT)`
+   - Prevents re-fetching articles that were already synced (by desktop or by a previous iOS sync)
+
+3. **Port the extraction pipeline**
+   - Copy `feed.ts`, `extractor.ts`, `writer.ts` into `pullread-mobile/lib/sync/`
+   - Replace `fs.writeFileSync` → `FolderAccess.writeFile()`
+   - Replace `bun:sqlite` → `expo-sqlite`
+   - Remove `cookies.ts` import (replaced by WKWebView login — see below)
+   - Remove `unpdf` initially (PDF articles get skipped; add back if Wasm works in Hermes)
+
+4. **Feed configuration UI**
+   - Simple screen to add/remove RSS feed URLs
+   - Option to import `feeds.json` from the same folder (auto-detect on folder pick)
+   - Store feed list in `expo-sqlite`
+
+5. **Sync UI**
+   - "Sync Now" button on the main screen
+   - Progress indicator: "Fetching TechCrunch... 3/12 articles"
+   - Sync only runs while app is in foreground (iOS kills background work)
+   - Sequential processing (one article at a time) to stay within iOS memory limits
+
+6. **Wire into the viewer**
+   - Change `api-handler.ts` to return `{ syncInterval: 'manual' }` with a sync action
+   - After sync completes, the existing folder poll detects new files and auto-refreshes
+
+### Authenticated content via WKWebView login
+
+For paywalled sites (Medium, NYT, etc.), the iOS app can't read Safari's cookies. Instead:
+
+1. **"Manage Logins" settings screen** — lists domains the user can authenticate with
+2. User taps "Log in to Medium" → app opens a `WKWebView` to `medium.com`
+3. User logs in normally — **iCloud Keychain autofill works**, so it's typically one tap
+4. App reads cookies via `WKHTTPCookieStore.getAllCookies()`
+   ```swift
+   webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { cookies in
+       let domainCookies = cookies.filter { $0.domain.contains("medium.com") }
+       // Persist to Keychain for use during sync
+   }
+   ```
+5. During sync, attach stored cookies to fetch requests for that domain
+6. Cookies persist in the app's WKWebView data store across launches
+
+This is the same approach used by Reeder, Fiery Feeds, and other iOS RSS readers for authenticated feeds. It's arguably **more transparent** than the desktop approach (silently reading Chrome cookies) — the user explicitly chooses which sites to authenticate.
+
+### iOS-specific constraints
+
+- **Foreground only** — iOS aggressively kills background tasks. Sync runs only while the app is open. "Manual sync while the app is open" is the design intent.
+- **No Chrome cookies** — replaced by the WKWebView login flow above.
+- **Memory** — sequential article processing (already the desktop's approach) keeps memory usage low.
+- **Network** — iOS apps can make arbitrary HTTP requests in the foreground. No restrictions.
+- **App Store** — plenty of RSS readers (Reeder, NetNewsWire, Unread) do exactly this. Apple won't object.
+- **Bidirectional sync via shared folder** — articles synced on iOS appear on desktop (and vice versa) through the cloud service. No custom sync protocol needed.
+
+### What this unlocks
+
+- **Phone-only users** — can use PullRead without a Mac at all
+- **Travel/offline prep** — sync articles to the phone before going offline
+- **Bidirectional** — desktop syncs show up on phone; phone syncs show up on desktop
+- **Same pipeline** — identical extraction quality (Readability, Turndown, etc.)
+- **Authenticated feeds** — WKWebView login handles paywalled content
+
+---
+
 ## Future (v2+)
 
 Features to consider after the initial release:
@@ -166,12 +299,12 @@ Features to consider after the initial release:
 | Feature | Approach |
 |---------|----------|
 | **Highlights & notes** | On-device JSON storage via `expo-file-system`, bridged to viewer via POST endpoints |
-| **iCloud sync** | Store article folder in iCloud Drive; PullRead desktop syncs there too |
-| **Share extension** | Accept URLs from Safari → save to a "to read" queue |
+| **Share extension** | Accept URLs from Safari → save to a "to read" queue, extract on next sync |
 | **Widgets** | Show reading stats or recent articles on home screen |
-| **Push notifications** | Notify when new articles appear in the synced folder |
+| **Background App Refresh** | Lightweight check for new feed items (iOS allows ~30s of background work) |
 | **Spotlight search** | Index article titles via Core Spotlight |
-| **Shortcuts integration** | "Open latest article" Siri Shortcut |
+| **Shortcuts integration** | "Sync feeds" or "Open latest article" Siri Shortcuts |
+| **Safari cookies (macOS desktop)** | Add Safari support to the desktop tool — `~/Library/Cookies/Cookies.binarycookies` is unencrypted binary (simpler than Chrome's AES), but requires Full Disk Access permission |
 
 ---
 
