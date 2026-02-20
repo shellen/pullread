@@ -557,10 +557,10 @@ async function runTranslation(targetLang) {
 
     // Check translation availability
     var avail = await Translator.availability({ sourceLanguage: sourceLang, targetLanguage: targetLang });
-    if (avail === 'unavailable') {
+    if (avail === 'unsupported' || avail === 'unavailable') {
       var srcName = TRANSLATE_LANGUAGES.find(function(l) { return l.code === sourceLang; });
       var tgtName = TRANSLATE_LANGUAGES.find(function(l) { return l.code === targetLang; });
-      showToast('Translation from ' + (srcName ? srcName.label : sourceLang) + ' to ' + (tgtName ? tgtName.label : targetLang) + ' is not available', true);
+      showToast('Translation from ' + (srcName ? srcName.label : sourceLang) + ' to ' + (tgtName ? tgtName.label : targetLang) + ' is not available');
       btn.disabled = false;
       btn.innerHTML = '<svg class="icon icon-sm"><use href="#i-globe"/></svg> Translate';
       return;
@@ -572,7 +572,16 @@ async function runTranslation(targetLang) {
       showToast('Downloading language pack\u2026');
     }
 
-    var translator = await Translator.create({ sourceLanguage: sourceLang, targetLanguage: targetLang });
+    var translator = await Translator.create({
+      sourceLanguage: sourceLang,
+      targetLanguage: targetLang,
+      monitor: function(m) {
+        m.addEventListener('downloadprogress', function(e) {
+          var pct = Math.round(e.loaded * 100);
+          btn.innerHTML = '<svg class="icon icon-sm"><use href="#i-globe"/></svg> Downloading ' + pct + '%';
+        });
+      }
+    });
 
     // Save original and translate paragraph by paragraph
     _originalContent = body.innerHTML;
@@ -597,7 +606,8 @@ async function runTranslation(targetLang) {
     btn.title = 'Translated to ' + (tgtLabel ? tgtLabel.label : targetLang) + '. Click to show original.';
     btn.disabled = false;
   } catch (err) {
-    showToast('Translation failed: ' + err.message, true);
+    console.error('Translation error:', err);
+    showToast('Translation failed: ' + (err.message || 'unknown error'));
     btn.disabled = false;
     btn.innerHTML = '<svg class="icon icon-sm"><use href="#i-globe"/></svg> Translate';
   }
