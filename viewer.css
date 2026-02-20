@@ -826,9 +826,11 @@
     line-height: 1.7;
     font-size: 17px;
   }
+  .size-xsmall .content-wrap { font-size: 13px; }
   .size-small .content-wrap { font-size: 15px; }
   .size-medium .content-wrap { font-size: 17px; }
   .size-large .content-wrap { font-size: 20px; }
+  .size-xlarge .content-wrap { font-size: 24px; }
 
   /* Article content */
   .content-wrap h1 { font-size: 1.8em; margin: 0.5em 0 0.3em; line-height: 1.2; }
@@ -2765,6 +2767,8 @@
   .writing-focus-overlay .wf-toolbar button:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 6%, transparent); }
   .writing-focus-overlay .wf-title {
     font-size: 13px; color: var(--muted); font-weight: 500;
+    flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    padding: 0 16px;
   }
   .writing-focus-overlay .wf-body {
     flex: 1;

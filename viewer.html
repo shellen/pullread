@@ -117,9 +117,9 @@
           </div>
         </div>
         <div class="bottom-bar-controls">
-          <button onclick="ttsSkipPrev()" title="Rewind 15s" id="tts-prev-btn"><svg><use href="#i-backward"/></svg></button>
+          <button onpointerdown="ttsStartHoldSkip(-15)" onpointerup="ttsStopHoldSkip()" onpointerleave="ttsStopHoldSkip()" title="Rewind 15s (hold to scan)" id="tts-prev-btn"><svg><use href="#i-backward"/></svg></button>
           <button class="bottom-bar-play" onclick="ttsTogglePlay()" title="Play/Pause" id="tts-play-btn"><svg><use href="#i-play"/></svg></button>
-          <button onclick="ttsSkipNext()" title="Forward 15s" id="tts-next-btn"><svg><use href="#i-forward"/></svg></button>
+          <button onpointerdown="ttsStartHoldSkip(15)" onpointerup="ttsStopHoldSkip()" onpointerleave="ttsStopHoldSkip()" title="Forward 15s (hold to scan)" id="tts-next-btn"><svg><use href="#i-forward"/></svg></button>
         </div>
         <div class="bottom-bar-progress-row">
           <span class="audio-time" id="tts-time-current">0:00</span>
@@ -155,9 +155,9 @@
         <div class="mini-mode-status" id="mini-mode-status"></div>
       </div>
       <div class="mini-mode-controls">
-        <button onclick="ttsSkipPrev()" title="Rewind 15s"><svg><use href="#i-backward"/></svg></button>
+        <button onpointerdown="ttsStartHoldSkip(-15)" onpointerup="ttsStopHoldSkip()" onpointerleave="ttsStopHoldSkip()" title="Rewind 15s (hold to scan)"><svg><use href="#i-backward"/></svg></button>
         <button class="mini-mode-play-btn" onclick="ttsTogglePlay()" title="Play/Pause" id="mini-mode-play-btn"><svg><use href="#i-play"/></svg></button>
-        <button onclick="ttsSkipNext()" title="Forward 15s"><svg><use href="#i-forward"/></svg></button>
+        <button onpointerdown="ttsStartHoldSkip(15)" onpointerup="ttsStopHoldSkip()" onpointerleave="ttsStopHoldSkip()" title="Forward 15s (hold to scan)"><svg><use href="#i-forward"/></svg></button>
       </div>
       <div class="mini-mode-progress">
         <span class="mini-mode-time" id="mini-mode-time-current">0:00</span>

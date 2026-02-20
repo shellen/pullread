@@ -49,7 +49,7 @@ function renderFileList() {
     if (annotatedFiles.length) {
       html += '<div class="sidebar-section-label">Annotated Articles</div>';
       displayedCount = Math.min(annotatedFiles.length, PAGE_SIZE);
-      html += annotatedFiles.slice(0, displayedCount).map((f, i) => renderFileItem(f, i)).join('');
+      html += annotatedFiles.slice(0, displayedCount).map(f => renderFileItem(f, displayFiles.indexOf(f))).join('');
     }
     var totalNotes = nbObj ? (nbObj.notes || []).length : 0;
     countStr = totalNotes + ' note' + (totalNotes !== 1 ? 's' : '');

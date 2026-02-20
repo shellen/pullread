@@ -309,7 +309,7 @@ function renderArticle(text, filename) {
     html += '</div>';
     // Show podcast description in a collapsible section instead of as article body
     if (body && body.trim()) {
-      html += '<details class="podcast-description"><summary>Episode description</summary>';
+      html += '<details class="podcast-description" open><summary>Episode description</summary>';
       html += '<div>' + sanitizeHtml(marked.parse(cleanMarkdown(body))) + '</div>';
       html += '</details>';
     }

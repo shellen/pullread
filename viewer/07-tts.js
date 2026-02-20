@@ -821,6 +821,25 @@ function ttsSkipPrev() {
   skipTime(-15);
 }
 
+var _skipHoldTimer = null;
+var _skipHoldInterval = null;
+
+function ttsStartHoldSkip(seconds) {
+  skipTime(seconds);
+  _skipHoldTimer = setTimeout(function() {
+    _skipHoldInterval = setInterval(function() {
+      skipTime(seconds);
+    }, 200);
+  }, 300);
+}
+
+function ttsStopHoldSkip() {
+  clearTimeout(_skipHoldTimer);
+  clearInterval(_skipHoldInterval);
+  _skipHoldTimer = null;
+  _skipHoldInterval = null;
+}
+
 function skipTime(seconds) {
   if (_ttsChunkSession) {
     var session = _ttsChunkSession;

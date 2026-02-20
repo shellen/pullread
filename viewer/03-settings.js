@@ -90,9 +90,11 @@ function toggleSettingsDropdown() {
     </div>
     <label>Size</label>
     <div class="setting-row">
+      <button data-setting="size" data-val="xsmall" onclick="setSize('xsmall');updateDropdownState()" ${currentSize==='xsmall'?'class="active"':''} style="font-size:9px" aria-label="Extra small text">A</button>
       <button data-setting="size" data-val="small" onclick="setSize('small');updateDropdownState()" ${currentSize==='small'?'class="active"':''} aria-label="Small text">A</button>
       <button data-setting="size" data-val="medium" onclick="setSize('medium');updateDropdownState()" ${currentSize==='medium'?'class="active"':''} style="font-size:14px" aria-label="Medium text">A</button>
       <button data-setting="size" data-val="large" onclick="setSize('large');updateDropdownState()" ${currentSize==='large'?'class="active"':''} style="font-size:17px" aria-label="Large text">A</button>
+      <button data-setting="size" data-val="xlarge" onclick="setSize('xlarge');updateDropdownState()" ${currentSize==='xlarge'?'class="active"':''} style="font-size:20px" aria-label="Extra large text">A</button>
     </div>
     <label>Line height</label>
     <div class="setting-row">
@@ -321,8 +323,8 @@ function showSettingsPage(scrollToSection) {
         h += '<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">';
         for (var fi = 0; fi < feedNames.length; fi++) {
           var fn = feedNames[fi];
-          h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:' + (fi < feedNames.length - 1 ? '1px solid var(--border)' : 'none') + ';font-size:13px">'
-            + '<div><div style="font-weight:500">' + escapeHtml(fn) + '</div><div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px">' + escapeHtml(feeds[fn]) + '</div></div>'
+          h += '<div id="feed-row-' + fi + '" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:' + (fi < feedNames.length - 1 ? '1px solid var(--border)' : 'none') + ';font-size:13px">'
+            + '<div style="cursor:pointer;flex:1;min-width:0" onclick="settingsEditFeed(' + fi + ')" title="Click to edit"><div style="font-weight:500">' + escapeHtml(fn) + '</div><div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px">' + escapeHtml(feeds[fn]) + '</div></div>'
             + '<button onclick="settingsRemoveFeed(\'' + escapeHtml(fn.replace(/'/g, "\\'")) + '\')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:2px 6px" title="Remove">&times;</button>'
             + '</div>';
         }
@@ -331,6 +333,7 @@ function showSettingsPage(scrollToSection) {
       h += '<div style="display:flex;gap:8px;margin-top:10px">'
         + '<input type="text" id="sp-new-feed" placeholder="Paste bookmark feed URL or web address\u2026" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;font-family:inherit" onkeydown="if(event.key===\'Enter\')settingsAddFeed()">'
         + '<button class="btn-primary" onclick="settingsAddFeed()" id="sp-add-feed-btn" style="font-size:13px;padding:6px 14px">Add</button>'
+        + '<button onclick="settingsImportOPML()" style="font-size:13px;padding:6px 14px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit;white-space:nowrap">Import OPML\u2026</button>'
         + '</div>';
       h += '<div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6">'
         + 'Paste a bookmark feed URL from Instapaper, Pinboard, Raindrop, or Pocket. '
@@ -338,7 +341,7 @@ function showSettingsPage(scrollToSection) {
         + '</div>';
       h += '<div style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;padding:8px 10px;background:color-mix(in srgb, var(--fg) 4%, transparent);border-radius:6px;font-size:11px;color:var(--muted)">'
         + '<span style="flex-shrink:0">&#128196;</span>'
-        + '<span>Bookmark services only sync articles you save. Newsletter feeds save every post as a separate file.</span>'
+        + '<span>Bookmark services only sync articles you save. Newsletter and blog feeds save every post as a separate file, which can use significant disk space over time.</span>'
         + '</div>';
       h += '</div>';
 
@@ -767,6 +770,69 @@ function settingsRemoveFeed(name) {
     delete sec._configData.feeds[name];
   }
   settingsPageSaveConfig();
+}
+
+function settingsEditFeed(rowIndex) {
+  var sec = document.getElementById('settings-feeds');
+  if (!sec || !sec._configData) return;
+  var feeds = sec._configData.feeds || {};
+  var names = Object.keys(feeds);
+  var name = names[rowIndex];
+  if (name === undefined) return;
+  var url = feeds[name];
+  var row = document.getElementById('feed-row-' + rowIndex);
+  if (!row) return;
+  row.innerHTML = '<div style="flex:1;display:flex;flex-direction:column;gap:6px">'
+    + '<input type="text" id="feed-edit-name-' + rowIndex + '" value="' + escapeHtml(name) + '" placeholder="Feed name" style="padding:5px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg);font-size:13px;font-family:inherit">'
+    + '<input type="text" id="feed-edit-url-' + rowIndex + '" value="' + escapeHtml(url) + '" placeholder="Feed URL" style="padding:5px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg);font-size:12px;font-family:inherit">'
+    + '<div style="display:flex;gap:6px">'
+    + '<button class="btn-primary" onclick="settingsSaveEditFeed(' + rowIndex + ',\'' + escapeHtml(name.replace(/'/g, "\\'")) + '\')" style="font-size:12px;padding:4px 12px">Save</button>'
+    + '<button onclick="showSettingsPage(\'settings-feeds\')" style="font-size:12px;padding:4px 12px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit">Cancel</button>'
+    + '</div></div>';
+  document.getElementById('feed-edit-name-' + rowIndex).focus();
+}
+
+function settingsSaveEditFeed(rowIndex, oldName) {
+  var sec = document.getElementById('settings-feeds');
+  if (!sec || !sec._configData) return;
+  var newName = (document.getElementById('feed-edit-name-' + rowIndex).value || '').trim();
+  var newUrl = (document.getElementById('feed-edit-url-' + rowIndex).value || '').trim();
+  if (!newName || !newUrl) return;
+  if (newName !== oldName) delete sec._configData.feeds[oldName];
+  sec._configData.feeds[newName] = newUrl;
+  settingsPageSaveConfig();
+}
+
+function settingsImportOPML() {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.opml,.xml';
+  input.onchange = function() {
+    if (!input.files || !input.files[0]) return;
+    var reader = new FileReader();
+    reader.onload = function() {
+      var doc = new DOMParser().parseFromString(reader.result, 'text/xml');
+      var outlines = doc.querySelectorAll('outline[xmlUrl]');
+      if (!outlines.length) { alert('No feeds found in this file.'); return; }
+      var sec = document.getElementById('settings-feeds');
+      if (!sec || !sec._configData) return;
+      if (!sec._configData.feeds) sec._configData.feeds = {};
+      var added = 0;
+      for (var i = 0; i < outlines.length; i++) {
+        var el = outlines[i];
+        var url = el.getAttribute('xmlUrl');
+        var name = el.getAttribute('text') || el.getAttribute('title') || url;
+        if (!sec._configData.feeds[name]) {
+          sec._configData.feeds[name] = url;
+          added++;
+        }
+      }
+      if (added === 0) { alert('All feeds already exist.'); return; }
+      settingsPageSaveConfig();
+    };
+    reader.readAsText(input.files[0]);
+  };
+  input.click();
 }
 
 function settingsBackup() {
