@@ -31,7 +31,7 @@ pub async fn open_viewer_inner(app: &AppHandle) -> Result<(), String> {
             "viewer",
             WebviewUrl::External(url.parse().map_err(|e| format!("Invalid URL: {}", e))?),
         )
-        .title("PullRead")
+        .title("Pull Read")
         .inner_size(1100.0, 750.0)
         .min_inner_size(600.0, 400.0)
         .build()

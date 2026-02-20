@@ -38,8 +38,8 @@ pub fn create_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         MenuItem::with_id(app, "updates", "Check for Updates\u{2026}", true, None::<&str>)?;
     let sep4 = PredefinedMenuItem::separator(app)?;
 
-    let about = MenuItem::with_id(app, "about", "About PullRead", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Quit PullRead", true, Some("CmdOrCtrl+Q"))?;
+    let about = MenuItem::with_id(app, "about", "About Pull Read", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "Quit Pull Read", true, Some("CmdOrCtrl+Q"))?;
 
     let menu = Menu::with_items(
         app,
@@ -65,7 +65,7 @@ pub fn create_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     TrayIconBuilder::with_id("main")
         .icon(tauri::include_image!("icons/tray-icon.png"))
         .icon_as_template(true)
-        .tooltip("PullRead")
+        .tooltip("Pull Read")
         .menu(&menu)
         .show_menu_on_left_click(true)
         .on_menu_event(|app, event| {
@@ -111,8 +111,8 @@ pub fn create_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     let version = env!("CARGO_PKG_VERSION");
                     notifications::notify(
                         &handle,
-                        "About PullRead",
-                        &format!("PullRead v{}\nSync articles to searchable markdown files.", version),
+                        "About Pull Read",
+                        &format!("Pull Read v{}\nSync articles to searchable markdown files.", version),
                     );
                 }
                 "quit" => {
@@ -146,7 +146,7 @@ pub fn create_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
 async fn handle_sync(app: &AppHandle, retry_failed: bool) {
     // Update tray to show syncing state
-    notifications::notify(app, "PullRead", "Syncing...");
+    notifications::notify(app, "Pull Read", "Syncing...");
 
     match sidecar::run_sync(app, retry_failed).await {
         Ok(summary) => {
@@ -203,14 +203,14 @@ async fn handle_check_updates(app: &AppHandle) {
                 notifications::notify(
                     app,
                     "Update Available",
-                    &format!("PullRead v{} is available. Downloading...", version),
+                    &format!("Pull Read v{} is available. Downloading...", version),
                 );
                 match update.download_and_install(|_, _| {}, || {}).await {
                     Ok(_) => {
                         notifications::notify(
                             app,
                             "Update Installed",
-                            "PullRead will restart to apply the update.",
+                            "Pull Read will restart to apply the update.",
                         );
                         app.restart();
                     }
@@ -224,7 +224,7 @@ async fn handle_check_updates(app: &AppHandle) {
                 }
             }
             Ok(None) => {
-                notifications::notify(app, "PullRead", "You're up to date.");
+                notifications::notify(app, "Pull Read", "You're up to date.");
             }
             Err(e) => {
                 notifications::notify(
@@ -253,7 +253,7 @@ pub async fn check_updates_silently(app: &AppHandle) {
                     app,
                     "Update Available",
                     &format!(
-                        "PullRead v{} is available. Use Check for Updates to install.",
+                        "Pull Read v{} is available. Use Check for Updates to install.",
                         version
                     ),
                 );
@@ -282,7 +282,7 @@ pub fn update_last_sync(app: &AppHandle) {
     };
     log::info!("Last sync updated: {}", now);
     if let Some(tray) = app.tray_by_id("main") {
-        let _ = tray.set_tooltip(Some(&format!("PullRead — Last sync: {}", now)));
+        let _ = tray.set_tooltip(Some(&format!("Pull Read — Last sync: {}", now)));
     }
     let items = app.state::<TrayItems>();
     let lock = items.last_sync.lock();
