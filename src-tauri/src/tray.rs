@@ -242,7 +242,13 @@ async fn handle_check_updates(app: &AppHandle) {
 
 /// Update the "Last sync:" tray menu item and tooltip with current time.
 pub fn update_last_sync(app: &AppHandle) {
-    let now = chrono::Local::now().format("%H:%M").to_string();
+    let state = app.state::<sidecar::SidecarState>();
+    let fmt = state.get_time_format();
+    let now = if fmt == "24h" {
+        chrono::Local::now().format("%H:%M").to_string()
+    } else {
+        chrono::Local::now().format("%-I:%M %p").to_string()
+    };
     log::info!("Last sync updated: {}", now);
     if let Some(tray) = app.tray_by_id("main") {
         let _ = tray.set_tooltip(Some(&format!("PullRead — Last sync: {}", now)));

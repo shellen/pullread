@@ -685,7 +685,8 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
             providers,
             appleAvailable: isAppleAvailable()
           },
-          viewerMode: (appSettings.viewerMode as string) || 'app'
+          viewerMode: (appSettings.viewerMode as string) || 'app',
+          timeFormat: (appSettings.timeFormat as string) || '12h'
         });
         return;
       }
@@ -697,6 +698,15 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
           if (body.viewerMode !== undefined) {
             const appSettings = loadJsonFile(APP_SETTINGS_PATH);
             appSettings.viewerMode = body.viewerMode === 'browser' ? 'browser' : 'app';
+            saveJsonFile(APP_SETTINGS_PATH, appSettings);
+            sendJson(res, { ok: true });
+            return;
+          }
+
+          // Time format preference (12h vs 24h)
+          if (body.timeFormat !== undefined) {
+            const appSettings = loadJsonFile(APP_SETTINGS_PATH);
+            appSettings.timeFormat = body.timeFormat === '24h' ? '24h' : '12h';
             saveJsonFile(APP_SETTINGS_PATH, appSettings);
             sendJson(res, { ok: true });
             return;

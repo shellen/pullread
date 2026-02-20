@@ -1,6 +1,6 @@
 [package]
 name = "pullread"
-version = "2.0.0"
+version = "0.2.0"
 description = "Sync articles from RSS feeds, bookmarks, and newsletters to searchable markdown files"
 authors = ["PullRead"]
 edition = "2021"

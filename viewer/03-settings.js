@@ -198,6 +198,11 @@ function showSettingsPage(scrollToSection) {
   html += '<option value="app">PullRead window</option>';
   html += '<option value="browser">Default browser</option>';
   html += '</select></div>';
+  html += '<div class="settings-row"><div><label>Time format</label><div class="settings-desc">How times appear in the menu bar</div></div>';
+  html += '<select id="sp-time-format" onchange="settingsPageSaveTimeFormat()">';
+  html += '<option value="12h">12-hour (2:30 PM)</option>';
+  html += '<option value="24h">24-hour (14:30)</option>';
+  html += '</select></div>';
   html += '</div>';
 
   // ---- Feeds & Sync section (placeholder, loaded async) ----
@@ -271,6 +276,8 @@ function showSettingsPage(scrollToSection) {
         sel.value = data.viewerMode || 'app';
         sec.style.display = '';
       }
+      var timeSel = document.getElementById('sp-time-format');
+      if (timeSel) timeSel.value = data.timeFormat || '12h';
     }).catch(function() {});
   }
 
@@ -535,6 +542,15 @@ function settingsPageSaveViewerMode() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ viewerMode: mode }),
+  });
+}
+
+function settingsPageSaveTimeFormat() {
+  var fmt = document.getElementById('sp-time-format').value;
+  fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ timeFormat: fmt }),
   });
 }
 
