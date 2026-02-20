@@ -1020,6 +1020,7 @@
     padding: 4px 6px !important;
     border-radius: 0 6px 6px 0 !important;
     border-left: 1px solid color-mix(in srgb, var(--fg) 12%, transparent) !important;
+    align-self: stretch;
     margin-left: -1px;
     opacity: 0.7;
     line-height: 1.4;
