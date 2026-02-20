@@ -4,7 +4,7 @@
 import { parseHTML } from 'linkedom';
 import { Readability } from '@mozilla/readability';
 import TurndownService from 'turndown';
-import { getCookiesForDomain, getDomainFromUrl } from './cookies';
+import { getCookiesForDomain, getDomainFromUrl, getSiteLoginCookies } from './cookies';
 import { extractText, getDocumentProxy } from 'unpdf';
 import { XMLParser } from 'fast-xml-parser';
 
@@ -991,10 +991,16 @@ async function extractYouTube(url: string, videoId: string, options: FetchOption
   const cleanUrl = normalizeUrl(url);
   const headers = getBrowserHeaders(cleanUrl);
 
-  if (options.useBrowserCookies) {
-    const domain = getDomainFromUrl(cleanUrl);
-    const cookies = getCookiesForDomain(domain);
-    if (cookies) headers['Cookie'] = cookies;
+  // Site login cookies take priority over browser cookies
+  const domain = getDomainFromUrl(cleanUrl);
+  const siteLoginCookies = getSiteLoginCookies(domain);
+  if (siteLoginCookies) {
+    headers['Cookie'] = siteLoginCookies;
+  } else if (options.useBrowserCookies) {
+    const browserCookies = getCookiesForDomain(domain);
+    if (browserCookies) {
+      headers['Cookie'] = browserCookies;
+    }
   }
 
   const response = await fetchWithTimeout(cleanUrl, headers, FETCH_TIMEOUT_MS);
@@ -1227,10 +1233,16 @@ async function extractAcademicPaper(
   // Fall back to PDF extraction via the normal fetch path
   const cleanUrl = normalizeUrl(url);
   const headers = getBrowserHeaders(cleanUrl);
-  if (options.useBrowserCookies) {
-    const domain = getDomainFromUrl(cleanUrl);
-    const cookies = getCookiesForDomain(domain);
-    if (cookies) headers['Cookie'] = cookies;
+  // Site login cookies take priority over browser cookies
+  const domain = getDomainFromUrl(cleanUrl);
+  const siteLoginCookies = getSiteLoginCookies(domain);
+  if (siteLoginCookies) {
+    headers['Cookie'] = siteLoginCookies;
+  } else if (options.useBrowserCookies) {
+    const browserCookies = getCookiesForDomain(domain);
+    if (browserCookies) {
+      headers['Cookie'] = browserCookies;
+    }
   }
 
   try {
@@ -1321,12 +1333,15 @@ export async function fetchAndExtract(
   const cleanUrl = normalizeUrl(url);
   const headers = getBrowserHeaders(cleanUrl);
 
-  // Add browser cookies if enabled
-  if (options.useBrowserCookies) {
-    const domain = getDomainFromUrl(cleanUrl);
-    const cookies = getCookiesForDomain(domain);
-    if (cookies) {
-      headers['Cookie'] = cookies;
+  // Site login cookies take priority over browser cookies
+  const domain = getDomainFromUrl(cleanUrl);
+  const siteLoginCookies = getSiteLoginCookies(domain);
+  if (siteLoginCookies) {
+    headers['Cookie'] = siteLoginCookies;
+  } else if (options.useBrowserCookies) {
+    const browserCookies = getCookiesForDomain(domain);
+    if (browserCookies) {
+      headers['Cookie'] = browserCookies;
     }
   }
 
