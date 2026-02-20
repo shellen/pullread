@@ -188,6 +188,13 @@ jobs:
           name: pullread-x86_64-apple-darwin
           path: ./artifacts/x64
 
+      - name: Rename DMGs to stable filenames
+        run: |
+          mkdir -p ./release
+          find ./artifacts/arm64 -name '*.dmg' -exec cp {} ./release/PullRead.dmg \;
+          find ./artifacts/x64 -name '*.dmg' -exec cp {} ./release/PullRead_Intel.dmg \;
+          ls -la ./release/
+
       - name: Update latest release
         uses: softprops/action-gh-release@v2
         with:
@@ -196,15 +203,15 @@ jobs:
           body: |
             Rolling build of Pull Read from the main branch.
 
-            **arm64 (Apple Silicon):** PullRead_aarch64.dmg
-            **x64 (Intel):** PullRead_x64.dmg
+            **Apple Silicon:** [PullRead.dmg](https://github.com/shellen/pullread/releases/download/latest/PullRead.dmg)
+            **Intel:** [PullRead_Intel.dmg](https://github.com/shellen/pullread/releases/download/latest/PullRead_Intel.dmg)
 
             _Commit: ${{ github.sha }}_
             _Updated: ${{ github.event.head_commit.timestamp }}_
           files: |
-            ./artifacts/arm64/**/*.dmg
-            ./artifacts/x64/**/*.dmg
-          prerelease: true
+            ./release/PullRead.dmg
+            ./release/PullRead_Intel.dmg
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
