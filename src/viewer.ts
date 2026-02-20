@@ -263,6 +263,13 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
       return;
     }
 
+    // /settings redirects to the viewer with Settings panel open
+    if (url.pathname === '/settings') {
+      res.writeHead(302, { 'Location': '/#tab=settings' });
+      res.end();
+      return;
+    }
+
     // Web app manifest for Safari "Add to Dock" / PWA support
     if (url.pathname === '/manifest.json') {
       const manifest = {

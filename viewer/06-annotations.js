@@ -731,6 +731,7 @@ function toggleVoiceNote(btn) {
   recognition.lang = navigator.language || 'en-US';
 
   let finalTranscript = '';
+  const originalText = textarea.value;
 
   recognition.onstart = function() {
     voiceRecognition = recognition;
@@ -740,19 +741,17 @@ function toggleVoiceNote(btn) {
   };
 
   recognition.onresult = function(event) {
+    finalTranscript = '';
     let interim = '';
-    for (let i = event.resultIndex; i < event.results.length; i++) {
+    for (let i = 0; i < event.results.length; i++) {
       if (event.results[i].isFinal) {
         finalTranscript += event.results[i][0].transcript;
       } else {
         interim += event.results[i][0].transcript;
       }
     }
-    // Show live preview: existing text + final transcript + interim (dimmed)
-    const existingText = textarea.value;
-    const separator = existingText && !existingText.endsWith('\n') && !existingText.endsWith(' ') ? '\n' : '';
-    const preview = existingText + separator + finalTranscript + interim;
-    textarea.value = preview;
+    const separator = originalText && !originalText.endsWith('\n') && !originalText.endsWith(' ') ? '\n' : '';
+    textarea.value = originalText + (finalTranscript || interim ? separator : '') + finalTranscript + interim;
     textarea.scrollTop = textarea.scrollHeight;
   };
 

@@ -6,25 +6,34 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
 /// Open the viewer window, starting the sidecar server if needed
 pub async fn open_viewer_inner(app: &AppHandle) -> Result<(), String> {
+    open_viewer_at(app, None).await
+}
+
+/// Open the viewer window at an optional hash fragment (e.g. "tab=settings")
+pub async fn open_viewer_at(app: &AppHandle, hash: Option<&str>) -> Result<(), String> {
     let port = sidecar::ensure_viewer_running(app).await?;
+    let fragment = hash.map(|h| format!("#{}", h)).unwrap_or_default();
 
     // Check if user prefers default browser over the built-in WebView
     let state = app.state::<sidecar::SidecarState>();
     if state.should_open_in_browser() {
         // Use 127.0.0.1 (not localhost) — the server binds IPv4 only and
         // browsers may try IPv6 ::1 first, causing a long connection timeout.
-        let browser_url = format!("http://127.0.0.1:{}", port);
+        let browser_url = format!("http://127.0.0.1:{}{}", port, fragment);
         let _ = open::that(&browser_url);
         return Ok(());
     }
 
     // Keep localhost for WebView to preserve localStorage across launches
-    let url = format!("http://localhost:{}", port);
+    let url = format!("http://localhost:{}{}", port, fragment);
 
     // Reuse existing window or create new
     if let Some(window) = app.get_webview_window("viewer") {
         let _ = window.show();
         let _ = window.set_focus();
+        if hash.is_some() {
+            let _ = window.navigate(url.parse().unwrap());
+        }
     } else {
         let _window = WebviewWindowBuilder::new(
             app,
@@ -112,26 +121,11 @@ pub async fn handle_deep_link(app: &AppHandle, url: &str) {
     match host {
         "open" => {
             // pullread://open or pullread://open?file=filename.md
-            let _ = open_viewer_inner(app).await;
-
-            // If a specific file is requested, we could pass it via URL fragment
-            // The viewer handles this natively via hash navigation
-            if let Some(file) = parsed
+            let hash = parsed
                 .query_pairs()
                 .find(|(k, _)| k == "file")
-                .map(|(_, v)| v.to_string())
-            {
-                // Navigate the viewer to the specific file
-                if let Some(window) = app.get_webview_window("viewer") {
-                    let port = app.state::<sidecar::SidecarState>().get_viewer_port();
-                    let nav_url = format!(
-                        "http://localhost:{}/#file={}",
-                        port,
-                        urlencoding::encode(&file)
-                    );
-                    let _ = window.navigate(nav_url.parse().unwrap());
-                }
-            }
+                .map(|(_, v)| format!("file={}", urlencoding::encode(&v)));
+            let _ = open_viewer_at(app, hash.as_deref()).await;
         }
         "save" => {
             // pullread://save?url=<encoded_url>&title=<optional_title>
@@ -164,22 +158,11 @@ pub async fn handle_deep_link(app: &AppHandle, url: &str) {
         }
         "notebook" => {
             // pullread://notebook?id=<id>
-            let _ = open_viewer_inner(app).await;
-            if let Some(id) = parsed
+            let hash = parsed
                 .query_pairs()
                 .find(|(k, _)| k == "id")
-                .map(|(_, v)| v.to_string())
-            {
-                if let Some(window) = app.get_webview_window("viewer") {
-                    let port = app.state::<sidecar::SidecarState>().get_viewer_port();
-                    let nav_url = format!(
-                        "http://localhost:{}/#notebook={}",
-                        port,
-                        urlencoding::encode(&id)
-                    );
-                    let _ = window.navigate(nav_url.parse().unwrap());
-                }
-            }
+                .map(|(_, v)| format!("notebook={}", urlencoding::encode(&v)));
+            let _ = open_viewer_at(app, hash.as_deref()).await;
         }
         _ => {
             log::warn!("Unknown deep link host: {}", host);

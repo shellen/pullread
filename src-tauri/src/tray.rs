@@ -76,14 +76,7 @@ pub fn create_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                 }
                 "settings" => {
                     tauri::async_runtime::spawn(async move {
-                        let _ = commands::open_viewer_inner(&handle).await;
-                        if let Some(window) = handle.get_webview_window("viewer") {
-                            let port =
-                                handle.state::<sidecar::SidecarState>().get_viewer_port();
-                            let nav_url =
-                                format!("http://localhost:{}/#tab=settings", port);
-                            let _ = window.navigate(nav_url.parse().unwrap());
-                        }
+                        let _ = commands::open_viewer_at(&handle, Some("tab=settings")).await;
                     });
                 }
                 "quit" => {

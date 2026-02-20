@@ -428,6 +428,97 @@ async function batchAutotagAll(force) {
   }
 }
 
+// ---- Chrome Translation API (progressive enhancement) ----
+
+let _translatedContent = null;
+let _originalContent = null;
+
+async function translateArticle(btn) {
+  if (!btn || typeof Translator === 'undefined') return;
+
+  // Toggle back to original
+  if (_translatedContent && btn.classList.contains('active-fav')) {
+    var body = document.querySelector('#content .article-body');
+    if (body && _originalContent) body.innerHTML = _originalContent;
+    btn.classList.remove('active-fav');
+    btn.innerHTML = '<svg class="icon icon-sm"><use href="#i-globe"/></svg> Translate';
+    _translatedContent = null;
+    _originalContent = null;
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<svg class="icon icon-sm"><use href="#i-globe"/></svg> Detecting\u2026';
+
+  var body = document.querySelector('#content .article-body');
+  if (!body) { btn.disabled = false; btn.innerHTML = '<svg class="icon icon-sm"><use href="#i-globe"/></svg> Translate'; return; }
+
+  var textContent = body.innerText.slice(0, 1000);
+  var userLang = (navigator.language || 'en').split('-')[0];
+
+  try {
+    // Detect article language
+    var sourceLang = 'en';
+    if (typeof LanguageDetector !== 'undefined') {
+      var detector = await LanguageDetector.create();
+      var results = await detector.detect(textContent);
+      if (results && results.length > 0 && results[0].confidence > 0.3) {
+        sourceLang = results[0].detectedLanguage;
+      }
+    }
+
+    if (sourceLang === userLang) {
+      showToast('Article is already in your language');
+      btn.disabled = false;
+      btn.innerHTML = '<svg class="icon icon-sm"><use href="#i-globe"/></svg> Translate';
+      return;
+    }
+
+    // Check translation availability
+    var avail = await Translator.availability({ sourceLanguage: sourceLang, targetLanguage: userLang });
+    if (avail === 'unavailable') {
+      showToast('Translation from ' + sourceLang + ' to ' + userLang + ' is not available', true);
+      btn.disabled = false;
+      btn.innerHTML = '<svg class="icon icon-sm"><use href="#i-globe"/></svg> Translate';
+      return;
+    }
+
+    btn.innerHTML = '<svg class="icon icon-sm"><use href="#i-globe"/></svg> Translating\u2026';
+
+    if (avail === 'downloadable' || avail === 'downloading') {
+      showToast('Downloading language pack\u2026');
+    }
+
+    var translator = await Translator.create({ sourceLanguage: sourceLang, targetLanguage: userLang });
+
+    // Save original and translate paragraph by paragraph
+    _originalContent = body.innerHTML;
+    var paragraphs = body.querySelectorAll('p, li, h1, h2, h3, h4, h5, h6, blockquote, figcaption, td, th');
+
+    for (var i = 0; i < paragraphs.length; i++) {
+      var el = paragraphs[i];
+      var text = el.textContent.trim();
+      if (text.length < 3) continue;
+      try {
+        var translated = await translator.translate(text);
+        el.textContent = translated;
+      } catch (e) {
+        // Skip paragraphs that fail
+      }
+    }
+
+    _translatedContent = body.innerHTML;
+    btn.classList.add('active-fav');
+    btn.innerHTML = '<svg class="icon icon-sm"><use href="#i-globe"/></svg> Original';
+    btn.title = 'Click to show original text';
+    btn.disabled = false;
+  } catch (err) {
+    showToast('Translation failed: ' + err.message, true);
+    btn.disabled = false;
+    btn.innerHTML = '<svg class="icon icon-sm"><use href="#i-globe"/></svg> Translate';
+  }
+}
+
 let _modalReturnFocus = null;
 
 function trapFocus(overlay) {
