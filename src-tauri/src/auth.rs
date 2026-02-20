@@ -4,6 +4,8 @@
 use std::process::Command;
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
+use crate::sidecar::SidecarState;
+
 const KEYCHAIN_SERVICE: &str = "PullRead";
 
 /// Open a webview window for the user to log into a site.
@@ -16,6 +18,10 @@ pub async fn open_site_login(app: AppHandle, domain: String) -> Result<(), Strin
 
     let window_label = format!("login-{}", domain.replace('.', "-"));
     let url = format!("https://{}", domain);
+
+    // Get viewer server port for fallback cookie save via HTTP
+    let state = app.state::<SidecarState>();
+    let port = state.get_viewer_port();
 
     // Close existing login window for this domain if any
     if let Some(existing) = app.get_webview_window(&window_label) {
@@ -37,7 +43,16 @@ pub async fn open_site_login(app: AppHandle, domain: String) -> Result<(), Strin
             return {{ name: parts[0], value: parts.slice(1).join('='), domain: '.{domain}', path: '/', expires: 0, secure: location.protocol === 'https:', httpOnly: false }};
         }}).filter(function(c) {{ return c.name && c.value; }});
         try {{
-            await window.__TAURI__.core.invoke('save_site_cookies', {{ domain: '{domain}', cookiesJson: JSON.stringify(cookies) }});
+            if (window.__TAURI__ && window.__TAURI__.core) {{
+                await window.__TAURI__.core.invoke('save_site_cookies', {{ domain: '{domain}', cookiesJson: JSON.stringify(cookies) }});
+            }} else {{
+                var resp = await fetch('http://localhost:{port}/api/site-logins', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ domain: '{domain}', cookies: cookies }})
+                }});
+                if (!resp.ok) throw new Error('Server returned ' + resp.status);
+            }}
             btn.textContent = 'Saved!';
             btn.style.background = '#22c55e';
             setTimeout(function() {{ window.close(); }}, 800);
@@ -48,7 +63,7 @@ pub async fn open_site_login(app: AppHandle, domain: String) -> Result<(), Strin
     }};
     document.body.appendChild(btn);
 }})();
-"#, domain = domain);
+"#, domain = domain, port = port);
 
     let _window = WebviewWindowBuilder::new(
         &app,

@@ -1,0 +1,11 @@
+{
+  "identifier": "login",
+  "description": "IPC access for site login webview windows loading external HTTPS pages",
+  "windows": ["login-*"],
+  "remote": {
+    "urls": ["https://*"]
+  },
+  "permissions": [
+    "core:default"
+  ]
+}

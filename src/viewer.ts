@@ -13,7 +13,7 @@ import { APP_ICON } from './app-icon';
 import { fetchAndExtract } from './extractor';
 import { generateMarkdown, writeArticle, ArticleData, downloadFavicon } from './writer';
 import { loadTTSConfig, saveTTSConfig, generateSpeech, getAudioContentType, getKokoroStatus, preloadKokoro, getCachedAudioPath, createTtsSession, generateSessionChunk, TTS_VOICES, TTS_MODELS } from './tts';
-import { listSiteLogins, removeSiteLogin } from './cookies';
+import { listSiteLogins, removeSiteLogin, saveSiteLoginCookies } from './cookies';
 
 interface FileMeta {
   filename: string;
@@ -865,6 +865,15 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
     if (url.pathname === '/api/site-logins') {
       if (req.method === 'GET') {
         sendJson(res, { domains: listSiteLogins() });
+        return;
+      }
+      if (req.method === 'POST') {
+        try {
+          const body = JSON.parse(await readBody(req));
+          if (!body.domain || !body.cookies) { sendJson(res, { ok: false, error: 'missing domain or cookies' }); return; }
+          saveSiteLoginCookies(body.domain, body.cookies);
+          sendJson(res, { ok: true });
+        } catch (e: any) { sendJson(res, { ok: false, error: e.message || 'save failed' }); }
         return;
       }
       if (req.method === 'DELETE') {
