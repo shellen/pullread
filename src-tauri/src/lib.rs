@@ -1,6 +1,7 @@
 // ABOUTME: Tauri application library for PullRead
 // ABOUTME: Sets up system tray, sidecar management, timers, and all plugins
 
+mod auth;
 mod commands;
 mod notifications;
 mod platform;
@@ -86,6 +87,10 @@ pub fn run() {
             commands::trigger_sync,
             commands::trigger_review,
             commands::get_log_content,
+            auth::open_site_login,
+            auth::list_site_logins,
+            auth::remove_site_login,
+            auth::save_site_cookies,
         ])
         .build(tauri::generate_context!())
         .expect("error building PullRead")
