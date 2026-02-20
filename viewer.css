@@ -183,38 +183,6 @@
     margin: 3px 0;
   }
 
-  /* Translate language picker */
-  .translate-picker {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    width: 200px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-    z-index: 55;
-    animation: fadeIn 0.12s ease;
-  }
-  .translate-lang-btn {
-    display: block;
-    width: 100%;
-    padding: 6px 12px;
-    text-align: left;
-    border: none;
-    background: none;
-    color: var(--fg);
-    font-size: 13px;
-    cursor: pointer;
-    font-family: inherit;
-  }
-  .translate-lang-btn:hover {
-    background: var(--sidebar-hover);
-  }
-  .translate-lang-btn.default {
-    font-weight: 600;
-  }
-
   .toolbar-icon-btn {
     background: none !important;
     border: 1px solid transparent !important;

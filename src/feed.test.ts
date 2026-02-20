@@ -161,6 +161,22 @@ describe('parseFeed - RSS', () => {
     expect(entries[0].title).toBe('Grace Ives Announces New Album Girlfriend: Hear \u201cStupid\u201d');
     expect(entries[1].title).toBe('Best New Music: February 2026');
   });
+
+  test('strips HTML tags encoded as numeric entities', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Stereogum</title>
+    <item>
+      <title>At The Gates Announce Final Album &#060;em&#062;The Ghost&#060;/em&#062;: Hear &#8220;Mask&#8221;</title>
+      <link>https://example.com/gates</link>
+      <pubDate>Thu, 20 Feb 2026 12:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].title).toBe('At The Gates Announce Final Album The Ghost: Hear \u201cMask\u201d');
+  });
 });
 
 describe('parseFeed - Podcast', () => {

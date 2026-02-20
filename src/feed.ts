@@ -161,7 +161,7 @@ function extractTitle(title: any): string {
   else if (title?.['#text']) text = title['#text'];
   else if (title?.['__cdata']) text = title['__cdata'];
   else text = String(title || 'Untitled');
-  return decodeEntities(text.replace(/<[^>]+>/g, ''));
+  return decodeEntities(text).replace(/<[^>]+>/g, '').trim();
 }
 
 function parseRssDate(dateStr: string): string {

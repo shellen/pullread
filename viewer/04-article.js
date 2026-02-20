@@ -289,9 +289,6 @@ function renderArticle(text, filename) {
   if (meta && meta.url) {
     html += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg> Share</button></div>';
   }
-  if (typeof Translator !== 'undefined') {
-    html += '<button onclick="translateArticle(this)" id="translate-btn" aria-label="Translate article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-globe"/></svg> Translate</button>';
-  }
   html += '<button onclick="markCurrentAsUnread()" aria-label="Mark as unread"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-eye-slash"/></svg> Mark Unread</button>';
   html += '</div>';
   // Show notebook back-references

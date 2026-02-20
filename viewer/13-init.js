@@ -114,6 +114,7 @@ async function refreshArticleList(silent) {
       const prevCount = allFiles.length;
       const prevFilenames = new Set(allFiles.map(f => f.filename));
       allFiles = await res.json();
+      allFiles.forEach(function(f) { if (f.title) f.title = stripTags(f.title); });
       filteredFiles = allFiles;
       await Promise.all([loadAnnotationsIndex(), loadNotebooks()]);
       filterFiles();
@@ -252,6 +253,7 @@ async function init() {
     const res = await fetch('/api/files');
     if (res.ok) {
       allFiles = await res.json();
+      allFiles.forEach(function(f) { if (f.title) f.title = stripTags(f.title); });
       serverMode = true;
       filteredFiles = allFiles;
 

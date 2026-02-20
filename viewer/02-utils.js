@@ -11,7 +11,12 @@ function parseFrontmatter(text) {
       meta[key] = val;
     }
   });
+  if (meta.title) meta.title = stripTags(meta.title);
   return { meta, body: match[2] };
+}
+
+function stripTags(s) {
+  return s ? s.replace(/<[^>]+>/g, '').trim() : s;
 }
 
 function escapeHtml(s) {
