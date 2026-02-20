@@ -490,7 +490,11 @@ document.addEventListener('mouseup', e => {
   }
 
   const sel = window.getSelection();
-  if (!sel || sel.isCollapsed || !sel.toString().trim()) return;
+  const selText = sel ? sel.toString().trim() : '';
+  if (!sel || sel.isCollapsed || selText.length < 3) {
+    removeHlToolbar();
+    return;
+  }
 
   // Don't show highlight toolbar on Guide or Explore pages
   if (!activeFile) return;
