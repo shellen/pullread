@@ -60,10 +60,10 @@ function listFiles(outputPath: string): FileMeta[] {
     try {
       const stat = statSync(fullPath);
       if (!stat.isFile()) continue;
-      // Read first 8KB for frontmatter + start of body (for image extraction)
-      const buf = Buffer.alloc(8192);
+      // Read first 32KB for frontmatter + start of body (for image extraction)
+      const buf = Buffer.alloc(32768);
       const fd = require('fs').openSync(fullPath, 'r');
-      const bytesRead = require('fs').readSync(fd, buf, 0, 8192, 0);
+      const bytesRead = require('fs').readSync(fd, buf, 0, 32768, 0);
       require('fs').closeSync(fd);
       const head = buf.slice(0, bytesRead).toString('utf-8');
       const meta = parseFrontmatter(head);
@@ -609,6 +609,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
           feeds: config.feeds || {},
           syncInterval: config.syncInterval || '1h',
           useBrowserCookies: !!config.useBrowserCookies,
+          maxAgeDays: config.maxAgeDays || 0,
           configured: !!(config.outputPath && config.feeds && Object.keys(config.feeds as object).length > 0)
         });
         return;
@@ -622,6 +623,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
           if (body.feeds !== undefined) existing.feeds = body.feeds;
           if (body.syncInterval !== undefined) existing.syncInterval = body.syncInterval;
           if (body.useBrowserCookies !== undefined) existing.useBrowserCookies = body.useBrowserCookies;
+          if (body.maxAgeDays !== undefined) existing.maxAgeDays = body.maxAgeDays;
           saveJsonFile(FEEDS_PATH, existing);
 
           // Create output directory if it doesn't exist

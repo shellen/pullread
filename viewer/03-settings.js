@@ -317,6 +317,15 @@ function showSettingsPage(scrollToSection) {
       h += '<input type="checkbox" id="sp-cookies"' + (cfg.useBrowserCookies ? ' checked' : '') + '>';
       h += '</div>';
 
+      // Max age for feed entries
+      h += '<div class="settings-row"><div><label>Max article age</label><div class="settings-desc">Skip feed entries older than this (0 = no limit)</div></div>';
+      h += '<select id="sp-max-age">';
+      var ages = [[0,'No limit'],[30,'30 days'],[90,'3 months'],[180,'6 months'],[365,'1 year']];
+      for (var ai = 0; ai < ages.length; ai++) {
+        h += '<option value="' + ages[ai][0] + '"' + (cfg.maxAgeDays === ages[ai][0] ? ' selected' : '') + '>' + ages[ai][1] + '</option>';
+      }
+      h += '</select></div>';
+
       // Feed list
       h += '<div style="margin-top:16px"><label style="font-size:13px;font-weight:500;margin-bottom:8px;display:block">Feeds (' + feedNames.length + ')</label>';
       if (feedNames.length > 0) {
@@ -723,6 +732,7 @@ function settingsPageSaveConfig() {
   var outputPath = document.getElementById('sp-output-path').value.trim();
   var syncInterval = document.getElementById('sp-sync-interval').value;
   var cookies = document.getElementById('sp-cookies').checked;
+  var maxAge = parseInt(document.getElementById('sp-max-age').value, 10) || 0;
   var sec = document.getElementById('settings-feeds');
   var cfg = sec ? sec._configData : {};
   var feeds = cfg.feeds || {};
@@ -730,7 +740,7 @@ function settingsPageSaveConfig() {
   fetch('/api/config', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ outputPath: outputPath, feeds: feeds, syncInterval: syncInterval, useBrowserCookies: cookies })
+    body: JSON.stringify({ outputPath: outputPath, feeds: feeds, syncInterval: syncInterval, useBrowserCookies: cookies, maxAgeDays: maxAge })
   }).then(function(r) {
     if (r.ok) showSettingsPage();
     else alert('Failed to save feed settings.');

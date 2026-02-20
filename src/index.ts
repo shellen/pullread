@@ -67,6 +67,7 @@ interface Config {
   outputPath: string;
   feeds: { [name: string]: string };
   useBrowserCookies?: boolean;
+  maxAgeDays?: number;
 }
 
 function loadConfig(): Config {
@@ -92,7 +93,8 @@ function loadConfig(): Config {
     return {
       outputPath: config.outputPath.replace(/^~/, process.env.HOME || ''),
       feeds: config.feeds,
-      useBrowserCookies: config.useBrowserCookies || false
+      useBrowserCookies: config.useBrowserCookies || false,
+      maxAgeDays: config.maxAgeDays,
     };
   } catch (err) {
     console.error('Error: Could not parse feeds.json:', err instanceof Error ? err.message : err);
@@ -107,7 +109,8 @@ async function syncFeed(
   outputPath: string,
   retryFailed: boolean,
   fetchOptions: FetchOptions = {},
-  progress?: SyncProgress
+  progress?: SyncProgress,
+  maxAgeDays?: number
 ): Promise<{ success: number; failed: number }> {
   console.log(`\nSyncing ${feedName}...`);
 
@@ -118,6 +121,18 @@ async function syncFeed(
   } catch (err) {
     console.error(`  Error fetching feed: ${err instanceof Error ? err.message : err}`);
     return { success: 0, failed: 0 };
+  }
+
+  // Filter out entries older than maxAgeDays
+  if (maxAgeDays) {
+    const cutoff = Date.now() - maxAgeDays * 86400000;
+    const before = entries.length;
+    entries = entries.filter(e => {
+      const ts = new Date(e.updatedAt).getTime();
+      return !isNaN(ts) && ts >= cutoff;
+    });
+    const skipped = before - entries.length;
+    if (skipped > 0) console.log(`  Skipped ${skipped} entries older than ${maxAgeDays} days`);
   }
 
   let urlsToProcess: string[] = [];
@@ -277,7 +292,7 @@ async function sync(feedFilter?: string, retryFailed = false): Promise<void> {
       progress.feed = name;
       progress.feedIndex = i + 1;
       writeSyncProgress(progress);
-      const { success, failed } = await syncFeed(name, url, storage, config.outputPath, retryFailed, fetchOptions, progress);
+      const { success, failed } = await syncFeed(name, url, storage, config.outputPath, retryFailed, fetchOptions, progress, config.maxAgeDays);
       totalSuccess += success;
       totalFailed += failed;
     }
