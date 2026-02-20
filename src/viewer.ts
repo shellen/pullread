@@ -60,10 +60,10 @@ function listFiles(outputPath: string): FileMeta[] {
     try {
       const stat = statSync(fullPath);
       if (!stat.isFile()) continue;
-      // Read first 3KB for frontmatter + start of body (for image extraction)
-      const buf = Buffer.alloc(3072);
+      // Read first 8KB for frontmatter + start of body (for image extraction)
+      const buf = Buffer.alloc(8192);
       const fd = require('fs').openSync(fullPath, 'r');
-      const bytesRead = require('fs').readSync(fd, buf, 0, 3072, 0);
+      const bytesRead = require('fs').readSync(fd, buf, 0, 8192, 0);
       require('fs').closeSync(fd);
       const head = buf.slice(0, bytesRead).toString('utf-8');
       const meta = parseFrontmatter(head);

@@ -8,11 +8,15 @@ async function loadSyncStatus() {
     const res = await fetch('/api/sync-status');
     if (!res.ok) return;
     const data = await res.json();
-    const countEl = document.getElementById('file-count-text');
-    if (countEl && data.intervalMinutes) {
-      const nextSync = data.intervalMinutes + ' min';
-      countEl.title = 'Sync every ' + nextSync;
+    var btn = document.getElementById('refresh-btn');
+    var parts = [];
+    if (data.intervalMinutes) parts.push('Sync every ' + data.intervalMinutes + ' min');
+    if (data.lastActivity) {
+      var ago = Math.round((Date.now() - new Date(data.lastActivity).getTime()) / 60000);
+      parts.push('Last activity: ' + (ago < 1 ? 'just now' : ago + ' min ago'));
     }
+    if (data.articleCount) parts.push(data.articleCount + ' articles');
+    if (btn && parts.length) btn.title = parts.join('\n');
   } catch {}
 }
 
@@ -140,6 +144,7 @@ async function refreshArticleList(silent) {
 // Auto-refresh: poll lightweight /api/files-changed every 5s, full refresh only when files change
 let _autoRefreshTimer = null;
 let _lastKnownChangeAt = 0;
+let _syncSpinTimeout = null;
 function startAutoRefresh() {
   if (_autoRefreshTimer) return;
   _autoRefreshTimer = setInterval(async () => {
@@ -149,6 +154,13 @@ function startAutoRefresh() {
       const data = await res.json();
       if (data.changedAt > _lastKnownChangeAt) {
         _lastKnownChangeAt = data.changedAt;
+        var btn = document.getElementById('refresh-btn');
+        if (btn) btn.classList.add('spinning');
+        clearTimeout(_syncSpinTimeout);
+        _syncSpinTimeout = setTimeout(function() {
+          if (btn) btn.classList.remove('spinning');
+          loadSyncStatus();
+        }, 8000);
         refreshArticleList(true);
       }
     } catch {}
