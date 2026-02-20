@@ -144,11 +144,24 @@ function parseRdfFeed(rdf: any): FeedEntry[] {
   });
 }
 
+function decodeEntities(text: string): string {
+  return text
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)))
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
+}
+
 function extractTitle(title: any): string {
-  if (typeof title === 'string') return title;
-  if (title?.['#text']) return title['#text'];
-  if (title?.['__cdata']) return title['__cdata'];
-  return String(title || 'Untitled');
+  let text: string;
+  if (typeof title === 'string') text = title;
+  else if (title?.['#text']) text = title['#text'];
+  else if (title?.['__cdata']) text = title['__cdata'];
+  else text = String(title || 'Untitled');
+  return decodeEntities(text);
 }
 
 function parseRssDate(dateStr: string): string {
@@ -160,15 +173,11 @@ function parseRssDate(dateStr: string): string {
 }
 
 function extractTextFromHtml(html: string): string {
-  return html
-    .replace(/<!\[CDATA\[(.*?)\]\]>/gs, '$1')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&#039;/g, "'")
-    .trim();
+  return decodeEntities(
+    html
+      .replace(/<!\[CDATA\[(.*?)\]\]>/gs, '$1')
+      .replace(/<[^>]+>/g, '')
+  ).trim();
 }
 
 export function parseFeed(xml: string): FeedEntry[] {

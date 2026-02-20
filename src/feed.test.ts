@@ -111,6 +111,34 @@ describe('parseFeed - RSS', () => {
 
     expect(second.annotation).toBeUndefined();
   });
+
+  test('decodes HTML entities in titles', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Entity Feed</title>
+    <item>
+      <title>Mumford &#038; Sons announce tour</title>
+      <link>https://example.com/mumford</link>
+      <pubDate>Mon, 20 Feb 2026 12:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Rock &amp; Roll Hall of Fame</title>
+      <link>https://example.com/rock</link>
+      <pubDate>Mon, 20 Feb 2026 11:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Tom&#x27;s Diner &#8211; A Classic</title>
+      <link>https://example.com/toms</link>
+      <pubDate>Mon, 20 Feb 2026 10:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].title).toBe('Mumford & Sons announce tour');
+    expect(entries[1].title).toBe('Rock & Roll Hall of Fame');
+    expect(entries[2].title).toBe("Tom's Diner \u2013 A Classic");
+  });
 });
 
 describe('parseFeed - Podcast', () => {
