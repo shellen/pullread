@@ -1,7 +1,7 @@
 // ABOUTME: CLI entry point for PullRead
 // ABOUTME: Syncs RSS and Atom feeds to markdown files
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { fetchFeed, FeedEntry } from './feed';
@@ -17,6 +17,32 @@ import { parseBookmarksHtml, bookmarksToEntries } from './bookmarks';
 const DEFAULT_CONFIG_DIR = join(homedir(), '.config', 'pullread');
 const DEFAULT_DB_PATH = join(DEFAULT_CONFIG_DIR, 'pullread.db');
 const DEFAULT_CONFIG_PATH = join(DEFAULT_CONFIG_DIR, 'feeds.json');
+
+const SYNC_PROGRESS_PATH = join(DEFAULT_CONFIG_DIR, '.sync-progress');
+
+interface SyncProgress {
+  status: 'syncing';
+  feed: string;
+  feedIndex: number;
+  totalFeeds: number;
+  saved: number;
+  failed: number;
+  startedAt: string;
+  updatedAt: string;
+}
+
+function writeSyncProgress(progress: SyncProgress): void {
+  try {
+    progress.updatedAt = new Date().toISOString();
+    writeFileSync(SYNC_PROGRESS_PATH, JSON.stringify(progress));
+  } catch {}
+}
+
+function clearSyncProgress(): void {
+  try {
+    if (existsSync(SYNC_PROGRESS_PATH)) unlinkSync(SYNC_PROGRESS_PATH);
+  } catch {}
+}
 
 // Allow overriding via command line args: --config-path and --data-path
 function getPaths(): { configPath: string; dbPath: string } {
@@ -41,6 +67,7 @@ interface Config {
   outputPath: string;
   feeds: { [name: string]: string };
   useBrowserCookies?: boolean;
+  maxAgeDays?: number;
 }
 
 function loadConfig(): Config {
@@ -66,7 +93,8 @@ function loadConfig(): Config {
     return {
       outputPath: config.outputPath.replace(/^~/, process.env.HOME || ''),
       feeds: config.feeds,
-      useBrowserCookies: config.useBrowserCookies || false
+      useBrowserCookies: config.useBrowserCookies || false,
+      maxAgeDays: config.maxAgeDays,
     };
   } catch (err) {
     console.error('Error: Could not parse feeds.json:', err instanceof Error ? err.message : err);
@@ -80,7 +108,9 @@ async function syncFeed(
   storage: Storage,
   outputPath: string,
   retryFailed: boolean,
-  fetchOptions: FetchOptions = {}
+  fetchOptions: FetchOptions = {},
+  progress?: SyncProgress,
+  maxAgeDays?: number
 ): Promise<{ success: number; failed: number }> {
   console.log(`\nSyncing ${feedName}...`);
 
@@ -91,6 +121,18 @@ async function syncFeed(
   } catch (err) {
     console.error(`  Error fetching feed: ${err instanceof Error ? err.message : err}`);
     return { success: 0, failed: 0 };
+  }
+
+  // Filter out entries older than maxAgeDays
+  if (maxAgeDays) {
+    const cutoff = Date.now() - maxAgeDays * 86400000;
+    const before = entries.length;
+    entries = entries.filter(e => {
+      const ts = new Date(e.updatedAt).getTime();
+      return !isNaN(ts) && ts >= cutoff;
+    });
+    const skipped = before - entries.length;
+    if (skipped > 0) console.log(`  Skipped ${skipped} entries older than ${maxAgeDays} days`);
   }
 
   let urlsToProcess: string[] = [];
@@ -176,6 +218,7 @@ async function syncFeed(
 
       console.log(`      Saved: ${filename}`);
       success++;
+      if (progress) { progress.saved = success; writeSyncProgress(progress); }
 
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -186,6 +229,7 @@ async function syncFeed(
       console.log(`      Failed: ${label} — ${message}`);
       storage.markFailed(entry.url, message);
       failed++;
+      if (progress) { progress.failed = failed; writeSyncProgress(progress); }
     }
   }
 
@@ -231,8 +275,24 @@ async function sync(feedFilter?: string, retryFailed = false): Promise<void> {
       console.log('Browser cookies enabled - using Chrome login sessions');
     }
 
-    for (const [name, url] of Object.entries(feedsToSync)) {
-      const { success, failed } = await syncFeed(name, url, storage, config.outputPath, retryFailed, fetchOptions);
+    const feedEntries = Object.entries(feedsToSync);
+    const progress: SyncProgress = {
+      status: 'syncing',
+      feed: '',
+      feedIndex: 0,
+      totalFeeds: feedEntries.length,
+      saved: 0,
+      failed: 0,
+      startedAt: new Date().toISOString(),
+    };
+    writeSyncProgress(progress);
+
+    for (let i = 0; i < feedEntries.length; i++) {
+      const [name, url] = feedEntries[i];
+      progress.feed = name;
+      progress.feedIndex = i + 1;
+      writeSyncProgress(progress);
+      const { success, failed } = await syncFeed(name, url, storage, config.outputPath, retryFailed, fetchOptions, progress, config.maxAgeDays);
       totalSuccess += success;
       totalFailed += failed;
     }
@@ -285,6 +345,7 @@ async function sync(feedFilter?: string, retryFailed = false): Promise<void> {
     console.log(`\nDone: ${totalSuccess} saved, ${totalFailed} failed`);
 
   } finally {
+    clearSyncProgress();
     storage.close();
   }
 }

@@ -328,26 +328,45 @@
   .sidebar-search {
     padding: 12px 12px 8px;
     position: relative;
+    overflow: hidden;
   }
   .search-clear {
     position: absolute;
     right: 18px;
     top: 50%;
     transform: translateY(-50%);
-    background: none;
+    background: color-mix(in srgb, var(--fg) 8%, transparent);
     border: none;
     color: var(--muted);
-    font-size: 16px;
+    font-size: 13px;
     cursor: pointer;
-    padding: 2px 6px;
-    line-height: 1;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    line-height: 20px;
+    text-align: center;
     display: none;
     border-radius: 50%;
   }
-  .search-clear:hover { color: var(--fg); }
+  .search-clear:hover { background: color-mix(in srgb, var(--fg) 16%, transparent); color: var(--fg); }
+  .search-pin {
+    position: absolute;
+    right: 40px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 2px;
+    display: none;
+    line-height: 1;
+    border-radius: 4px;
+  }
+  .search-pin:hover { color: var(--link); }
   .sidebar-search input {
     width: 100%;
-    padding: 7px 28px 7px 12px;
+    padding: 7px 52px 7px 12px;
     border: none;
     border-radius: 6px;
     background: var(--bg);
@@ -363,6 +382,55 @@
   .sidebar-search input::placeholder {
     color: var(--muted);
   }
+
+  .pinned-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 12px;
+  }
+  .pinned-filters:empty { display: none; }
+  .pinned-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 500;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: var(--fg);
+    background: var(--code-bg);
+    border: 1px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    max-width: 140px;
+    transition: background 0.15s, border-color 0.15s;
+    line-height: 1.4;
+  }
+  .pinned-filter:hover {
+    background: var(--sidebar-active);
+  }
+  .pinned-filter.active {
+    border-color: var(--link);
+    color: var(--link);
+    background: color-mix(in srgb, var(--link) 10%, var(--bg));
+  }
+  .pinned-filter-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .pinned-filter-unpin {
+    font-size: 13px;
+    line-height: 1;
+    color: var(--muted);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+  }
+  .pinned-filter:hover .pinned-filter-unpin { opacity: 1; }
+  .pinned-filter-unpin:hover { color: var(--fg); }
 
   .quick-add-row {
     display: flex;
@@ -464,6 +532,19 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+  }
+  .sync-status {
+    padding: 0 12px 4px;
+    font-size: 11px;
+    color: var(--muted);
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: opacity 0.3s, max-height 0.3s;
+  }
+  .sync-status.visible {
+    opacity: 1;
+    max-height: 24px;
   }
   .new-notebook-btn {
     display: block;
@@ -783,6 +864,30 @@
   .dash-empty-hint .subhint {
     font-size: 13px;
   }
+  .dash-footer {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    padding: 24px 0 8px;
+  }
+  .dash-footer button {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 14px;
+    font-size: 12px;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: color 0.12s, border-color 0.12s;
+  }
+  .dash-footer button:hover {
+    color: var(--fg);
+    border-color: color-mix(in srgb, var(--fg) 20%, transparent);
+  }
 
   /* Typography classes */
   .font-sans .content-wrap { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, sans-serif; }
@@ -799,9 +904,11 @@
     line-height: 1.7;
     font-size: 17px;
   }
+  .size-xsmall .content-wrap { font-size: 13px; }
   .size-small .content-wrap { font-size: 15px; }
   .size-medium .content-wrap { font-size: 17px; }
   .size-large .content-wrap { font-size: 20px; }
+  .size-xlarge .content-wrap { font-size: 24px; }
 
   /* Article content */
   .content-wrap h1 { font-size: 1.8em; margin: 0.5em 0 0.3em; line-height: 1.2; }
@@ -884,7 +991,7 @@
   .article-byline .sep { margin: 0 6px; opacity: 0.4; }
   .article-actions {
     display: flex;
-    gap: 4px;
+    gap: 6px;
     margin-top: 10px;
     align-items: center;
     flex-wrap: wrap;
@@ -906,8 +1013,24 @@
     line-height: 1.4;
   }
   .article-actions button:hover { background: var(--sidebar-active); color: var(--fg); }
-  .article-actions button.active-fav { background: color-mix(in srgb, #e91e63 12%, var(--bg)); color: #e91e63; }
+  .article-actions button.active-fav { background: color-mix(in srgb, #d97706 12%, var(--bg)); color: #d97706; }
   .article-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .play-next-menu { display: inline-flex; align-items: center; gap: 0; position: relative; }
+  .play-next-trigger {
+    padding: 4px 6px !important;
+    border-radius: 0 6px 6px 0 !important;
+    border-left: 1px solid color-mix(in srgb, var(--fg) 12%, transparent) !important;
+    align-self: stretch;
+    margin-left: -1px;
+    opacity: 0.7;
+    line-height: 1.4;
+  }
+  .play-next-trigger svg { width: 10px; height: 10px; }
+  .play-next-trigger:hover { opacity: 1; }
+  .play-next-menu #listen-btn { border-radius: 6px; }
+  .play-next-menu:has(.play-next-trigger:not([style*="display: none"])) #listen-btn {
+    border-radius: 6px 0 0 6px;
+  }
   .article-actions button.listen-loading {
     position: relative;
     overflow: hidden;
@@ -1006,7 +1129,8 @@
     .content-wrap {
       padding: 24px 20px 80px;
     }
-    .sidebar.collapsed ~ .content-pane .content-wrap {
+    .sidebar.collapsed ~ .content-pane .content-wrap,
+    .sidebar.collapsed ~ .content-pane .dashboard {
       padding-top: 52px;
     }
     .article-header h1 {
@@ -1046,7 +1170,8 @@
     .content-wrap {
       padding: 16px 14px 72px;
     }
-    .sidebar.collapsed ~ .content-pane .content-wrap {
+    .sidebar.collapsed ~ .content-pane .content-wrap,
+    .sidebar.collapsed ~ .content-pane .dashboard {
       padding-top: 56px;
     }
     .article-header h1 {
@@ -1083,6 +1208,11 @@
       min-height: 60px;
       font-size: 16px;
     }
+    .bottom-bar-inner { padding: 4px 8px; gap: 4px; flex-wrap: wrap; }
+    .bottom-bar-now { flex: 1 1 100%; order: 1; }
+    .bottom-bar-controls { order: 2; }
+    .bottom-bar-progress-row { order: 3; flex: 1; }
+    .bottom-bar-right { order: 4; }
   }
 
   /* Focus indicators (a11y) */
@@ -1091,7 +1221,7 @@
     outline-offset: 2px;
   }
   .sidebar-header-actions button:focus-visible,
-  .sidebar-footer-btn:focus-visible {
+  .sidebar-settings-btn:focus-visible {
     outline: 2px solid var(--link);
     outline-offset: 1px;
     border-radius: 4px;
@@ -1127,27 +1257,30 @@
     word-spacing: 0.1em;
   }
 
-  /* Sidebar footer buttons */
+  /* Sidebar footer */
   .sidebar-footer {
-    display: flex;
-    gap: 2px;
     padding: 6px 8px;
   }
-  .sidebar-footer-btn {
-    flex: 1;
-    padding: 5px 0;
-    font-size: 11px;
+  .sidebar-settings-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 7px 0;
+    font-size: 12px;
     color: var(--muted);
     background: transparent;
-    border: none;
+    border: 1px solid var(--border);
     border-radius: 6px;
     cursor: pointer;
     font-family: inherit;
-    transition: color 0.12s, background 0.12s;
+    transition: color 0.12s, background 0.12s, border-color 0.12s;
   }
-  .sidebar-footer-btn:hover {
+  .sidebar-settings-btn:hover {
     color: var(--fg);
     background: color-mix(in srgb, var(--fg) 6%, transparent);
+    border-color: color-mix(in srgb, var(--fg) 15%, transparent);
   }
 
   /* Audio player panel */
@@ -1158,58 +1291,109 @@
     margin-left: -14px;
   }
 
-  .audio-player-panel {
-    background: color-mix(in srgb, var(--fg) 3%, transparent);
-    margin: 4px 8px;
-    border-radius: 8px;
-    padding: 10px 12px;
+  /* ---- Bottom bar audio player ---- */
+  .bottom-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    background: var(--sidebar-bg);
+    border-top: 1px solid var(--border);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-size: 12px;
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
+    transition: transform 0.25s ease;
   }
-  .audio-player-panel.hidden { display: none; }
-  .audio-now-playing {
+  .bottom-bar.hidden { transform: translateY(100%); pointer-events: none; }
+  .bottom-bar-inner {
     display: flex;
     align-items: center;
-    gap: 6px;
-    margin-bottom: 6px;
+    gap: 14px;
+    padding: 14px 20px;
+    max-width: 100%;
   }
-  .audio-now-label {
+  .bottom-bar-now {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex: 0 1 220px;
+    cursor: pointer;
+  }
+  .bottom-bar-now:hover .bottom-bar-title { text-decoration: underline; }
+  .bottom-bar-artwork {
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+    overflow: hidden;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--sidebar-hover);
+  }
+  .bottom-bar-artwork img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .bottom-bar-icon { width: 18px; height: 18px; fill: var(--muted); flex-shrink: 0; }
+  .bottom-bar-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .bottom-bar-title {
     font-weight: 600;
+    font-size: 13px;
+    color: var(--fg);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    flex: 1;
-    color: var(--fg);
+  }
+  .bottom-bar-status {
     font-size: 11px;
-  }
-  .audio-now-label:hover {
-    text-decoration: underline;
-  }
-  .audio-now-status {
-    font-size: 10px;
     color: var(--muted);
-    flex-shrink: 0;
+    white-space: nowrap;
   }
-  .audio-controls {
+  .bottom-bar-controls {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 4px;
+    flex-shrink: 0;
   }
-  .audio-controls button {
+  .bottom-bar-controls button {
     border: none;
     background: none;
     color: var(--fg);
     cursor: pointer;
-    padding: 4px;
-    border-radius: 4px;
+    padding: 8px;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
   }
-  .audio-controls button:hover { background: var(--sidebar-hover); }
-  .audio-controls button:disabled { opacity: 0.3; cursor: default; }
-  .audio-controls button:disabled:hover { background: none; }
-  .audio-controls svg { width: 14px; height: 14px; fill: currentColor; }
+  .bottom-bar-controls button:hover { background: var(--sidebar-hover); }
+  .bottom-bar-controls svg { width: 18px; height: 18px; fill: currentColor; }
+  .skip-btn { position: relative; }
+  .skip-label {
+    position: absolute;
+    bottom: -2px;
+    right: 2px;
+    font-size: 8px;
+    font-weight: 700;
+    color: var(--muted);
+    pointer-events: none;
+  }
+  .bottom-bar-play svg { width: 26px; height: 26px; }
+  .bottom-bar-progress-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 80px;
+  }
   .audio-progress-wrap {
     flex: 1;
     height: 20px;
@@ -1222,35 +1406,64 @@
   }
   .audio-progress {
     width: 100%;
-    height: 4px;
+    height: 5px;
     background: var(--border);
-    border-radius: 2px;
+    border-radius: 3px;
     overflow: hidden;
   }
   .audio-progress-fill {
     height: 100%;
     background: var(--link);
-    border-radius: 2px;
+    border-radius: 3px;
     width: 0%;
     transition: width 0.2s linear;
   }
   .audio-time {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--muted);
-    min-width: 32px;
+    min-width: 36px;
     text-align: center;
     flex-shrink: 0;
   }
+  .bottom-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .bottom-bar-right button {
+    border: none;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .bottom-bar-right button:hover { background: var(--sidebar-hover); color: var(--fg); }
+  .bottom-bar-right svg { width: 18px; height: 18px; fill: currentColor; }
   .audio-speed-btn {
-    font-size: 10px !important;
+    font-size: 12px !important;
     font-weight: 600;
-    padding: 2px 6px !important;
+    padding: 4px 8px !important;
     border: 1px solid var(--border) !important;
-    border-radius: 4px;
-    min-width: 36px;
+    border-radius: 4px !important;
+    min-width: 40px;
     text-align: center;
     position: relative;
   }
+  .bottom-bar-queue-btn.active { color: var(--link); }
+  .bottom-bar-queue {
+    border-top: 1px solid var(--border);
+    padding: 8px 20px 10px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  /* Add bottom padding to content pane when bottom bar is visible */
+  .app.has-bottom-bar .content-pane { padding-bottom: 80px; }
+  .app.has-bottom-bar .sidebar { padding-bottom: 80px; }
   .tts-speed-popup {
     position: fixed;
     background: var(--bg);
@@ -1396,18 +1609,33 @@
     animation: spin 0.8s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .audio-settings-link {
-    display: block;
-    text-align: center;
-    font-size: 10px;
-    color: var(--muted);
-    cursor: pointer;
-    margin-top: 6px;
-    background: none;
-    border: none;
-    width: 100%;
+  /* Play Next dropdown menu positioning */
+  .play-next-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    z-index: 20;
+    padding: 4px 0;
+    min-width: 140px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
-  .audio-settings-link:hover { color: var(--link); }
+  .play-next-dropdown button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 6px 12px;
+    border: none;
+    background: none;
+    color: var(--fg);
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .play-next-dropdown button:hover { background: var(--sidebar-hover); }
 
   /* Aa reader settings button — always visible in content area */
   .aa-settings-btn {
@@ -1432,36 +1660,44 @@
     border-color: var(--muted);
   }
 
-  /* Floating mini player — visible when sidebar is collapsed and TTS is active */
-  .mini-player {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    z-index: 15;
-    background: var(--sidebar-bg);
-    border: 1px solid var(--border);
-    border-radius: 24px;
-    padding: 6px 10px;
-    display: flex;
+  /* Sidebar audio indicator on file items */
+  .file-item-audio {
+    display: inline-flex;
     align-items: center;
-    gap: 2px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    gap: 3px;
+    margin-left: 4px;
+    flex-shrink: 0;
   }
-  .mini-player button {
-    border: none;
-    background: none;
-    color: var(--fg);
-    cursor: pointer;
-    padding: 6px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  .file-item-audio svg { width: 10px; height: 10px; fill: var(--link); }
+  .file-item-audio .eq-bars {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 1px;
+    height: 10px;
   }
-  .mini-player button:hover { background: var(--sidebar-hover); }
-  .mini-player svg { width: 16px; height: 16px; fill: currentColor; }
-  .sidebar:not(.collapsed) ~ .mini-player { display: none !important; }
+  .file-item-audio .eq-bars span {
+    display: block;
+    width: 2px;
+    background: var(--link);
+    border-radius: 1px;
+    animation: eq-bounce 0.8s ease-in-out infinite alternate;
+  }
+  .file-item-audio .eq-bars span:nth-child(1) { height: 4px; animation-delay: 0s; }
+  .file-item-audio .eq-bars span:nth-child(2) { height: 7px; animation-delay: 0.2s; }
+  .file-item-audio .eq-bars span:nth-child(3) { height: 5px; animation-delay: 0.4s; }
+  @keyframes eq-bounce {
+    0% { height: 3px; }
+    100% { height: 10px; }
+  }
+  .file-item-audio .queue-pos {
+    font-size: 9px;
+    color: var(--link);
+    font-weight: 600;
+    background: color-mix(in srgb, var(--link) 12%, transparent);
+    border-radius: 3px;
+    padding: 0 3px;
+    line-height: 14px;
+  }
 
   /* Generic modal overlay */
   .modal-overlay {
@@ -1587,6 +1823,32 @@
   .drop-highlight .content-pane {
     outline: 3px dashed var(--link);
     outline-offset: -3px;
+  }
+
+  /* Toast notifications */
+  .toast {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    background: var(--sidebar-bg);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 10000;
+    max-width: 400px;
+    text-align: center;
+  }
+  .toast.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    pointer-events: auto;
   }
 
   /* Onboarding overlay */
@@ -2053,7 +2315,7 @@
   .dot-highlight { background: #ffeb3b; }
   .dot-note { background: var(--link); }
   .dot-summary { background: var(--muted); opacity: 0.6; }
-  .dot-favorite { color: #e91e63; font-size: 8px; line-height: 6px; }
+  .dot-favorite { color: #d97706; font-size: 8px; line-height: 6px; }
 
   /* Highlight note marker (small icon after highlighted text) */
   .hl-note-marker {
@@ -2244,6 +2506,11 @@
   .podcast-player { margin: 1em 0; padding: 12px; background: var(--code-bg); border-radius: 8px; display: flex; align-items: center; gap: 10px; }
   .podcast-player audio { flex: 1; min-width: 0; height: 36px; }
   .podcast-duration { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .podcast-description { margin: 0.5em 0 1em; font-size: 13px; color: var(--muted); }
+  .podcast-description summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+  .podcast-description summary:hover { color: var(--fg); }
+  .podcast-description > div { margin-top: 8px; line-height: 1.5; color: var(--fg); }
+  .podcast-description > div p { margin: 0.5em 0; }
 
   /* Review article link list — link-blog style */
   .review-content ul {
@@ -2272,6 +2539,39 @@
     color: var(--muted);
     font-style: normal;
   }
+
+  /* Open Questions — hover to start a note */
+  .review-content li { position: relative; }
+  .oq-note-btn {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0;
+    transition: opacity 0.15s;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 11px;
+    color: var(--muted);
+    cursor: pointer;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+  .oq-note-btn:hover { color: var(--link); border-color: var(--link); }
+  .review-content li:hover .oq-note-btn { opacity: 1; }
+
+  /* Review links — external link affordance */
+  .review-ext-link {
+    opacity: 0;
+    transition: opacity 0.15s;
+    margin-left: 6px;
+    color: var(--muted);
+    vertical-align: middle;
+  }
+  .review-ext-link:hover { color: var(--link); }
+  .review-content li:hover .review-ext-link { opacity: 1; }
 
   /* Notebook */
   .notebook-header {
@@ -2594,6 +2894,8 @@
   .writing-focus-overlay .wf-toolbar button:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 6%, transparent); }
   .writing-focus-overlay .wf-title {
     font-size: 13px; color: var(--muted); font-weight: 500;
+    flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    padding: 0 16px;
   }
   .writing-focus-overlay .wf-body {
     flex: 1;
@@ -2689,26 +2991,6 @@
   .read-stats .stat-divider {
     opacity: 0.4;
   }
-
-  /* Audio player bottom row (settings + mini mode) */
-  .audio-bottom-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 6px;
-  }
-  .audio-mini-mode-btn {
-    font-size: 10px;
-    font-weight: 600;
-    padding: 2px 8px;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: none;
-    color: var(--muted);
-    cursor: pointer;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  }
-  .audio-mini-mode-btn:hover { color: var(--fg); border-color: var(--muted); }
 
   /* Mini mode — full-screen audio player overlay */
   .mini-mode-container {
@@ -2859,7 +3141,7 @@
   body.mini-mode .content-pane,
   body.mini-mode .sidebar-toggle-float,
   body.mini-mode .aa-settings-btn,
-  body.mini-mode .mini-player { display: none !important; }
+  body.mini-mode .bottom-bar { display: none !important; }
   body.mini-mode { background: var(--bg); }
 
   /* Focus mode: dim all paragraphs except the one closest to center */
@@ -3341,7 +3623,8 @@
     .toolbar, .sidebar, .sidebar-toggle-float, .skip-link, .margin-notes, .toc-container,
     .reading-progress, .hl-toolbar, .annotation-popover, .resume-indicator,
     .article-actions, .notes-panel .tags-row, .notes-panel textarea, .notes-save-hint,
-    .onboarding-overlay, .modal-overlay, .settings-dropdown-panel { display: none !important; }
+    .onboarding-overlay, .modal-overlay, .settings-dropdown-panel,
+    .bottom-bar, .mini-mode-container { display: none !important; }
 
     body, .app, .main, .content-pane {
       height: auto !important;

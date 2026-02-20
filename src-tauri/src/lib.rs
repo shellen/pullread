@@ -58,6 +58,13 @@ pub fn run() {
                 }
             });
 
+            // Check for updates in the background after startup settles
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                tray::check_updates_silently(&handle).await;
+            });
+
             // Handle URL scheme (pullread://)
             let handle = app.handle().clone();
             app.deep_link().on_open_url(move |event| {

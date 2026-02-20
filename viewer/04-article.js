@@ -70,7 +70,7 @@ function renderDashboard() {
   if (favorites.length > 0) {
     html += '<div class="dash-section">';
     html += '<div class="dash-section-header">';
-    html += '<span class="dash-section-title"><svg viewBox="0 0 512 512"><use href="#i-heart"/></svg> Favorites <span class="dash-section-count">(' + favorites.length + ')</span></span>';
+    html += '<span class="dash-section-title"><svg viewBox="0 0 576 512"><use href="#i-heart"/></svg> Favorites <span class="dash-section-count">(' + favorites.length + ')</span></span>';
     html += '</div>';
     html += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards">';
     for (const f of favorites.slice(0, 10)) {
@@ -95,6 +95,12 @@ function renderDashboard() {
     }
     html += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
   }
+
+  // Footer links
+  html += '<div class="dash-footer">';
+  html += '<button onclick="showTagCloud()"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px"><use href="#i-search"/></svg> Explore</button>';
+  html += '<button onclick="showGuideModal()"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px"><use href="#i-book"/></svg> Guide</button>';
+  html += '</div>';
 
   dash.innerHTML = html;
   // Initialize chevron visibility after DOM is populated
@@ -143,10 +149,13 @@ function dashCardHtml(f, progressPct) {
 }
 
 function goHome() {
-  _sidebarView = 'library'; syncSidebarTabs();
+  _sidebarView = 'home'; syncSidebarTabs();
   activeFile = null;
   document.title = 'PullRead';
+  renderFileList();
   renderDashboard();
+  var toc = document.getElementById('toc-container');
+  if (toc) toc.innerHTML = '';
 }
 
 function dashScrollLeft(btn) {
@@ -194,7 +203,8 @@ function dashLoadArticle(filename) {
 }
 
 function renderArticle(text, filename) {
-  const { meta, body } = parseFrontmatter(text);
+  const { meta, body: rawBodyText } = parseFrontmatter(text);
+  let body = rawBodyText;
   const content = document.getElementById('content');
   const empty = document.getElementById('empty-state');
 
@@ -238,17 +248,20 @@ function renderArticle(text, filename) {
   html += '<div class="article-actions">';
   const isFav = articleNotes.isFavorite;
   html += '<button onclick="toggleFavoriteFromHeader(this)" class="' + (isFav ? 'active-fav' : '') + '" aria-label="' + (isFav ? 'Remove from favorites' : 'Add to favorites') + '" aria-pressed="' + isFav + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg> Favorite</button>';
-  html += '<button onclick="toggleNotesFromHeader()" aria-label="Toggle annotations panel"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-pen"/></svg> Annotations</button>';
+  html += '<button onclick="toggleNotesFromHeader()" aria-label="Toggle notes panel"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-pen"/></svg> Notes</button>';
   if (!isReviewArticle) {
     html += '<button onclick="summarizeArticle()" id="summarize-btn" aria-label="Summarize article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Summarize</button>';
   }
   var isPodcast = meta && meta.enclosure_url && meta.enclosure_type && meta.enclosure_type.startsWith('audio/');
   var listenLabel = isPodcast ? 'Play' : 'Listen';
+  html += '<div class="play-next-menu" id="play-next-menu">';
   html += '<button id="listen-btn" onclick="addCurrentToTTSQueue()" aria-label="' + listenLabel + ' article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> ' + listenLabel + '</button>';
+  html += '<button class="play-next-trigger" id="play-next-trigger" onclick="togglePlayNextMenu(event)" aria-label="Queue options" style="display:none"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>';
+  html += '</div>';
   if (meta && meta.url) {
     html += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg> Share</button></div>';
   }
-  html += '<button onclick="markCurrentAsUnread()" aria-label="Mark as unread"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-eye-slash"/></svg> Unread</button>';
+  html += '<button onclick="markCurrentAsUnread()" aria-label="Mark as unread"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-eye-slash"/></svg> Mark Unread</button>';
   html += '</div>';
   // Show notebook back-references
   var nbRefs = Object.values(_notebooks || {}).filter(function(nb) { return nb.sources && nb.sources.indexOf(filename) >= 0; });
@@ -287,15 +300,26 @@ function renderArticle(text, filename) {
     }
   }
 
-  // Podcast: inline audio player for articles with audio enclosures
+  // Podcast: show podcast info banner (audio plays through unified bottom bar)
   if (isPodcast) {
     html += '<div class="podcast-player">';
-    html += '<audio controls preload="metadata" src="' + escapeHtml(meta.enclosure_url) + '"></audio>';
+    html += '<svg style="width:16px;height:16px;fill:var(--muted);flex-shrink:0"><use href="#i-mic"/></svg>';
+    html += '<span style="font-size:13px;color:var(--fg)">Podcast episode</span>';
     if (meta.enclosure_duration) {
       html += '<span class="podcast-duration">' + escapeHtml(meta.enclosure_duration) + '</span>';
     }
+    html += '<button onclick="addCurrentToTTSQueue()" style="margin-left:auto;padding:4px 12px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--link);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">Play in player</button>';
     html += '</div>';
+    // Show podcast description in a collapsible section instead of as article body
+    if (body && body.trim()) {
+      html += '<details class="podcast-description" open><summary>Episode description</summary>';
+      html += '<div>' + sanitizeHtml(marked.parse(cleanMarkdown(body))) + '</div>';
+      html += '</details>';
+    }
   }
+
+  // Podcast body is already rendered in the collapsible description above
+  if (isPodcast) body = '';
 
   // Strip YouTube thumbnail link BEFORE cleanMarkdown (which mangles the link-wrapped image)
   var rawBody = body;
@@ -370,6 +394,8 @@ function renderArticle(text, filename) {
   // Apply review-content class for link-blog styling on review articles
   if (isReviewArticle) {
     content.classList.add('review-content');
+    enhanceOpenQuestions(content, filename);
+    localizeReviewLinks(content);
   } else {
     content.classList.remove('review-content');
   }
@@ -478,6 +504,76 @@ function renderArticle(text, filename) {
   updateListenButtonState();
 }
 
+
+// Add "start a note" buttons to Open Questions in review articles
+function enhanceOpenQuestions(container, filename) {
+  var headings = container.querySelectorAll('h2');
+  var oqHeading = null;
+  for (var i = 0; i < headings.length; i++) {
+    if (/open questions/i.test(headings[i].textContent)) {
+      oqHeading = headings[i];
+      break;
+    }
+  }
+  if (!oqHeading) return;
+
+  var list = oqHeading.nextElementSibling;
+  if (!list || (list.tagName !== 'UL' && list.tagName !== 'OL')) return;
+
+  var items = list.querySelectorAll('li');
+  for (var j = 0; j < items.length; j++) {
+    var li = items[j];
+    var questionText = li.textContent.trim();
+    var btn = document.createElement('button');
+    btn.className = 'oq-note-btn';
+    btn.textContent = 'Note';
+    btn.setAttribute('aria-label', 'Start a note from this question');
+    (function(q) {
+      btn.onclick = function(e) {
+        e.stopPropagation();
+        var content = '# ' + q + '\n\n';
+        createNote(filename, content);
+        _sidebarView = 'notebooks';
+        syncSidebarTabs();
+        renderFileList();
+      };
+    })(questionText);
+    li.appendChild(btn);
+  }
+}
+
+// Rewrite review article links to open in PullRead when the article exists locally
+function localizeReviewLinks(container) {
+  var urlMap = {};
+  for (var i = 0; i < allFiles.length; i++) {
+    if (allFiles[i].url) urlMap[allFiles[i].url] = allFiles[i].filename;
+  }
+
+  container.querySelectorAll('li > a[href]').forEach(function(a) {
+    var href = a.getAttribute('href');
+    var localFile = urlMap[href];
+    if (!localFile) return;
+
+    a.removeAttribute('target');
+    a.removeAttribute('rel');
+    a.onclick = function(e) {
+      e.preventDefault();
+      dashLoadArticle(localFile);
+    };
+
+    // Add small external link affordance on hover
+    var ext = document.createElement('a');
+    ext.href = href;
+    ext.target = '_blank';
+    ext.rel = 'noopener noreferrer';
+    ext.className = 'review-ext-link';
+    ext.title = 'Open original';
+    ext.setAttribute('aria-label', 'Open original article');
+    ext.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-external"/></svg>';
+    ext.onclick = function(e) { e.stopPropagation(); };
+    a.parentElement.appendChild(ext);
+  });
+}
 
 // ---- Reading Progress Bar ----
 function updateReadingProgress() {

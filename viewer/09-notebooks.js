@@ -89,13 +89,13 @@ function migrateContentToNotes(content, timestamp) {
   });
 }
 
-async function createNote(sourceArticle) {
+async function createNote(sourceArticle, initialContent) {
   if (!_activeNotebook) {
     _activeNotebook = await getOrCreateSingleNotebook();
   }
   if (!_activeNotebook.notes) _activeNotebook.notes = [];
   var now = new Date().toISOString();
-  var note = { id: generateNoteId(), content: '', sourceArticle: sourceArticle || '', createdAt: now, updatedAt: now };
+  var note = { id: generateNoteId(), content: initialContent || '', sourceArticle: sourceArticle || '', createdAt: now, updatedAt: now };
   _activeNotebook.notes.unshift(note);
   _activeNotebook.updatedAt = now;
   saveNotebook(_activeNotebook);

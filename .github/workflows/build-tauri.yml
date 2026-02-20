@@ -1,11 +1,35 @@
+# ABOUTME: CI/CD pipeline for building, signing, notarizing, and releasing the Tauri app
+# ABOUTME: Handles CI builds on push/PR, tagged releases, and rolling "latest" pre-releases
+
 name: Build Tauri App
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [main]
+    tags: ['v*']
+    paths:
+      - 'src/**'
+      - 'src-tauri/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'bun.lockb'
+      - 'viewer.html'
+      - '.github/workflows/build-tauri.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'src-tauri/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'bun.lockb'
+      - 'viewer.html'
+      - '.github/workflows/build-tauri.yml'
   workflow_dispatch:
     inputs:
+      version:
+        description: 'Version (e.g. 2.0.1)'
+        required: false
       debug:
         description: 'Build in debug mode'
         required: false
@@ -26,13 +50,6 @@ jobs:
           - platform: macos-13
             target: x86_64-apple-darwin
             bun_target: bun-darwin-x64
-          # Future cross-platform targets:
-          # - platform: ubuntu-22.04
-          #   target: x86_64-unknown-linux-gnu
-          #   bun_target: bun-linux-x64
-          # - platform: windows-latest
-          #   target: x86_64-pc-windows-msvc
-          #   bun_target: bun-windows-x64
 
     runs-on: ${{ matrix.platform }}
 
@@ -58,12 +75,6 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Install dependencies (Linux only)
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-
       - name: Install Node dependencies
         run: bun install
 
@@ -71,56 +82,140 @@ jobs:
         run: bun scripts/embed-viewer.ts
 
       - name: Build Bun sidecar
-        run: |
-          bun build src/index.ts --compile --target=${{ matrix.bun_target }} --outfile dist/pullread
+        run: bun build src/index.ts --compile --target=${{ matrix.bun_target }} --outfile dist/pullread
 
       - name: Prepare sidecar
         run: bash scripts/prepare-sidecar.sh ${{ matrix.target }}
 
-      - name: Sign sidecar (macOS)
+      - name: Download Kokoro TTS model
+        run: bash scripts/download-kokoro-model.sh
+
+      - name: Copy Kokoro model to Tauri resources
+        run: |
+          mkdir -p src-tauri/resources/kokoro-model
+          cp -R dist/kokoro-model/* src-tauri/resources/kokoro-model/
+
+      - name: Import Apple certificate
         if: startsWith(matrix.platform, 'macos')
         env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          if [ -n "$APPLE_CERTIFICATE" ]; then
-            # Create temporary keychain
-            KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-            security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-            security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
-            security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-
-            # Import certificate
-            echo "$APPLE_CERTIFICATE" | base64 --decode > $RUNNER_TEMP/certificate.p12
-            security import $RUNNER_TEMP/certificate.p12 -P "$APPLE_CERTIFICATE_PASSWORD" \
-              -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
-            security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-            security list-keychain -d user -s $KEYCHAIN_PATH
-
-            # Sign sidecar
-            codesign --force --options runtime \
-              --sign "$APPLE_SIGNING_IDENTITY" \
-              src-tauri/binaries/pullread-cli-${{ matrix.target }}
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "No signing certificate available — skipping"
+            exit 0
           fi
+
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+          echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> $GITHUB_ENV
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          echo "$APPLE_CERTIFICATE" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security import $RUNNER_TEMP/certificate.p12 \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+
+          rm $RUNNER_TEMP/certificate.p12
+          echo "HAS_SIGNING_CERT=true" >> $GITHUB_ENV
+
+      - name: Sign sidecar with entitlements
+        if: env.HAS_SIGNING_CERT == 'true'
+        run: |
+          codesign --force --options runtime --timestamp \
+            --sign "Developer ID Application" \
+            --entitlements src-tauri/entitlements.plist \
+            src-tauri/binaries/pullread-cli-${{ matrix.target }}
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_KEY_PASSWORD }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_SIGNING_IDENTITY: "Developer ID Application"
           APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'PullRead ${{ github.ref_name }}'
+          tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+          releaseName: ${{ startsWith(github.ref, 'refs/tags/') && format('PullRead {0}', github.ref_name) || '' }}
           releaseBody: 'See the assets to download and install this version.'
-          releaseDraft: true
+          releaseDraft: ${{ startsWith(github.ref, 'refs/tags/') }}
           prerelease: false
           args: --target ${{ matrix.target }}
+
+      - name: Upload build artifacts
+        if: "!startsWith(github.ref, 'refs/tags/')"
+        uses: actions/upload-artifact@v4
+        with:
+          name: pullread-${{ matrix.target }}
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+            src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app
+          retention-days: 30
+
+      - name: Clean up keychain
+        if: always() && env.HAS_SIGNING_CERT == 'true'
+        run: security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
+
+  # Auto-update "latest" pre-release on every push to main
+  latest-release:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download arm64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: pullread-aarch64-apple-darwin
+          path: ./artifacts/arm64
+
+      - name: Download x64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: pullread-x86_64-apple-darwin
+          path: ./artifacts/x64
+
+      - name: Update latest release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest Build
+          body: |
+            Rolling build of Pull Read from the main branch.
+
+            **arm64 (Apple Silicon):** PullRead_aarch64.dmg
+            **x64 (Intel):** PullRead_x64.dmg
+
+            _Commit: ${{ github.sha }}_
+            _Updated: ${{ github.event.head_commit.timestamp }}_
+          files: |
+            ./artifacts/arm64/**/*.dmg
+            ./artifacts/x64/**/*.dmg
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Trigger site deploy on tagged releases
+  deploy-site:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger site deployment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run deploy-site.yml --ref main --repo ${{ github.repository }}

@@ -240,9 +240,46 @@ async fn handle_check_updates(app: &AppHandle) {
     }
 }
 
+/// Check for updates silently — only notify if an update is found.
+pub async fn check_updates_silently(app: &AppHandle) {
+    use tauri_plugin_updater::UpdaterExt;
+
+    match app.updater() {
+        Ok(updater) => match updater.check().await {
+            Ok(Some(update)) => {
+                let version = update.version.clone();
+                log::info!("Update available: v{}", version);
+                notifications::notify(
+                    app,
+                    "Update Available",
+                    &format!(
+                        "PullRead v{} is available. Use Check for Updates to install.",
+                        version
+                    ),
+                );
+            }
+            Ok(None) => {
+                log::info!("No updates available");
+            }
+            Err(e) => {
+                log::warn!("Silent update check failed: {}", e);
+            }
+        },
+        Err(e) => {
+            log::warn!("Updater not configured: {}", e);
+        }
+    }
+}
+
 /// Update the "Last sync:" tray menu item and tooltip with current time.
 pub fn update_last_sync(app: &AppHandle) {
-    let now = chrono::Local::now().format("%H:%M").to_string();
+    let state = app.state::<sidecar::SidecarState>();
+    let fmt = state.get_time_format();
+    let now = if fmt == "24h" {
+        chrono::Local::now().format("%H:%M").to_string()
+    } else {
+        chrono::Local::now().format("%-I:%M %p").to_string()
+    };
     log::info!("Last sync updated: {}", now);
     if let Some(tray) = app.tray_by_id("main") {
         let _ = tray.set_tooltip(Some(&format!("PullRead — Last sync: {}", now)));

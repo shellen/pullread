@@ -142,6 +142,33 @@ impl SidecarState {
             .to_string()
     }
 
+    /// Get time format preference ("12h" or "24h")
+    pub fn get_time_format(&self) -> String {
+        let path = self.config_dir.join("settings.json");
+        let content = std::fs::read_to_string(&path).unwrap_or_default();
+        let config: Value = serde_json::from_str(&content).unwrap_or_default();
+        config
+            .get("timeFormat")
+            .and_then(|v| v.as_str())
+            .unwrap_or("12h")
+            .to_string()
+    }
+
+    /// Check if viewer should open in the default browser instead of the WebView
+    pub fn should_open_in_browser(&self) -> bool {
+        let path = self.config_dir.join("settings.json");
+        if let Ok(content) = std::fs::read_to_string(&path) {
+            if let Ok(v) = serde_json::from_str::<Value>(&content) {
+                return v
+                    .get("viewerMode")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("app")
+                    == "browser";
+            }
+        }
+        false
+    }
+
     /// Get environment for sidecar processes
     fn process_env(&self, app: &AppHandle) -> Vec<(String, String)> {
         let mut env = Vec::new();

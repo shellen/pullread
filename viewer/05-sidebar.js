@@ -49,7 +49,7 @@ function renderFileList() {
     if (annotatedFiles.length) {
       html += '<div class="sidebar-section-label">Annotated Articles</div>';
       displayedCount = Math.min(annotatedFiles.length, PAGE_SIZE);
-      html += annotatedFiles.slice(0, displayedCount).map((f, i) => renderFileItem(f, i)).join('');
+      html += annotatedFiles.slice(0, displayedCount).map(f => renderFileItem(f, displayFiles.indexOf(f))).join('');
     }
     var totalNotes = nbObj ? (nbObj.notes || []).length : 0;
     countStr = totalNotes + ' note' + (totalNotes !== 1 ? 's' : '');
@@ -146,7 +146,10 @@ function clearSearch() {
 function filterFiles() {
   const raw = document.getElementById('search').value.trim();
   var clearBtn = document.getElementById('search-clear');
-  if (clearBtn) clearBtn.style.display = raw ? '' : 'none';
+  if (clearBtn) clearBtn.style.display = raw ? 'block' : 'none';
+  var pinBtn = document.getElementById('search-pin');
+  if (pinBtn) pinBtn.style.display = raw ? 'block' : 'none';
+  updatePinnedFilterActive();
   if (!raw) {
     filteredFiles = allFiles;
     renderFileList();
@@ -220,10 +223,12 @@ function filterFiles() {
   renderFileList();
 }
 
+var _loadFileAbort = null;
+
 async function loadFile(index) {
   const file = displayFiles[index];
   if (!file) return;
-  _sidebarView = 'library'; syncSidebarTabs();
+  _sidebarView = 'home'; syncSidebarTabs();
   activeFile = file.filename;
   markAsRead(file.filename);
   renderFileList();
@@ -236,14 +241,29 @@ async function loadFile(index) {
   }
 
   if (serverMode) {
+    // Abort any in-flight article fetch so stale responses don't overwrite
+    if (_loadFileAbort) _loadFileAbort.abort();
+    var controller = new AbortController();
+    _loadFileAbort = controller;
+    var targetFile = file.filename;
+
     // Load annotations first so favorite state is available for header render
     await preloadAnnotations(file.filename);
-    const res = await fetch('/api/file?name=' + encodeURIComponent(file.filename));
-    if (res.ok) {
-      const text = await res.text();
-      renderArticle(text, file.filename);
-      applyHighlights();
-      renderNotesPanel();
+    if (activeFile !== targetFile) return;
+
+    try {
+      const res = await fetch('/api/file?name=' + encodeURIComponent(file.filename), { signal: controller.signal });
+      if (activeFile !== targetFile) return;
+      if (res.ok) {
+        const text = await res.text();
+        if (activeFile !== targetFile) return;
+        renderArticle(text, file.filename);
+        applyHighlights();
+        renderNotesPanel();
+      }
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      throw e;
     }
   }
 }
@@ -359,16 +379,14 @@ function quickAddUrl() {
 }
 
 // ---- Sidebar nav view switching ----
-let _sidebarView = 'library';
+let _sidebarView = 'home';
 
 function switchSidebarView(view) {
   _sidebarView = view;
   syncSidebarTabs();
 
-  // Trigger the appropriate view in the content area
-  if (view === 'explore') showTagCloud();
-  else if (view === 'notebooks') { openSingleNotebook(); }
-  else if (view === 'library') goHome();
+  if (view === 'notebooks') { openSingleNotebook(); }
+  else if (view === 'home') goHome();
 }
 
 function openSingleNotebook() {
@@ -390,10 +408,15 @@ function syncSidebarTabs() {
   // Update search placeholder contextually
   var search = document.getElementById('search');
   if (search) {
-    if (_sidebarView === 'explore') search.placeholder = 'Search articles, tags, sources...';
-    else if (_sidebarView === 'notebooks') search.placeholder = 'Search notebooks...';
+    if (_sidebarView === 'notebooks') search.placeholder = 'Search notebooks...';
     else search.placeholder = 'Search... try is:favorite or tag:tech';
   }
+
+  // Pinned filters only apply to articles (home view)
+  var pinnedContainer = document.getElementById('pinned-filters');
+  if (pinnedContainer) pinnedContainer.style.display = _sidebarView === 'home' ? '' : 'none';
+  var pinBtn = document.getElementById('search-pin');
+  if (pinBtn && _sidebarView !== 'home') pinBtn.style.display = 'none';
 }
 
 let _writingFocusActive = false;
@@ -608,5 +631,76 @@ function updateWritingFocusLine() {
   var height = endY - startY + lineHeight;
   line.style.top = top + 'px';
   line.style.height = height + 'px';
+}
+
+// ---- Pinned filters ----
+var MAX_PINNED = 3;
+
+function getPinnedFilters() {
+  try { return JSON.parse(localStorage.getItem('pr-pinned-filters') || '[]'); }
+  catch { return []; }
+}
+
+function savePinnedFilters(pins) {
+  localStorage.setItem('pr-pinned-filters', JSON.stringify(pins));
+}
+
+function renderPinnedFilters() {
+  var container = document.getElementById('pinned-filters');
+  if (!container) return;
+  var pins = getPinnedFilters();
+  if (!pins.length) { container.innerHTML = ''; return; }
+  var currentQuery = (document.getElementById('search').value || '').trim();
+  container.innerHTML = pins.map(function(q, i) {
+    var isActive = currentQuery === q ? ' active' : '';
+    return '<button class="pinned-filter' + isActive + '" onclick="applyPinnedFilter(' + i + ')" title="' + escapeHtml(q) + '">'
+      + '<span class="pinned-filter-label">' + escapeHtml(q) + '</span>'
+      + '<span class="pinned-filter-unpin" onclick="event.stopPropagation();unpinFilter(' + i + ')" title="Unpin">&times;</span>'
+      + '</button>';
+  }).join('');
+}
+
+function updatePinnedFilterActive() {
+  var container = document.getElementById('pinned-filters');
+  if (!container) return;
+  var currentQuery = (document.getElementById('search').value || '').trim();
+  var buttons = container.querySelectorAll('.pinned-filter');
+  var pins = getPinnedFilters();
+  for (var i = 0; i < buttons.length; i++) {
+    buttons[i].classList.toggle('active', pins[i] === currentQuery);
+  }
+}
+
+function pinCurrentSearch() {
+  var input = document.getElementById('search');
+  var query = (input.value || '').trim();
+  if (!query) { showToast('Type a search query first'); return; }
+  var pins = getPinnedFilters();
+  if (pins.indexOf(query) !== -1) { showToast('Already pinned'); return; }
+  pins.push(query);
+  if (pins.length > MAX_PINNED) pins.shift();
+  savePinnedFilters(pins);
+  renderPinnedFilters();
+}
+
+function unpinFilter(index) {
+  var pins = getPinnedFilters();
+  pins.splice(index, 1);
+  savePinnedFilters(pins);
+  renderPinnedFilters();
+}
+
+function applyPinnedFilter(index) {
+  var pins = getPinnedFilters();
+  var query = pins[index];
+  if (!query) return;
+  var input = document.getElementById('search');
+  if (input.value.trim() === query) {
+    input.value = '';
+  } else {
+    input.value = query;
+  }
+  filterFiles();
+  renderPinnedFilters();
 }
 

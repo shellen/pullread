@@ -28,6 +28,8 @@ OPTIONS:
     --apple-id <email>        Apple ID for notarization (optional)
     --team-id <id>            Apple Team ID for notarization (optional)
     --app-password <password> App-specific password for notarization (optional)
+    --tauri-signing-key <path>      Path to Tauri updater private key file (optional)
+    --tauri-signing-password <pw>   Password for Tauri signing key (optional)
     --repo <owner/repo>       GitHub repository (default: auto-detect from git remote)
     --dry-run                 Show what would be set without actually setting secrets
     --help                    Show this help message
@@ -47,22 +49,26 @@ PREREQUISITES:
        - Find Team ID at: https://developer.apple.com/account
 
 SECRETS CONFIGURED:
-    APPLE_CERTIFICATE_BASE64    Base64-encoded .p12 certificate
-    APPLE_CERTIFICATE_PASSWORD  Password for the .p12 file
-    APPLE_ID                    Apple ID email (for notarization)
-    APPLE_ID_PASSWORD           App-specific password (for notarization)
-    APPLE_TEAM_ID               Apple Developer Team ID (for notarization)
+    APPLE_CERTIFICATE_BASE64              Base64-encoded .p12 certificate
+    APPLE_CERTIFICATE_PASSWORD            Password for the .p12 file
+    APPLE_ID                              Apple ID email (for notarization)
+    APPLE_ID_PASSWORD                     App-specific password (for notarization)
+    APPLE_TEAM_ID                         Apple Developer Team ID (for notarization)
+    TAURI_SIGNING_PRIVATE_KEY             Tauri updater signing private key
+    TAURI_SIGNING_PRIVATE_KEY_PASSWORD    Password for Tauri signing key
 
 EXAMPLES:
     # Signing only (no notarization)
     ./scripts/setup-signing-secrets.sh --p12 ~/certs/developer.p12
 
-    # Full setup with notarization
+    # Full setup with notarization and Tauri updater
     ./scripts/setup-signing-secrets.sh \
       --p12 ~/certs/developer.p12 \
       --apple-id your@email.com \
       --team-id ABC123DEF \
-      --app-password xxxx-xxxx-xxxx-xxxx
+      --app-password xxxx-xxxx-xxxx-xxxx \
+      --tauri-signing-key ~/.tauri/keys \
+      --tauri-signing-password "your-key-password"
 
     # Dry run to see what would be set
     ./scripts/setup-signing-secrets.sh --p12 ~/certs/developer.p12 --dry-run
@@ -77,6 +83,8 @@ P12_PASSWORD=""
 APPLE_ID=""
 TEAM_ID=""
 APP_PASSWORD=""
+TAURI_KEY_PATH=""
+TAURI_KEY_PASSWORD=""
 REPO=""
 DRY_RUN=false
 
@@ -87,6 +95,8 @@ while [[ $# -gt 0 ]]; do
         --apple-id)     APPLE_ID="$2"; shift 2 ;;
         --team-id)      TEAM_ID="$2"; shift 2 ;;
         --app-password) APP_PASSWORD="$2"; shift 2 ;;
+        --tauri-signing-key)      TAURI_KEY_PATH="$2"; shift 2 ;;
+        --tauri-signing-password) TAURI_KEY_PASSWORD="$2"; shift 2 ;;
         --repo)         REPO="$2"; shift 2 ;;
         --dry-run)      DRY_RUN=true; shift ;;
         --help)         usage ;;
@@ -175,6 +185,24 @@ if [ -n "$APPLE_ID" ] || [ -n "$TEAM_ID" ] || [ -n "$APP_PASSWORD" ]; then
     fi
 fi
 
+if [ -n "$TAURI_KEY_PATH" ] || [ -n "$TAURI_KEY_PASSWORD" ]; then
+    echo ""
+    echo_step "Setting Tauri updater secrets..."
+
+    if [ -n "$TAURI_KEY_PATH" ]; then
+        if [ ! -f "$TAURI_KEY_PATH" ]; then
+            echo_error "Tauri signing key not found: $TAURI_KEY_PATH"
+            echo "  Generate with: bunx @tauri-apps/cli signer generate -w ~/.tauri/keys"
+            exit 1
+        fi
+        TAURI_KEY=$(cat "$TAURI_KEY_PATH")
+        set_secret "TAURI_SIGNING_PRIVATE_KEY" "$TAURI_KEY" "Tauri updater signing key"
+    fi
+    if [ -n "$TAURI_KEY_PASSWORD" ]; then
+        set_secret "TAURI_SIGNING_PRIVATE_KEY_PASSWORD" "$TAURI_KEY_PASSWORD" "Tauri signing key password"
+    fi
+fi
+
 echo ""
 echo -e "${GREEN}Done!${NC}"
 echo ""
@@ -190,5 +218,5 @@ else
         echo "  4. Notarize the app and DMG with Apple"
     fi
     echo ""
-    echo "Trigger a build with: gh workflow run build-macos-app.yml"
+    echo "Trigger a build with: gh workflow run build-tauri.yml"
 fi

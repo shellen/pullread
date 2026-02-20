@@ -8,11 +8,15 @@ async function loadSyncStatus() {
     const res = await fetch('/api/sync-status');
     if (!res.ok) return;
     const data = await res.json();
-    const countEl = document.getElementById('file-count-text');
-    if (countEl && data.intervalMinutes) {
-      const nextSync = data.intervalMinutes + ' min';
-      countEl.title = 'Sync every ' + nextSync;
+    var btn = document.getElementById('refresh-btn');
+    var parts = [];
+    if (data.intervalMinutes) parts.push('Sync every ' + data.intervalMinutes + ' min');
+    if (data.lastActivity) {
+      var ago = Math.round((Date.now() - new Date(data.lastActivity).getTime()) / 60000);
+      parts.push('Last activity: ' + (ago < 1 ? 'just now' : ago + ' min ago'));
     }
+    if (data.articleCount) parts.push(data.articleCount + ' articles');
+    if (btn && parts.length) btn.title = parts.join('\n');
   } catch {}
 }
 
@@ -140,15 +144,52 @@ async function refreshArticleList(silent) {
 // Auto-refresh: poll lightweight /api/files-changed every 5s, full refresh only when files change
 let _autoRefreshTimer = null;
 let _lastKnownChangeAt = 0;
+let _syncSpinTimeout = null;
+let _wasSyncing = false;
 function startAutoRefresh() {
   if (_autoRefreshTimer) return;
   _autoRefreshTimer = setInterval(async () => {
     try {
-      const res = await fetch('/api/files-changed');
+      // Poll sync progress
+      var progressRes = await fetch('/api/sync-progress');
+      if (progressRes.ok) {
+        var progress = await progressRes.json();
+        var btn = document.getElementById('refresh-btn');
+        var statusEl = document.getElementById('sync-status');
+        if (progress.status === 'syncing') {
+          _wasSyncing = true;
+          if (btn) {
+            btn.classList.add('spinning');
+            btn.title = 'Syncing ' + progress.feed + '... (' + progress.feedIndex + '/' + progress.totalFeeds + ')';
+          }
+          if (statusEl) {
+            statusEl.textContent = 'Syncing ' + progress.feed + ' (' + progress.feedIndex + '/' + progress.totalFeeds + ')';
+            statusEl.classList.add('visible');
+          }
+        } else if (_wasSyncing) {
+          _wasSyncing = false;
+          if (btn) btn.classList.remove('spinning');
+          if (statusEl) statusEl.classList.remove('visible');
+          loadSyncStatus();
+          refreshArticleList(true);
+        }
+      }
+
+      // Poll for file changes
+      var res = await fetch('/api/files-changed');
       if (!res.ok) return;
-      const data = await res.json();
+      var data = await res.json();
       if (data.changedAt > _lastKnownChangeAt) {
         _lastKnownChangeAt = data.changedAt;
+        if (!_wasSyncing) {
+          var btn2 = document.getElementById('refresh-btn');
+          if (btn2) btn2.classList.add('spinning');
+          clearTimeout(_syncSpinTimeout);
+          _syncSpinTimeout = setTimeout(function() {
+            if (btn2) btn2.classList.remove('spinning');
+            loadSyncStatus();
+          }, 8000);
+        }
         refreshArticleList(true);
       }
     } catch {}
@@ -218,6 +259,7 @@ async function init() {
       await Promise.all([loadAnnotationsIndex(), checkLLMConfig(), loadNotebooks()]);
 
       renderFileList();
+      renderPinnedFilters();
 
       // Run one-time migration and load sync status in background
       migrateAnnotationsIfNeeded();

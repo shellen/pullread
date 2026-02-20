@@ -1,5 +1,5 @@
 // ABOUTME: Tests for viewer module helpers
-// ABOUTME: Covers reprocessFile, parseFrontmatter, and XSS sanitization
+// ABOUTME: Covers reprocessFile, parseFrontmatter, sync progress, and XSS sanitization
 
 import { reprocessFile, parseFrontmatter } from './viewer';
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'fs';
@@ -161,6 +161,40 @@ bookmarked: 2025-01-15T00:00:00Z
     const result = await reprocessFile(filePath);
     expect(result.ok).toBe(false);
     expect(result.error).toBe('Network timeout');
+  });
+});
+
+describe('sync progress', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('viewer.html includes sync-status element', () => {
+    const html = readFileSync(join(rootDir, 'viewer.html'), 'utf-8');
+    expect(html).toContain('id="sync-status"');
+  });
+
+  test('13-init.js polls /api/sync-progress', () => {
+    const init = readFileSync(join(rootDir, 'viewer', '13-init.js'), 'utf-8');
+    expect(init).toContain('/api/sync-progress');
+  });
+
+  test('13-init.js updates sync-status element when syncing', () => {
+    const init = readFileSync(join(rootDir, 'viewer', '13-init.js'), 'utf-8');
+    expect(init).toContain("getElementById('sync-status')");
+    expect(init).toContain("classList.add('visible')");
+    expect(init).toContain("classList.remove('visible')");
+  });
+
+  test('viewer.css styles sync-status with fade transition', () => {
+    const css = readFileSync(join(rootDir, 'viewer.css'), 'utf-8');
+    expect(css).toContain('.sync-status');
+    expect(css).toContain('.sync-status.visible');
+  });
+
+  test('index.ts writes and clears sync progress file', () => {
+    const index = readFileSync(join(rootDir, 'src', 'index.ts'), 'utf-8');
+    expect(index).toContain('.sync-progress');
+    expect(index).toContain('writeSyncProgress');
+    expect(index).toContain('clearSyncProgress');
   });
 });
 

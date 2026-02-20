@@ -57,15 +57,12 @@ Licensed under the MIT License.
 
 ================================================================================
 
-Sparkle (macOS app only)
-License: MIT
-https://github.com/sparkle-project/Sparkle
+Tauri
+License: Apache-2.0 / MIT
+https://github.com/tauri-apps/tauri
 
-Copyright (c) 2006-2013 Andy Matuschak.
-Copyright (c) 2009-2013 Elgato Systems GmbH.
-Copyright (c) 2011-2014 Kornel Lesinski.
-Copyright (c) 2015-2024 Sparkle Project.
-Licensed under the MIT License.
+Copyright (c) 2019-2024 Tauri Programme within The Commons Conservancy.
+Licensed under the Apache License, Version 2.0 or MIT License.
 
 ================================================================================
 

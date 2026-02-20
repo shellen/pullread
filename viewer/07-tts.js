@@ -68,6 +68,38 @@ function updateListenButtonState() {
     btn.classList.remove('listen-playing');
     btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> ' + idleLabel;
   }
+  // Show/hide Play Next trigger when queue is active
+  var trigger = document.getElementById('play-next-trigger');
+  if (trigger) {
+    trigger.style.display = ttsQueue.length > 0 ? '' : 'none';
+  }
+}
+
+function togglePlayNextMenu(e) {
+  e.stopPropagation();
+  var existing = document.querySelector('.play-next-dropdown');
+  if (existing) { existing.remove(); return; }
+  var menu = document.getElementById('play-next-menu');
+  if (!menu) return;
+  var dropdown = document.createElement('div');
+  dropdown.className = 'play-next-dropdown';
+
+  var isQueued = ttsQueue.some(function(q) { return q.filename === activeFile; });
+  if (!isQueued) {
+    dropdown.innerHTML =
+      '<button onclick="playNextFromArticle();this.closest(\'.play-next-dropdown\').remove()"><svg class="icon icon-sm" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px"><use href="#i-forward"/></svg> Play next</button>'
+      + '<button onclick="addCurrentToTTSQueue();this.closest(\'.play-next-dropdown\').remove()"><svg class="icon icon-sm" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px"><use href="#i-queue"/></svg> Add to queue</button>';
+  } else {
+    dropdown.innerHTML = '<button onclick="this.closest(\'.play-next-dropdown\').remove()" style="color:var(--muted)">Already in queue</button>';
+  }
+  menu.appendChild(dropdown);
+  // Close on click outside
+  setTimeout(function() {
+    document.addEventListener('click', function closePlayNext() {
+      dropdown.remove();
+      document.removeEventListener('click', closePlayNext);
+    });
+  }, 0);
 }
 
 function addCurrentToTTSQueue() {
@@ -75,6 +107,32 @@ function addCurrentToTTSQueue() {
   _listenLoadingFile = activeFile;
   startListenLoading();
   addToTTSQueue(activeFile);
+}
+
+function playNextFromArticle(filename) {
+  if (!filename) filename = activeFile;
+  if (!filename) return;
+  // Insert after current playing item
+  var file = allFiles.find(function(f) { return f.filename === filename; });
+  if (!file) return;
+  // If already in queue, just move it
+  var existingIdx = ttsQueue.findIndex(function(q) { return q.filename === filename; });
+  if (existingIdx >= 0) {
+    var item = ttsQueue.splice(existingIdx, 1)[0];
+    if (existingIdx < ttsCurrentIndex) ttsCurrentIndex--;
+    var insertAt = ttsCurrentIndex + 1;
+    ttsQueue.splice(insertAt, 0, item);
+    renderAudioPlayer();
+    return;
+  }
+  var newItem = { filename: filename, title: file.title, image: file.image || '', domain: file.domain || '' };
+  if (file.enclosureUrl && file.enclosureType && file.enclosureType.startsWith('audio/')) {
+    newItem.enclosureUrl = file.enclosureUrl;
+  }
+  var insertAt = ttsCurrentIndex >= 0 ? ttsCurrentIndex + 1 : 0;
+  ttsQueue.splice(insertAt, 0, newItem);
+  renderAudioPlayer();
+  if (ttsQueue.length === 1) playTTSItem(0);
 }
 
 async function addToTTSQueue(filename) {
@@ -100,7 +158,7 @@ async function addToTTSQueue(filename) {
     } catch {}
   }
 
-  var item = { filename, title: file.title };
+  var item = { filename, title: file.title, image: file.image || '', domain: file.domain || '' };
   if (file.enclosureUrl && file.enclosureType && file.enclosureType.startsWith('audio/')) {
     item.enclosureUrl = file.enclosureUrl;
   }
@@ -114,45 +172,48 @@ function renderAudioPlayer() {
   const panel = document.getElementById('audio-player');
   if (!panel) return;
 
-  // Update mini player visibility
-  var miniPlayer = document.getElementById('mini-player');
-  if (miniPlayer) {
-    miniPlayer.style.display = (ttsQueue.length > 0 && (ttsPlaying || ttsCurrentIndex >= 0)) ? '' : 'none';
-    var miniPlayBtn = document.getElementById('mini-play-btn');
-    if (miniPlayBtn) {
-      miniPlayBtn.innerHTML = ttsPlaying
-        ? '<svg><use href="#i-pause"/></svg>'
-        : '<svg><use href="#i-play"/></svg>';
-    }
-  }
+  var app = document.querySelector('.app');
 
   if (ttsQueue.length === 0) {
     panel.classList.add('hidden');
+    if (app) app.classList.remove('has-bottom-bar');
+    updateSidebarAudioIndicators();
+    updateArticleNowPlaying();
     return;
   }
   panel.classList.remove('hidden');
+  if (app) app.classList.add('has-bottom-bar');
 
   const label = document.getElementById('audio-now-label');
   const status = document.getElementById('audio-now-status');
   const playBtn = document.getElementById('tts-play-btn');
 
-  if (ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length) {
-    label.textContent = ttsQueue[ttsCurrentIndex].title;
-    label.style.cursor = 'pointer';
-    label.onclick = function() {
-      var fn = ttsQueue[ttsCurrentIndex] && ttsQueue[ttsCurrentIndex].filename;
-      if (!fn) return;
-      var idx = displayFiles.findIndex(function(f) { return f.filename === fn; });
-      if (idx >= 0) loadFile(idx);
-    };
-  } else {
-    label.textContent = 'No article playing';
-    label.style.cursor = '';
-    label.onclick = null;
+  var currentItem = (ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length) ? ttsQueue[ttsCurrentIndex] : null;
+  label.textContent = currentItem ? currentItem.title : 'No article playing';
+
+  // Update artwork: article image > favicon > volume icon
+  var artworkEl = document.getElementById('bottom-bar-artwork');
+  if (artworkEl) {
+    var artSrc = '';
+    if (currentItem) {
+      if (currentItem.image) artSrc = currentItem.image;
+      else if (currentItem.domain) artSrc = '/favicons/' + encodeURIComponent(currentItem.domain) + '.png';
+    }
+    var fallbackIcon = '<svg class="bottom-bar-icon" aria-hidden="true"><use href="#i-volume"/></svg>';
+    if (artSrc) {
+      var img = new Image();
+      img.src = artSrc;
+      img.alt = '';
+      img.onerror = function() { artworkEl.innerHTML = fallbackIcon; };
+      artworkEl.innerHTML = '';
+      artworkEl.appendChild(img);
+    } else {
+      artworkEl.innerHTML = fallbackIcon;
+    }
   }
 
   if (ttsGenerating) {
-    status.textContent = 'Generating...';
+    status.textContent = 'Generating\u2026';
   } else if (ttsPlaying) {
     status.textContent = 'Playing';
   } else if (ttsCurrentIndex >= 0) {
@@ -168,8 +229,9 @@ function renderAudioPlayer() {
   // Render queue
   const queueSection = document.getElementById('audio-queue-section');
   const queueList = document.getElementById('audio-queue-list');
+  var queueToggle = document.getElementById('bottom-bar-queue-toggle');
   if (ttsQueue.length > 1) {
-    queueSection.style.display = '';
+    if (queueToggle) queueToggle.classList.add('active');
     queueList.innerHTML = ttsQueue.map((item, i) =>
       '<div class="audio-queue-item' + (i === ttsCurrentIndex ? ' playing' : '') + '" onclick="playTTSItem(' + i + ')">'
       + '<span style="font-size:10px;color:var(--muted);width:14px;text-align:center">' + (i === ttsCurrentIndex ? '&#9654;' : (i + 1)) + '</span>'
@@ -178,11 +240,65 @@ function renderAudioPlayer() {
       + '</div>'
     ).join('');
   } else {
+    if (queueToggle) queueToggle.classList.remove('active');
     queueSection.style.display = 'none';
   }
 
   updateListenButtonState();
+  updateSidebarAudioIndicators();
+  updateArticleNowPlaying();
   renderMiniMode();
+  saveTTSState();
+}
+
+/** Navigate to the currently playing article */
+function bottomBarGoToArticle() {
+  var fn = ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length
+    ? ttsQueue[ttsCurrentIndex].filename : null;
+  if (!fn) return;
+  var idx = displayFiles.findIndex(function(f) { return f.filename === fn; });
+  if (idx >= 0) loadFile(idx);
+}
+
+/** Toggle queue visibility in bottom bar */
+function toggleBottomBarQueue() {
+  var qs = document.getElementById('audio-queue-section');
+  if (!qs) return;
+  if (ttsQueue.length <= 1) { qs.style.display = 'none'; return; }
+  qs.style.display = qs.style.display === 'none' ? '' : 'none';
+}
+
+/** Show playing/queued indicators on sidebar file items */
+function updateSidebarAudioIndicators() {
+  // Remove all existing indicators first
+  document.querySelectorAll('.file-item-audio').forEach(function(el) { el.remove(); });
+  if (ttsQueue.length === 0) return;
+
+  var playingFile = ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length
+    ? ttsQueue[ttsCurrentIndex].filename : null;
+
+  ttsQueue.forEach(function(item, i) {
+    var el = document.querySelector('.file-item[data-filename="' + CSS.escape(item.filename) + '"]');
+    if (!el) return;
+    var meta = el.querySelector('.file-item-meta');
+    if (!meta) return;
+    var indicator = document.createElement('span');
+    indicator.className = 'file-item-audio';
+    if (item.filename === playingFile && ttsPlaying) {
+      indicator.innerHTML = '<span class="eq-bars"><span></span><span></span><span></span></span>';
+    } else if (item.filename === playingFile) {
+      indicator.innerHTML = '<svg><use href="#i-pause"/></svg>';
+    } else {
+      indicator.innerHTML = '<span class="queue-pos">' + (i + 1) + '</span>';
+    }
+    meta.appendChild(indicator);
+  });
+}
+
+/** Clean up any stale inline player elements */
+function updateArticleNowPlaying() {
+  var existing = document.getElementById('article-now-playing');
+  if (existing) existing.remove();
 }
 
 async function playTTSItem(index) {
@@ -224,7 +340,7 @@ async function loadTTSSettings() {
 async function playBrowserTTS(filename) {
   const synth = window.speechSynthesis;
   if (!synth) {
-    alert('Speech synthesis not available in this browser.');
+    showToast('Speech synthesis not available in this browser.');
     ttsPlaying = false;
     renderAudioPlayer();
     return;
@@ -314,7 +430,7 @@ async function playCloudTTS(filename) {
         return;
       }
       stopListenLoading();
-      alert('TTS Error: ' + (err.error || 'Unknown error'));
+      showToast('TTS Error: ' + (err.error || 'Unknown error'));
       ttsPlaying = false;
       renderAudioPlayer();
       return;
@@ -345,7 +461,7 @@ async function playCloudTTS(filename) {
     ttsPlaying = false;
     _ttsChunkSession = null;
     renderAudioPlayer();
-    alert('TTS Error: ' + err.message);
+    showToast('TTS Error: ' + err.message);
   }
 }
 
@@ -376,6 +492,7 @@ async function playCloudTTSCached(filename) {
     });
 
     audio.addEventListener('ended', function() {
+      if (ttsAudio !== audio) return;
       document.getElementById('tts-progress').style.width = '100%';
       ttsPlaying = false;
       _ttsNextPrefetch = null;
@@ -386,21 +503,21 @@ async function playCloudTTSCached(filename) {
     });
 
     audio.addEventListener('error', function() {
+      if (ttsAudio !== audio) return;
       stopListenLoading();
       ttsPlaying = false;
       renderAudioPlayer();
-      alert('TTS Error: Failed to load cached audio');
+      showToast('Could not load cached audio');
     });
-
-    audio.play();
 
     ttsAudio = audio;
     ttsPlaying = true;
+    audio.play();
     renderAudioPlayer();
   } catch (err) {
     ttsPlaying = false;
     renderAudioPlayer();
-    alert('TTS Error: ' + err.message);
+    showToast('TTS Error: ' + err.message);
   }
 }
 
@@ -409,25 +526,42 @@ async function playPodcastAudio(item) {
   try {
     var audio = new Audio(item.enclosureUrl);
     audio.playbackRate = ttsSpeed;
+    var resumeTime = item.savedTime || 0;
 
     audio.addEventListener('loadedmetadata', function() {
       document.getElementById('tts-time-total').textContent = formatTime(audio.duration);
+      // Resume from saved position
+      if (resumeTime > 0 && resumeTime < audio.duration - 5) {
+        audio.currentTime = resumeTime;
+        resumeTime = 0;
+      }
     });
 
+    var _cuePlayed = false;
     audio.addEventListener('playing', function() {
+      if (ttsAudio !== audio) return;
       stopListenLoading();
+      if (!_cuePlayed) { _cuePlayed = true; playCueSound(); }
       ttsPlaying = true;
       renderAudioPlayer();
     });
 
+    var _lastProgressSave = 0;
     audio.addEventListener('timeupdate', function() {
+      if (ttsAudio !== audio) return;
       if (!audio.duration) return;
       var pct = Math.min(100, (audio.currentTime / audio.duration) * 100);
       document.getElementById('tts-progress').style.width = pct + '%';
       document.getElementById('tts-time-current').textContent = formatTime(audio.currentTime);
+      // Save progress every 5 seconds
+      if (Date.now() - _lastProgressSave > 5000) {
+        _lastProgressSave = Date.now();
+        saveTTSState();
+      }
     });
 
     audio.addEventListener('ended', function() {
+      if (ttsAudio !== audio) return;
       document.getElementById('tts-progress').style.width = '100%';
       ttsPlaying = false;
       renderAudioPlayer();
@@ -437,20 +571,21 @@ async function playPodcastAudio(item) {
     });
 
     audio.addEventListener('error', function() {
+      if (ttsAudio !== audio) return;
       stopListenLoading();
       ttsPlaying = false;
       renderAudioPlayer();
-      alert('Podcast playback error: could not load audio');
+      showToast('Could not load podcast audio');
     });
 
-    audio.play();
     ttsAudio = audio;
     ttsPlaying = true;
+    audio.play();
     renderAudioPlayer();
   } catch (err) {
     ttsPlaying = false;
     renderAudioPlayer();
-    alert('Podcast playback error: ' + err.message);
+    showToast('Podcast error: ' + err.message);
   }
 }
 
@@ -629,7 +764,7 @@ async function ttsPlayNextChunk(index, seekPct) {
     _ttsChunkSession = null;
     _ttsChunkBuffer.clear();
     renderAudioPlayer();
-    alert('TTS Error: ' + err.message);
+    showToast('TTS Error: ' + err.message);
   }
 }
 
@@ -649,9 +784,12 @@ function stopTTS() {
   }
   ttsPlaying = false;
   ttsGenerating = false;
-  document.getElementById('tts-progress').style.width = '0%';
-  document.getElementById('tts-time-current').textContent = '0:00';
-  document.getElementById('tts-time-total').textContent = '0:00';
+  var prog = document.getElementById('tts-progress');
+  if (prog) prog.style.width = '0%';
+  var cur = document.getElementById('tts-time-current');
+  if (cur) cur.textContent = '0:00';
+  var tot = document.getElementById('tts-time-total');
+  if (tot) tot.textContent = '0:00';
 }
 
 function ttsTogglePlay() {
@@ -704,6 +842,25 @@ function ttsSkipNext() {
 
 function ttsSkipPrev() {
   skipTime(-15);
+}
+
+var _skipHoldTimer = null;
+var _skipHoldInterval = null;
+
+function ttsStartHoldSkip(seconds) {
+  skipTime(seconds);
+  _skipHoldTimer = setTimeout(function() {
+    _skipHoldInterval = setInterval(function() {
+      skipTime(seconds);
+    }, 200);
+  }, 300);
+}
+
+function ttsStopHoldSkip() {
+  clearTimeout(_skipHoldTimer);
+  clearInterval(_skipHoldInterval);
+  _skipHoldTimer = null;
+  _skipHoldInterval = null;
 }
 
 function skipTime(seconds) {
@@ -923,11 +1080,15 @@ function ttsPositionThumb() {
 
 function ttsSetSpeed(speed) {
   ttsSpeed = speed;
-  document.getElementById('tts-speed-btn').textContent = speed + 'x';
+  var speedBtn = document.getElementById('tts-speed-btn');
+  if (speedBtn) speedBtn.textContent = speed + 'x';
   var popupVal = document.getElementById('tts-speed-popup-val');
   if (popupVal) popupVal.textContent = speed + 'x';
   var miniSpeedBtn = document.getElementById('mini-mode-speed-btn');
   if (miniSpeedBtn) miniSpeedBtn.textContent = speed + 'x';
+  // Update article inline speed button
+  var anpSpeed = document.querySelector('.article-now-playing .anp-speed');
+  if (anpSpeed) anpSpeed.textContent = speed + 'x';
 
   if (ttsAudio) {
     ttsAudio.playbackRate = speed;
@@ -935,6 +1096,7 @@ function ttsSetSpeed(speed) {
   if (ttsSynthUtterance && window.speechSynthesis.speaking) {
     ttsSynthUtterance.rate = speed;
   }
+  saveTTSState();
 }
 
 function ttsCycleSpeed() {
@@ -967,7 +1129,12 @@ function ttsClearQueue() {
   stopTTS();
   ttsQueue = [];
   ttsCurrentIndex = -1;
+  localStorage.removeItem('pr-tts-state');
   renderAudioPlayer();
+}
+
+function ttsDismissPlayer() {
+  ttsClearQueue();
 }
 
 function formatTime(seconds) {
@@ -1071,7 +1238,7 @@ function ttsHighlightByProgress(progress, paraOffsets) {
 
 function showTTSSettings() {
   if (!serverMode) {
-    alert('Voice playback settings are only available in server mode.');
+    showToast('Voice settings are only available in server mode.');
     return;
   }
 
@@ -1182,7 +1349,7 @@ function showTTSSettings() {
       '</div>';
   }).catch(function() {
     overlay.remove();
-    alert('Could not load voice playback settings.');
+    showToast('Could not load voice settings.');
   });
 }
 
@@ -1356,7 +1523,7 @@ function saveTTSSettings() {
     const overlay = document.querySelector('.modal-overlay');
     const hasExistingKey = overlay?._ttsData?.hasKey;
     if (!apiKeyInput && !hasExistingKey) {
-      alert('Please enter an API key for TTS.');
+      showToast('Please enter an API key for TTS.');
       return;
     }
   }
@@ -1391,9 +1558,74 @@ function saveTTSSettings() {
         playTTSItem(resumeIdx);
       }
     } else {
-      alert('Failed to save voice playback settings.');
+      showToast('Failed to save voice settings.');
     }
   });
+}
+
+// ---- Playback State Persistence ----
+function saveTTSState() {
+  try {
+    // Save position on the current queue item so it persists with the queue
+    if (ttsAudio && ttsAudio.duration && ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length) {
+      ttsQueue[ttsCurrentIndex].savedTime = ttsAudio.currentTime;
+      ttsQueue[ttsCurrentIndex].savedDuration = ttsAudio.duration;
+    }
+    var state = {
+      queue: ttsQueue,
+      currentIndex: ttsCurrentIndex,
+      speed: ttsSpeed,
+      timestamp: Date.now(),
+    };
+    if (ttsAudio && ttsAudio.duration) {
+      state.currentTime = ttsAudio.currentTime;
+      state.duration = ttsAudio.duration;
+    }
+    localStorage.setItem('pr-tts-state', JSON.stringify(state));
+  } catch(e) {}
+}
+
+function restoreTTSState() {
+  try {
+    var raw = localStorage.getItem('pr-tts-state');
+    if (!raw) return;
+    var state = JSON.parse(raw);
+    // Only restore if saved within last 24 hours
+    if (!state || !state.queue || !state.queue.length) return;
+    if (Date.now() - state.timestamp > 24 * 60 * 60 * 1000) {
+      localStorage.removeItem('pr-tts-state');
+      return;
+    }
+    ttsQueue = state.queue;
+    ttsCurrentIndex = state.currentIndex;
+    if (state.speed) ttsSpeed = state.speed;
+    // Don't auto-play — just show the queue and position
+    ttsPlaying = false;
+    renderAudioPlayer();
+    var speedBtn = document.getElementById('tts-speed-btn');
+    if (speedBtn) speedBtn.textContent = ttsSpeed + 'x';
+    // Show saved playback position in the progress bar
+    if (state.currentTime && state.duration && state.duration > 0) {
+      var pct = Math.min(100, (state.currentTime / state.duration) * 100);
+      var bar = document.getElementById('tts-progress');
+      var timeEl = document.getElementById('tts-time-current');
+      var totalEl = document.getElementById('tts-time-total');
+      if (bar) bar.style.width = pct + '%';
+      if (timeEl) timeEl.textContent = formatTime(state.currentTime);
+      if (totalEl) totalEl.textContent = formatTime(state.duration);
+    }
+  } catch(e) {}
+}
+
+// Save state when the page is closing so progress isn't lost
+window.addEventListener('beforeunload', function() {
+  if (ttsQueue.length > 0) saveTTSState();
+});
+
+// Restore on load (called externally after DOM is ready)
+if (typeof _ttsStateRestored === 'undefined') {
+  var _ttsStateRestored = true;
+  setTimeout(restoreTTSState, 500);
 }
 
 // ---- Mini Mode ----

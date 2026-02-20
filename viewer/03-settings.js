@@ -90,9 +90,11 @@ function toggleSettingsDropdown() {
     </div>
     <label>Size</label>
     <div class="setting-row">
+      <button data-setting="size" data-val="xsmall" onclick="setSize('xsmall');updateDropdownState()" ${currentSize==='xsmall'?'class="active"':''} style="font-size:9px" aria-label="Extra small text">A</button>
       <button data-setting="size" data-val="small" onclick="setSize('small');updateDropdownState()" ${currentSize==='small'?'class="active"':''} aria-label="Small text">A</button>
       <button data-setting="size" data-val="medium" onclick="setSize('medium');updateDropdownState()" ${currentSize==='medium'?'class="active"':''} style="font-size:14px" aria-label="Medium text">A</button>
       <button data-setting="size" data-val="large" onclick="setSize('large');updateDropdownState()" ${currentSize==='large'?'class="active"':''} style="font-size:17px" aria-label="Large text">A</button>
+      <button data-setting="size" data-val="xlarge" onclick="setSize('xlarge');updateDropdownState()" ${currentSize==='xlarge'?'class="active"':''} style="font-size:20px" aria-label="Extra large text">A</button>
     </div>
     <label>Line height</label>
     <div class="setting-row">
@@ -123,6 +125,10 @@ function toggleSettingsDropdown() {
     <label>Article</label>
     <div class="setting-row">
       <button onclick="reprocessCurrentArticle(this)" id="reprocess-btn" style="flex:1;text-align:center" title="Re-fetch this article from the original URL"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-cloud-download"/></svg> Re-fetch from source</button>
+    </div>
+    <hr style="border:none;border-top:1px solid var(--border);margin:12px 0 8px">
+    <div class="setting-row">
+      <button onclick="var p=document.querySelector('.settings-dropdown-panel');if(p)p.remove();var b=document.getElementById('aa-settings-btn');if(b)b.setAttribute('aria-expanded','false');showShortcutsModal()" style="flex:1;text-align:center"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-keyboard"/></svg> Keyboard Shortcuts</button>
     </div>
   `;
   document.body.appendChild(panel);
@@ -155,7 +161,7 @@ document.addEventListener('click', function(e) {
 });
 
 // ---- Full Settings Page ----
-function showSettingsPage() {
+function showSettingsPage(scrollToSection) {
   activeFile = null;
   _activeNotebook = null;
   const content = document.getElementById('content');
@@ -167,19 +173,8 @@ function showSettingsPage() {
   renderFileList();
 
   var currentTheme = document.body.getAttribute('data-theme') || 'light';
-  var currentFont = localStorage.getItem('pr-font') || 'serif';
-  var currentSize = localStorage.getItem('pr-size') || 'medium';
-  var currentLeading = localStorage.getItem('pr-leading') || 'default';
-  var currentSpacing = localStorage.getItem('pr-spacing') || 'default';
-  var currentWidth = localStorage.getItem('pr-width') || 'default';
   function themeBtn(val, label) {
     return '<button class="' + (currentTheme === val ? 'active' : '') + '" onclick="setTheme(\'' + val + '\');showSettingsPage()">' + label + '</button>';
-  }
-  function sizeBtn(val, label, style) {
-    return '<button class="' + (currentSize === val ? 'active' : '') + '" onclick="setSize(\'' + val + '\');showSettingsPage()"' + (style ? ' style="' + style + '"' : '') + '>' + label + '</button>';
-  }
-  function opt(val, label, current) {
-    return '<option value="' + val + '"' + (current === val ? ' selected' : '') + '>' + label + '</option>';
   }
 
   var html = '<div class="article-header"><h1>Settings</h1></div>';
@@ -190,25 +185,24 @@ function showSettingsPage() {
   html += '<div class="settings-row"><label>Theme</label><div class="settings-btn-group">'
     + themeBtn('light', 'Light') + themeBtn('dark', 'Dark') + themeBtn('sepia', 'Sepia') + themeBtn('high-contrast', 'Hi-Con')
     + '</div></div>';
-  html += '<div class="settings-row"><label>Font</label><select onchange="setFont(this.value);showSettingsPage()">'
-    + opt('serif','Serif',currentFont) + opt('sans','Sans-serif',currentFont) + opt('system','Charter',currentFont)
-    + opt('mono','Monospace',currentFont) + opt('inter','Inter',currentFont) + opt('lora','Lora',currentFont)
-    + opt('literata','Literata',currentFont) + opt('source-serif','Source Serif',currentFont)
-    + opt('work-sans','Work Sans',currentFont) + opt('opendyslexic','OpenDyslexic',currentFont)
-    + '</select></div>';
-  html += '<div class="settings-row"><label>Text size</label><div class="settings-btn-group">'
-    + sizeBtn('small','A','font-size:12px') + sizeBtn('medium','A','font-size:14px') + sizeBtn('large','A','font-size:17px')
-    + '</div></div>';
-  html += '<div class="settings-row"><label>Line height</label><select onchange="setLineHeight(this.value)">'
-    + opt('default','Default',currentLeading) + opt('compact','Compact',currentLeading)
-    + opt('relaxed','Relaxed',currentLeading) + opt('loose','Loose',currentLeading)
-    + '</select></div>';
-  html += '<div class="settings-row"><label>Letter spacing</label><select onchange="setSpacing(this.value)">'
-    + opt('default','Default',currentSpacing) + opt('wide','Wide',currentSpacing) + opt('wider','Wider',currentSpacing)
-    + '</select></div>';
-  html += '<div class="settings-row"><label>Content width</label><select onchange="setWidth(this.value)">'
-    + opt('narrow','Narrow',currentWidth) + opt('default','Default',currentWidth) + opt('wide','Wide',currentWidth)
-    + '</select></div>';
+  html += '<div class="settings-row"><div><label>Article font &amp; layout</label><div class="settings-desc">Font, text size, line height, spacing, and content width</div></div>';
+  html += '<button onclick="settingsOpenAa()" style="font-size:13px;padding:6px 14px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit;white-space:nowrap">Open Aa reader settings</button>';
+  html += '</div>';
+  html += '</div>';
+
+  // ---- Open In section (Tauri only) ----
+  html += '<div class="settings-section" id="settings-viewer-mode" style="display:none">';
+  html += '<h2>Open In</h2>';
+  html += '<div class="settings-row"><div><label>Viewer window</label><div class="settings-desc">Where PullRead opens when you click View Articles</div></div>';
+  html += '<select id="sp-viewer-mode" onchange="settingsPageSaveViewerMode()">';
+  html += '<option value="app">PullRead window</option>';
+  html += '<option value="browser">Default browser</option>';
+  html += '</select></div>';
+  html += '<div class="settings-row"><div><label>Time format</label><div class="settings-desc">How times appear in the menu bar</div></div>';
+  html += '<select id="sp-time-format" onchange="settingsPageSaveTimeFormat()">';
+  html += '<option value="12h">12-hour (2:30 PM)</option>';
+  html += '<option value="24h">24-hour (14:30)</option>';
+  html += '</select></div>';
   html += '</div>';
 
   // ---- Feeds & Sync section (placeholder, loaded async) ----
@@ -255,8 +249,48 @@ function showSettingsPage() {
   html += '<div id="reimport-status" style="font-size:12px;color:var(--muted);padding-top:8px"></div>';
   html += '</div>';
 
+  // ---- About section ----
+  html += '<div class="settings-section" id="settings-about">';
+  html += '<h2>About</h2>';
+  html += '<div class="settings-row"><label>Version</label><span id="sp-version" style="color:var(--muted);font-size:13px">Checking\u2026</span></div>';
+  html += '<div class="settings-row" style="gap:12px">';
+  html += '<button id="sp-check-updates-btn" style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer" onclick="settingsCheckForUpdates()">Check for Updates</button>';
+  html += '<span id="sp-update-status" style="font-size:12px;color:var(--muted);align-self:center"></span>';
+  html += '</div>';
+  html += '</div>';
+
   content.innerHTML = html;
   document.getElementById('content-pane').scrollTop = 0;
+
+  if (scrollToSection) {
+    var target = document.getElementById(scrollToSection);
+    if (target) setTimeout(function() { target.scrollIntoView({ behavior: 'smooth' }); }, 50);
+  }
+
+  // Load viewer mode setting (show section when running inside Tauri or always for server mode)
+  if (serverMode) {
+    fetch('/api/settings').then(function(r) { return r.json(); }).then(function(data) {
+      var sec = document.getElementById('settings-viewer-mode');
+      var sel = document.getElementById('sp-viewer-mode');
+      if (sec && sel) {
+        sel.value = data.viewerMode || 'app';
+        sec.style.display = '';
+      }
+      var timeSel = document.getElementById('sp-time-format');
+      if (timeSel) timeSel.value = data.timeFormat || '12h';
+    }).catch(function() {});
+  }
+
+  // Load current version
+  if (serverMode) {
+    fetch('/api/check-updates').then(function(r) { return r.json(); }).then(function(data) {
+      var el = document.getElementById('sp-version');
+      if (el) el.textContent = data.currentVersion || 'unknown';
+    }).catch(function() {
+      var el = document.getElementById('sp-version');
+      if (el) el.textContent = 'unknown';
+    });
+  }
 
   // Load Feeds & Sync config async
   if (serverMode) {
@@ -290,14 +324,23 @@ function showSettingsPage() {
       h += '<input type="checkbox" id="sp-cookies"' + (cfg.useBrowserCookies ? ' checked' : '') + '>';
       h += '</div>';
 
+      // Max age for feed entries
+      h += '<div class="settings-row"><div><label>Max article age</label><div class="settings-desc">Skip feed entries older than this (0 = no limit)</div></div>';
+      h += '<select id="sp-max-age">';
+      var ages = [[0,'No limit'],[30,'30 days'],[90,'3 months'],[180,'6 months'],[365,'1 year']];
+      for (var ai = 0; ai < ages.length; ai++) {
+        h += '<option value="' + ages[ai][0] + '"' + (cfg.maxAgeDays === ages[ai][0] ? ' selected' : '') + '>' + ages[ai][1] + '</option>';
+      }
+      h += '</select></div>';
+
       // Feed list
       h += '<div style="margin-top:16px"><label style="font-size:13px;font-weight:500;margin-bottom:8px;display:block">Feeds (' + feedNames.length + ')</label>';
       if (feedNames.length > 0) {
         h += '<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">';
         for (var fi = 0; fi < feedNames.length; fi++) {
           var fn = feedNames[fi];
-          h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:' + (fi < feedNames.length - 1 ? '1px solid var(--border)' : 'none') + ';font-size:13px">'
-            + '<div><div style="font-weight:500">' + escapeHtml(fn) + '</div><div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px">' + escapeHtml(feeds[fn]) + '</div></div>'
+          h += '<div id="feed-row-' + fi + '" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:' + (fi < feedNames.length - 1 ? '1px solid var(--border)' : 'none') + ';font-size:13px">'
+            + '<div style="cursor:pointer;flex:1;min-width:0" onclick="settingsEditFeed(' + fi + ')" title="Click to edit"><div style="font-weight:500">' + escapeHtml(fn) + '</div><div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px">' + escapeHtml(feeds[fn]) + '</div></div>'
             + '<button onclick="settingsRemoveFeed(\'' + escapeHtml(fn.replace(/'/g, "\\'")) + '\')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:2px 6px" title="Remove">&times;</button>'
             + '</div>';
         }
@@ -306,6 +349,7 @@ function showSettingsPage() {
       h += '<div style="display:flex;gap:8px;margin-top:10px">'
         + '<input type="text" id="sp-new-feed" placeholder="Paste bookmark feed URL or web address\u2026" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;font-family:inherit" onkeydown="if(event.key===\'Enter\')settingsAddFeed()">'
         + '<button class="btn-primary" onclick="settingsAddFeed()" id="sp-add-feed-btn" style="font-size:13px;padding:6px 14px">Add</button>'
+        + '<button onclick="settingsImportOPML()" style="font-size:13px;padding:6px 14px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit;white-space:nowrap">Import OPML\u2026</button>'
         + '</div>';
       h += '<div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6">'
         + 'Paste a bookmark feed URL from Instapaper, Pinboard, Raindrop, or Pocket. '
@@ -313,7 +357,7 @@ function showSettingsPage() {
         + '</div>';
       h += '<div style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;padding:8px 10px;background:color-mix(in srgb, var(--fg) 4%, transparent);border-radius:6px;font-size:11px;color:var(--muted)">'
         + '<span style="flex-shrink:0">&#128196;</span>'
-        + '<span>Bookmark services only sync articles you save. Newsletter feeds save every post as a separate file.</span>'
+        + '<span>Bookmark services only sync articles you save. Newsletter and blog feeds save every post as a separate file, which can use significant disk space over time.</span>'
         + '</div>';
       h += '</div>';
 
@@ -492,6 +536,51 @@ function showSettingsPage() {
   }
 }
 
+function settingsPageSaveViewerMode() {
+  var mode = document.getElementById('sp-viewer-mode').value;
+  fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ viewerMode: mode }),
+  });
+}
+
+function settingsPageSaveTimeFormat() {
+  var fmt = document.getElementById('sp-time-format').value;
+  fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ timeFormat: fmt }),
+  });
+}
+
+function settingsCheckForUpdates() {
+  var btn = document.getElementById('sp-check-updates-btn');
+  var status = document.getElementById('sp-update-status');
+  if (btn) btn.disabled = true;
+  if (status) status.textContent = 'Checking\u2026';
+  fetch('/api/check-updates').then(function(r) { return r.json(); }).then(function(data) {
+    if (btn) btn.disabled = false;
+    if (!status) return;
+    if (data.error) {
+      status.textContent = data.error;
+    } else if (data.updateAvailable) {
+      status.innerHTML = 'v' + escapeHtml(data.latestVersion) + ' available \u2014 <a href="' + escapeHtml(data.releaseUrl) + '" target="_blank" style="color:var(--link)">View release</a>';
+    } else {
+      status.textContent = 'You\u2019re up to date.';
+    }
+  }).catch(function() {
+    if (btn) btn.disabled = false;
+    if (status) status.textContent = 'Could not check for updates.';
+  });
+}
+
+function settingsOpenAa() {
+  // Navigate to dashboard/last article so the Aa button is in context, then open the dropdown
+  renderDashboard();
+  setTimeout(function() { toggleSettingsDropdown(); }, 100);
+}
+
 function settingsPageLLMProviderChanged() {
   var selected = document.getElementById('sp-llm-default').value;
   var cloudProviders = ['anthropic', 'openai', 'gemini', 'openrouter'];
@@ -659,6 +748,7 @@ function settingsPageSaveConfig() {
   var outputPath = document.getElementById('sp-output-path').value.trim();
   var syncInterval = document.getElementById('sp-sync-interval').value;
   var cookies = document.getElementById('sp-cookies').checked;
+  var maxAge = parseInt(document.getElementById('sp-max-age').value, 10) || 0;
   var sec = document.getElementById('settings-feeds');
   var cfg = sec ? sec._configData : {};
   var feeds = cfg.feeds || {};
@@ -666,7 +756,7 @@ function settingsPageSaveConfig() {
   fetch('/api/config', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ outputPath: outputPath, feeds: feeds, syncInterval: syncInterval, useBrowserCookies: cookies })
+    body: JSON.stringify({ outputPath: outputPath, feeds: feeds, syncInterval: syncInterval, useBrowserCookies: cookies, maxAgeDays: maxAge })
   }).then(function(r) {
     if (r.ok) showSettingsPage();
     else alert('Failed to save feed settings.');
@@ -706,6 +796,69 @@ function settingsRemoveFeed(name) {
     delete sec._configData.feeds[name];
   }
   settingsPageSaveConfig();
+}
+
+function settingsEditFeed(rowIndex) {
+  var sec = document.getElementById('settings-feeds');
+  if (!sec || !sec._configData) return;
+  var feeds = sec._configData.feeds || {};
+  var names = Object.keys(feeds);
+  var name = names[rowIndex];
+  if (name === undefined) return;
+  var url = feeds[name];
+  var row = document.getElementById('feed-row-' + rowIndex);
+  if (!row) return;
+  row.innerHTML = '<div style="flex:1;display:flex;flex-direction:column;gap:6px">'
+    + '<input type="text" id="feed-edit-name-' + rowIndex + '" value="' + escapeHtml(name) + '" placeholder="Feed name" style="padding:5px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg);font-size:13px;font-family:inherit">'
+    + '<input type="text" id="feed-edit-url-' + rowIndex + '" value="' + escapeHtml(url) + '" placeholder="Feed URL" style="padding:5px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg);font-size:12px;font-family:inherit">'
+    + '<div style="display:flex;gap:6px">'
+    + '<button class="btn-primary" onclick="settingsSaveEditFeed(' + rowIndex + ',\'' + escapeHtml(name.replace(/'/g, "\\'")) + '\')" style="font-size:12px;padding:4px 12px">Save</button>'
+    + '<button onclick="showSettingsPage(\'settings-feeds\')" style="font-size:12px;padding:4px 12px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit">Cancel</button>'
+    + '</div></div>';
+  document.getElementById('feed-edit-name-' + rowIndex).focus();
+}
+
+function settingsSaveEditFeed(rowIndex, oldName) {
+  var sec = document.getElementById('settings-feeds');
+  if (!sec || !sec._configData) return;
+  var newName = (document.getElementById('feed-edit-name-' + rowIndex).value || '').trim();
+  var newUrl = (document.getElementById('feed-edit-url-' + rowIndex).value || '').trim();
+  if (!newName || !newUrl) return;
+  if (newName !== oldName) delete sec._configData.feeds[oldName];
+  sec._configData.feeds[newName] = newUrl;
+  settingsPageSaveConfig();
+}
+
+function settingsImportOPML() {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.opml,.xml';
+  input.onchange = function() {
+    if (!input.files || !input.files[0]) return;
+    var reader = new FileReader();
+    reader.onload = function() {
+      var doc = new DOMParser().parseFromString(reader.result, 'text/xml');
+      var outlines = doc.querySelectorAll('outline[xmlUrl]');
+      if (!outlines.length) { alert('No feeds found in this file.'); return; }
+      var sec = document.getElementById('settings-feeds');
+      if (!sec || !sec._configData) return;
+      if (!sec._configData.feeds) sec._configData.feeds = {};
+      var added = 0;
+      for (var i = 0; i < outlines.length; i++) {
+        var el = outlines[i];
+        var url = el.getAttribute('xmlUrl');
+        var name = el.getAttribute('text') || el.getAttribute('title') || url;
+        if (!sec._configData.feeds[name]) {
+          sec._configData.feeds[name] = url;
+          added++;
+        }
+      }
+      if (added === 0) { alert('All feeds already exist.'); return; }
+      settingsPageSaveConfig();
+    };
+    reader.readAsText(input.files[0]);
+  };
+  input.click();
 }
 
 function settingsBackup() {

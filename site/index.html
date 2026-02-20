@@ -912,8 +912,7 @@
     <li><a href="#features">Features</a></li>
     <li><a href="#intelligence">Intelligence</a></li>
     <li><a href="#reader">Reader</a></li>
-    <li><a href="https://github.com/shellen/pullread" class="btn btn-sm btn-ghost">GitHub</a></li>
-    <li><a href="https://github.com/shellen/pullread/releases/latest/download/PullRead.dmg" class="btn btn-sm btn-primary">Download</a></li>
+    <li><a href="#download" class="btn btn-sm btn-primary">Download</a></li>
   </ul>
 </nav>
 
@@ -921,16 +920,15 @@
 <section class="hero">
   <div class="hero-badge">
     <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 1v12M1 7h12"/></svg>
-    Version 1.3.8
+    Version __VERSION__
   </div>
   <h1>Keep what<br>you read.</h1>
   <p>Save articles from your bookmarks as clean markdown. Read, highlight, summarize, and listen&mdash;all yours, all local.</p>
   <div class="hero-buttons">
-    <a href="https://github.com/shellen/pullread/releases/latest/download/PullRead.dmg" class="btn btn-primary">
+    <a href="#download" class="btn btn-primary">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12V2M4 8l4 4 4-4M2 14h12"/></svg>
       Download for macOS
     </a>
-    <a href="https://github.com/shellen/pullread" class="btn btn-outline">View on GitHub</a>
   </div>
   <p class="hero-note">Self-contained menu bar app. No dependencies.</p>
 </section>
@@ -1001,7 +999,7 @@
           <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8"/><path d="M6 10h8M10 6v8"/></svg>
         </div>
         <h3>Search operators</h3>
-        <p>Filter with <code style="font-size:12px;background:rgba(0,0,0,.05);padding:1px 4px;border-radius:3px">is:favorite</code>, <code style="font-size:12px;background:rgba(0,0,0,.05);padding:1px 4px;border-radius:3px">tag:design</code>, <code style="font-size:12px;background:rgba(0,0,0,.05);padding:1px 4px;border-radius:3px">has:summary</code>, AND/OR logic, and more.</p>
+        <p>Filter with <code style="font-size:12px;background:rgba(0,0,0,.05);padding:1px 4px;border-radius:3px">is:favorite</code>, <code style="font-size:12px;background:rgba(0,0,0,.05);padding:1px 4px;border-radius:3px">tag:design</code>, <code style="font-size:12px;background:rgba(0,0,0,.05);padding:1px 4px;border-radius:3px">has:summary</code>, AND/OR logic, and pinned filters for quick access.</p>
       </div>
 
       <div class="feature-card">
@@ -1024,8 +1022,8 @@
         <div class="feature-icon">
           <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v6l3-2 3 2V3M3 18V5a2 2 0 012-2h6"/><path d="M3 18l7-4 8 4"/></svg>
         </div>
-        <h3>Dashboard</h3>
-        <p>Card-based homepage with continue reading, weekly reviews, favorites, and recent articles at a glance.</p>
+        <h3>Dashboard &amp; Explore</h3>
+        <p>Card-based homepage with continue reading, weekly reviews, and favorites. Explore view shows tags, sources, and connections.</p>
       </div>
 
       <div class="feature-card">
@@ -1033,7 +1031,7 @@
           <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M8 17a2 2 0 004 0"/></svg>
         </div>
         <h3>Menu bar app</h3>
-        <p>Native macOS menu bar app with sync, notifications, and scheduled reviews. Self-contained binary, no dependencies.</p>
+        <p>Native macOS menu bar app with sync, notifications, scheduled reviews, and automatic updates. Self-contained binary, no dependencies.</p>
       </div>
 
       <div class="feature-card">
@@ -1103,6 +1101,7 @@
           <span class="op-tag">feed:*</span>
           <span class="op-tag">domain:*</span>
           <span class="op-tag">author:*</span>
+          <span class="op-tag">before:*</span>
         </div>
       </div>
     </div>
@@ -1326,16 +1325,15 @@ or any tool that reads markdown.
 </section>
 
 <!-- CTA -->
-<section class="cta">
+<section class="cta" id="download">
   <div class="reveal">
     <h2>Start keeping<br>what you read.</h2>
-    <p>Free, open source, and built for readers who care about their data.</p>
+    <p>Built for readers who care about owning their data.</p>
     <div class="cta-buttons">
-      <a href="https://github.com/shellen/pullread/releases/latest/download/PullRead.dmg" class="btn btn-teal">
+      <a href="#download" class="btn btn-teal">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12V2M4 8l4 4 4-4M2 14h12"/></svg>
         Download for macOS
       </a>
-      <a href="https://github.com/shellen/pullread" class="btn btn-outline">View on GitHub</a>
     </div>
   </div>
 </section>
@@ -1344,10 +1342,8 @@ or any tool that reads markdown.
 <footer>
   <a href="https://alittledrive.com" style="font-weight: 600; letter-spacing: -0.01em;">A Little Drive</a>
   <ul class="footer-links">
-    <li><a href="https://github.com/shellen/pullread">GitHub</a></li>
     <li><a href="/privacy">Privacy</a></li>
     <li><a href="/terms">Terms</a></li>
-    <li><a href="https://github.com/shellen/pullread/blob/main/LICENSE">MIT License</a></li>
   </ul>
 </footer>
 

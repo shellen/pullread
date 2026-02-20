@@ -60,10 +60,10 @@ function listFiles(outputPath: string): FileMeta[] {
     try {
       const stat = statSync(fullPath);
       if (!stat.isFile()) continue;
-      // Read first 3KB for frontmatter + start of body (for image extraction)
-      const buf = Buffer.alloc(3072);
+      // Read first 32KB for frontmatter + start of body (for image extraction)
+      const buf = Buffer.alloc(32768);
       const fd = require('fs').openSync(fullPath, 'r');
-      const bytesRead = require('fs').readSync(fd, buf, 0, 3072, 0);
+      const bytesRead = require('fs').readSync(fd, buf, 0, 32768, 0);
       require('fs').closeSync(fd);
       const head = buf.slice(0, bytesRead).toString('utf-8');
       const meta = parseFrontmatter(head);
@@ -110,12 +110,14 @@ function listFiles(outputPath: string): FileMeta[] {
   return files;
 }
 
-// Annotations storage path
-const ANNOTATIONS_DIR = join(homedir(), '.config', 'pullread');
-const FEEDS_PATH = join(ANNOTATIONS_DIR, 'feeds.json');
-const HIGHLIGHTS_PATH = join(ANNOTATIONS_DIR, 'highlights.json');
-const NOTES_PATH = join(ANNOTATIONS_DIR, 'notes.json');
-const NOTEBOOKS_PATH = join(ANNOTATIONS_DIR, 'notebooks.json');
+// App config and data paths
+const CONFIG_DIR = join(homedir(), '.config', 'pullread');
+const FEEDS_PATH = join(CONFIG_DIR, 'feeds.json');
+const HIGHLIGHTS_PATH = join(CONFIG_DIR, 'highlights.json');
+const NOTES_PATH = join(CONFIG_DIR, 'notes.json');
+const APP_SETTINGS_PATH = join(CONFIG_DIR, 'settings.json');
+const NOTEBOOKS_PATH = join(CONFIG_DIR, 'notebooks.json');
+const APP_VERSION = require('../package.json').version as string;
 
 function loadJsonFile(path: string): Record<string, unknown> {
   if (!existsSync(path)) return {};
@@ -607,6 +609,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
           feeds: config.feeds || {},
           syncInterval: config.syncInterval || '1h',
           useBrowserCookies: !!config.useBrowserCookies,
+          maxAgeDays: config.maxAgeDays || 0,
           configured: !!(config.outputPath && config.feeds && Object.keys(config.feeds as object).length > 0)
         });
         return;
@@ -620,6 +623,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
           if (body.feeds !== undefined) existing.feeds = body.feeds;
           if (body.syncInterval !== undefined) existing.syncInterval = body.syncInterval;
           if (body.useBrowserCookies !== undefined) existing.useBrowserCookies = body.useBrowserCookies;
+          if (body.maxAgeDays !== undefined) existing.maxAgeDays = body.maxAgeDays;
           saveJsonFile(FEEDS_PATH, existing);
 
           // Create output directory if it doesn't exist
@@ -674,18 +678,39 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
             model: config?.model || getDefaultModel(p)
           };
         }
+        const appSettings = loadJsonFile(APP_SETTINGS_PATH);
         sendJson(res, {
           llm: {
             defaultProvider: settings.defaultProvider,
             providers,
             appleAvailable: isAppleAvailable()
-          }
+          },
+          viewerMode: (appSettings.viewerMode as string) || 'app',
+          timeFormat: (appSettings.timeFormat as string) || '12h'
         });
         return;
       }
       if (req.method === 'POST') {
         try {
           const body = JSON.parse(await readBody(req));
+
+          // Viewer mode preference (app window vs default browser)
+          if (body.viewerMode !== undefined) {
+            const appSettings = loadJsonFile(APP_SETTINGS_PATH);
+            appSettings.viewerMode = body.viewerMode === 'browser' ? 'browser' : 'app';
+            saveJsonFile(APP_SETTINGS_PATH, appSettings);
+            sendJson(res, { ok: true });
+            return;
+          }
+
+          // Time format preference (12h vs 24h)
+          if (body.timeFormat !== undefined) {
+            const appSettings = loadJsonFile(APP_SETTINGS_PATH);
+            appSettings.timeFormat = body.timeFormat === '24h' ? '24h' : '12h';
+            saveJsonFile(APP_SETTINGS_PATH, appSettings);
+            sendJson(res, { ok: true });
+            return;
+          }
 
           // New multi-provider format: { defaultProvider, providers: { ... } }
           if (body.defaultProvider) {
@@ -745,6 +770,36 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
       }
     }
 
+    // Version and update check
+    if (url.pathname === '/api/check-updates' && req.method === 'GET') {
+      try {
+        const resp = await fetch('https://api.github.com/repos/shellen/pullread/releases/latest', {
+          headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'PullRead/' + APP_VERSION }
+        });
+        if (!resp.ok) {
+          sendJson(res, { currentVersion: APP_VERSION, error: 'Could not reach GitHub' });
+          return;
+        }
+        const data = await resp.json() as { tag_name?: string; html_url?: string };
+        const latest = (data.tag_name || '').replace(/^v/, '');
+        const isNewer = (() => {
+          if (!latest || latest === APP_VERSION) return false;
+          const [aMaj = 0, aMin = 0, aPat = 0] = latest.split('.').map(Number);
+          const [bMaj = 0, bMin = 0, bPat = 0] = APP_VERSION.split('.').map(Number);
+          return aMaj > bMaj || (aMaj === bMaj && (aMin > bMin || (aMin === bMin && aPat > bPat)));
+        })();
+        sendJson(res, {
+          currentVersion: APP_VERSION,
+          latestVersion: latest,
+          updateAvailable: isNewer,
+          releaseUrl: data.html_url || ''
+        });
+      } catch {
+        sendJson(res, { currentVersion: APP_VERSION, error: 'Network error' });
+      }
+      return;
+    }
+
     // Sync status API
     if (url.pathname === '/api/sync-status' && req.method === 'GET') {
       const config = loadJsonFile(join(homedir(), '.config', 'pullread', 'feeds.json')) as Record<string, unknown>;
@@ -769,6 +824,32 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         lastActivity: latestMtime > 0 ? new Date(latestMtime).toISOString() : null,
         articleCount: outputFiles.length
       });
+      return;
+    }
+
+    // Live sync progress (written by CLI during sync)
+    if (url.pathname === '/api/sync-progress' && req.method === 'GET') {
+      const progressPath = join(homedir(), '.config', 'pullread', '.sync-progress');
+      try {
+        if (existsSync(progressPath)) {
+          const data = JSON.parse(readFileSync(progressPath, 'utf-8'));
+          // Treat as stale if not updated in 60 seconds (CLI died or timed out)
+          const timestamp = data.updatedAt || data.startedAt;
+          if (timestamp) {
+            const age = Date.now() - new Date(timestamp).getTime();
+            if (age > 60000) {
+              try { unlinkSync(progressPath); } catch {}
+              sendJson(res, { status: 'idle' });
+              return;
+            }
+          }
+          sendJson(res, data);
+        } else {
+          sendJson(res, { status: 'idle' });
+        }
+      } catch {
+        sendJson(res, { status: 'idle' });
+      }
       return;
     }
 
@@ -1208,13 +1289,13 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         _createdAt: new Date().toISOString(),
       };
       for (const f of backupFiles) {
-        const p = join(ANNOTATIONS_DIR, f);
+        const p = join(CONFIG_DIR, f);
         if (existsSync(p)) {
           try { backup[f] = JSON.parse(readFileSync(p, 'utf-8')); } catch {}
         }
       }
       // Include sync database if it exists
-      const dbPath = join(ANNOTATIONS_DIR, 'pullread.json');
+      const dbPath = join(CONFIG_DIR, 'pullread.json');
       if (existsSync(dbPath)) {
         try { backup['pullread.json'] = JSON.parse(readFileSync(dbPath, 'utf-8')); } catch {}
       }
@@ -1241,7 +1322,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         let restored = 0;
         for (const f of restorableFiles) {
           if (body[f] && typeof body[f] === 'object') {
-            saveJsonFile(join(ANNOTATIONS_DIR, f), body[f]);
+            saveJsonFile(join(CONFIG_DIR, f), body[f]);
             restored++;
           }
         }
@@ -1396,7 +1477,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
       const cmd = process.platform === 'darwin' ? 'open'
         : process.platform === 'win32' ? 'start'
         : 'xdg-open';
-      exec(`${cmd} ${url}`);
+      execFile(cmd, [url]);
     }
   });
 }
