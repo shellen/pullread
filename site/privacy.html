@@ -38,12 +38,15 @@
 <div class="container">
   <a href="/" class="back">&larr; Back to Pull Read</a>
   <h1>Privacy Policy</h1>
-  <p class="updated">Last updated: February 19, 2026</p>
+  <p class="updated">Effective date: February 19, 2026</p>
 
-  <h2>Local-first by design</h2>
-  <p>Pull Read is designed to keep your data on your device. Articles, highlights, notes, tags, and reading history are stored locally on your Mac in the output folder you configure and in <code>~/.config/pullread/</code>. No data is sent to our servers because we don't operate any.</p>
+  <h2>1. Introduction</h2>
+  <p>Welcome to Pull Read, a product of A Little Drive LLC ("A Little Drive", "we", "us", "our"). We are committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your information when you use Pull Read (the "Software"). For more information about using the Software, please refer to our <a href="/terms">Terms of Use</a>.</p>
 
-  <h2>What stays local</h2>
+  <h2>2. Local-first by design</h2>
+  <p>Pull Read is designed to keep your data on your device. Articles, highlights, notes, tags, and reading history are stored locally on your Mac in the output folder you configure and in <code>~/.config/pullread/</code>. We do not operate servers that store your data.</p>
+
+  <h2>3. What stays local</h2>
   <ul>
     <li>All saved articles (markdown files in your output folder)</li>
     <li>Highlights, notes, and annotations</li>
@@ -54,37 +57,48 @@
     <li>Browser TTS and Kokoro local TTS — fully on-device</li>
   </ul>
 
-  <h2>When data leaves your device</h2>
-  <p>Data is only sent to third parties when you explicitly use certain optional AI features:</p>
+  <h2>4. When data leaves your device</h2>
+  <p>Data is only sent to third parties when you explicitly use certain optional features:</p>
   <ul>
     <li><strong>AI Summaries &amp; Auto-tagging:</strong> When you click Summarize or run auto-tagging, article text is sent to your selected LLM provider (Anthropic, OpenAI, Google Gemini, or OpenRouter) using your own API key. Apple Intelligence processes on-device.</li>
     <li><strong>Weekly Reviews:</strong> When scheduled or triggered manually, recent article content is sent to your configured LLM provider.</li>
     <li><strong>Cloud TTS (OpenAI / ElevenLabs):</strong> When you use a paid TTS provider, article text is sent to that provider's API using your dedicated TTS API key. A consent prompt is shown before the first use, and cost estimates are displayed.</li>
     <li><strong>RSS Feed Fetching:</strong> Pull Read fetches RSS/Atom feeds and article URLs you configure. These are standard HTTP requests to the content sources.</li>
+    <li><strong>Auto-updates:</strong> The macOS app checks for updates via a periodic HTTPS request to GitHub Releases. No personal data is included in this request.</li>
   </ul>
-  <p>Each third-party provider has its own privacy policy governing how they handle data sent through their APIs. We encourage you to review those policies.</p>
+  <p>Each third-party provider has its own privacy policy governing how they handle data sent through their APIs. We strongly advise you to review those policies.</p>
 
-  <h2>API keys</h2>
+  <h2>5. API keys</h2>
   <p>API keys are stored locally in <code>~/.config/pullread/settings.json</code>. They are never sent to us, never logged, and never shared between features (your Summaries key is separate from your TTS key). Keys are transmitted only to the provider API you selected, over HTTPS.</p>
 
-  <h2>The viewer server</h2>
+  <h2>6. The viewer server</h2>
   <p>Pull Read's built-in article reader runs a local HTTP server bound to <code>127.0.0.1</code> (localhost only). It is not accessible from other devices on your network.</p>
 
-  <h2>Analytics and tracking</h2>
-  <p>Pull Read does not include any analytics, telemetry, crash reporting, or tracking. We don't collect any usage data.</p>
+  <h2>7. Analytics and tracking</h2>
+  <p>Pull Read does not include any analytics, telemetry, crash reporting, or tracking. We do not collect any usage data.</p>
 
-  <h2>Auto-updates</h2>
-  <p>The macOS app checks for updates via a periodic HTTPS request to GitHub Releases to see if a new version is available. No personal data is included in this request.</p>
+  <h2>8. Data security</h2>
+  <p>Because Pull Read stores data locally on your device, data security is primarily in your hands. We recommend keeping your operating system and the Software up to date. No method of electronic storage is 100% secure, and we cannot guarantee absolute security of locally stored data.</p>
 
-  <h2>Children's privacy</h2>
-  <p>Pull Read is not directed at children under 13. We do not knowingly collect information from children.</p>
+  <h2>9. Your choices and rights</h2>
+  <p>Because Pull Read is local-first, you have direct control over your data at all times. You can delete any article, note, highlight, or configuration file directly from your filesystem. Uninstalling the Software and removing <code>~/.config/pullread/</code> removes all traces of Pull Read from your device.</p>
 
-  <h2>Changes to this policy</h2>
-  <p>We may update this policy as the product evolves. Changes will be noted with an updated date at the top of this page.</p>
+  <h2>9a. California privacy rights</h2>
+  <p>California residents have certain rights regarding their personal information under the California Consumer Privacy Act (CCPA) and California Privacy Rights Act (CPRA), including the right to know what personal information is collected and how it is used, the right to delete personal information, and the right to opt-out of the sale of personal information. Because Pull Read does not collect, store, or transmit personal information to our servers, these rights are inherently satisfied by the Software's local-first design. If you have questions about exercising your rights, please contact us at <a href="mailto:support@alittledrive.com">support@alittledrive.com</a>.</p>
 
-  <h2>Contact</h2>
-  <p>If you have questions about this policy, contact us at <a href="mailto:support@alittledrive.com">support@alittledrive.com</a>.</p>
-  <p style="margin-top: 24px; font-size: 13px;">A Little Drive LLC<br>3527 Mt. Diablo Blvd. #217<br>Lafayette, CA 94549</p>
+  <h2>10. Children's privacy</h2>
+  <p>Pull Read is not directed at children under 13 years of age. We do not knowingly collect personal information from children under 13. If you are a parent or guardian and believe we may have collected information from your child, please contact us immediately at <a href="mailto:support@alittledrive.com">support@alittledrive.com</a>.</p>
+
+  <h2>11. International users</h2>
+  <p>The Software is intended for users located in the United States. If you access or use the Software from outside the United States, you do so at your own risk and are responsible for compliance with local laws.</p>
+
+  <h2>12. Changes to this policy</h2>
+  <p>We reserve the right to modify this Privacy Policy at any time. If we make changes, we will notify you by updating the "Effective date" at the top of this page. Your continued use of the Software after any modifications indicates your acceptance of the updated Privacy Policy.</p>
+
+  <h2>13. Contact us</h2>
+  <p>If you have any questions or concerns about this Privacy Policy, please contact us at <a href="mailto:support@alittledrive.com">support@alittledrive.com</a> or by mail at:</p>
+  <p>A Little Drive LLC<br>3527 Mt. Diablo Blvd. #217<br>Lafayette, CA 94549</p>
+  <p>This Privacy Policy works in conjunction with our <a href="/terms">Terms of Use</a>.</p>
 </div>
 </body>
 </html>
