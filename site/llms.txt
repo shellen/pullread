@@ -15,28 +15,31 @@ Pull Read is an open-source macOS menu bar app and CLI tool that connects to boo
 - Markdown output with YAML frontmatter
 - Built-in two-pane article reader (localhost:7777)
 - Homepage dashboard with card-based landing page
+- Explore view with tag cloud, source breakdown, and article connections
 - Text highlighting in four colors (yellow, green, blue, pink)
 - Inline annotations and article-level notes
 - Article tagging and favorites
-- Search operators: is:favorite, is:read, has:summary, tag:*, feed:*, domain:*, author:* with AND/OR logic
+- Search operators: is:favorite, is:read, has:summary, tag:*, feed:*, domain:*, author:*, before:*, after:* with AND/OR logic
+- Pinned filters: save up to 3 search queries as quick-access buttons
 - AI-powered article summaries (Anthropic Claude, OpenAI GPT, Google Gemini, OpenRouter, Apple Intelligence)
 - Summary provenance with provider/model badges saved to frontmatter
 - AI-generated weekly reading reviews
+- AI-powered auto-tagging of articles
 - Text-to-speech with 4 providers: Browser (free), Kokoro local AI (free), OpenAI, ElevenLabs
 - Voice notes via Web Speech API microphone recording
 - Export articles as markdown with optional highlights, notes, summary, and tags
 - Smart deduplication and retry for failed extractions
 - Self-contained native macOS menu bar app (no dependencies)
 - Cloud-sync friendly (Dropbox, iCloud, Google Drive, or any folder)
-- Automatic updates via Sparkle
+- Automatic updates with signed binaries
 
 ## Technical Details
 
-- macOS app: Native Swift with SwiftUI
+- macOS app: Tauri 2 (Rust) with embedded web viewer
 - CLI: TypeScript compiled to standalone binary via Bun
 - Viewer: Single-file HTML/CSS/JavaScript served locally
 - Distribution: Signed and notarized DMG via GitHub Releases
-- Auto-updates: Sparkle 2 with EdDSA signature verification
+- Auto-updates: Tauri updater plugin with minisign signature verification
 - Configuration stored at ~/.config/pullread/
 - Articles saved as date-prefixed markdown files (e.g., 2026-02-10-article-title.md)
 - TTS audio cached locally in .tts-cache/ directory
@@ -45,7 +48,5 @@ Pull Read is an open-source macOS menu bar app and CLI tool that connects to boo
 ## Links
 
 - Website: https://pullread.com
-- GitHub: https://github.com/shellen/pullread
-- Download: https://github.com/shellen/pullread/releases/latest
-- License: MIT
+- Download: https://pullread.com/#download
 - By: A Little Drive (https://alittledrive.com)

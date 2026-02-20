@@ -117,7 +117,7 @@ const HIGHLIGHTS_PATH = join(CONFIG_DIR, 'highlights.json');
 const NOTES_PATH = join(CONFIG_DIR, 'notes.json');
 const APP_SETTINGS_PATH = join(CONFIG_DIR, 'settings.json');
 const NOTEBOOKS_PATH = join(CONFIG_DIR, 'notebooks.json');
-const APP_VERSION = '2.0.0';
+const APP_VERSION = require('../package.json').version as string;
 
 function loadJsonFile(path: string): Record<string, unknown> {
   if (!existsSync(path)) return {};
@@ -782,10 +782,16 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         }
         const data = await resp.json() as { tag_name?: string; html_url?: string };
         const latest = (data.tag_name || '').replace(/^v/, '');
+        const isNewer = (() => {
+          if (!latest || latest === APP_VERSION) return false;
+          const [aMaj = 0, aMin = 0, aPat = 0] = latest.split('.').map(Number);
+          const [bMaj = 0, bMin = 0, bPat = 0] = APP_VERSION.split('.').map(Number);
+          return aMaj > bMaj || (aMaj === bMaj && (aMin > bMin || (aMin === bMin && aPat > bPat)));
+        })();
         sendJson(res, {
           currentVersion: APP_VERSION,
           latestVersion: latest,
-          updateAvailable: latest !== '' && latest !== APP_VERSION,
+          updateAvailable: isNewer,
           releaseUrl: data.html_url || ''
         });
       } catch {

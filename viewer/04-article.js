@@ -70,7 +70,7 @@ function renderDashboard() {
   if (favorites.length > 0) {
     html += '<div class="dash-section">';
     html += '<div class="dash-section-header">';
-    html += '<span class="dash-section-title"><svg viewBox="0 0 512 512"><use href="#i-heart"/></svg> Favorites <span class="dash-section-count">(' + favorites.length + ')</span></span>';
+    html += '<span class="dash-section-title"><svg viewBox="0 0 576 512"><use href="#i-heart"/></svg> Favorites <span class="dash-section-count">(' + favorites.length + ')</span></span>';
     html += '</div>';
     html += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards">';
     for (const f of favorites.slice(0, 10)) {
@@ -248,7 +248,7 @@ function renderArticle(text, filename) {
   html += '<div class="article-actions">';
   const isFav = articleNotes.isFavorite;
   html += '<button onclick="toggleFavoriteFromHeader(this)" class="' + (isFav ? 'active-fav' : '') + '" aria-label="' + (isFav ? 'Remove from favorites' : 'Add to favorites') + '" aria-pressed="' + isFav + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg> Favorite</button>';
-  html += '<button onclick="toggleNotesFromHeader()" aria-label="Toggle notes panel"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-pen"/></svg></button>';
+  html += '<button onclick="toggleNotesFromHeader()" aria-label="Toggle notes panel"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-pen"/></svg> Notes</button>';
   if (!isReviewArticle) {
     html += '<button onclick="summarizeArticle()" id="summarize-btn" aria-label="Summarize article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Summarize</button>';
   }
@@ -261,7 +261,7 @@ function renderArticle(text, filename) {
   if (meta && meta.url) {
     html += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg> Share</button></div>';
   }
-  html += '<button onclick="markCurrentAsUnread()" aria-label="Mark as unread"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-eye-slash"/></svg> Unread</button>';
+  html += '<button onclick="markCurrentAsUnread()" aria-label="Mark as unread"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-eye-slash"/></svg> Mark Unread</button>';
   html += '</div>';
   // Show notebook back-references
   var nbRefs = Object.values(_notebooks || {}).filter(function(nb) { return nb.sources && nb.sources.indexOf(filename) >= 0; });

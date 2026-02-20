@@ -991,7 +991,7 @@
   .article-byline .sep { margin: 0 6px; opacity: 0.4; }
   .article-actions {
     display: flex;
-    gap: 4px;
+    gap: 6px;
     margin-top: 10px;
     align-items: center;
     flex-wrap: wrap;
@@ -1013,7 +1013,7 @@
     line-height: 1.4;
   }
   .article-actions button:hover { background: var(--sidebar-active); color: var(--fg); }
-  .article-actions button.active-fav { background: color-mix(in srgb, #e91e63 12%, var(--bg)); color: #e91e63; }
+  .article-actions button.active-fav { background: color-mix(in srgb, #d97706 12%, var(--bg)); color: #d97706; }
   .article-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
   .play-next-menu { display: inline-flex; align-items: center; gap: 0; position: relative; }
   .play-next-trigger {
@@ -2318,7 +2318,7 @@
   .dot-highlight { background: #ffeb3b; }
   .dot-note { background: var(--link); }
   .dot-summary { background: var(--muted); opacity: 0.6; }
-  .dot-favorite { color: #e91e63; font-size: 8px; line-height: 6px; }
+  .dot-favorite { color: #d97706; font-size: 8px; line-height: 6px; }
 
   /* Highlight note marker (small icon after highlighted text) */
   .hl-note-marker {
