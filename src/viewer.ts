@@ -868,9 +868,12 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         return;
       }
       if (req.method === 'DELETE') {
-        const body = JSON.parse(await readBody(req));
-        const removed = removeSiteLogin(body.domain);
-        sendJson(res, { ok: removed });
+        try {
+          const body = JSON.parse(await readBody(req));
+          if (!body.domain) { sendJson(res, { ok: false, error: 'missing domain' }); return; }
+          const removed = removeSiteLogin(body.domain);
+          sendJson(res, { ok: removed });
+        } catch { sendJson(res, { ok: false, error: 'invalid request' }); }
         return;
       }
     }

@@ -4,7 +4,7 @@
 import { existsSync, copyFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import { createDecipheriv, pbkdf2Sync } from 'crypto';
 import { Database } from 'bun:sqlite';
 
@@ -287,10 +287,9 @@ function assertSafeDomain(domain: string): void {
 export function saveSiteLoginCookies(domain: string, cookies: SiteLoginCookie[]): void {
   assertSafeDomain(domain);
   const json = JSON.stringify(cookies);
-  execSync(
-    `security add-generic-password -s "${KEYCHAIN_SERVICE}" -a "${domain}" -w "${json.replace(/"/g, '\\"')}" -U`,
-    { stdio: ['pipe', 'pipe', 'pipe'] }
-  );
+  execFileSync('security', [
+    'add-generic-password', '-s', KEYCHAIN_SERVICE, '-a', domain, '-w', json, '-U'
+  ], { stdio: ['pipe', 'pipe', 'pipe'] });
 }
 
 /**
@@ -299,19 +298,27 @@ export function saveSiteLoginCookies(domain: string, cookies: SiteLoginCookie[])
  */
 export function getSiteLoginCookies(domain: string): string | null {
   assertSafeDomain(domain);
-  try {
-    const result = execSync(
-      `security find-generic-password -w -s "${KEYCHAIN_SERVICE}" -a "${domain}"`,
-      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
-    );
-    const cookies: SiteLoginCookie[] = JSON.parse(result.trim());
-    const now = Date.now();
-    const valid = cookies.filter(c => c.expires === 0 || c.expires > now);
-    if (valid.length === 0) return null;
-    return valid.map(c => `${c.name}=${c.value}`).join('; ');
-  } catch {
-    return null;
+  // Try exact domain first, then without www. prefix
+  const domains = [domain];
+  const base = domain.replace(/^www\./, '');
+  if (base !== domain) domains.push(base);
+  else domains.push(`www.${domain}`);
+
+  for (const d of domains) {
+    try {
+      const result = execFileSync('security', [
+        'find-generic-password', '-w', '-s', KEYCHAIN_SERVICE, '-a', d
+      ], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+      const cookies: SiteLoginCookie[] = JSON.parse(result.trim());
+      const now = Date.now();
+      const valid = cookies.filter(c => c.expires === 0 || c.expires > now);
+      if (valid.length === 0) return null;
+      return valid.map(c => `${c.name}=${c.value}`).join('; ');
+    } catch {
+      continue;
+    }
   }
+  return null;
 }
 
 /**
@@ -320,10 +327,9 @@ export function getSiteLoginCookies(domain: string): string | null {
 export function removeSiteLogin(domain: string): boolean {
   assertSafeDomain(domain);
   try {
-    execSync(
-      `security delete-generic-password -s "${KEYCHAIN_SERVICE}" -a "${domain}"`,
-      { stdio: ['pipe', 'pipe', 'pipe'] }
-    );
+    execFileSync('security', [
+      'delete-generic-password', '-s', KEYCHAIN_SERVICE, '-a', domain
+    ], { stdio: ['pipe', 'pipe', 'pipe'] });
     return true;
   } catch {
     return false;

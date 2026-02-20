@@ -125,16 +125,6 @@ pub fn save_site_cookies(domain: String, cookies_json: String) -> Result<(), Str
         return Err(format!("Invalid domain: {}", domain));
     }
 
-    // Delete existing entry first
-    let _ = Command::new("security")
-        .args([
-            "delete-generic-password",
-            "-s", KEYCHAIN_SERVICE,
-            "-a", &domain,
-        ])
-        .output();
-
-    // Add new entry
     let status = Command::new("security")
         .args([
             "add-generic-password",
