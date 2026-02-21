@@ -202,6 +202,7 @@ function showSettingsPage(scrollToSection) {
   html += '<div class="settings-row"><div><label>Activity suggestion</label><div class="settings-desc">Leave blank for random suggestions (walk, stretch, tea\u2026)</div></div>';
   html += '<input type="text" id="sp-break-activity" value="' + escapeHtml(breakActivity) + '" placeholder="e.g. Take a walk, Play guitar, Call a friend" style="min-width:200px" onchange="localStorage.setItem(\'pr-break-activity\',this.value)">';
   html += '</div>';
+  html += '<div style="padding:6px 0"><button onclick="showBreakReminder()" style="font-size:12px;padding:4px 12px;background:var(--sidebar-bg);color:var(--link);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit">Preview break reminder</button></div>';
   html += '</div>';
 
   // ---- Open In section (Tauri only) ----
@@ -403,6 +404,32 @@ function showSettingsPage(scrollToSection) {
         + '<span style="flex-shrink:0">&#128196;</span>'
         + '<span>Bookmark services only sync articles you save. Newsletter and blog feeds save every post as a separate file, which can use significant disk space over time.</span>'
         + '</div>';
+
+      // Recommended feeds
+      var recFeeds = [
+        { name: 'Daring Fireball', url: 'https://daringfireball.net/feeds/main' },
+        { name: 'Kottke.org', url: 'https://feeds.kottke.org/main' },
+        { name: 'Austin Kleon', url: 'https://austinkleon.com' },
+        { name: 'Craig Mod', url: 'https://craigmod.com' },
+        { name: 'Aeon Essays', url: 'https://aeon.co/feed.rss' },
+        { name: 'Longreads', url: 'https://longreads.com' },
+        { name: 'The Marginalian', url: 'https://www.themarginalian.org' },
+      ];
+      // Filter out feeds already added
+      var existingUrls = Object.values(feeds).map(function(u) { return u.toLowerCase(); });
+      var existingNames = Object.keys(feeds).map(function(n) { return n.toLowerCase(); });
+      var available = recFeeds.filter(function(rf) {
+        return existingUrls.indexOf(rf.url.toLowerCase()) === -1 &&
+               existingNames.indexOf(rf.name.toLowerCase()) === -1;
+      });
+      if (available.length > 0) {
+        h += '<div style="margin-top:14px"><label style="font-size:12px;font-weight:500;color:var(--muted);display:block;margin-bottom:6px">Recommended feeds (low traffic)</label>';
+        h += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+        for (var ri = 0; ri < available.length; ri++) {
+          h += '<button onclick="settingsAddRecFeed(\'' + escapeHtml(available[ri].name.replace(/'/g, "\\'")) + '\',\'' + escapeHtml(available[ri].url.replace(/'/g, "\\'")) + '\')" style="font-size:12px;padding:4px 10px;background:var(--sidebar-bg);color:var(--fg);border:1px solid var(--border);border-radius:14px;cursor:pointer;font-family:inherit;white-space:nowrap">+ ' + escapeHtml(available[ri].name) + '</button>';
+        }
+        h += '</div></div>';
+      }
       h += '</div>';
 
       h += '<div class="settings-row" style="justify-content:flex-end;padding-top:12px">';
@@ -819,6 +846,15 @@ function settingsPageSaveConfig() {
     if (r.ok) showSettingsPage();
     else alert('Failed to save feed settings.');
   });
+}
+
+function settingsAddRecFeed(name, url) {
+  var sec = document.getElementById('settings-feeds');
+  if (sec && sec._configData) {
+    if (!sec._configData.feeds) sec._configData.feeds = {};
+    sec._configData.feeds[name] = url;
+  }
+  settingsPageSaveConfig();
 }
 
 async function settingsAddFeed() {
