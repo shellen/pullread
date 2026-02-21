@@ -102,6 +102,7 @@ function renderDashboard() {
   html += '<button onclick="dashGenerateReview(7)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Weekly Review</button>';
   html += '<button onclick="showTagCloud()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-search"/></svg> Explore</button>';
   html += '<button onclick="showGuideModal()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-book"/></svg> Guide</button>';
+  html += '<button onclick="showTour()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-comment"/></svg> Tour</button>';
   html += '</div>';
 
   dash.innerHTML = html;
