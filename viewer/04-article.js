@@ -501,7 +501,8 @@ function renderArticle(text, filename) {
       sep.innerHTML = '&middot;';
       bylineEl.appendChild(sep);
     }
-    statsSpan.innerHTML = minutes + ' min read<span class="stat-divider">&middot;</span>' + (words >= 1000 ? (words / 1000).toFixed(1) + 'k' : words) + ' words';
+    var wordStr = (words >= 1000 ? (words / 1000).toFixed(1) + 'k' : words) + ' words';
+    statsSpan.innerHTML = minutes + ' min read<span class="word-count"><span class="stat-divider">&middot;</span>' + wordStr + '</span>';
     bylineEl.appendChild(statsSpan);
   }
 

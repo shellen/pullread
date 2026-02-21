@@ -3049,6 +3049,12 @@
   .read-stats .stat-divider {
     opacity: 0.4;
   }
+  .read-stats .word-count {
+    display: none;
+  }
+  .read-stats:hover .word-count {
+    display: inline;
+  }
 
   /* Mini mode — full-screen audio player overlay */
   .mini-mode-container {
