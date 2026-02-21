@@ -10,7 +10,7 @@ Based on the existing build spec (`2026-02-12-ios-companion-app.md`), here's the
 - **Existing spec**: A complete Expo + WebView architecture is designed for the iOS companion app.
 - **Viewer**: Self-contained HTML/JS viewer (~400KB) already works in any WebView.
 - **Architecture**: Fetch bridge intercepts `/api/*` calls → routes to an Expo native Swift module → reads local `.md` files.
-- **Scope**: Read-only companion app. No sync, no accounts, no server.
+- **Scope**: Reader + on-device sync. No accounts, no server. Users can read articles synced from desktop OR fetch new articles directly on iOS.
 
 > **Note**: The iOS app's Swift code (the `FolderAccessModule` Expo native module) is completely separate from the desktop app's Tauri/Rust shell. The desktop app does not use Swift.
 
@@ -18,7 +18,11 @@ Based on the existing build spec (`2026-02-12-ios-companion-app.md`), here's the
 
 ## How Articles Get to Your Phone
 
-The iOS app is a **reader only** — the desktop PullRead app (Tauri) does all the RSS syncing and article extraction. The `.md` files need to reach your phone via a **shared folder** using a cloud or sync service.
+The iOS app supports **two modes**: reading articles synced from the desktop, and fetching new articles directly on the device. In both cases, articles live as `.md` files in a shared folder.
+
+**Mode 1 — Desktop sync (passive):** The desktop PullRead app (Tauri) does the RSS syncing and article extraction. The `.md` files reach your phone via a cloud/sync service (iCloud Drive, Dropbox, etc.).
+
+**Mode 2 — On-device sync (active):** The iOS app can also fetch RSS feeds and extract articles directly, using the same pure-JS pipeline as the desktop. This runs in the foreground when you tap "Sync Now". Articles written to the shared folder also sync back to desktop.
 
 ### How iOS folder access works
 
