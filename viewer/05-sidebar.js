@@ -322,6 +322,7 @@ var _loadFileAbort = null;
 async function loadFile(index) {
   const file = displayFiles[index];
   if (!file) return;
+  if (_breakSessionStart === 0) _breakSessionStart = Date.now();
   _sidebarView = 'home'; syncSidebarTabs();
   var prevActive = activeFile;
   activeFile = file.filename;
@@ -366,12 +367,27 @@ async function loadFile(index) {
 // Navigate to next (+1) or previous (-1) article with wrapping
 function navigateArticle(direction) {
   if (!displayFiles.length) return;
-  const currentIdx = displayFiles.findIndex(f => f.filename === activeFile);
+  var interval = parseInt(localStorage.getItem('pr-break-interval') || '0', 10);
+  if (interval > 0 && _breakSessionStart > 0) {
+    var elapsed = (Date.now() - _breakSessionStart) / 60000;
+    if (elapsed >= interval) {
+      var currentIdx = displayFiles.findIndex(f => f.filename === activeFile);
+      _breakPendingDirection = direction;
+      if (direction > 0) {
+        _breakPendingIndex = currentIdx < displayFiles.length - 1 ? currentIdx + 1 : 0;
+      } else {
+        _breakPendingIndex = currentIdx > 0 ? currentIdx - 1 : displayFiles.length - 1;
+      }
+      showBreakReminder();
+      return;
+    }
+  }
+  const cidx = displayFiles.findIndex(f => f.filename === activeFile);
   let next;
   if (direction > 0) {
-    next = currentIdx < displayFiles.length - 1 ? currentIdx + 1 : 0;
+    next = cidx < displayFiles.length - 1 ? cidx + 1 : 0;
   } else {
-    next = currentIdx > 0 ? currentIdx - 1 : displayFiles.length - 1;
+    next = cidx > 0 ? cidx - 1 : displayFiles.length - 1;
   }
   loadFile(next);
   const el = document.querySelector('.file-item[data-index="' + next + '"]');
@@ -797,5 +813,207 @@ function applyPinnedFilter(index) {
   }
   filterFiles();
   renderPinnedFilters();
+}
+
+// ---- Reading break reminder ----
+var COVER_COLORS = [
+  '#8B4513', '#2F4F4F', '#4A3728', '#1B3A4B', '#5B3256',
+  '#6B4423', '#2D4A22', '#3C3C5A', '#7A3B2E', '#2E5F5F'
+];
+
+var DEFAULT_ACTIVITIES = [
+  'Take a walk outside',
+  'Call a friend',
+  'Play guitar',
+  'Stretch for a few minutes',
+  'Make a cup of tea',
+  'Look out the window',
+  'Do some pushups',
+  'Water a plant',
+  'Doodle something'
+];
+
+// gutenberg: Project Gutenberg ebook ID (null if not available)
+var CLASSIC_BOOKS = [
+  { title: 'Pride and Prejudice', author: 'Jane Austen', gutenberg: 1342 },
+  { title: '1984', author: 'George Orwell', gutenberg: null },
+  { title: 'To Kill a Mockingbird', author: 'Harper Lee', gutenberg: null },
+  { title: 'Jane Eyre', author: 'Charlotte Brontë', gutenberg: 1260 },
+  { title: 'Wuthering Heights', author: 'Emily Brontë', gutenberg: 768 },
+  { title: 'Great Expectations', author: 'Charles Dickens', gutenberg: 1400 },
+  { title: 'Moby-Dick', author: 'Herman Melville', gutenberg: 2701 },
+  { title: 'War and Peace', author: 'Leo Tolstoy', gutenberg: 2600 },
+  { title: 'Anna Karenina', author: 'Leo Tolstoy', gutenberg: 1399 },
+  { title: 'Crime and Punishment', author: 'Fyodor Dostoevsky', gutenberg: 2554 },
+  { title: 'The Brothers Karamazov', author: 'Fyodor Dostoevsky', gutenberg: 28054 },
+  { title: 'Don Quixote', author: 'Miguel de Cervantes', gutenberg: 996 },
+  { title: 'The Count of Monte Cristo', author: 'Alexandre Dumas', gutenberg: 1184 },
+  { title: 'Les Misérables', author: 'Victor Hugo', gutenberg: 135 },
+  { title: 'The Adventures of Huckleberry Finn', author: 'Mark Twain', gutenberg: 76 },
+  { title: 'The Adventures of Tom Sawyer', author: 'Mark Twain', gutenberg: 74 },
+  { title: 'A Tale of Two Cities', author: 'Charles Dickens', gutenberg: 98 },
+  { title: 'Oliver Twist', author: 'Charles Dickens', gutenberg: 730 },
+  { title: 'David Copperfield', author: 'Charles Dickens', gutenberg: 766 },
+  { title: 'Frankenstein', author: 'Mary Shelley', gutenberg: 84 },
+  { title: 'Dracula', author: 'Bram Stoker', gutenberg: 345 },
+  { title: 'The Picture of Dorian Gray', author: 'Oscar Wilde', gutenberg: 174 },
+  { title: 'The Importance of Being Earnest', author: 'Oscar Wilde', gutenberg: 844 },
+  { title: 'Sense and Sensibility', author: 'Jane Austen', gutenberg: 161 },
+  { title: 'Emma', author: 'Jane Austen', gutenberg: 158 },
+  { title: 'Persuasion', author: 'Jane Austen', gutenberg: 105 },
+  { title: 'Northanger Abbey', author: 'Jane Austen', gutenberg: 121 },
+  { title: 'Mansfield Park', author: 'Jane Austen', gutenberg: 141 },
+  { title: 'The Odyssey', author: 'Homer', gutenberg: 1727 },
+  { title: 'The Iliad', author: 'Homer', gutenberg: 6130 },
+  { title: 'Metamorphoses', author: 'Ovid', gutenberg: 26073 },
+  { title: 'Meditations', author: 'Marcus Aurelius', gutenberg: 2680 },
+  { title: 'The Republic', author: 'Plato', gutenberg: 1497 },
+  { title: 'Thus Spoke Zarathustra', author: 'Friedrich Nietzsche', gutenberg: 1998 },
+  { title: 'Beyond Good and Evil', author: 'Friedrich Nietzsche', gutenberg: 4363 },
+  { title: 'Walden', author: 'Henry David Thoreau', gutenberg: 205 },
+  { title: 'The Scarlet Letter', author: 'Nathaniel Hawthorne', gutenberg: 25344 },
+  { title: 'Little Women', author: 'Louisa May Alcott', gutenberg: 514 },
+  { title: 'The Call of the Wild', author: 'Jack London', gutenberg: 215 },
+  { title: 'White Fang', author: 'Jack London', gutenberg: 910 },
+  { title: 'Treasure Island', author: 'Robert Louis Stevenson', gutenberg: 120 },
+  { title: 'The Strange Case of Dr Jekyll and Mr Hyde', author: 'Robert Louis Stevenson', gutenberg: 43 },
+  { title: 'The War of the Worlds', author: 'H.G. Wells', gutenberg: 36 },
+  { title: 'The Time Machine', author: 'H.G. Wells', gutenberg: 35 },
+  { title: 'The Island of Doctor Moreau', author: 'H.G. Wells', gutenberg: 159 },
+  { title: 'Heart of Darkness', author: 'Joseph Conrad', gutenberg: 219 },
+  { title: 'Lord Jim', author: 'Joseph Conrad', gutenberg: 5658 },
+  { title: 'The Secret Garden', author: 'Frances Hodgson Burnett', gutenberg: 113 },
+  { title: 'A Little Princess', author: 'Frances Hodgson Burnett', gutenberg: 146 },
+  { title: 'Alice\'s Adventures in Wonderland', author: 'Lewis Carroll', gutenberg: 11 },
+  { title: 'Through the Looking-Glass', author: 'Lewis Carroll', gutenberg: 12 },
+  { title: 'The Jungle Book', author: 'Rudyard Kipling', gutenberg: 236 },
+  { title: 'Kim', author: 'Rudyard Kipling', gutenberg: 2226 },
+  { title: 'The Hound of the Baskervilles', author: 'Arthur Conan Doyle', gutenberg: 2852 },
+  { title: 'A Study in Scarlet', author: 'Arthur Conan Doyle', gutenberg: 244 },
+  { title: 'The Sign of the Four', author: 'Arthur Conan Doyle', gutenberg: 2097 },
+  { title: 'Around the World in Eighty Days', author: 'Jules Verne', gutenberg: 103 },
+  { title: 'Twenty Thousand Leagues Under the Seas', author: 'Jules Verne', gutenberg: 164 },
+  { title: 'A Journey to the Centre of the Earth', author: 'Jules Verne', gutenberg: 18857 },
+  { title: 'The Phantom of the Opera', author: 'Gaston Leroux', gutenberg: 175 },
+  { title: 'The Three Musketeers', author: 'Alexandre Dumas', gutenberg: 1257 },
+  { title: 'Gulliver\'s Travels', author: 'Jonathan Swift', gutenberg: 829 },
+  { title: 'Robinson Crusoe', author: 'Daniel Defoe', gutenberg: 521 },
+  { title: 'The Wonderful Wizard of Oz', author: 'L. Frank Baum', gutenberg: 55 },
+  { title: 'Peter Pan', author: 'J.M. Barrie', gutenberg: 16 },
+  { title: 'Anne of Green Gables', author: 'L.M. Montgomery', gutenberg: 45 },
+  { title: 'The Wind in the Willows', author: 'Kenneth Grahame', gutenberg: 289 },
+  { title: 'Black Beauty', author: 'Anna Sewell', gutenberg: 271 },
+  { title: 'The Metamorphosis', author: 'Franz Kafka', gutenberg: 5200 },
+  { title: 'The Trial', author: 'Franz Kafka', gutenberg: 7849 },
+  { title: 'Siddhartha', author: 'Hermann Hesse', gutenberg: null },
+  { title: 'Steppenwolf', author: 'Hermann Hesse', gutenberg: null },
+  { title: 'Dubliners', author: 'James Joyce', gutenberg: 2814 },
+  { title: 'Ulysses', author: 'James Joyce', gutenberg: 4300 },
+  { title: 'A Portrait of the Artist as a Young Man', author: 'James Joyce', gutenberg: 4217 },
+  { title: 'Sons and Lovers', author: 'D.H. Lawrence', gutenberg: 5150 },
+  { title: 'Middlemarch', author: 'George Eliot', gutenberg: 145 },
+  { title: 'Silas Marner', author: 'George Eliot', gutenberg: 550 },
+  { title: 'Tess of the d\'Urbervilles', author: 'Thomas Hardy', gutenberg: 110 },
+  { title: 'Far from the Madding Crowd', author: 'Thomas Hardy', gutenberg: 148 },
+  { title: 'The Age of Innocence', author: 'Edith Wharton', gutenberg: 541 },
+  { title: 'Ethan Frome', author: 'Edith Wharton', gutenberg: 4517 },
+  { title: 'The House of Mirth', author: 'Edith Wharton', gutenberg: 284 },
+  { title: 'My Ántonia', author: 'Willa Cather', gutenberg: 242 },
+  { title: 'The Great Gatsby', author: 'F. Scott Fitzgerald', gutenberg: null },
+  { title: 'This Side of Paradise', author: 'F. Scott Fitzgerald', gutenberg: 805 },
+  { title: 'The Sun Also Rises', author: 'Ernest Hemingway', gutenberg: null },
+  { title: 'A Farewell to Arms', author: 'Ernest Hemingway', gutenberg: null },
+  { title: 'Of Mice and Men', author: 'John Steinbeck', gutenberg: null },
+  { title: 'Brave New World', author: 'Aldous Huxley', gutenberg: null },
+  { title: 'Catch-22', author: 'Joseph Heller', gutenberg: null },
+  { title: 'Slaughterhouse-Five', author: 'Kurt Vonnegut', gutenberg: null },
+  { title: 'One Hundred Years of Solitude', author: 'Gabriel García Márquez', gutenberg: null },
+  { title: 'The Stranger', author: 'Albert Camus', gutenberg: null },
+  { title: 'Invisible Man', author: 'Ralph Ellison', gutenberg: null },
+  { title: 'Their Eyes Were Watching God', author: 'Zora Neale Hurston', gutenberg: null },
+  { title: 'Beloved', author: 'Toni Morrison', gutenberg: null },
+  { title: 'The Color Purple', author: 'Alice Walker', gutenberg: null },
+  { title: 'Things Fall Apart', author: 'Chinua Achebe', gutenberg: null },
+  { title: 'The Awakening', author: 'Kate Chopin', gutenberg: 160 },
+  { title: 'The Yellow Wallpaper', author: 'Charlotte Perkins Gilman', gutenberg: 1952 },
+];
+
+function hashString(str) {
+  var hash = 0;
+  for (var i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function bookshopUrl(book) {
+  return 'https://bookshop.org/search?keywords=' + encodeURIComponent(book.title + ' ' + book.author);
+}
+
+function gutenbergUrl(book) {
+  if (!book.gutenberg) return null;
+  return 'https://www.gutenberg.org/ebooks/' + book.gutenberg;
+}
+
+function showBreakReminder() {
+  var content = document.getElementById('content');
+  var empty = document.getElementById('empty-state');
+  if (empty) empty.style.display = 'none';
+  if (!content) return;
+  content.style.display = 'block';
+
+  var activity = (localStorage.getItem('pr-break-activity') || '').trim();
+  var showBook = !activity || Math.random() < 0.5;
+
+  var html = '<div class="break-reminder">';
+  html += '<a class="break-adjust" href="#" onclick="event.preventDefault();showSettingsPage(\'settings-breaks\')">Adjust timer</a>';
+  html += '<div class="break-reminder-icon">';
+  html += '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+  html += '</div>';
+  html += '<h2 class="break-reminder-title">Time for a break</h2>';
+  html += '<p class="break-reminder-subtitle">You\u2019ve been reading a while. Maybe\u2026</p>';
+
+  if (showBook) {
+    var book = CLASSIC_BOOKS[Math.floor(Math.random() * CLASSIC_BOOKS.length)];
+    var color = COVER_COLORS[hashString(book.title) % COVER_COLORS.length];
+    html += '<div class="break-suggestion">';
+    html += '<div class="break-book-cover" style="background:' + color + '">';
+    html += '<div class="break-book-title">' + escapeHtml(book.title) + '</div>';
+    html += '<hr class="break-book-rule">';
+    html += '<div class="break-book-author">' + escapeHtml(book.author) + '</div>';
+    html += '</div>';
+    html += '<div class="break-actions">';
+    html += '<a href="' + bookshopUrl(book) + '" target="_blank" rel="noopener" class="break-link">Find on Bookshop.org</a>';
+    if (book.gutenberg) {
+      html += '<a href="' + gutenbergUrl(book) + '" target="_blank" rel="noopener" class="break-link break-gutenberg-link">Read free on Project Gutenberg</a>';
+    }
+    html += '</div>';
+    html += '</div>';
+  } else {
+    var suggestion = activity || DEFAULT_ACTIVITIES[Math.floor(Math.random() * DEFAULT_ACTIVITIES.length)];
+    html += '<div class="break-suggestion">';
+    html += '<div class="break-activity-card">';
+    html += '<svg class="break-activity-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
+    html += '<div class="break-activity-text">' + escapeHtml(suggestion) + '</div>';
+    html += '</div>';
+    html += '</div>';
+  }
+
+  html += '<div class="break-continue">';
+  html += '<button class="btn-primary break-continue-btn" onclick="dismissBreakReminder()">Continue Reading</button>';
+  html += '</div>';
+  html += '</div>';
+
+  content.innerHTML = html;
+  document.getElementById('content-pane').scrollTop = 0;
+}
+
+function dismissBreakReminder() {
+  _breakSessionStart = Date.now();
+  if (_breakPendingIndex >= 0) {
+    loadFile(_breakPendingIndex);
+    _breakPendingIndex = -1;
+  }
 }
 

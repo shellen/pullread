@@ -191,6 +191,24 @@ function showSettingsPage(scrollToSection) {
   html += '</div>';
   html += '</div>';
 
+  // ---- Reading Breaks section ----
+  var breakInterval = localStorage.getItem('pr-break-interval') || '0';
+  var breakActivity = localStorage.getItem('pr-break-activity') || '';
+  html += '<div class="settings-section" id="settings-breaks">';
+  html += '<h2>Reading Breaks</h2>';
+  html += '<p style="font-size:13px;color:var(--muted);margin-bottom:16px">Get a gentle reminder to take a break after reading for a while. The reminder suggests a classic book or an activity of your choosing.</p>';
+  html += '<div class="settings-row"><div><label>Timer interval</label><div class="settings-desc">How long before suggesting a break (Off to disable)</div></div>';
+  html += '<select id="sp-break-interval" onchange="localStorage.setItem(\'pr-break-interval\',this.value);_breakSessionStart=0">';
+  var breakOpts = [['0','Off'],['10','10 min'],['15','15 min'],['20','20 min'],['25','25 min'],['30','30 min']];
+  for (var bi = 0; bi < breakOpts.length; bi++) {
+    html += '<option value="' + breakOpts[bi][0] + '"' + (breakInterval === breakOpts[bi][0] ? ' selected' : '') + '>' + breakOpts[bi][1] + '</option>';
+  }
+  html += '</select></div>';
+  html += '<div class="settings-row"><div><label>Activity suggestion</label><div class="settings-desc">Leave blank for random suggestions (walk, stretch, tea\u2026)</div></div>';
+  html += '<input type="text" id="sp-break-activity" value="' + escapeHtml(breakActivity) + '" placeholder="e.g. Take a walk, Play guitar, Call a friend" style="min-width:200px" onchange="localStorage.setItem(\'pr-break-activity\',this.value)">';
+  html += '</div>';
+  html += '</div>';
+
   // ---- Open In section (Tauri only) ----
   html += '<div class="settings-section" id="settings-viewer-mode" style="display:none">';
   html += '<h2>Open In</h2>';

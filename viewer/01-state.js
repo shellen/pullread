@@ -18,3 +18,8 @@ let articleNotes = { articleNote: '', annotations: [], tags: [], isFavorite: fal
 let allHighlightsIndex = {}; // { filename: [...] } for sidebar indicators
 let allNotesIndex = {}; // { filename: { articleNote, annotations } } for sidebar indicators
 
+// Reading break reminder state
+var _breakSessionStart = 0;
+var _breakPendingIndex = -1;
+var _breakPendingDirection = 0;
+
