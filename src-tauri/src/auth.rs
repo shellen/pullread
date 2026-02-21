@@ -30,38 +30,44 @@ pub async fn open_site_login(app: AppHandle, domain: String) -> Result<(), Strin
 
     let js = format!(r#"
 (function() {{
-    if (document.getElementById('pr-login-done')) return;
-    var btn = document.createElement('button');
-    btn.id = 'pr-login-done';
-    btn.textContent = 'Done \u2014 Save Login';
-    btn.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:999999;padding:12px 24px;background:#1d9bf0;color:#fff;border:none;border-radius:24px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);font-family:-apple-system,BlinkMacSystemFont,sans-serif';
-    btn.onmouseover = function() {{ btn.style.background = '#1a8cd8'; }};
-    btn.onmouseout = function() {{ btn.style.background = '#1d9bf0'; }};
-    btn.onclick = async function() {{
-        var cookies = document.cookie.split(';').map(function(c) {{
-            var parts = c.trim().split('=');
-            return {{ name: parts[0], value: parts.slice(1).join('='), domain: '.{domain}', path: '/', expires: 0, secure: location.protocol === 'https:', httpOnly: false }};
-        }}).filter(function(c) {{ return c.name && c.value; }});
-        try {{
-            if (window.__TAURI__ && window.__TAURI__.core) {{
-                await window.__TAURI__.core.invoke('save_site_cookies', {{ domain: '{domain}', cookiesJson: JSON.stringify(cookies) }});
-            }} else {{
+    function addSaveButton() {{
+        if (document.getElementById('pr-login-done')) return;
+        var btn = document.createElement('button');
+        btn.id = 'pr-login-done';
+        btn.textContent = 'Done \u2014 Save Login';
+        btn.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:999999;padding:12px 24px;background:#1d9bf0;color:#fff;border:none;border-radius:24px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);font-family:-apple-system,BlinkMacSystemFont,sans-serif';
+        btn.onmouseover = function() {{ btn.style.background = '#1a8cd8'; }};
+        btn.onmouseout = function() {{ btn.style.background = '#1d9bf0'; }};
+        btn.onclick = async function() {{
+            btn.textContent = 'Saving\u2026';
+            btn.disabled = true;
+            var cookies = document.cookie.split(';').map(function(c) {{
+                var parts = c.trim().split('=');
+                return {{ name: parts[0], value: parts.slice(1).join('='), domain: '.{domain}', path: '/', expires: 0, secure: location.protocol === 'https:', httpOnly: false }};
+            }}).filter(function(c) {{ return c.name && c.value; }});
+            try {{
                 var resp = await fetch('http://localhost:{port}/api/site-logins', {{
                     method: 'POST',
                     headers: {{ 'Content-Type': 'application/json' }},
                     body: JSON.stringify({{ domain: '{domain}', cookies: cookies }})
                 }});
                 if (!resp.ok) throw new Error('Server returned ' + resp.status);
+                btn.textContent = 'Saved!';
+                btn.style.background = '#22c55e';
+                setTimeout(function() {{ window.close(); }}, 800);
+            }} catch(e) {{
+                btn.textContent = 'Error: ' + e;
+                btn.style.background = '#ef4444';
+                btn.disabled = false;
             }}
-            btn.textContent = 'Saved!';
-            btn.style.background = '#22c55e';
-            setTimeout(function() {{ window.close(); }}, 800);
-        }} catch(e) {{
-            btn.textContent = 'Error: ' + e;
-            btn.style.background = '#ef4444';
-        }}
-    }};
-    document.body.appendChild(btn);
+        }};
+        document.body.appendChild(btn);
+    }}
+    if (document.body) {{
+        addSaveButton();
+    }} else {{
+        document.addEventListener('DOMContentLoaded', addSaveButton);
+    }}
 }})();
 "#, domain = domain, port = port);
 
