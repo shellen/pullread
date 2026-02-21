@@ -287,10 +287,10 @@ function renderArticle(text, filename) {
   html += '<button id="listen-btn" onclick="addCurrentToTTSQueue()" aria-label="' + listenLabel + ' article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> ' + listenLabel + '</button>';
   html += '<button class="play-next-trigger" id="play-next-trigger" onclick="togglePlayNextMenu(event)" aria-label="Queue options" style="display:none"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>';
   html += '</div>';
-  if (meta && meta.url) {
-    html += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg> Share</button></div>';
-  }
-  html += '<button onclick="markCurrentAsUnread()" aria-label="Mark as unread"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-eye-slash"/></svg> Mark Unread</button>';
+  // Overflow menu for secondary actions
+  html += '<div class="more-dropdown">';
+  html += '<button onclick="toggleMoreMenu(event)" aria-label="More actions"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-ellipsis"/></svg></button>';
+  html += '</div>';
   html += '</div>';
   // Show notebook back-references
   var nbRefs = Object.values(_notebooks || {}).filter(function(nb) { return nb.sources && nb.sources.indexOf(filename) >= 0; });

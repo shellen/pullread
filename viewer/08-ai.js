@@ -207,6 +207,45 @@ function toggleShareDropdown(e) {
   e.target.closest('.share-dropdown').appendChild(panel);
 }
 
+function toggleMoreMenu(e) {
+  e.stopPropagation();
+  var existing = document.querySelector('.more-dropdown-panel');
+  if (existing) { existing.remove(); return; }
+  // Close any share dropdown too
+  var sharePanel = document.querySelector('.share-dropdown-panel');
+  if (sharePanel) sharePanel.remove();
+
+  var meta = _currentMeta;
+  var panel = document.createElement('div');
+  panel.className = 'more-dropdown-panel';
+  panel.onclick = function(ev) { ev.stopPropagation(); };
+
+  var items = '';
+  if (meta && meta.url) {
+    items += '<button onclick="toggleShareFromMore(event)"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-share"/></svg> Share</button>';
+  }
+  items += '<button onclick="markCurrentAsUnread(); closeMoreMenu()"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-eye-slash"/></svg> Mark Unread</button>';
+  panel.innerHTML = items;
+
+  e.target.closest('.more-dropdown').appendChild(panel);
+}
+
+function toggleShareFromMore(e) {
+  e.stopPropagation();
+  closeMoreMenu();
+  // Open share panel anchored to the more-dropdown (has position: relative)
+  var host = document.querySelector('.more-dropdown');
+  if (!host) return;
+  host.classList.add('share-dropdown');
+  var fakeEvent = { stopPropagation: function() {}, target: host };
+  toggleShareDropdown(fakeEvent);
+}
+
+function closeMoreMenu() {
+  var panel = document.querySelector('.more-dropdown-panel');
+  if (panel) panel.remove();
+}
+
 function copyArticleLink() {
   const data = getShareData();
   if (!data) return;
@@ -382,6 +421,13 @@ document.addEventListener('click', function(e) {
   const panel = document.querySelector('.share-dropdown-panel');
   if (panel && !panel.contains(e.target) && !e.target.closest('.share-dropdown')) {
     panel.remove();
+    // Clean up share-dropdown class added by share-from-more flow
+    var moreDd = document.querySelector('.more-dropdown.share-dropdown');
+    if (moreDd) moreDd.classList.remove('share-dropdown');
+  }
+  var morePanel = document.querySelector('.more-dropdown-panel');
+  if (morePanel && !morePanel.contains(e.target) && !e.target.closest('.more-dropdown')) {
+    morePanel.remove();
   }
 });
 
