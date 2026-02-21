@@ -691,6 +691,31 @@ describe('formatTweetMarkdown', () => {
     expect(md).not.toContain('![');
     expect(md).not.toContain('[![');
   });
+
+  test('renders article tweet with title and content blocks', () => {
+    const articleTweet: FxTweet = {
+      text: '',
+      author: { name: 'Test Author', screen_name: 'testuser' },
+      created_at: 'Wed Jan 01 12:00:00 +0000 2025',
+      article: {
+        title: 'Agentic Note-Taking',
+        preview_text: 'Written from the other side.',
+        content: {
+          blocks: [
+            { type: 'unstyled', text: 'First paragraph.' },
+            { type: 'header-two', text: 'A Subheading' },
+            { type: 'unstyled', text: 'Second paragraph.' },
+          ],
+        },
+      },
+    };
+    const md = formatTweetMarkdown(articleTweet);
+    expect(md).toContain('## Agentic Note-Taking');
+    expect(md).toContain('First paragraph.');
+    expect(md).toContain('## A Subheading');
+    expect(md).toContain('Second paragraph.');
+    expect(md).toContain('**@testuser**');
+  });
 });
 
 // ── Tweet extraction integration (mocked fetch) ────────────────────

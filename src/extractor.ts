@@ -230,6 +230,11 @@ export interface FxTweet {
   };
   quote?: FxTweet;
   replying_to_status?: string | null;
+  article?: {
+    title?: string;
+    preview_text?: string;
+    content?: { blocks?: Array<{ type: string; text?: string; media?: { url?: string } }> };
+  };
 }
 
 /**
@@ -256,9 +261,30 @@ export function formatTweetMarkdown(tweet: FxTweet): string {
   const date = formatTweetDate(tweet.created_at);
   parts.push(`**@${tweet.author.screen_name}**${date ? ` · ${date}` : ''}`);
 
-  // Tweet text
+  // Tweet text or article content
   parts.push('');
-  parts.push(tweet.text);
+  if (tweet.article?.content?.blocks?.length) {
+    if (tweet.article.title) {
+      parts.push(`## ${tweet.article.title}`);
+      parts.push('');
+    }
+    for (const block of tweet.article.content.blocks) {
+      if (block.text) {
+        if (block.type?.startsWith('header')) {
+          const level = block.type === 'header-one' ? '#' : block.type === 'header-three' ? '###' : '##';
+          parts.push(`${level} ${block.text}`);
+        } else {
+          parts.push(block.text);
+        }
+        parts.push('');
+      } else if (block.type === 'media' && block.media?.url) {
+        parts.push(`![](${block.media.url})`);
+        parts.push('');
+      }
+    }
+  } else if (tweet.text) {
+    parts.push(tweet.text);
+  }
 
   // Photos
   if (tweet.media?.photos) {
@@ -1075,16 +1101,20 @@ async function extractTweet(url: string, username: string, statusId: string): Pr
   // Build markdown
   const markdown = tweets.map(t => formatTweetMarkdown(t)).join('\n\n---\n\n');
 
-  // Title: first tweet text truncated to 80 chars
-  const titleSource = tweets[0].text;
+  // Title: prefer article title, fall back to first tweet text
+  const firstTweet = tweets[0];
+  const titleSource = firstTweet.article?.title || firstTweet.text || firstTweet.article?.preview_text || '';
   const title = titleSource.length > 80 ? titleSource.slice(0, 77) + '...' : titleSource;
+
+  // Excerpt: prefer article preview, fall back to tweet text
+  const excerptSource = firstTweet.article?.preview_text || firstTweet.text || titleSource;
 
   return {
     title,
-    content: `<p>${tweets.map(t => t.text).join(' ')}</p>`,
+    content: `<p>${tweets.map(t => t.article?.preview_text || t.text).join(' ')}</p>`,
     markdown,
-    byline: `@${tweets[0].author.screen_name}`,
-    excerpt: titleSource.slice(0, 200),
+    byline: `@${firstTweet.author.screen_name}`,
+    excerpt: excerptSource.slice(0, 200),
   };
 }
 
