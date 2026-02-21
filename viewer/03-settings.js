@@ -193,12 +193,14 @@ function showSettingsPage(scrollToSection) {
   html += '<h2>Reading Breaks</h2>';
   html += '<p style="font-size:13px;color:var(--muted);margin-bottom:16px">Get a gentle reminder to take a break after reading for a while. The reminder suggests a classic book or an activity of your choosing.</p>';
   html += '<div class="settings-row"><div><label>Timer interval</label><div class="settings-desc">How long before suggesting a break (Off to disable)</div></div>';
-  html += '<select id="sp-break-interval" onchange="localStorage.setItem(\'pr-break-interval\',this.value);_breakSessionStart=0" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;font-family:inherit;min-width:120px">';
-  var breakOpts = [['0','Off'],['10','10 min'],['15','15 min'],['20','20 min'],['25','25 min'],['30','30 min']];
-  for (var bi = 0; bi < breakOpts.length; bi++) {
-    html += '<option value="' + breakOpts[bi][0] + '"' + (breakInterval === breakOpts[bi][0] ? ' selected' : '') + '>' + breakOpts[bi][1] + '</option>';
-  }
-  html += '</select></div>';
+  html += '<select id="sp-break-interval" onchange="localStorage.setItem(\'pr-break-interval\',this.value);_breakSessionStart=0">'
+    + '<option value="0"' + (breakInterval === '0' ? ' selected' : '') + '>Off</option>'
+    + '<option value="10"' + (breakInterval === '10' ? ' selected' : '') + '>10 min</option>'
+    + '<option value="15"' + (breakInterval === '15' ? ' selected' : '') + '>15 min</option>'
+    + '<option value="20"' + (breakInterval === '20' ? ' selected' : '') + '>20 min</option>'
+    + '<option value="25"' + (breakInterval === '25' ? ' selected' : '') + '>25 min</option>'
+    + '<option value="30"' + (breakInterval === '30' ? ' selected' : '') + '>30 min</option>'
+    + '</select></div>';
   html += '<div class="settings-row"><div><label>Activity suggestion</label><div class="settings-desc">Leave blank for random suggestions (walk, stretch, tea\u2026)</div></div>';
   html += '<input type="text" id="sp-break-activity" value="' + escapeHtml(breakActivity) + '" placeholder="e.g. Take a walk, Play guitar, Call a friend" style="min-width:200px" onchange="localStorage.setItem(\'pr-break-activity\',this.value)">';
   html += '</div>';
@@ -375,12 +377,15 @@ function showSettingsPage(scrollToSection) {
       // Feed list
       var FEED_COLLAPSE_LIMIT = 5;
       h += '<div style="margin-top:16px"><label style="font-size:13px;font-weight:500;margin-bottom:8px;display:block">Feeds (' + feedNames.length + ')</label>';
+      if (feedNames.length > FEED_COLLAPSE_LIMIT) {
+        h += '<input type="text" id="sp-feed-search" placeholder="Search feeds\u2026" oninput="settingsFilterFeeds(this.value)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;font-family:inherit;margin-bottom:8px;box-sizing:border-box">';
+      }
       if (feedNames.length > 0) {
-        h += '<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">';
+        h += '<div id="feed-list-container" style="border:1px solid var(--border);border-radius:8px;overflow:hidden">';
         for (var fi = 0; fi < feedNames.length; fi++) {
           var fn = feedNames[fi];
           var hiddenFeed = fi >= FEED_COLLAPSE_LIMIT && feedNames.length > FEED_COLLAPSE_LIMIT + 1;
-          h += '<div id="feed-row-' + fi + '" class="' + (hiddenFeed ? 'feed-row-hidden' : '') + '" style="display:' + (hiddenFeed ? 'none' : 'flex') + ';align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:' + (fi < feedNames.length - 1 ? '1px solid var(--border)' : 'none') + ';font-size:13px">'
+          h += '<div id="feed-row-' + fi + '" class="feed-row' + (hiddenFeed ? ' feed-row-hidden' : '') + '" data-feed-name="' + escapeHtml(fn.toLowerCase()) + '" data-feed-url="' + escapeHtml(feeds[fn].toLowerCase()) + '" style="display:' + (hiddenFeed ? 'none' : 'flex') + ';align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:' + (fi < feedNames.length - 1 ? '1px solid var(--border)' : 'none') + ';font-size:13px">'
             + '<div style="cursor:pointer;flex:1;min-width:0" onclick="settingsEditFeed(' + fi + ')" title="Click to edit"><div style="font-weight:500">' + escapeHtml(fn) + '</div><div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px">' + escapeHtml(feeds[fn]) + '</div></div>'
             + '<button onclick="settingsRemoveFeed(\'' + escapeHtml(fn.replace(/'/g, "\\'")) + '\')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:2px 6px" title="Remove">&times;</button>'
             + '</div>';
@@ -882,6 +887,27 @@ async function settingsAddFeed() {
     }
   }
   settingsPageSaveConfig();
+}
+
+function settingsFilterFeeds(query) {
+  var q = (query || '').toLowerCase().trim();
+  var rows = document.querySelectorAll('.feed-row');
+  var toggle = document.getElementById('feed-expand-toggle');
+  if (!q) {
+    // Restore collapse state
+    for (var i = 0; i < rows.length; i++) {
+      rows[i].style.display = rows[i].classList.contains('feed-row-hidden') ? 'none' : 'flex';
+    }
+    if (toggle) { toggle.style.display = ''; toggle.dataset.expanded = '0'; }
+    return;
+  }
+  // Filter: show matching rows, hide expand toggle
+  if (toggle) toggle.style.display = 'none';
+  for (var j = 0; j < rows.length; j++) {
+    var name = rows[j].getAttribute('data-feed-name') || '';
+    var url = rows[j].getAttribute('data-feed-url') || '';
+    rows[j].style.display = (name.indexOf(q) !== -1 || url.indexOf(q) !== -1) ? 'flex' : 'none';
+  }
 }
 
 function toggleFeedList() {

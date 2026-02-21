@@ -3497,10 +3497,15 @@
   .settings-row .settings-desc {
     font-size: 11px; color: var(--muted); margin-top: 2px;
   }
-  .settings-row select, .settings-row input[type="text"], .settings-row input[type="password"] {
+  .settings-row input[type="text"], .settings-row input[type="password"] {
     padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px;
     background: var(--bg); color: var(--fg); font-size: 13px;
     font-family: inherit; min-width: 160px;
+  }
+  .settings-row select {
+    padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px;
+    font-size: 13px; font-family: inherit; min-width: 160px;
+    color: var(--fg);
   }
   .settings-btn-group {
     display: flex; gap: 4px;
