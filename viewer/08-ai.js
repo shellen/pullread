@@ -75,6 +75,25 @@ async function reprocessCurrentArticle(btn) {
   }
 }
 
+async function reprocessFromMenu() {
+  if (!serverMode || !activeFile) return;
+  showToast('Re-fetching article\u2026');
+  try {
+    var res = await fetch('/api/reprocess', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: activeFile })
+    });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Reprocess failed');
+    var r = await fetch('/api/file?name=' + encodeURIComponent(activeFile));
+    if (r.ok) { var text = await r.text(); renderArticle(text, activeFile); await loadAnnotations(activeFile); }
+    showToast('Article updated');
+  } catch (err) {
+    showToast('Re-fetch failed: ' + (err.message || err));
+  }
+}
+
 async function summarizeArticle() {
   if (!serverMode || !activeFile) return;
   const btn = document.getElementById('summarize-btn');
@@ -222,6 +241,9 @@ function toggleMoreMenu(e) {
   var items = '';
   items += '<button onclick="toggleNotesFromHeader(); closeMoreMenu()"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-pen"/></svg> Notes</button>';
   items += '<button onclick="markCurrentAsUnread(); closeMoreMenu()"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-eye-slash"/></svg> Mark Unread</button>';
+  if (serverMode) {
+    items += '<button onclick="closeMoreMenu(); reprocessFromMenu()" title="Re-fetch this article from the original URL"><svg class="share-icon" viewBox="0 0 24 24"><use href="#i-cloud-download"/></svg> Re-fetch from source</button>';
+  }
   panel.innerHTML = items;
 
   // Walk up from target to find .more-dropdown (avoids SVG closest() issues in WebKit)

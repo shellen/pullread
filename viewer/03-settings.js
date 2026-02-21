@@ -122,11 +122,6 @@ function toggleSettingsDropdown() {
       </select>
     </div>
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0 8px">
-    <label>Article</label>
-    <div class="setting-row">
-      <button onclick="reprocessCurrentArticle(this)" id="reprocess-btn" style="flex:1;text-align:center" title="Re-fetch this article from the original URL"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-cloud-download"/></svg> Re-fetch from source</button>
-    </div>
-    <hr style="border:none;border-top:1px solid var(--border);margin:12px 0 8px">
     <div class="setting-row">
       <button onclick="var p=document.querySelector('.settings-dropdown-panel');if(p)p.remove();var b=document.getElementById('aa-settings-btn');if(b)b.setAttribute('aria-expanded','false');showShortcutsModal()" style="flex:1;text-align:center"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-keyboard"/></svg> Keyboard Shortcuts</button>
     </div>
@@ -198,7 +193,7 @@ function showSettingsPage(scrollToSection) {
   html += '<h2>Reading Breaks</h2>';
   html += '<p style="font-size:13px;color:var(--muted);margin-bottom:16px">Get a gentle reminder to take a break after reading for a while. The reminder suggests a classic book or an activity of your choosing.</p>';
   html += '<div class="settings-row"><div><label>Timer interval</label><div class="settings-desc">How long before suggesting a break (Off to disable)</div></div>';
-  html += '<select id="sp-break-interval" onchange="localStorage.setItem(\'pr-break-interval\',this.value);_breakSessionStart=0">';
+  html += '<select id="sp-break-interval" onchange="localStorage.setItem(\'pr-break-interval\',this.value);_breakSessionStart=0" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;font-family:inherit;min-width:120px">';
   var breakOpts = [['0','Off'],['10','10 min'],['15','15 min'],['20','20 min'],['25','25 min'],['30','30 min']];
   for (var bi = 0; bi < breakOpts.length; bi++) {
     html += '<option value="' + breakOpts[bi][0] + '"' + (breakInterval === breakOpts[bi][0] ? ' selected' : '') + '>' + breakOpts[bi][1] + '</option>';
