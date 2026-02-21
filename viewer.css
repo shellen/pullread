@@ -2400,7 +2400,9 @@
   }
   .hl-note-marker:hover { opacity: 1; }
 
-  /* Tags input */
+  /* Tags in article header */
+  #header-tags { margin-top: 8px; }
+  #header-tags:empty { display: none; }
   .tags-row {
     display: flex;
     align-items: center;
@@ -3239,7 +3241,7 @@
   }
   .focus-mode .content-wrap > .article-header,
   .focus-mode .content-wrap > .article-summary,
-  .focus-mode .content-wrap > .notes-panel {
+  .focus-mode .content-wrap > .annotations-section {
     opacity: 1;
   }
 
@@ -3836,7 +3838,7 @@
   @media print {
     .toolbar, .sidebar, .sidebar-toggle-float, .skip-link, .margin-notes, .toc-container,
     .reading-progress, .hl-toolbar, .annotation-popover, .resume-indicator,
-    .article-actions, .notes-panel .tags-row, .notes-panel textarea, .notes-save-hint,
+    .article-actions, #header-tags, .notes-panel, .notes-save-hint,
     .onboarding-overlay, .modal-overlay, .settings-dropdown-panel,
     .bottom-bar, .mini-mode-container, .break-reminder { display: none !important; }
 
@@ -3873,13 +3875,6 @@
       page-break-before: auto;
     }
     .footnote-marker { color: #333 !important; }
-    .notes-panel {
-      display: block !important;
-      border-top: 1px solid #ccc !important;
-      background: #f5f5f5 !important;
-      page-break-before: auto;
-    }
-
     @page {
       margin: 2cm;
       @bottom-center { content: counter(page); }

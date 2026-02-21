@@ -298,6 +298,8 @@ function renderArticle(text, filename) {
   html += '<button onclick="toggleMoreMenu(event)" aria-label="More actions"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-ellipsis"/></svg></button>';
   html += '</div>';
   html += '</div>';
+  // Tags row (populated by renderNotesPanel)
+  html += '<div id="header-tags"></div>';
   // Show notebook back-references
   var nbRefs = Object.values(_notebooks || {}).filter(function(nb) { return nb.sources && nb.sources.indexOf(filename) >= 0; });
   if (nbRefs.length) {
@@ -711,7 +713,7 @@ function updateFocusMode() {
     if (closest.previousElementSibling && !closest.previousElementSibling.classList.contains('article-header')) {
       closest.previousElementSibling.classList.add('focus-adjacent');
     }
-    if (closest.nextElementSibling && !closest.nextElementSibling.classList.contains('notes-panel')) {
+    if (closest.nextElementSibling && !closest.nextElementSibling.classList.contains('annotations-section')) {
       closest.nextElementSibling.classList.add('focus-adjacent');
     }
   }

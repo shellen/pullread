@@ -609,52 +609,20 @@ function updateAnnotation(id, btn) {
   removeAnnotationPopover();
 }
 
-// Article-level annotations panel
+// Render tags in the article header
 function renderNotesPanel() {
-  const existing = document.querySelector('.notes-panel');
-  if (existing) existing.remove();
+  var container = document.getElementById('header-tags');
+  if (!container) return;
 
-  const content = document.getElementById('content');
-  if (!content || content.style.display === 'none') return;
+  var tags = articleNotes.tags || [];
+  var machineTags = articleNotes.machineTags || [];
+  var tagsHtml = tags.map(function(t) { return '<span class="tag">' + escapeHtml(t) + '<span class="tag-remove" onclick="removeTag(\'' + escapeHtml(t.replace(/'/g, "\\'")) + '\')">&times;</span></span>'; }).join('')
+    + machineTags.map(function(t) { return '<span class="tag tag-machine" title="Auto-generated">' + escapeHtml(t) + '</span>'; }).join('');
 
-  const panel = document.createElement('div');
-  panel.className = 'notes-panel';
-  const noteText = articleNotes.articleNote || '';
-
-  const tags = articleNotes.tags || [];
-  const machineTags = articleNotes.machineTags || [];
-  const tagsHtml = tags.map(t => '<span class="tag">' + escapeHtml(t) + '<span class="tag-remove" onclick="removeTag(\'' + escapeHtml(t.replace(/'/g, "\\'")) + '\')">&times;</span></span>').join('')
-    + machineTags.map(t => '<span class="tag tag-machine" title="Auto-generated">' + escapeHtml(t) + '</span>').join('');
-
-  panel.innerHTML = `
-    <div class="tags-row">
-      ${tagsHtml}
-      <input type="text" placeholder="Add tag..." onkeydown="handleTagKey(event)" />
-    </div>
-    <div class="notes-textarea-wrap">
-      <textarea placeholder="Write a note...">${escapeHtml(noteText)}</textarea>
-      <button class="voice-note-btn" onclick="toggleVoiceNote(this)" title="Voice note"><svg aria-hidden="true"><use href="#i-mic"/></svg></button>
-    </div>
-    <div class="notes-save-hint">Auto-saved</div>
-  `;
-
-  content.appendChild(panel);
-
-  const textarea = panel.querySelector('textarea');
-  let saveTimeout;
-  textarea.addEventListener('input', () => {
-    clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => {
-      articleNotes.articleNote = textarea.value;
-      saveNotes();
-      updateSidebarItem(activeFile);
-    }, 800);
-  });
-  textarea.addEventListener('blur', () => {
-    articleNotes.articleNote = textarea.value;
-    saveNotes();
-    updateSidebarItem(activeFile);
-  });
+  container.innerHTML = '<div class="tags-row">'
+    + tagsHtml
+    + '<input type="text" placeholder="Add tag\u2026" onkeydown="handleTagKey(event)" />'
+    + '</div>';
 }
 
 function toggleFavorite(btn) {
@@ -669,11 +637,11 @@ function toggleFavorite(btn) {
 var toggleFavoriteFromHeader = toggleFavorite;
 
 function toggleNotesFromHeader() {
-  const panel = document.querySelector('.notes-panel');
-  if (panel) {
-    panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    const ta = panel.querySelector('textarea');
-    if (ta) ta.focus();
+  var container = document.getElementById('header-tags');
+  if (container) {
+    container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    var input = container.querySelector('input');
+    if (input) input.focus();
   }
 }
 
