@@ -864,6 +864,25 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
       return;
     }
 
+    // Site login save via form submission (bypasses external site CSP)
+    if (url.pathname === '/api/site-login-callback' && req.method === 'POST') {
+      try {
+        const body = await readBody(req);
+        const params = new URLSearchParams(body);
+        const domain = params.get('domain') || '';
+        const cookiesRaw = params.get('cookies') || '[]';
+        if (!domain) throw new Error('missing domain');
+        const cookies = JSON.parse(cookiesRaw);
+        saveSiteLoginCookies(domain, cookies);
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end(`<!DOCTYPE html><html><body style="background:#1a1a2e;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><div style="text-align:center"><div style="font-size:48px;margin-bottom:16px;color:#22c55e">&#10003;</div><p style="font-size:18px">Login saved for ${domain.replace(/[<>&"]/g, '')}</p><p style="color:#888;font-size:13px">This window will close automatically.</p></div><script>setTimeout(function(){window.close()},1200)</script></body></html>`);
+      } catch (e: any) {
+        res.writeHead(400, { 'Content-Type': 'text/html' });
+        res.end(`<!DOCTYPE html><html><body style="background:#1a1a2e;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><p style="color:#ef4444">Error: ${(e.message || 'save failed').replace(/[<>&"]/g, '')}</p></body></html>`);
+      }
+      return;
+    }
+
     // Site login management
     if (url.pathname === '/api/site-logins') {
       if (req.method === 'GET') {

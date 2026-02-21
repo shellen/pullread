@@ -4,6 +4,8 @@
 use std::process::Command;
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
+use crate::sidecar::SidecarState;
+
 const KEYCHAIN_SERVICE: &str = "PullRead";
 
 /// Open a webview window for the user to log into a site.
@@ -17,12 +19,18 @@ pub async fn open_site_login(app: AppHandle, domain: String) -> Result<(), Strin
     let window_label = format!("login-{}", domain.replace('.', "-"));
     let url = format!("https://{}", domain);
 
+    let state = app.state::<SidecarState>();
+    let port = state.get_viewer_port();
+
     // Close existing login window for this domain if any
     if let Some(existing) = app.get_webview_window(&window_label) {
         let _ = existing.close();
     }
 
-    // Save cookies via Tauri IPC (not HTTP fetch, which external CSP blocks)
+    // Save cookies via form submission to the viewer server.
+    // Can't use fetch() because external site CSP blocks it.
+    // Can't use Tauri IPC because app commands need explicit ACL from remote URLs.
+    // Form submission bypasses CSP connect-src restrictions.
     let js = format!(r#"
 (function() {{
     function addSaveButton() {{
@@ -33,30 +41,24 @@ pub async fn open_site_login(app: AppHandle, domain: String) -> Result<(), Strin
         btn.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:999999;padding:12px 24px;background:#1d9bf0;color:#fff;border:none;border-radius:24px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);font-family:-apple-system,BlinkMacSystemFont,sans-serif';
         btn.onmouseover = function() {{ btn.style.background = '#1a8cd8'; }};
         btn.onmouseout = function() {{ btn.style.background = '#1d9bf0'; }};
-        btn.onclick = async function() {{
+        btn.onclick = function() {{
             btn.textContent = 'Saving\u2026';
             btn.disabled = true;
             var cookies = document.cookie.split(';').map(function(c) {{
                 var parts = c.trim().split('=');
                 return {{ name: parts[0], value: parts.slice(1).join('='), domain: '.{domain}', path: '/', expires: 0, secure: location.protocol === 'https:', httpOnly: false }};
             }}).filter(function(c) {{ return c.name && c.value; }});
-            try {{
-                if (window.__TAURI__ && window.__TAURI__.core) {{
-                    await window.__TAURI__.core.invoke('save_site_cookies', {{
-                        domain: '{domain}',
-                        cookiesJson: JSON.stringify(cookies)
-                    }});
-                }} else {{
-                    throw new Error('Tauri IPC not available');
-                }}
-                btn.textContent = 'Saved!';
-                btn.style.background = '#22c55e';
-                setTimeout(function() {{ window.close(); }}, 800);
-            }} catch(e) {{
-                btn.textContent = 'Error: ' + e;
-                btn.style.background = '#ef4444';
-                btn.disabled = false;
-            }}
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = 'http://localhost:{port}/api/site-login-callback';
+            var d = document.createElement('input');
+            d.type = 'hidden'; d.name = 'domain'; d.value = '{domain}';
+            form.appendChild(d);
+            var c = document.createElement('input');
+            c.type = 'hidden'; c.name = 'cookies'; c.value = JSON.stringify(cookies);
+            form.appendChild(c);
+            document.body.appendChild(form);
+            form.submit();
         }};
         document.body.appendChild(btn);
     }}
@@ -66,7 +68,7 @@ pub async fn open_site_login(app: AppHandle, domain: String) -> Result<(), Strin
         document.addEventListener('DOMContentLoaded', addSaveButton);
     }}
 }})();
-"#, domain = domain);
+"#, domain = domain, port = port);
 
     let _window = WebviewWindowBuilder::new(
         &app,
