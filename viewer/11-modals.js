@@ -298,15 +298,15 @@ function renderStepWelcome() {
     ? 'A quick look at what you can do with your reading library.'
     : 'Save articles as clean, local markdown you can read anywhere. Install our bookmarking shortcut or use PullRead with your favorite service.';
   return '<div style="text-align:center;padding:12px 0">'
-    + '<div style="font-size:48px;margin-bottom:12px">&#128218;</div>'
+    + '<div style="margin-bottom:12px"><svg class="icon" style="width:48px;height:48px;color:var(--link)" aria-hidden="true"><use href="#i-book"/></svg></div>'
     + '<h2>' + title + '</h2>'
     + '<p class="ob-subtitle">' + subtitle + '</p>'
     + '<div class="ob-features">'
-    + '<span class="ob-feature-pill">&#128278; Bookmark sync</span>'
-    + '<span class="ob-feature-pill">&#128196; Markdown files</span>'
-    + '<span class="ob-feature-pill">&#10024; Summaries</span>'
-    + '<span class="ob-feature-pill">&#127911; Text-to-speech</span>'
-    + '<span class="ob-feature-pill">&#128064; Focus mode</span>'
+    + '<span class="ob-feature-pill"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-pin"/></svg> Bookmark sync</span>'
+    + '<span class="ob-feature-pill"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-pen"/></svg> Markdown files</span>'
+    + '<span class="ob-feature-pill"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-comment"/></svg> Summaries</span>'
+    + '<span class="ob-feature-pill"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-headphones"/></svg> Text-to-speech</span>'
+    + '<span class="ob-feature-pill"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-focus"/></svg> Focus mode</span>'
     + '</div>'
     + '</div>';
 }
@@ -360,10 +360,10 @@ function renderStepReading() {
   return '<h2>Reading</h2>'
     + '<p class="ob-subtitle">Tools for focused, annotated reading.</p>'
     + '<div class="ob-glass-card">'
-    + '<div class="ob-method"><div class="ob-method-icon">&#128064;</div><div><div class="ob-method-title">Focus Mode <kbd>f</kbd></div><div class="ob-method-desc">Dims everything except the current paragraph so you can concentrate.</div></div></div>'
-    + '<div class="ob-method"><div class="ob-method-icon">&#127912;</div><div><div class="ob-method-title">Highlights <kbd>h</kbd></div><div class="ob-method-desc">Select text and choose a color. Highlights appear in the margin with optional notes.</div></div></div>'
-    + '<div class="ob-method"><div class="ob-method-icon">&#128209;</div><div><div class="ob-method-title">Table of Contents</div><div class="ob-method-desc">Auto-generated navigation for long articles. Appears on wide screens.</div></div></div>'
-    + '<div class="ob-method"><div class="ob-method-icon">&#128215;</div><div><div class="ob-method-title">Reading Progress</div><div class="ob-method-desc">Your position is saved automatically and restored when you return.</div></div></div>'
+    + '<div class="ob-method"><div class="ob-method-icon"><svg class="icon" aria-hidden="true"><use href="#i-focus"/></svg></div><div><div class="ob-method-title">Focus Mode <kbd>f</kbd></div><div class="ob-method-desc">Dims everything except the current paragraph so you can concentrate.</div></div></div>'
+    + '<div class="ob-method"><div class="ob-method-icon"><svg class="icon" aria-hidden="true"><use href="#i-pen"/></svg></div><div><div class="ob-method-title">Highlights <kbd>h</kbd></div><div class="ob-method-desc">Select text and choose a color. Highlights appear in the margin with optional notes.</div></div></div>'
+    + '<div class="ob-method"><div class="ob-method-icon"><svg class="icon" aria-hidden="true"><use href="#i-bars"/></svg></div><div><div class="ob-method-title">Table of Contents</div><div class="ob-method-desc">Auto-generated navigation for long articles. Appears on wide screens.</div></div></div>'
+    + '<div class="ob-method"><div class="ob-method-icon"><svg class="icon" aria-hidden="true"><use href="#i-book"/></svg></div><div><div class="ob-method-title">Reading Progress</div><div class="ob-method-desc">Your position is saved automatically and restored when you return.</div></div></div>'
     + '</div>';
 }
 
@@ -371,10 +371,10 @@ function renderStepSearch() {
   return '<h2>Search &amp; Organize</h2>'
     + '<p class="ob-subtitle">Find anything in your library instantly.</p>'
     + '<div class="ob-glass-card">'
-    + '<div class="ob-method"><div class="ob-method-icon">&#128269;</div><div><div class="ob-method-title">Search Operators</div><div class="ob-method-desc">Type <code>is:unread</code>, <code>tag:tech</code>, <code>feed:NYT</code>, <code>has:highlights</code> and more in the search bar.</div></div></div>'
-    + '<div class="ob-method"><div class="ob-method-icon">&#128204;</div><div><div class="ob-method-title">Pinned Filters</div><div class="ob-method-desc">Pin up to 3 frequent searches as quick-access buttons below the search bar.</div></div></div>'
-    + '<div class="ob-method"><div class="ob-method-icon">&#10084;&#65039;</div><div><div class="ob-method-title">Favorites</div><div class="ob-method-desc">Heart any article. Find them with <code>is:favorite</code>.</div></div></div>'
-    + '<div class="ob-method"><div class="ob-method-icon">&#127760;</div><div><div class="ob-method-title">Explore</div><div class="ob-method-desc">Tag cloud and topic connections across your entire library.</div></div></div>'
+    + '<div class="ob-method"><div class="ob-method-icon"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg></div><div><div class="ob-method-title">Search Operators</div><div class="ob-method-desc">Type <code>is:unread</code>, <code>tag:tech</code>, <code>feed:NYT</code>, <code>has:highlights</code> and more in the search bar.</div></div></div>'
+    + '<div class="ob-method"><div class="ob-method-icon"><svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg></div><div><div class="ob-method-title">Pinned Filters</div><div class="ob-method-desc">Pin up to 3 frequent searches as quick-access buttons below the search bar.</div></div></div>'
+    + '<div class="ob-method"><div class="ob-method-icon"><svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg></div><div><div class="ob-method-title">Favorites</div><div class="ob-method-desc">Heart any article. Find them with <code>is:favorite</code>.</div></div></div>'
+    + '<div class="ob-method"><div class="ob-method-icon"><svg class="icon" aria-hidden="true"><use href="#i-tags"/></svg></div><div><div class="ob-method-title">Explore</div><div class="ob-method-desc">Tag cloud and topic connections across your entire library.</div></div></div>'
     + '</div>';
 }
 
@@ -382,15 +382,15 @@ function renderStepListening() {
   return '<h2>Listening &amp; Summaries</h2>'
     + '<p class="ob-subtitle">Listen to articles and get concise summaries.</p>'
     + '<div class="ob-glass-card">'
-    + '<div class="ob-method"><div class="ob-method-icon">&#127911;</div><div><div class="ob-method-title">Text-to-Speech</div><div class="ob-method-desc">Listen to any article. Free on-device voice included, with premium options available.</div></div></div>'
-    + '<div class="ob-method"><div class="ob-method-icon">&#10024;</div><div><div class="ob-method-title">Summaries</div><div class="ob-method-desc">One-click summary saved to each article. Works with multiple providers.</div></div></div>'
-    + '<div class="ob-method"><div class="ob-method-icon">&#128240;</div><div><div class="ob-method-title">Reviews</div><div class="ob-method-desc">Thematic roundups of your recent reading. Generate daily or weekly from the dashboard.</div></div></div>'
+    + '<div class="ob-method"><div class="ob-method-icon"><svg class="icon" aria-hidden="true"><use href="#i-headphones"/></svg></div><div><div class="ob-method-title">Text-to-Speech</div><div class="ob-method-desc">Listen to any article. Free on-device voice included, with premium options available.</div></div></div>'
+    + '<div class="ob-method"><div class="ob-method-icon"><svg class="icon" aria-hidden="true"><use href="#i-comment"/></svg></div><div><div class="ob-method-title">Summaries</div><div class="ob-method-desc">One-click summary saved to each article. Works with multiple providers.</div></div></div>'
+    + '<div class="ob-method"><div class="ob-method-icon"><svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg></div><div><div class="ob-method-title">Reviews</div><div class="ob-method-desc">Thematic roundups of your recent reading. Generate daily or weekly from the dashboard.</div></div></div>'
     + '</div>';
 }
 
 function renderStepReady() {
   return '<div style="text-align:center;padding:12px 0">'
-    + '<div style="font-size:48px;margin-bottom:12px">&#128640;</div>'
+    + '<div style="margin-bottom:12px"><svg class="icon" style="width:48px;height:48px;color:var(--link)" aria-hidden="true"><use href="#i-play"/></svg></div>'
     + '<h2>' + (_tourMode ? 'That\u2019s the Tour' : 'Ready to Go') + '</h2>'
     + '<p class="ob-subtitle">' + (_tourMode ? 'Here are some keyboard shortcuts to remember:' : 'PullRead will fetch your bookmarked articles and save them as markdown. Here are some keyboard shortcuts to get started:') + '</p>'
     + '</div>'
