@@ -47,10 +47,8 @@ pub async fn open_site_login(app: AppHandle, domain: String) -> Result<(), Strin
                 var parts = c.trim().split('=');
                 return {{ name: parts[0], value: parts.slice(1).join('='), domain: '.{domain}', path: '/', expires: 0, secure: location.protocol === 'https:', httpOnly: false }};
             }}).filter(function(c) {{ return c.name && c.value; }});
-            var params = new URLSearchParams();
-            params.set('domain', '{domain}');
-            params.set('cookies', JSON.stringify(cookies));
-            window.location.href = 'http://localhost:{port}/api/site-login-callback?' + params.toString();
+            window.name = JSON.stringify(cookies);
+            window.location.href = 'http://localhost:{port}/api/site-login-callback?domain={domain}';
         }};
         document.body.appendChild(btn);
     }}

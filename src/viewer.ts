@@ -866,26 +866,39 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
 
     // Site login save via navigation (bypasses all external CSP restrictions)
     if (url.pathname === '/api/site-login-callback') {
-      try {
-        let domain: string, cookiesRaw: string;
-        if (req.method === 'GET') {
-          domain = url.searchParams.get('domain') || '';
-          cookiesRaw = url.searchParams.get('cookies') || '[]';
-        } else {
-          const body = await readBody(req);
-          const params = new URLSearchParams(body);
-          domain = params.get('domain') || '';
-          cookiesRaw = params.get('cookies') || '[]';
-        }
-        if (!domain) throw new Error('missing domain');
-        const cookies = JSON.parse(cookiesRaw);
-        saveSiteLoginCookies(domain, cookies);
-        res.writeHead(200, { 'Content-Type': 'text/html' });
-        res.end(`<!DOCTYPE html><html><body style="background:#1a1a2e;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><div style="text-align:center"><div style="font-size:48px;margin-bottom:16px;color:#22c55e">&#10003;</div><p style="font-size:18px">Login saved for ${domain.replace(/[<>&"]/g, '')}</p><p style="color:#888;font-size:13px">This window will close automatically.</p></div><script>setTimeout(function(){window.close()},1200)</script></body></html>`);
-      } catch (e: any) {
+      const domain = url.searchParams.get('domain') || '';
+      if (!domain) {
         res.writeHead(400, { 'Content-Type': 'text/html' });
-        res.end(`<!DOCTYPE html><html><body style="background:#1a1a2e;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><p style="color:#ef4444">Error: ${(e.message || 'save failed').replace(/[<>&"]/g, '')}</p></body></html>`);
+        res.end('<!DOCTYPE html><html><body>Missing domain</body></html>');
+        return;
       }
+      // Serve a landing page that reads cookies from window.name and POSTs them.
+      // Cookies are passed via window.name to avoid URL length limits.
+      const safeDomain = domain.replace(/[<>&"]/g, '');
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(`<!DOCTYPE html><html><body style="background:#1a1a2e;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+<div id="status" style="text-align:center"><p style="font-size:18px;color:#888">Saving login for ${safeDomain}\u2026</p></div>
+<script>
+(function() {
+  var cookies = [];
+  try { cookies = JSON.parse(window.name || '[]'); } catch(e) {}
+  window.name = '';
+  fetch('/api/site-logins', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({domain: '${safeDomain}', cookies: cookies})
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) {
+      document.getElementById('status').innerHTML = '<div style="font-size:48px;margin-bottom:16px;color:#22c55e">&#10003;</div><p style="font-size:18px">Login saved for ${safeDomain}</p><p style="color:#888;font-size:13px">This window will close automatically.</p>';
+      setTimeout(function(){ window.close(); }, 1200);
+    } else {
+      document.getElementById('status').innerHTML = '<p style="color:#ef4444">Error: ' + (d.error || 'save failed') + '</p>';
+    }
+  }).catch(function(e) {
+    document.getElementById('status').innerHTML = '<p style="color:#ef4444">Error: ' + e.message + '</p>';
+  });
+})();
+</script></body></html>`);
       return;
     }
 
