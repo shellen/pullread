@@ -358,15 +358,21 @@ function showSettingsPage(scrollToSection) {
       h += '</select></div>';
 
       // Feed list
+      var FEED_COLLAPSE_LIMIT = 5;
       h += '<div style="margin-top:16px"><label style="font-size:13px;font-weight:500;margin-bottom:8px;display:block">Feeds (' + feedNames.length + ')</label>';
       if (feedNames.length > 0) {
         h += '<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">';
         for (var fi = 0; fi < feedNames.length; fi++) {
           var fn = feedNames[fi];
-          h += '<div id="feed-row-' + fi + '" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:' + (fi < feedNames.length - 1 ? '1px solid var(--border)' : 'none') + ';font-size:13px">'
+          var hiddenFeed = fi >= FEED_COLLAPSE_LIMIT && feedNames.length > FEED_COLLAPSE_LIMIT + 1;
+          h += '<div id="feed-row-' + fi + '" class="' + (hiddenFeed ? 'feed-row-hidden' : '') + '" style="display:' + (hiddenFeed ? 'none' : 'flex') + ';align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:' + (fi < feedNames.length - 1 ? '1px solid var(--border)' : 'none') + ';font-size:13px">'
             + '<div style="cursor:pointer;flex:1;min-width:0" onclick="settingsEditFeed(' + fi + ')" title="Click to edit"><div style="font-weight:500">' + escapeHtml(fn) + '</div><div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px">' + escapeHtml(feeds[fn]) + '</div></div>'
             + '<button onclick="settingsRemoveFeed(\'' + escapeHtml(fn.replace(/'/g, "\\'")) + '\')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:2px 6px" title="Remove">&times;</button>'
             + '</div>';
+        }
+        if (feedNames.length > FEED_COLLAPSE_LIMIT + 1) {
+          h += '<div id="feed-expand-toggle" style="padding:6px 12px;font-size:12px;color:var(--link);cursor:pointer;text-align:center;border-top:1px solid var(--border)" onclick="toggleFeedList()">'
+            + 'Show ' + (feedNames.length - FEED_COLLAPSE_LIMIT) + ' more feeds</div>';
         }
         h += '</div>';
       }
@@ -826,6 +832,18 @@ async function settingsAddFeed() {
     }
   }
   settingsPageSaveConfig();
+}
+
+function toggleFeedList() {
+  var hidden = document.querySelectorAll('.feed-row-hidden');
+  var toggle = document.getElementById('feed-expand-toggle');
+  if (!toggle) return;
+  var expanded = toggle.dataset.expanded === '1';
+  for (var i = 0; i < hidden.length; i++) {
+    hidden[i].style.display = expanded ? 'none' : 'flex';
+  }
+  toggle.dataset.expanded = expanded ? '0' : '1';
+  toggle.textContent = expanded ? ('Show ' + hidden.length + ' more feeds') : 'Show fewer';
 }
 
 function settingsRemoveFeed(name) {
