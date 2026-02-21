@@ -423,6 +423,14 @@ function renderArticle(text, filename) {
     }
   );
 
+  // Convert linked video thumbnails into embedded <video> players
+  html = html.replace(
+    /<a[^>]*href="(https?:\/\/[^"]+\.mp4[^"]*)"[^>]*>\s*<img[^>]*src="([^"]+)"[^>]*\/?>\s*<\/a>/gi,
+    function(match, videoUrl, posterUrl) {
+      return '<div class="video-embed"><video controls playsinline preload="metadata" poster="' + posterUrl + '"><source src="' + videoUrl + '" type="video/mp4"></video></div>';
+    }
+  );
+
   content.innerHTML = html;
   document.title = (meta && meta.title) || filename || 'PullRead';
 
