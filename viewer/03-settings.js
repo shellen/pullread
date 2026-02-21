@@ -162,6 +162,7 @@ document.addEventListener('click', function(e) {
 
 // ---- Full Settings Page ----
 function showSettingsPage(scrollToSection) {
+  var prevActive = activeFile;
   activeFile = null;
   _activeNotebook = null;
   const content = document.getElementById('content');
@@ -170,7 +171,7 @@ function showSettingsPage(scrollToSection) {
   content.style.display = 'block';
   document.title = 'Settings — PullRead';
   document.getElementById('margin-notes').innerHTML = '';
-  renderFileList();
+  updateSidebarActiveState(prevActive);
 
   var currentTheme = document.body.getAttribute('data-theme') || 'light';
   function themeBtn(val, label) {

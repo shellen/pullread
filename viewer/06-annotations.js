@@ -109,14 +109,14 @@ function createHighlight(color) {
   applyHighlights();
   removeHlToolbar();
   sel.removeAllRanges();
-  renderFileList(); // update indicator dots
+  updateSidebarItem(activeFile);
 }
 
 function deleteHighlight(id) {
   articleHighlights = articleHighlights.filter(h => h.id !== id);
   saveHighlights();
   applyHighlights();
-  renderFileList();
+  updateSidebarItem(activeFile);
 }
 
 // ---- Footnotes ----
@@ -458,7 +458,7 @@ function saveHighlightNote(id, btn) {
     saveHighlights();
     applyHighlights();
     renderNotesPanel();
-    renderFileList();
+    updateSidebarItem(activeFile);
   }
   removeAnnotationPopover();
 }
@@ -471,7 +471,7 @@ function clearHighlightNote(id) {
     saveHighlights();
     applyHighlights();
     renderNotesPanel();
-    renderFileList();
+    updateSidebarItem(activeFile);
   }
   removeAnnotationPopover();
 }
@@ -564,7 +564,7 @@ function saveInlineNote(btn) {
   saveNotes();
   applyHighlights();
   removeAnnotationPopover();
-  renderFileList();
+  updateSidebarItem(activeFile);
 }
 
 function showAnnotationPopover(e, ann) {
@@ -594,7 +594,7 @@ function deleteAnnotation(id) {
   saveNotes();
   applyHighlights();
   removeAnnotationPopover();
-  renderFileList();
+  updateSidebarItem(activeFile);
 }
 
 function updateAnnotation(id, btn) {
@@ -647,13 +647,13 @@ function renderNotesPanel() {
     saveTimeout = setTimeout(() => {
       articleNotes.articleNote = textarea.value;
       saveNotes();
-      renderFileList();
+      updateSidebarItem(activeFile);
     }, 800);
   });
   textarea.addEventListener('blur', () => {
     articleNotes.articleNote = textarea.value;
     saveNotes();
-    renderFileList();
+    updateSidebarItem(activeFile);
   });
 }
 
@@ -661,7 +661,7 @@ function toggleFavorite(btn) {
   articleNotes.isFavorite = !articleNotes.isFavorite;
   saveNotes();
   renderNotesPanel();
-  renderFileList();
+  updateSidebarItem(activeFile);
   updateHeaderActions();
 }
 
@@ -699,7 +699,7 @@ function updateHeaderActions() {
 function handleTagKey(e) {
   handleTagInput(e,
     function() { if (!articleNotes.tags) articleNotes.tags = []; return articleNotes.tags; },
-    function() { saveNotes(); renderNotesPanel(); renderFileList(); }
+    function() { saveNotes(); renderNotesPanel(); updateSidebarItem(activeFile); }
   );
 }
 
@@ -708,7 +708,7 @@ function removeTag(tag) {
   articleNotes.tags = articleNotes.tags.filter(t => t !== tag);
   saveNotes();
   renderNotesPanel();
-  renderFileList();
+  updateSidebarItem(activeFile);
 }
 
 // ---- Voice Notes (Web Speech API) ----
@@ -771,7 +771,7 @@ function toggleVoiceNote(btn) {
       articleNotes.articleNote = existingText + separator + finalTranscript.trim();
       textarea.value = articleNotes.articleNote;
       saveNotes();
-      renderFileList();
+      updateSidebarItem(activeFile);
     }
   };
 

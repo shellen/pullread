@@ -116,7 +116,7 @@ async function refreshArticleList(silent) {
       allFiles = await res.json();
       allFiles.forEach(function(f) { if (f.title) f.title = stripTags(f.title); });
       filteredFiles = allFiles;
-      await Promise.all([loadAnnotationsIndex(), loadNotebooks()]);
+      await loadAnnotationsIndex();
       filterFiles();
       // Highlight new articles with a fade-in effect
       if (silent && allFiles.length > prevCount) {

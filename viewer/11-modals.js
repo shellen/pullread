@@ -47,9 +47,10 @@ function showGuideModal() {
   content.style.display = 'block';
 
   // Deselect sidebar and clear overlays
+  var prevActive = activeFile;
   activeFile = null;
   document.getElementById('margin-notes').innerHTML = '';
-  renderFileList();
+  updateSidebarActiveState(prevActive);
 
   content.innerHTML = `
     <div class="article-header">

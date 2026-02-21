@@ -118,6 +118,72 @@ function renderNoteItem(note, index) {
     + '</div>';
 }
 
+// Toggle active/read classes on old and new sidebar items without rebuilding the list
+function updateSidebarActiveState(prevFilename) {
+  if (prevFilename) {
+    var prevEl = document.querySelector('.file-item[data-filename="' + CSS.escape(prevFilename) + '"]');
+    if (prevEl) {
+      prevEl.classList.remove('active');
+      prevEl.setAttribute('aria-selected', 'false');
+      if (readArticles.has(prevFilename)) prevEl.classList.add('read');
+    }
+  }
+  if (activeFile) {
+    var nextEl = document.querySelector('.file-item[data-filename="' + CSS.escape(activeFile) + '"]');
+    if (nextEl) {
+      nextEl.classList.add('active');
+      nextEl.classList.remove('read');
+      nextEl.setAttribute('aria-selected', 'true');
+    }
+  }
+  // Also handle note items
+  document.querySelectorAll('.note-item.active').forEach(function(el) { el.classList.remove('active'); });
+  if (_activeNoteId) {
+    var noteEl = document.querySelector('.note-item[data-note-id="' + CSS.escape(_activeNoteId) + '"]');
+    if (noteEl) noteEl.classList.add('active');
+  }
+}
+
+// Rebuild only the indicator dots for a single sidebar item
+function updateSidebarItem(filename) {
+  if (!filename) return;
+  var el = document.querySelector('.file-item[data-filename="' + CSS.escape(filename) + '"]');
+  if (!el) return;
+  var f = allFiles.find(function(af) { return af.filename === filename; });
+  if (!f) return;
+  var { hasHl, hasNote, isFavorite } = hasAnnotations(filename);
+  var hasSummary = f.hasSummary;
+  var isPodcast = !!(f.enclosureUrl && f.enclosureType && f.enclosureType.startsWith('audio/'));
+  var existing = el.querySelector('.file-item-indicators');
+  if (hasHl || hasNote || hasSummary || isFavorite || isPodcast) {
+    var html = '<div class="file-item-indicators">'
+      + (isFavorite ? '<span class="dot dot-favorite" aria-label="Favorite"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-heart"/></svg></span>' : '')
+      + (isPodcast ? '<span class="dot dot-podcast" aria-label="Podcast"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-headphones"/></svg></span>' : '')
+      + (hasHl ? '<span class="dot dot-highlight" aria-label="Has highlights"></span>' : '')
+      + (hasNote ? '<span class="dot dot-note" aria-label="Has annotations"></span>' : '')
+      + (hasSummary ? '<span class="dot dot-summary" aria-label="Has summary"></span>' : '')
+      + '</div>';
+    if (existing) {
+      existing.outerHTML = html;
+    } else {
+      el.insertAdjacentHTML('beforeend', html);
+    }
+  } else if (existing) {
+    existing.remove();
+  }
+}
+
+// Debounced renderFileList for background triggers (sync polls, etc.)
+var _renderPending = false;
+function scheduleRenderFileList() {
+  if (_renderPending) return;
+  _renderPending = true;
+  requestAnimationFrame(function() {
+    _renderPending = false;
+    renderFileList();
+  });
+}
+
 function toggleHideRead() {
   hideRead = !hideRead;
   localStorage.setItem('pr-hide-read', hideRead ? '1' : '0');
@@ -125,22 +191,33 @@ function toggleHideRead() {
   renderFileList();
 }
 
+// Debounced localStorage write for read articles
+var _markAsReadTimer = null;
+function _flushReadArticles() {
+  localStorage.setItem('pr-read-articles', JSON.stringify(Array.from(readArticles)));
+}
+
 function markAsRead(filename) {
   readArticles.add(filename);
-  // Keep only last 5000 entries
   if (readArticles.size > 5000) {
-    const arr = Array.from(readArticles);
+    var arr = Array.from(readArticles);
     readArticles = new Set(arr.slice(arr.length - 5000));
   }
-  localStorage.setItem('pr-read-articles', JSON.stringify(Array.from(readArticles)));
+  clearTimeout(_markAsReadTimer);
+  _markAsReadTimer = setTimeout(_flushReadArticles, 2000);
 }
 
 function markCurrentAsUnread() {
   if (!activeFile) return;
   readArticles.delete(activeFile);
-  localStorage.setItem('pr-read-articles', JSON.stringify(Array.from(readArticles)));
+  clearTimeout(_markAsReadTimer);
+  _markAsReadTimer = setTimeout(_flushReadArticles, 2000);
   renderFileList();
 }
+
+window.addEventListener('beforeunload', function() {
+  if (_markAsReadTimer) _flushReadArticles();
+});
 
 function clearSearch() {
   var input = document.getElementById('search');
@@ -246,9 +323,10 @@ async function loadFile(index) {
   const file = displayFiles[index];
   if (!file) return;
   _sidebarView = 'home'; syncSidebarTabs();
+  var prevActive = activeFile;
   activeFile = file.filename;
   markAsRead(file.filename);
-  renderFileList();
+  updateSidebarActiveState(prevActive);
   removeHlToolbar();
 
   // Auto-close sidebar on mobile after selecting an article

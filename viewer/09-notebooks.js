@@ -5,9 +5,13 @@ let _notebookSaveTimeout = null;
 let _notebookPreviewMode = false;
 let _activeNoteId = null;
 const SINGLE_NOTEBOOK_ID = 'nb-shared';
+var _notebooksLoaded = false;
 
 // Get or create the single shared notebook
 async function getOrCreateSingleNotebook() {
+  if (_notebooksLoaded && _notebooks[SINGLE_NOTEBOOK_ID]) {
+    return _notebooks[SINGLE_NOTEBOOK_ID];
+  }
   await loadNotebooks();
   if (_notebooks[SINGLE_NOTEBOOK_ID]) {
     let found = _notebooks[SINGLE_NOTEBOOK_ID];
@@ -56,7 +60,10 @@ async function getOrCreateSingleNotebook() {
 async function loadNotebooks() {
   try {
     const res = await fetch('/api/notebooks');
-    if (res.ok) _notebooks = await res.json();
+    if (res.ok) {
+      _notebooks = await res.json();
+      _notebooksLoaded = true;
+    }
   } catch {}
 }
 
@@ -145,14 +152,14 @@ function openNotebookInPane(id) {
   activeFile = null;
   _activeNotebook = nb;
   if (!nb.notes) nb.notes = [];
-  renderFileList();
 
   if (nb.notes.length && !_activeNoteId) {
     openNoteInPane(nb.notes[0].id);
   } else if (_activeNoteId) {
     openNoteInPane(_activeNoteId);
   } else {
-    // Empty state
+    // Empty state — needs its own render since openNoteInPane won't be called
+    renderFileList();
     var content = document.getElementById('content');
     var empty = document.getElementById('empty-state');
     empty.style.display = 'none';
@@ -186,7 +193,7 @@ function openNoteInPane(noteId) {
   var firstLine = (note.content || '').split('\n')[0].replace(/^#+\s*/, '').trim() || 'Untitled Note';
   document.title = firstLine + ' — PullRead';
 
-  renderFileList();
+  updateSidebarActiveState(null);
 
   var html = '<div class="note-page" data-note-id="' + escapeHtml(note.id) + '">';
 
