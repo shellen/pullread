@@ -215,7 +215,6 @@ function toggleMoreMenu(e) {
   var sharePanel = document.querySelector('.share-dropdown-panel');
   if (sharePanel) sharePanel.remove();
 
-  var meta = _currentMeta;
   var panel = document.createElement('div');
   panel.className = 'more-dropdown-panel';
   panel.onclick = function(ev) { ev.stopPropagation(); };
@@ -225,7 +224,12 @@ function toggleMoreMenu(e) {
   items += '<button onclick="markCurrentAsUnread(); closeMoreMenu()"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-eye-slash"/></svg> Mark Unread</button>';
   panel.innerHTML = items;
 
-  e.target.closest('.more-dropdown').appendChild(panel);
+  // Walk up from target to find .more-dropdown (avoids SVG closest() issues in WebKit)
+  var host = e.target;
+  while (host && (!host.classList || !host.classList.contains('more-dropdown'))) {
+    host = host.parentNode;
+  }
+  if (host) host.appendChild(panel);
 }
 
 function closeMoreMenu() {

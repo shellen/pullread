@@ -346,22 +346,21 @@ export function listSiteLogins(): string[] {
       { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
     );
     const domains: string[] = [];
-    let inPullReadEntry = false;
+    // acct appears before svce in keychain dump, so collect both per entry
+    // and check at entry boundaries.
+    let currentAcct = '';
+    let isPullRead = false;
     for (const line of result.split('\n')) {
-      if (line.startsWith('keychain:') || line.match(/^    "keyc"/)) {
-        inPullReadEntry = false;
+      if (line.startsWith('keychain:') || line.startsWith('class:')) {
+        if (isPullRead && currentAcct) domains.push(currentAcct);
+        currentAcct = '';
+        isPullRead = false;
       }
-      if (line.includes(`"svce"<blob>="${KEYCHAIN_SERVICE}"`)) {
-        inPullReadEntry = true;
-      }
-      if (inPullReadEntry) {
-        const match = line.match(/"acct"<blob>="([^"]+)"/);
-        if (match) {
-          domains.push(match[1]);
-          inPullReadEntry = false;
-        }
-      }
+      const acctMatch = line.match(/"acct"<blob>="([^"]+)"/);
+      if (acctMatch) currentAcct = acctMatch[1];
+      if (line.includes(`"svce"<blob>="${KEYCHAIN_SERVICE}"`)) isPullRead = true;
     }
+    if (isPullRead && currentAcct) domains.push(currentAcct);
     return [...new Set(domains)];
   } catch {
     return [];

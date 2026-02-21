@@ -107,24 +107,31 @@ pub fn list_site_logins() -> Vec<String> {
         Ok(out) => {
             let stdout = String::from_utf8_lossy(&out.stdout);
             let mut domains = Vec::new();
-            let mut in_pullread = false;
+            // acct appears before svce in the dump, so collect both per entry
+            // and check at entry boundaries.
+            let mut current_acct = String::new();
+            let mut is_pullread = false;
+            let svce_marker = format!("\"svce\"<blob>=\"{}\"", KEYCHAIN_SERVICE);
             for line in stdout.lines() {
-                // New entry boundary
-                if line.starts_with("keychain:") || line.contains("\"keyc\"") {
-                    in_pullread = false;
+                if line.starts_with("keychain:") || line.starts_with("class:") {
+                    if is_pullread && !current_acct.is_empty() {
+                        domains.push(current_acct.clone());
+                    }
+                    current_acct.clear();
+                    is_pullread = false;
                 }
-                if line.contains(&format!("\"svce\"<blob>=\"{}\"", KEYCHAIN_SERVICE)) {
-                    in_pullread = true;
-                }
-                if in_pullread {
-                    if let Some(start) = line.find("\"acct\"<blob>=\"") {
-                        let rest = &line[start + 14..];
-                        if let Some(end) = rest.find('"') {
-                            domains.push(rest[..end].to_string());
-                        }
-                        in_pullread = false;
+                if let Some(start) = line.find("\"acct\"<blob>=\"") {
+                    let rest = &line[start + 14..];
+                    if let Some(end) = rest.find('"') {
+                        current_acct = rest[..end].to_string();
                     }
                 }
+                if line.contains(&svce_marker) {
+                    is_pullread = true;
+                }
+            }
+            if is_pullread && !current_acct.is_empty() {
+                domains.push(current_acct);
             }
             domains.sort();
             domains.dedup();

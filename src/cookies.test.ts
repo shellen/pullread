@@ -103,19 +103,23 @@ describe('Site login cookies', () => {
     expect(() => saveSiteLoginCookies('evil.com$(whoami)', [])).toThrow('Invalid domain');
   });
 
-  test('listSiteLogins parses security dump output', () => {
+  test('listSiteLogins parses security dump output (acct before svce)', () => {
+    // Real keychain dump has acct before svce within each entry
     mockExecSync.mockReturnValue(
-      '    "svce"<blob>="PullRead"\n    "acct"<blob>="medium.com"\n' +
-      '    "svce"<blob>="PullRead"\n    "acct"<blob>="x.com"\n'
+      'keychain: "/Users/test/Library/Keychains/login.keychain-db"\nclass: "genp"\n' +
+      '    "acct"<blob>="medium.com"\n    "svce"<blob>="PullRead"\n' +
+      'keychain: "/Users/test/Library/Keychains/login.keychain-db"\nclass: "genp"\n' +
+      '    "acct"<blob>="x.com"\n    "svce"<blob>="PullRead"\n'
     );
     expect(listSiteLogins()).toEqual(['medium.com', 'x.com']);
   });
 
   test('listSiteLogins ignores acct values from non-PullRead entries', () => {
     mockExecSync.mockReturnValue(
-      '    "svce"<blob>="OtherApp"\n    "acct"<blob>="should-skip.com"\n' +
-      'keychain: "/Users/test/Library/Keychains/login.keychain-db"\n' +
-      '    "svce"<blob>="PullRead"\n    "acct"<blob>="keep.com"\n'
+      'keychain: "/Users/test/Library/Keychains/login.keychain-db"\nclass: "genp"\n' +
+      '    "acct"<blob>="should-skip.com"\n    "svce"<blob>="OtherApp"\n' +
+      'keychain: "/Users/test/Library/Keychains/login.keychain-db"\nclass: "genp"\n' +
+      '    "acct"<blob>="keep.com"\n    "svce"<blob>="PullRead"\n'
     );
     expect(listSiteLogins()).toEqual(['keep.com']);
   });
