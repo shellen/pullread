@@ -124,6 +124,13 @@ function cleanMarkdown(md) {
   return md;
 }
 
+// Check if a feed name roughly matches an article's domain
+function feedMatchesDomain(feedName, domain) {
+  var f = feedName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  var d = domain.toLowerCase().replace(/^www\./, '').replace(/\.[^.]+$/, '').replace(/[^a-z0-9]/g, '');
+  return f.includes(d) || d.includes(f);
+}
+
 // Show a brief non-blocking toast message (auto-dismisses)
 function showToast(message, durationMs) {
   if (!durationMs) durationMs = 4000;

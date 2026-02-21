@@ -262,10 +262,14 @@ function renderArticle(text, filename) {
       if (cutoff > 10 && cutoff < 80) authorText = authorText.slice(0, cutoff);
       else authorText = authorText.slice(0, 80).replace(/\s+\S*$/, '') + '\u2026';
     }
-    bylineParts.push('<span class="author">' + escapeHtml(authorText) + '</span>');
+    bylineParts.push('<span class="author" onclick="searchByAuthor(\'' + escapeHtml(authorText).replace(/'/g, "\\'") + '\')" title="Search for articles by this author">' + escapeHtml(authorText) + '</span>');
   }
   if (meta && meta.domain) bylineParts.push('<a href="' + escapeHtml(meta.url || '') + '" target="_blank">' + escapeHtml(meta.domain) + '</a>');
   if (meta && meta.bookmarked) bylineParts.push(escapeHtml(meta.bookmarked.slice(0, 10)));
+  // Show feed source when it doesn't match the article domain
+  if (meta && meta.feed && meta.domain && !feedMatchesDomain(meta.feed, meta.domain)) {
+    bylineParts.push('<span class="feed-source">via ' + escapeHtml(meta.feed) + '</span>');
+  }
   html += bylineParts.join('<span class="sep">&middot;</span>');
   // Read time will be inserted after rendering
   html += '</div>';

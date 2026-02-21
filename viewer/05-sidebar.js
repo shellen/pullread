@@ -88,6 +88,9 @@ function renderFileItem(f, i) {
   const metaParts = [];
   if (date) metaParts.push('<span>' + date + '</span>');
   if (f.domain) metaParts.push('<span>' + escapeHtml(f.domain) + '</span>');
+  if (f.feed && f.domain && !feedMatchesDomain(f.feed, f.domain)) {
+    metaParts.push('<span class="feed-via">via ' + escapeHtml(f.feed) + '</span>');
+  }
   const metaHtml = metaParts.join('<span class="meta-sep"></span>');
 
   return '<div class="file-item' + isActive + (isRead && !isActive ? ' read' : '') + '" data-index="' + i + '" data-filename="' + escapeHtml(f.filename) + '" onclick="loadFile(' + i + ')" role="option" aria-selected="' + (activeFile === f.filename) + '" tabindex="0" onkeydown="if(event.key===\'Enter\')loadFile(' + i + ')">'
@@ -143,6 +146,16 @@ function clearSearch() {
   var input = document.getElementById('search');
   if (input) { input.value = ''; input.focus(); }
   filterFiles();
+}
+
+function searchByAuthor(authorName) {
+  var input = document.getElementById('search');
+  if (!input) return;
+  input.value = 'author:' + authorName;
+  filterFiles();
+  // Switch to articles tab if not already there
+  var articlesTab = document.querySelector('.sidebar-tab[data-tab="articles"]');
+  if (articlesTab) articlesTab.click();
 }
 
 function filterFiles() {

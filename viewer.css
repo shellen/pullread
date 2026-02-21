@@ -527,6 +527,10 @@
     opacity: 0.5;
     flex-shrink: 0;
   }
+  .file-item-meta .feed-via {
+    opacity: 0.7;
+    font-style: italic;
+  }
 
   .file-count {
     padding: 4px 12px 4px 20px;
@@ -995,7 +999,9 @@
   }
   .article-byline a { color: var(--link); text-decoration: none; }
   .article-byline a:hover { text-decoration: underline; }
-  .article-byline .author { color: var(--fg); font-weight: 500; }
+  .article-byline .author { color: var(--fg); font-weight: 500; cursor: pointer; }
+  .article-byline .author:hover { text-decoration: underline; }
+  .article-byline .feed-source { opacity: 0.6; font-style: italic; }
   .article-byline .sep { margin: 0 6px; opacity: 0.4; }
   .article-actions {
     display: flex;
