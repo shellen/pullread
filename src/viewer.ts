@@ -8,7 +8,7 @@ import { exec, execFile } from 'child_process';
 import { homedir } from 'os';
 import { VIEWER_HTML } from './viewer-html';
 import { summarizeText, loadLLMConfig, saveLLMConfig, loadLLMSettings, saveLLMSettings, getDefaultModel, isAppleAvailable, KNOWN_MODELS, LLMConfig, LLMSettings } from './summarizer';
-import { autotagText, autotagBatch, saveMachineTags, hasMachineTags } from './autotagger';
+import { autotagText, autotagBatch, saveMachineTags, hasMachineTags, migrateDashedTags } from './autotagger';
 import { APP_ICON } from './app-icon';
 import { fetchAndExtract } from './extractor';
 import { generateMarkdown, writeArticle, ArticleData, downloadFavicon } from './writer';
@@ -232,6 +232,9 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
       }
     });
   } catch {}
+
+  // Normalize any legacy dashed machine tags
+  migrateDashedTags();
 
   // Backfill favicons for existing articles in the background
   (async () => {

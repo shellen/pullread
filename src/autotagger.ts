@@ -9,12 +9,12 @@ import { summarizeText, loadLLMConfig, LLMConfig, Provider, getDefaultModel } fr
 const NOTES_PATH = join(homedir(), '.config', 'pullread', 'notes.json');
 
 const AUTOTAG_PROMPT = `Extract 3-8 machine tags from this article for relational mapping. Tags should help identify connections between articles. Include:
-- Main topics (e.g., "artificial-intelligence", "climate-change", "economics")
+- Main topics (e.g., "artificialintelligence", "climatechange", "economics")
 - Key entities mentioned prominently — people, companies, technologies, places
-- Themes (e.g., "regulation", "open-source", "privacy", "fundraising")
+- Themes (e.g., "regulation", "opensource", "privacy", "fundraising")
 
-Return ONLY a valid JSON array of lowercase, hyphenated tag strings. No explanation, no markdown formatting — just the raw JSON array.
-Example: ["artificial-intelligence","openai","regulation","sam-altman","safety"]`;
+Return ONLY a valid JSON array of lowercase tag strings with no spaces or dashes. No explanation, no markdown formatting — just the raw JSON array.
+Example: ["artificialintelligence","openai","regulation","samaltman","safety"]`;
 
 interface AutotagResult {
   machineTags: string[];
@@ -79,7 +79,7 @@ function parseTagsFromResponse(response: string): string[] {
     if (Array.isArray(parsed)) {
       return parsed
         .filter((t: unknown): t is string => typeof t === 'string')
-        .map(t => t.toLowerCase().trim().replace(/\s+/g, '-'))
+        .map(t => t.toLowerCase().trim().replace(/[\s\-]+/g, ''))
         .filter(t => t.length > 0 && t.length <= 50);
     }
   } catch {
@@ -91,7 +91,7 @@ function parseTagsFromResponse(response: string): string[] {
         if (Array.isArray(parsed)) {
           return parsed
             .filter((t: unknown): t is string => typeof t === 'string')
-            .map(t => t.toLowerCase().trim().replace(/\s+/g, '-'))
+            .map(t => t.toLowerCase().trim().replace(/[\s\-]+/g, ''))
             .filter(t => t.length > 0 && t.length <= 50);
         }
       } catch {}
@@ -125,6 +125,27 @@ export function saveMachineTags(filename: string, machineTags: string[]): void {
   existing.machineTags = machineTags;
   notes[filename] = existing;
   saveNotesFile(notes);
+}
+
+/**
+ * Strip dashes from all existing machine tags in notes.json.
+ * Idempotent — safe to call multiple times.
+ */
+export function migrateDashedTags(): number {
+  const notes = loadNotesFile();
+  let migrated = 0;
+  for (const key of Object.keys(notes)) {
+    const entry = notes[key];
+    if (entry?.machineTags && Array.isArray(entry.machineTags)) {
+      const fixed = entry.machineTags.map((t: string) => t.replace(/[\s\-]+/g, ''));
+      if (fixed.some((t: string, i: number) => t !== entry.machineTags[i])) {
+        entry.machineTags = fixed;
+        migrated++;
+      }
+    }
+  }
+  if (migrated > 0) saveNotesFile(notes);
+  return migrated;
 }
 
 /**
