@@ -864,13 +864,19 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
       return;
     }
 
-    // Site login save via form submission (bypasses external site CSP)
-    if (url.pathname === '/api/site-login-callback' && req.method === 'POST') {
+    // Site login save via navigation (bypasses all external CSP restrictions)
+    if (url.pathname === '/api/site-login-callback') {
       try {
-        const body = await readBody(req);
-        const params = new URLSearchParams(body);
-        const domain = params.get('domain') || '';
-        const cookiesRaw = params.get('cookies') || '[]';
+        let domain: string, cookiesRaw: string;
+        if (req.method === 'GET') {
+          domain = url.searchParams.get('domain') || '';
+          cookiesRaw = url.searchParams.get('cookies') || '[]';
+        } else {
+          const body = await readBody(req);
+          const params = new URLSearchParams(body);
+          domain = params.get('domain') || '';
+          cookiesRaw = params.get('cookies') || '[]';
+        }
         if (!domain) throw new Error('missing domain');
         const cookies = JSON.parse(cookiesRaw);
         saveSiteLoginCookies(domain, cookies);

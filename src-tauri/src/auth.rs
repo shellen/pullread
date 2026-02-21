@@ -27,10 +27,9 @@ pub async fn open_site_login(app: AppHandle, domain: String) -> Result<(), Strin
         let _ = existing.close();
     }
 
-    // Save cookies via form submission to the viewer server.
-    // Can't use fetch() because external site CSP blocks it.
-    // Can't use Tauri IPC because app commands need explicit ACL from remote URLs.
-    // Form submission bypasses CSP connect-src restrictions.
+    // Save cookies via direct navigation to the viewer server.
+    // CSP connect-src blocks fetch(), form-action blocks form.submit(),
+    // but window.location.href navigation is unrestricted by CSP.
     let js = format!(r#"
 (function() {{
     function addSaveButton() {{
@@ -48,17 +47,10 @@ pub async fn open_site_login(app: AppHandle, domain: String) -> Result<(), Strin
                 var parts = c.trim().split('=');
                 return {{ name: parts[0], value: parts.slice(1).join('='), domain: '.{domain}', path: '/', expires: 0, secure: location.protocol === 'https:', httpOnly: false }};
             }}).filter(function(c) {{ return c.name && c.value; }});
-            var form = document.createElement('form');
-            form.method = 'POST';
-            form.action = 'http://localhost:{port}/api/site-login-callback';
-            var d = document.createElement('input');
-            d.type = 'hidden'; d.name = 'domain'; d.value = '{domain}';
-            form.appendChild(d);
-            var c = document.createElement('input');
-            c.type = 'hidden'; c.name = 'cookies'; c.value = JSON.stringify(cookies);
-            form.appendChild(c);
-            document.body.appendChild(form);
-            form.submit();
+            var params = new URLSearchParams();
+            params.set('domain', '{domain}');
+            params.set('cookies', JSON.stringify(cookies));
+            window.location.href = 'http://localhost:{port}/api/site-login-callback?' + params.toString();
         }};
         document.body.appendChild(btn);
     }}
