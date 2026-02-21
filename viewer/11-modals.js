@@ -211,20 +211,25 @@ function closeModal() {
 
 // ---- Onboarding Wizard ----
 let _obStep = 0;
-let _obFeeds = {}; // { name: url }
+let _obFeeds = {};
 let _obOutputPath = '~/Documents/PullRead';
-let _obCookies = false;
 let _obFeedLoading = false;
-const OB_TOTAL_STEPS = 5;
+let _tourMode = false;
 
 function dismissOnboarding() {
   document.getElementById('onboarding').style.display = 'none';
   localStorage.setItem('pr-onboarded', '1');
 }
 
+function showTour() {
+  _tourMode = true;
+  _obStep = 0;
+  document.getElementById('onboarding').style.display = 'flex';
+  renderOnboardingStep();
+}
+
 async function showOnboardingIfNeeded() {
   if (localStorage.getItem('pr-onboarded')) return;
-  // Check if already configured
   try {
     var r = await fetch('/api/config');
     var cfg = await r.json();
@@ -234,133 +239,174 @@ async function showOnboardingIfNeeded() {
     }
     if (cfg.outputPath) _obOutputPath = cfg.outputPath;
     if (cfg.feeds) _obFeeds = cfg.feeds;
-    if (cfg.useBrowserCookies) _obCookies = cfg.useBrowserCookies;
   } catch (e) {}
+  _tourMode = false;
   _obStep = 0;
   document.getElementById('onboarding').style.display = 'flex';
   renderOnboardingStep();
 }
 
+function getOnboardingSteps() {
+  var steps = [
+    { id: 'welcome', render: renderStepWelcome },
+    { id: 'setup', render: renderStepSetup, setupOnly: true },
+    { id: 'reading', render: renderStepReading },
+    { id: 'search', render: renderStepSearch },
+    { id: 'listening', render: renderStepListening },
+    { id: 'ready', render: renderStepReady }
+  ];
+  if (_tourMode) return steps.filter(function(s) { return !s.setupOnly; });
+  return steps;
+}
+
 function renderOnboardingStep() {
   var card = document.getElementById('onboarding-card');
+  var steps = getOnboardingSteps();
+  var total = steps.length;
+
   var progress = '<div class="ob-progress">';
-  for (var i = 0; i < OB_TOTAL_STEPS; i++) {
+  for (var i = 0; i < total; i++) {
     progress += '<div class="ob-progress-bar' + (i <= _obStep ? ' active' : '') + '"></div>';
   }
   progress += '</div>';
 
   var html = progress;
-
-  if (_obStep === 0) {
-    html += '<div style="text-align:center;padding:12px 0">'
-      + '<div style="font-size:48px;margin-bottom:12px">&#128218;</div>'
-      + '<h2>Welcome to PullRead</h2>'
-      + '<p class="ob-subtitle">Install our bookmarking shortcut or use PullRead with your favorite service. Articles are saved as clean, local markdown you can read anywhere.</p>'
-      + '<div class="ob-features">'
-      + '<span class="ob-feature-pill">&#128278; Bookmark sync</span>'
-      + '<span class="ob-feature-pill">&#128196; Markdown files</span>'
-      + '<span class="ob-feature-pill">&#10024; AI summaries</span>'
-      + '<span class="ob-feature-pill">&#128228; Share Extension</span>'
-      + '</div>'
-      + '</div>';
-  } else if (_obStep === 1) {
-    html += '<h2>Choose Output Folder</h2>'
-      + '<p class="ob-subtitle">Synced articles are saved as markdown here. A cloud-synced folder like Dropbox or iCloud works great.</p>'
-      + '<div class="ob-glass-card">'
-      + '<label>Output path</label>'
-      + '<div style="display:flex;gap:8px;align-items:center">'
-      + '<input type="text" id="ob-output-path" value="' + escapeHtml(_obOutputPath) + '" placeholder="~/Documents/PullRead" style="flex:1">'
-      + '<button onclick="pickOutputFolder(\'ob-output-path\')" style="white-space:nowrap;padding:7px 14px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;cursor:pointer;font-family:inherit">Choose\u2026</button>'
-      + '</div>'
-      + '<div style="font-size:11px;color:var(--muted);margin-top:6px">Default: ~/Documents/PullRead</div>'
-      + '</div>';
-  } else if (_obStep === 2) {
-    var feedNames = Object.keys(_obFeeds);
-    html += '<h2>Connect Your Bookmarks</h2>'
-      + '<p class="ob-subtitle">Paste the RSS feed URL from your bookmark service. PullRead syncs your saved articles and converts them to markdown.</p>'
-      + '<div class="ob-glass-card">';
-    if (feedNames.length > 0) {
-      html += '<ul class="ob-feed-list">';
-      for (var fi = 0; fi < feedNames.length; fi++) {
-        var fn = feedNames[fi];
-        html += '<li><div><div class="ob-feed-name">' + escapeHtml(fn) + '</div><div class="ob-feed-url">' + escapeHtml(_obFeeds[fn]) + '</div></div>'
-          + '<button onclick="obRemoveFeed(\'' + escapeHtml(fn.replace(/'/g, "\\'")) + '\')" title="Remove">&times;</button></li>';
-      }
-      html += '</ul>';
-    }
-    html += '<div class="ob-feed-add">'
-      + '<input type="text" id="ob-feed-url" placeholder="Paste bookmark feed URL or web address\u2026" onkeydown="if(event.key===\'Enter\')obAddFeed()">'
-      + '<button onclick="obAddFeed()" id="ob-add-btn"' + (_obFeedLoading ? ' disabled' : '') + '>' + (_obFeedLoading ? 'Finding feed\u2026' : 'Add') + '</button>'
-      + '</div>'
-      + '</div>'
-      + '<div class="ob-hint-list">'
-      + '<div style="margin-bottom:8px;color:var(--fg);font-size:12px;font-weight:500">Where to find your feed URL:</div>'
-      + '<div><strong>Instapaper</strong> Settings &rarr; Export &rarr; RSS Feed URL</div>'
-      + '<div><strong>Pinboard</strong> pinboard.in/feeds/u:USERNAME/</div>'
-      + '<div><strong>Raindrop</strong> Collection &rarr; Share &rarr; RSS Feed</div>'
-      + '<div><strong>Pocket</strong> getpocket.com/users/USERNAME/feed/all</div>'
-      + '</div>'
-      + '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">'
-      + '<div class="ob-hint-list">'
-      + '<div style="margin-bottom:6px;color:var(--fg);font-size:12px;font-weight:500">You can also subscribe to newsletters and blogs:</div>'
-      + '<div><strong>Substack</strong> Paste the newsletter URL, e.g. example.substack.com</div>'
-      + '<div><strong>Ghost</strong> Paste the publication URL</div>'
-      + '<div><strong>Buttondown</strong> Paste the newsletter URL</div>'
-      + '<div><strong>WordPress</strong> Paste any blog URL \u2014 PullRead finds the feed</div>'
-      + '</div>'
-      + '</div>'
-      + '<div style="display:flex;gap:8px;align-items:flex-start;margin-top:12px;padding:10px 12px;background:color-mix(in srgb, var(--fg) 4%, transparent);border-radius:8px;font-size:12px;color:var(--muted)">'
-      + '<span style="flex-shrink:0;font-size:14px">&#128196;</span>'
-      + '<span>Each new post from a feed is saved as a separate file. Bookmark services only sync articles you save; newsletters sync every post.</span>'
-      + '</div>';
-  } else if (_obStep === 3) {
-    html += '<h2>More Ways to Save</h2>'
-      + '<p class="ob-subtitle">Beyond bookmark sync, there are other ways to get articles into PullRead.</p>'
-      + '<div class="ob-glass-card">'
-      + '<div class="ob-method"><div class="ob-method-icon">&#128278;</div><div><div class="ob-method-title">Bookmark Sync</div><div class="ob-method-desc">Your primary source. Bookmarks from Instapaper, Pinboard, Raindrop, and Pocket sync automatically on a schedule.</div></div></div>'
-      + '<div class="ob-method"><div class="ob-method-icon">&#128228;</div><div><div class="ob-method-title">Share Extension</div><div class="ob-method-desc">In Safari or any app, tap Share &rarr; Save to PullRead. The article is fetched on next sync.</div></div></div>'
-      + '<div class="ob-method"><div class="ob-method-icon">&#128433;</div><div><div class="ob-method-title">Services Menu</div><div class="ob-method-desc">Select any URL, then right-click &rarr; Services &rarr; Save to PullRead.</div></div></div>'
-      + '<div class="ob-method"><div class="ob-method-icon">&#128225;</div><div><div class="ob-method-title">Newsletters &amp; Blogs</div><div class="ob-method-desc">Subscribe to any RSS feed \u2014 Substack, Ghost, Buttondown, WordPress, and more.</div></div></div>'
-      + '</div>'
-      + '<div class="ob-glass-card">'
-      + '<div class="ob-toggle-row">'
-      + '<label><strong>Use Chrome Cookies</strong><div class="ob-toggle-desc">Access paywalled sites using your Chrome login. Cookies stay local.</div></label>'
-      + '<input type="checkbox" id="ob-cookies"' + (_obCookies ? ' checked' : '') + ' onchange="_obCookies=this.checked">'
-      + '</div>'
-      + '</div>';
-  } else if (_obStep === 4) {
-    html += '<div style="text-align:center;padding:12px 0">'
-      + '<div style="font-size:48px;margin-bottom:12px">&#128640;</div>'
-      + '<h2>Ready to Go</h2>'
-      + '<p class="ob-subtitle">PullRead will fetch your bookmarked articles and save them as markdown. Sync anytime from the menu bar. Here are some keyboard shortcuts to get started:</p>'
-      + '</div>'
-      + '<div class="ob-shortcuts">'
-      + '<kbd>j</kbd> / <kbd>&rarr;</kbd> <span>Next article</span>'
-      + '<kbd>k</kbd> / <kbd>&larr;</kbd> <span>Previous article</span>'
-      + '<kbd>/</kbd> <span>Search articles</span>'
-      + '<kbd>[</kbd> <span>Toggle sidebar</span>'
-      + '<kbd>h</kbd> <span>Highlight selected text</span>'
-      + '<kbd>n</kbd> <span>Toggle article notes</span>'
-      + '<kbd>f</kbd> <span>Toggle focus mode</span>'
-      + '<kbd>Space</kbd> <span>Play / pause audio</span>'
-      + '</div>';
-  }
+  html += steps[_obStep].render();
 
   // Navigation
   html += '<div class="ob-nav">';
   if (_obStep > 0) {
     html += '<button onclick="obBack()">Back</button>';
+  } else if (_tourMode) {
+    html += '<button onclick="dismissOnboarding()" style="color:var(--muted)">Skip</button>';
   } else {
     html += '<span></span>';
   }
-  if (_obStep < OB_TOTAL_STEPS - 1) {
+  if (_obStep < total - 1) {
     html += '<button class="ob-primary" onclick="obNext()">Next</button>';
   } else {
-    html += '<button class="ob-primary" onclick="obFinish()">Get Started</button>';
+    html += '<button class="ob-primary" onclick="obFinish()">' + (_tourMode ? 'Done' : 'Get Started') + '</button>';
   }
   html += '</div>';
 
   card.innerHTML = html;
+}
+
+function renderStepWelcome() {
+  var title = _tourMode ? "What\u2019s in PullRead" : 'Welcome to PullRead';
+  var subtitle = _tourMode
+    ? 'A quick look at what you can do with your reading library.'
+    : 'Save articles as clean, local markdown you can read anywhere. Install our bookmarking shortcut or use PullRead with your favorite service.';
+  return '<div style="text-align:center;padding:12px 0">'
+    + '<div style="font-size:48px;margin-bottom:12px">&#128218;</div>'
+    + '<h2>' + title + '</h2>'
+    + '<p class="ob-subtitle">' + subtitle + '</p>'
+    + '<div class="ob-features">'
+    + '<span class="ob-feature-pill">&#128278; Bookmark sync</span>'
+    + '<span class="ob-feature-pill">&#128196; Markdown files</span>'
+    + '<span class="ob-feature-pill">&#10024; Summaries</span>'
+    + '<span class="ob-feature-pill">&#127911; Text-to-speech</span>'
+    + '<span class="ob-feature-pill">&#128064; Focus mode</span>'
+    + '</div>'
+    + '</div>';
+}
+
+function renderStepSetup() {
+  var feedNames = Object.keys(_obFeeds);
+  var html = '<h2>Setup</h2>'
+    + '<p class="ob-subtitle">Choose where to save articles, then add a bookmark feed to start syncing.</p>';
+
+  // Output folder
+  html += '<div class="ob-glass-card">'
+    + '<label style="font-weight:500;font-size:13px;margin-bottom:6px;display:block">Output folder</label>'
+    + '<div style="display:flex;gap:8px;align-items:center">'
+    + '<input type="text" id="ob-output-path" value="' + escapeHtml(_obOutputPath) + '" placeholder="~/Documents/PullRead" style="flex:1">'
+    + '<button onclick="pickOutputFolder(\'ob-output-path\')" style="white-space:nowrap;padding:7px 14px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;cursor:pointer;font-family:inherit">Choose\u2026</button>'
+    + '</div>'
+    + '</div>';
+
+  // Feed connection
+  html += '<div class="ob-glass-card" style="margin-top:12px">'
+    + '<label style="font-weight:500;font-size:13px;margin-bottom:6px;display:block">Bookmark feeds</label>';
+  if (feedNames.length > 0) {
+    html += '<ul class="ob-feed-list">';
+    for (var fi = 0; fi < feedNames.length; fi++) {
+      var fn = feedNames[fi];
+      html += '<li><div><div class="ob-feed-name">' + escapeHtml(fn) + '</div><div class="ob-feed-url">' + escapeHtml(_obFeeds[fn]) + '</div></div>'
+        + '<button onclick="obRemoveFeed(\'' + escapeHtml(fn.replace(/'/g, "\\'")) + '\')" title="Remove">&times;</button></li>';
+    }
+    html += '</ul>';
+  }
+  html += '<div class="ob-feed-add">'
+    + '<input type="text" id="ob-feed-url" placeholder="Paste bookmark feed URL or web address\u2026" onkeydown="if(event.key===\'Enter\')obAddFeed()">'
+    + '<button onclick="obAddFeed()" id="ob-add-btn"' + (_obFeedLoading ? ' disabled' : '') + '>' + (_obFeedLoading ? 'Finding feed\u2026' : 'Add') + '</button>'
+    + '</div>'
+    + '</div>';
+
+  // Service hints (compact)
+  html += '<div class="ob-hint-list" style="margin-top:10px">'
+    + '<div style="margin-bottom:6px;color:var(--fg);font-size:12px;font-weight:500">Where to find your feed URL:</div>'
+    + '<div><strong>Instapaper</strong> Settings &rarr; Export &rarr; RSS Feed URL</div>'
+    + '<div><strong>Pinboard</strong> pinboard.in/feeds/u:USERNAME/</div>'
+    + '<div><strong>Raindrop</strong> Collection &rarr; Share &rarr; RSS Feed</div>'
+    + '<div><strong>Pocket</strong> getpocket.com/users/USERNAME/feed/all</div>'
+    + '<div><strong>Substack / WordPress</strong> Paste any URL &mdash; PullRead finds the feed</div>'
+    + '</div>';
+
+  return html;
+}
+
+function renderStepReading() {
+  return '<h2>Reading</h2>'
+    + '<p class="ob-subtitle">Tools for focused, annotated reading.</p>'
+    + '<div class="ob-glass-card">'
+    + '<div class="ob-method"><div class="ob-method-icon">&#128064;</div><div><div class="ob-method-title">Focus Mode <kbd>f</kbd></div><div class="ob-method-desc">Dims everything except the current paragraph so you can concentrate.</div></div></div>'
+    + '<div class="ob-method"><div class="ob-method-icon">&#127912;</div><div><div class="ob-method-title">Highlights <kbd>h</kbd></div><div class="ob-method-desc">Select text and choose a color. Highlights appear in the margin with optional notes.</div></div></div>'
+    + '<div class="ob-method"><div class="ob-method-icon">&#128209;</div><div><div class="ob-method-title">Table of Contents</div><div class="ob-method-desc">Auto-generated navigation for long articles. Appears on wide screens.</div></div></div>'
+    + '<div class="ob-method"><div class="ob-method-icon">&#128215;</div><div><div class="ob-method-title">Reading Progress</div><div class="ob-method-desc">Your position is saved automatically and restored when you return.</div></div></div>'
+    + '</div>';
+}
+
+function renderStepSearch() {
+  return '<h2>Search &amp; Organize</h2>'
+    + '<p class="ob-subtitle">Find anything in your library instantly.</p>'
+    + '<div class="ob-glass-card">'
+    + '<div class="ob-method"><div class="ob-method-icon">&#128269;</div><div><div class="ob-method-title">Search Operators</div><div class="ob-method-desc">Type <code>is:unread</code>, <code>tag:tech</code>, <code>feed:NYT</code>, <code>has:highlights</code> and more in the search bar.</div></div></div>'
+    + '<div class="ob-method"><div class="ob-method-icon">&#128204;</div><div><div class="ob-method-title">Pinned Filters</div><div class="ob-method-desc">Pin up to 3 frequent searches as quick-access buttons below the search bar.</div></div></div>'
+    + '<div class="ob-method"><div class="ob-method-icon">&#10084;&#65039;</div><div><div class="ob-method-title">Favorites</div><div class="ob-method-desc">Heart any article. Find them with <code>is:favorite</code>.</div></div></div>'
+    + '<div class="ob-method"><div class="ob-method-icon">&#127760;</div><div><div class="ob-method-title">Explore</div><div class="ob-method-desc">Tag cloud and topic connections across your entire library.</div></div></div>'
+    + '</div>';
+}
+
+function renderStepListening() {
+  return '<h2>Listening &amp; Summaries</h2>'
+    + '<p class="ob-subtitle">Listen to articles and get concise summaries.</p>'
+    + '<div class="ob-glass-card">'
+    + '<div class="ob-method"><div class="ob-method-icon">&#127911;</div><div><div class="ob-method-title">Text-to-Speech</div><div class="ob-method-desc">Listen to any article. Free on-device voice included, with premium options available.</div></div></div>'
+    + '<div class="ob-method"><div class="ob-method-icon">&#10024;</div><div><div class="ob-method-title">Summaries</div><div class="ob-method-desc">One-click summary saved to each article. Works with multiple providers.</div></div></div>'
+    + '<div class="ob-method"><div class="ob-method-icon">&#128240;</div><div><div class="ob-method-title">Reviews</div><div class="ob-method-desc">Thematic roundups of your recent reading. Generate daily or weekly from the dashboard.</div></div></div>'
+    + '</div>';
+}
+
+function renderStepReady() {
+  return '<div style="text-align:center;padding:12px 0">'
+    + '<div style="font-size:48px;margin-bottom:12px">&#128640;</div>'
+    + '<h2>' + (_tourMode ? 'That\u2019s the Tour' : 'Ready to Go') + '</h2>'
+    + '<p class="ob-subtitle">' + (_tourMode ? 'Here are some keyboard shortcuts to remember:' : 'PullRead will fetch your bookmarked articles and save them as markdown. Here are some keyboard shortcuts to get started:') + '</p>'
+    + '</div>'
+    + '<div class="ob-shortcuts">'
+    + '<kbd>j</kbd> / <kbd>&rarr;</kbd> <span>Next article</span>'
+    + '<kbd>k</kbd> / <kbd>&larr;</kbd> <span>Previous article</span>'
+    + '<kbd>/</kbd> <span>Search articles</span>'
+    + '<kbd>[</kbd> <span>Toggle sidebar</span>'
+    + '<kbd>h</kbd> <span>Highlight selected text</span>'
+    + '<kbd>n</kbd> <span>Toggle article notes</span>'
+    + '<kbd>f</kbd> <span>Toggle focus mode</span>'
+    + '<kbd>Space</kbd> <span>Play / pause audio</span>'
+    + '</div>'
+    + '<div style="text-align:center;margin-top:16px">'
+    + '<button onclick="showGuideModal()" style="background:none;border:none;color:var(--link);cursor:pointer;font-size:13px;font-family:inherit;text-decoration:underline">Open full Guide for more</button>'
+    + '</div>';
 }
 
 function obBack() {
@@ -368,13 +414,14 @@ function obBack() {
 }
 
 function obNext() {
-  // Validate output path on step 1
-  if (_obStep === 1) {
+  var steps = getOnboardingSteps();
+  // Validate output path on setup step
+  if (steps[_obStep].id === 'setup') {
     var pathInput = document.getElementById('ob-output-path');
     if (pathInput) _obOutputPath = pathInput.value.trim();
     if (!_obOutputPath) { pathInput.focus(); return; }
   }
-  if (_obStep < OB_TOTAL_STEPS - 1) { _obStep++; renderOnboardingStep(); }
+  if (_obStep < steps.length - 1) { _obStep++; renderOnboardingStep(); }
 }
 
 async function obAddFeed() {
@@ -403,22 +450,23 @@ function obRemoveFeed(name) {
 }
 
 async function obFinish() {
-  // Save config via API
-  try {
-    await fetch('/api/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        outputPath: _obOutputPath,
-        feeds: _obFeeds,
-        useBrowserCookies: _obCookies
-      })
-    });
-  } catch (e) {
-    console.error('Failed to save onboarding config:', e);
+  if (!_tourMode) {
+    try {
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          outputPath: _obOutputPath,
+          feeds: _obFeeds
+        })
+      });
+    } catch (e) {
+      console.error('Failed to save onboarding config:', e);
+    }
   }
   dismissOnboarding();
-  // Refresh article list after config is saved
-  setTimeout(function() { refreshArticleList(); }, 500);
+  if (!_tourMode) {
+    setTimeout(function() { refreshArticleList(); }, 500);
+  }
 }
 
