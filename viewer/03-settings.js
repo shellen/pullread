@@ -193,14 +193,7 @@ function showSettingsPage(scrollToSection) {
   html += '<h2>Reading Breaks</h2>';
   html += '<p style="font-size:13px;color:var(--muted);margin-bottom:16px">Get a gentle reminder to take a break after reading for a while. The reminder suggests a classic book or an activity of your choosing.</p>';
   html += '<div class="settings-row"><div><label>Timer interval</label><div class="settings-desc">How long before suggesting a break (Off to disable)</div></div>';
-  html += '<select id="sp-break-interval" onchange="localStorage.setItem(\'pr-break-interval\',this.value);_breakSessionStart=0">'
-    + '<option value="0"' + (breakInterval === '0' ? ' selected' : '') + '>Off</option>'
-    + '<option value="10"' + (breakInterval === '10' ? ' selected' : '') + '>10 min</option>'
-    + '<option value="15"' + (breakInterval === '15' ? ' selected' : '') + '>15 min</option>'
-    + '<option value="20"' + (breakInterval === '20' ? ' selected' : '') + '>20 min</option>'
-    + '<option value="25"' + (breakInterval === '25' ? ' selected' : '') + '>25 min</option>'
-    + '<option value="30"' + (breakInterval === '30' ? ' selected' : '') + '>30 min</option>'
-    + '</select></div>';
+  html += '<select id="sp-break-interval"></select></div>';
   html += '<div class="settings-row"><div><label>Activity suggestion</label><div class="settings-desc">Leave blank for random suggestions (walk, stretch, tea\u2026)</div></div>';
   html += '<input type="text" id="sp-break-activity" value="' + escapeHtml(breakActivity) + '" placeholder="e.g. Take a walk, Play guitar, Call a friend" style="min-width:200px" onchange="localStorage.setItem(\'pr-break-activity\',this.value)">';
   html += '</div>';
@@ -301,6 +294,24 @@ function showSettingsPage(scrollToSection) {
 
   content.innerHTML = html;
   document.getElementById('content-pane').scrollTop = 0;
+
+  // Populate break interval select via DOM API (avoids innerHTML parsing issues)
+  var breakSel = document.getElementById('sp-break-interval');
+  if (breakSel) {
+    var breakChoices = [['0','Off'],['10','10 min'],['15','15 min'],['20','20 min'],['25','25 min'],['30','30 min']];
+    for (var bci = 0; bci < breakChoices.length; bci++) {
+      var opt = document.createElement('option');
+      opt.value = breakChoices[bci][0];
+      opt.textContent = breakChoices[bci][1];
+      if (breakInterval === breakChoices[bci][0]) opt.selected = true;
+      breakSel.appendChild(opt);
+    }
+    breakSel.onchange = function() {
+      localStorage.setItem('pr-break-interval', this.value);
+      _breakSessionStart = 0;
+    };
+    console.log('[PullRead] Break select options:', breakSel.options.length);
+  }
 
   if (scrollToSection) {
     var target = document.getElementById(scrollToSection);
@@ -923,6 +934,23 @@ function toggleFeedList() {
 }
 
 function settingsRemoveFeed(name) {
+  // Show inline confirmation
+  var rows = document.querySelectorAll('.feed-row');
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i].getAttribute('data-feed-name') === name.toLowerCase()) {
+      var row = rows[i];
+      row.innerHTML = '<div style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:8px">'
+        + '<span style="font-size:13px">Remove <strong>' + escapeHtml(name) + '</strong>?</span>'
+        + '<div style="display:flex;gap:6px">'
+        + '<button onclick="settingsConfirmRemoveFeed(\'' + escapeHtml(name.replace(/'/g, "\\'")) + '\')" style="font-size:12px;padding:4px 12px;background:#dc2626;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit">Remove</button>'
+        + '<button onclick="showSettingsPage(\'settings-feeds\')" style="font-size:12px;padding:4px 12px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit">Cancel</button>'
+        + '</div></div>';
+      break;
+    }
+  }
+}
+
+function settingsConfirmRemoveFeed(name) {
   var sec = document.getElementById('settings-feeds');
   if (sec && sec._configData && sec._configData.feeds) {
     delete sec._configData.feeds[name];
