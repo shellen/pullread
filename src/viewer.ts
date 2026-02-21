@@ -890,7 +890,6 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.ok) {
       document.getElementById('status').innerHTML = '<div style="font-size:48px;margin-bottom:16px;color:#22c55e">&#10003;</div><p style="font-size:18px">Login saved for ${safeDomain}</p><p style="color:#888;font-size:13px">This window will close automatically.</p>';
-      setTimeout(function(){ window.close(); }, 1200);
     } else {
       document.getElementById('status').innerHTML = '<p style="color:#ef4444">Error: ' + (d.error || 'save failed') + '</p>';
     }

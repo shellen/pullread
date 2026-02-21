@@ -34,6 +34,7 @@ pub async fn open_site_login(app: AppHandle, domain: String) -> Result<(), Strin
 (function() {{
     function addSaveButton() {{
         if (document.getElementById('pr-login-done')) return;
+        if (location.hostname === 'localhost') return;
         var btn = document.createElement('button');
         btn.id = 'pr-login-done';
         btn.textContent = 'Done \u2014 Save Login';
@@ -60,6 +61,9 @@ pub async fn open_site_login(app: AppHandle, domain: String) -> Result<(), Strin
 }})();
 "#, domain = domain, port = port);
 
+    let app_handle = app.clone();
+    let label_clone = window_label.clone();
+
     let _window = WebviewWindowBuilder::new(
         &app,
         &window_label,
@@ -69,6 +73,23 @@ pub async fn open_site_login(app: AppHandle, domain: String) -> Result<(), Strin
     .inner_size(900.0, 700.0)
     .min_inner_size(400.0, 300.0)
     .initialization_script(&js)
+    .on_navigation(move |nav_url| {
+        // When the webview navigates to our localhost callback, the save is done.
+        // Auto-close the window after a brief delay to show the success message.
+        if nav_url.host_str() == Some("localhost")
+            && nav_url.path().starts_with("/api/site-login-callback")
+        {
+            let app = app_handle.clone();
+            let lbl = label_clone.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(2000));
+                if let Some(win) = app.get_webview_window(&lbl) {
+                    let _ = win.close();
+                }
+            });
+        }
+        true // allow navigation
+    })
     .build()
     .map_err(|e| format!("Failed to create login window: {}", e))?;
 
