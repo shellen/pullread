@@ -258,6 +258,16 @@ function bottomBarGoToArticle() {
     ? ttsQueue[ttsCurrentIndex].filename : null;
   if (!fn) return;
   var idx = displayFiles.findIndex(function(f) { return f.filename === fn; });
+  if (idx >= 0) {
+    loadFile(idx);
+    return;
+  }
+  // Article not in current filtered view — clear search and switch to articles tab
+  var input = document.getElementById('search');
+  if (input && input.value) { input.value = ''; filterFiles(); }
+  var articlesTab = document.querySelector('.sidebar-tab[data-tab="articles"]');
+  if (articlesTab) articlesTab.click();
+  idx = displayFiles.findIndex(function(f) { return f.filename === fn; });
   if (idx >= 0) loadFile(idx);
 }
 
@@ -628,6 +638,23 @@ function ttsPrefetchChunk(index) {
     });
 }
 
+/** Pre-fetch several upcoming chunks while paused so resume has no lag */
+function ttsPrefetchAhead() {
+  var session = _ttsChunkSession;
+  if (!session) {
+    // Not chunked playback — try pre-generating next queue item instead
+    ttsPrefetchNextQueueItem();
+    return;
+  }
+  var start = session.currentChunk + 1;
+  var end = Math.min(session.totalChunks, start + 5);
+  for (var i = start; i < end; i++) {
+    ttsPrefetchChunk(i);
+  }
+  // If all remaining chunks are covered, also pre-generate next queue item
+  if (end >= session.totalChunks) ttsPrefetchNextQueueItem();
+}
+
 /** Pre-generate audio for the next queue item so transition is instant */
 function ttsPrefetchNextQueueItem() {
   if (ttsProvider === 'browser') return;
@@ -837,6 +864,8 @@ function ttsTogglePlay() {
       if (ttsPlaying) {
         ttsAudio.pause();
         ttsPlaying = false;
+        // Pre-buffer upcoming chunks while paused so resume is instant
+        ttsPrefetchAhead();
       } else {
         ttsAudio.play();
         ttsPlaying = true;
