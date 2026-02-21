@@ -273,11 +273,10 @@ function renderArticle(text, filename) {
   // Detect review/summary articles where Summarize doesn't make sense
   const isReviewArticle = meta && (meta.feed === 'weekly-review' || meta.feed === 'daily-review' || meta.domain === 'pullread');
 
-  // Action buttons row
+  // Action buttons row — primary actions visible, secondary behind overflow menu
   html += '<div class="article-actions">';
   const isFav = articleNotes.isFavorite;
   html += '<button onclick="toggleFavoriteFromHeader(this)" class="' + (isFav ? 'active-fav' : '') + '" aria-label="' + (isFav ? 'Remove from favorites' : 'Add to favorites') + '" aria-pressed="' + isFav + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg> Favorite</button>';
-  html += '<button onclick="toggleNotesFromHeader()" aria-label="Toggle notes panel"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-pen"/></svg> Notes</button>';
   if (!isReviewArticle) {
     html += '<button onclick="summarizeArticle()" id="summarize-btn" aria-label="Summarize article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Summarize</button>';
   }
@@ -287,7 +286,10 @@ function renderArticle(text, filename) {
   html += '<button id="listen-btn" onclick="addCurrentToTTSQueue()" aria-label="' + listenLabel + ' article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> ' + listenLabel + '</button>';
   html += '<button class="play-next-trigger" id="play-next-trigger" onclick="togglePlayNextMenu(event)" aria-label="Queue options" style="display:none"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>';
   html += '</div>';
-  // Overflow menu for secondary actions
+  if (meta && meta.url) {
+    html += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg> Share</button></div>';
+  }
+  // Overflow menu for secondary actions (Notes, Mark Unread)
   html += '<div class="more-dropdown">';
   html += '<button onclick="toggleMoreMenu(event)" aria-label="More actions"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-ellipsis"/></svg></button>';
   html += '</div>';

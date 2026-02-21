@@ -221,24 +221,11 @@ function toggleMoreMenu(e) {
   panel.onclick = function(ev) { ev.stopPropagation(); };
 
   var items = '';
-  if (meta && meta.url) {
-    items += '<button onclick="toggleShareFromMore(event)"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-share"/></svg> Share</button>';
-  }
+  items += '<button onclick="toggleNotesFromHeader(); closeMoreMenu()"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-pen"/></svg> Notes</button>';
   items += '<button onclick="markCurrentAsUnread(); closeMoreMenu()"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-eye-slash"/></svg> Mark Unread</button>';
   panel.innerHTML = items;
 
   e.target.closest('.more-dropdown').appendChild(panel);
-}
-
-function toggleShareFromMore(e) {
-  e.stopPropagation();
-  closeMoreMenu();
-  // Open share panel anchored to the more-dropdown (has position: relative)
-  var host = document.querySelector('.more-dropdown');
-  if (!host) return;
-  host.classList.add('share-dropdown');
-  var fakeEvent = { stopPropagation: function() {}, target: host };
-  toggleShareDropdown(fakeEvent);
 }
 
 function closeMoreMenu() {
@@ -421,9 +408,6 @@ document.addEventListener('click', function(e) {
   const panel = document.querySelector('.share-dropdown-panel');
   if (panel && !panel.contains(e.target) && !e.target.closest('.share-dropdown')) {
     panel.remove();
-    // Clean up share-dropdown class added by share-from-more flow
-    var moreDd = document.querySelector('.more-dropdown.share-dropdown');
-    if (moreDd) moreDd.classList.remove('share-dropdown');
   }
   var morePanel = document.querySelector('.more-dropdown-panel');
   if (morePanel && !morePanel.contains(e.target) && !e.target.closest('.more-dropdown')) {
