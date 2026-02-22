@@ -1,7 +1,9 @@
 // ABOUTME: Tests for markdown file generation
 // ABOUTME: Verifies filename slugification, frontmatter, and enclosure formatting
 
-import { generateFilename, generateMarkdown } from './writer';
+import { generateFilename, generateMarkdown, fileSubpath, resolveFilePath, listMarkdownFiles, writeArticle, migrateToDateFolders, exportNotebook } from './writer';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'fs';
+import { join } from 'path';
 
 describe('generateFilename', () => {
   test('creates date-prefixed slug', () => {
@@ -122,5 +124,191 @@ describe('generateMarkdown', () => {
     expect(md).toContain('enclosure_url: https://cdn.example.com/ep1.mp3');
     expect(md).toContain('enclosure_type: audio/mpeg');
     expect(md).not.toContain('enclosure_duration');
+  });
+});
+
+describe('fileSubpath', () => {
+  test('derives YYYY/MM/filename from dated filename', () => {
+    expect(fileSubpath('2024-01-29-my-article.md')).toBe('2024/01/2024-01-29-my-article.md');
+  });
+
+  test('handles different months and years', () => {
+    expect(fileSubpath('2025-12-05-test.md')).toBe('2025/12/2025-12-05-test.md');
+  });
+
+  test('returns filename unchanged for non-dated files', () => {
+    expect(fileSubpath('_weekly-review-2024-01-29.md')).toBe('_weekly-review-2024-01-29.md');
+  });
+
+  test('returns filename unchanged for bundled book files', () => {
+    expect(fileSubpath('pride-and-prejudice.md')).toBe('pride-and-prejudice.md');
+  });
+});
+
+const TEST_DIR = '/tmp/pullread-writer-test';
+
+function cleanTestDir() {
+  try { rmSync(TEST_DIR, { recursive: true, force: true }); } catch {}
+}
+
+describe('resolveFilePath', () => {
+  beforeEach(() => {
+    cleanTestDir();
+    mkdirSync(TEST_DIR, { recursive: true });
+  });
+  afterAll(cleanTestDir);
+
+  test('finds file in dated subfolder', () => {
+    const subdir = join(TEST_DIR, '2024', '01');
+    mkdirSync(subdir, { recursive: true });
+    writeFileSync(join(subdir, '2024-01-29-article.md'), 'test');
+
+    const resolved = resolveFilePath(TEST_DIR, '2024-01-29-article.md');
+    expect(resolved).toBe(join(subdir, '2024-01-29-article.md'));
+  });
+
+  test('falls back to flat path when file exists there', () => {
+    writeFileSync(join(TEST_DIR, '2024-01-29-flat.md'), 'test');
+
+    const resolved = resolveFilePath(TEST_DIR, '2024-01-29-flat.md');
+    expect(resolved).toBe(join(TEST_DIR, '2024-01-29-flat.md'));
+  });
+
+  test('defaults to dated location for new files', () => {
+    const resolved = resolveFilePath(TEST_DIR, '2024-01-29-new.md');
+    expect(resolved).toBe(join(TEST_DIR, '2024', '01', '2024-01-29-new.md'));
+  });
+
+  test('returns flat path for non-dated filenames', () => {
+    const resolved = resolveFilePath(TEST_DIR, '_review-2024-01-29.md');
+    expect(resolved).toBe(join(TEST_DIR, '_review-2024-01-29.md'));
+  });
+});
+
+describe('listMarkdownFiles', () => {
+  beforeEach(() => {
+    cleanTestDir();
+    mkdirSync(TEST_DIR, { recursive: true });
+  });
+  afterAll(cleanTestDir);
+
+  test('finds files in root and dated subdirectories', () => {
+    writeFileSync(join(TEST_DIR, '_review.md'), 'root file');
+    const subdir = join(TEST_DIR, '2024', '01');
+    mkdirSync(subdir, { recursive: true });
+    writeFileSync(join(subdir, '2024-01-29-article.md'), 'dated file');
+
+    const files = listMarkdownFiles(TEST_DIR);
+    expect(files).toHaveLength(2);
+    expect(files).toContain(join(TEST_DIR, '_review.md'));
+    expect(files).toContain(join(subdir, '2024-01-29-article.md'));
+  });
+
+  test('skips favicons and notebooks directories', () => {
+    writeFileSync(join(TEST_DIR, 'article.md'), 'ok');
+    mkdirSync(join(TEST_DIR, 'favicons'), { recursive: true });
+    writeFileSync(join(TEST_DIR, 'favicons', 'not-this.md'), 'skip');
+    mkdirSync(join(TEST_DIR, 'notebooks'), { recursive: true });
+    writeFileSync(join(TEST_DIR, 'notebooks', 'not-this-either.md'), 'skip');
+
+    const files = listMarkdownFiles(TEST_DIR);
+    expect(files).toHaveLength(1);
+    expect(files[0]).toContain('article.md');
+  });
+
+  test('returns empty array for non-existent directory', () => {
+    expect(listMarkdownFiles('/tmp/does-not-exist-pullread')).toEqual([]);
+  });
+});
+
+describe('writeArticle', () => {
+  beforeEach(() => {
+    cleanTestDir();
+    mkdirSync(TEST_DIR, { recursive: true });
+  });
+  afterAll(cleanTestDir);
+
+  test('writes dated articles to YYYY/MM/ subfolder', () => {
+    const filename = writeArticle(TEST_DIR, {
+      title: 'Test Article',
+      url: 'https://example.com/test',
+      bookmarkedAt: '2024-03-15T12:00:00Z',
+      domain: 'example.com',
+      content: 'Article content',
+    });
+
+    // Returns bare filename
+    expect(filename).toBe('2024-03-15-test-article.md');
+
+    // File written to dated subfolder
+    const expected = join(TEST_DIR, '2024', '03', '2024-03-15-test-article.md');
+    expect(existsSync(expected)).toBe(true);
+
+    // NOT in root
+    expect(existsSync(join(TEST_DIR, '2024-03-15-test-article.md'))).toBe(false);
+  });
+});
+
+describe('migrateToDateFolders', () => {
+  beforeEach(() => {
+    cleanTestDir();
+    mkdirSync(TEST_DIR, { recursive: true });
+  });
+  afterAll(cleanTestDir);
+
+  test('moves dated files to YYYY/MM/ subfolders', () => {
+    writeFileSync(join(TEST_DIR, '2024-01-15-article-one.md'), 'one');
+    writeFileSync(join(TEST_DIR, '2024-03-22-article-two.md'), 'two');
+    writeFileSync(join(TEST_DIR, '_weekly-review.md'), 'review');
+
+    const moved = migrateToDateFolders(TEST_DIR);
+    expect(moved).toBe(2);
+
+    expect(existsSync(join(TEST_DIR, '2024', '01', '2024-01-15-article-one.md'))).toBe(true);
+    expect(existsSync(join(TEST_DIR, '2024', '03', '2024-03-22-article-two.md'))).toBe(true);
+    // Non-dated file stays in root
+    expect(existsSync(join(TEST_DIR, '_weekly-review.md'))).toBe(true);
+    // Originals removed from root
+    expect(existsSync(join(TEST_DIR, '2024-01-15-article-one.md'))).toBe(false);
+  });
+
+  test('is idempotent — skips already migrated files', () => {
+    const subdir = join(TEST_DIR, '2024', '01');
+    mkdirSync(subdir, { recursive: true });
+    writeFileSync(join(subdir, '2024-01-15-article.md'), 'already there');
+
+    const moved = migrateToDateFolders(TEST_DIR);
+    expect(moved).toBe(0);
+  });
+});
+
+describe('exportNotebook', () => {
+  beforeEach(() => {
+    cleanTestDir();
+    mkdirSync(TEST_DIR, { recursive: true });
+  });
+  afterAll(cleanTestDir);
+
+  test('exports notebook as markdown with frontmatter', () => {
+    const notebook: import('./writer').Notebook = {
+      id: 'nb-abc123',
+      title: 'My Research Notes',
+      notes: [{ text: 'Key finding', source: 'article.md' }],
+      sources: ['https://example.com'],
+      tags: ['research', 'ai'],
+      createdAt: '2024-01-15T10:00:00Z',
+      updatedAt: '2024-01-16T14:00:00Z',
+    };
+
+    const filename = exportNotebook(TEST_DIR, notebook);
+    expect(filename).toBe('my-research-notes.md');
+
+    const content = readFileSync(join(TEST_DIR, 'notebooks', filename), 'utf-8');
+    expect(content).toContain('title: "My Research Notes"');
+    expect(content).toContain('created: 2024-01-15T10:00:00Z');
+    expect(content).toContain('tags: ["research", "ai"]');
+    expect(content).toContain('Key finding');
+    expect(content).toContain('*(article.md)*');
+    expect(content).toContain('https://example.com');
   });
 });

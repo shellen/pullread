@@ -1,8 +1,8 @@
 // ABOUTME: Generates markdown files with YAML frontmatter
 // ABOUTME: Handles filename slugification and content formatting
 
-import { writeFileSync, existsSync, mkdirSync } from 'fs';
-import { join, dirname } from 'path';
+import { writeFileSync, existsSync, mkdirSync, readdirSync, statSync, renameSync, unlinkSync } from 'fs';
+import { join, dirname, basename, extname } from 'path';
 import { Enclosure } from './feed';
 
 export interface ArticleData {
@@ -82,9 +82,58 @@ ${data.content}
 `;
 }
 
+const DATE_PREFIX_RE = /^(\d{4})-(\d{2})-\d{2}-.+\.md$/;
+
+/** Derive YYYY/MM/filename from a date-prefixed filename. Non-dated files pass through unchanged. */
+export function fileSubpath(filename: string): string {
+  const m = filename.match(DATE_PREFIX_RE);
+  if (!m) return filename;
+  return `${m[1]}/${m[2]}/${filename}`;
+}
+
+/** Resolve a bare filename to its full path, checking dated subfolder first, then flat. */
+export function resolveFilePath(outputPath: string, filename: string): string {
+  const subpath = fileSubpath(filename);
+  const datedPath = join(outputPath, subpath);
+  if (subpath !== filename && existsSync(datedPath)) return datedPath;
+
+  const flatPath = join(outputPath, filename);
+  if (existsSync(flatPath)) return flatPath;
+
+  // Default to dated location for new files, or flat for non-dated
+  return datedPath;
+}
+
+/** Recursively list all .md files, skipping favicons/ and notebooks/ directories. */
+export function listMarkdownFiles(dir: string): string[] {
+  if (!existsSync(dir)) return [];
+  const results: string[] = [];
+  const SKIP = new Set(['favicons', 'notebooks']);
+
+  function walk(current: string) {
+    let entries: string[];
+    try { entries = readdirSync(current); } catch { return; }
+    for (const name of entries) {
+      if (SKIP.has(name)) continue;
+      const full = join(current, name);
+      try {
+        const stat = statSync(full);
+        if (stat.isDirectory()) {
+          walk(full);
+        } else if (stat.isFile() && extname(name) === '.md') {
+          results.push(full);
+        }
+      } catch { continue; }
+    }
+  }
+
+  walk(dir);
+  return results;
+}
+
 export function writeArticle(outputPath: string, data: ArticleData): string {
   const filename = generateFilename(data.title, data.bookmarkedAt);
-  const fullPath = join(outputPath, filename);
+  const fullPath = join(outputPath, fileSubpath(filename));
 
   const dir = dirname(fullPath);
   if (!existsSync(dir)) {
@@ -100,6 +149,101 @@ export function writeArticle(outputPath: string, data: ArticleData): string {
   }
 
   return filename;
+}
+
+/** Move dated .md files from root to YYYY/MM/ subfolders. Returns count of files moved. */
+export function migrateToDateFolders(outputPath: string): number {
+  if (!existsSync(outputPath)) return 0;
+  let moved = 0;
+  let entries: string[];
+  try { entries = readdirSync(outputPath); } catch { return 0; }
+
+  for (const name of entries) {
+    if (extname(name) !== '.md') continue;
+    const m = name.match(DATE_PREFIX_RE);
+    if (!m) continue;
+
+    const src = join(outputPath, name);
+    try { if (!statSync(src).isFile()) continue; } catch { continue; }
+
+    const destDir = join(outputPath, m[1], m[2]);
+    const dest = join(destDir, name);
+    if (existsSync(dest)) continue; // already migrated
+
+    if (!existsSync(destDir)) mkdirSync(destDir, { recursive: true });
+    renameSync(src, dest);
+    moved++;
+  }
+  return moved;
+}
+
+export interface Notebook {
+  id: string;
+  title: string;
+  content?: string;
+  notes?: Array<{ text: string; source?: string }>;
+  sources?: string[];
+  tags?: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Export a notebook as markdown to outputPath/notebooks/{slug}.md */
+export function exportNotebook(outputPath: string, notebook: Notebook): string {
+  const slug = (notebook.title || notebook.id)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+  const filename = `${slug}.md`;
+  const dir = join(outputPath, 'notebooks');
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+
+  const tags = (notebook.tags && notebook.tags.length > 0)
+    ? `\ntags: [${notebook.tags.map(t => `"${t}"`).join(', ')}]`
+    : '';
+
+  let body = '';
+  if (notebook.notes && notebook.notes.length > 0) {
+    body += '## Notes\n\n';
+    for (const note of notebook.notes) {
+      body += `- ${note.text}`;
+      if (note.source) body += ` *(${note.source})*`;
+      body += '\n';
+    }
+    body += '\n';
+  }
+  if (notebook.content) {
+    body += notebook.content + '\n';
+  }
+  if (notebook.sources && notebook.sources.length > 0) {
+    body += '\n## Sources\n\n';
+    for (const src of notebook.sources) {
+      body += `- ${src}\n`;
+    }
+  }
+
+  const md = `---
+title: "${notebook.title.replace(/"/g, '\\"')}"
+created: ${notebook.createdAt}
+updated: ${notebook.updatedAt}${tags}
+---
+
+${body}`;
+
+  writeFileSync(join(dir, filename), md, 'utf-8');
+  return filename;
+}
+
+/** Remove an exported notebook markdown file */
+export function removeExportedNotebook(outputPath: string, notebook: Notebook): void {
+  const slug = (notebook.title || notebook.id)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+  const filepath = join(outputPath, 'notebooks', `${slug}.md`);
+  try { if (existsSync(filepath)) unlinkSync(filepath); } catch {}
 }
 
 /** Download a site's favicon and save it locally for privacy */
