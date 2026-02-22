@@ -103,6 +103,137 @@ function resolveEpubPath(outputPath: string, filename: string): string | null {
   return null;
 }
 
+/** Extract a single file from an EPUB (ZIP) as a Buffer. */
+function extractEpubFile(epubPath: string, innerPath: string): Buffer | null {
+  try {
+    return execFileSync('unzip', ['-p', epubPath, innerPath], {
+      timeout: 5000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extract readable HTML content from an EPUB by parsing its spine.
+ * Returns frontmatter + HTML body, similar to how markdown articles are served.
+ * Image src attributes are rewritten to /api/epub-resource?name=...&path=...
+ */
+function extractEpubContent(epubPath: string, filename: string): string | null {
+  try {
+    const meta = parseEpubMeta(epubPath);
+
+    // Read container.xml to find OPF
+    const containerXml = execFileSync('unzip', ['-p', epubPath, 'META-INF/container.xml'], {
+      encoding: 'utf-8', timeout: 3000, maxBuffer: 64 * 1024,
+    });
+    const rfMatch = containerXml.match(/rootfile[^>]*full-path="([^"]+)"/);
+    if (!rfMatch) return null;
+
+    const opfPath = rfMatch[1];
+    const opfDir = opfPath.includes('/') ? opfPath.slice(0, opfPath.lastIndexOf('/') + 1) : '';
+    const opfXml = execFileSync('unzip', ['-p', epubPath, opfPath], {
+      encoding: 'utf-8', timeout: 3000, maxBuffer: 512 * 1024,
+    });
+
+    // Build manifest: id → { href, mediaType }
+    const manifest: Record<string, { href: string; mediaType: string }> = {};
+    const manifestRe = /<item\s+([^>]+)>/gi;
+    let mm;
+    while ((mm = manifestRe.exec(opfXml)) !== null) {
+      const attrs = mm[1];
+      const idMatch = attrs.match(/id="([^"]+)"/);
+      const hrefMatch = attrs.match(/href="([^"]+)"/);
+      const typeMatch = attrs.match(/media-type="([^"]+)"/);
+      if (idMatch && hrefMatch) {
+        manifest[idMatch[1]] = {
+          href: hrefMatch[1],
+          mediaType: typeMatch ? typeMatch[1] : '',
+        };
+      }
+    }
+
+    // Parse spine order
+    const spineRe = /<itemref\s+[^>]*idref="([^"]+)"[^>]*>/gi;
+    const spineIds: string[] = [];
+    let sm;
+    while ((sm = spineRe.exec(opfXml)) !== null) {
+      spineIds.push(sm[1]);
+    }
+
+    // Extract each spine document and concatenate
+    const encFilename = encodeURIComponent(filename);
+    let bodyHtml = '';
+
+    for (const id of spineIds) {
+      const item = manifest[id];
+      if (!item || !item.mediaType.includes('html')) continue;
+
+      const innerPath = opfDir + item.href;
+      const chapterXml = execFileSync('unzip', ['-p', epubPath, innerPath], {
+        encoding: 'utf-8', timeout: 5000, maxBuffer: 2 * 1024 * 1024,
+      });
+
+      // Extract <body> content
+      const bodyMatch = chapterXml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+      if (!bodyMatch) continue;
+      let chapterHtml = bodyMatch[1];
+
+      // Resolve relative resource paths for images and links
+      const chapterDir = innerPath.includes('/') ? innerPath.slice(0, innerPath.lastIndexOf('/') + 1) : opfDir;
+
+      // Rewrite image src to /api/epub-resource
+      chapterHtml = chapterHtml.replace(
+        /(<img[^>]*\s+src=")([^"]+)(")/gi,
+        function(_match, before, src, after) {
+          if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:')) return before + src + after;
+          const resolved = resolveRelPath(chapterDir, src);
+          return before + '/api/epub-resource?name=' + encFilename + '&path=' + encodeURIComponent(resolved) + after;
+        }
+      );
+      // Also rewrite image src in xlink:href (SVG images in EPUB)
+      chapterHtml = chapterHtml.replace(
+        /(xlink:href="|href=")([^"]+\.(jpe?g|png|gif|svg|webp))(")/gi,
+        function(_match, before, src, _ext, after) {
+          if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:')) return before + src + after;
+          const resolved = resolveRelPath(chapterDir, src);
+          return before + '/api/epub-resource?name=' + encFilename + '&path=' + encodeURIComponent(resolved) + after;
+        }
+      );
+
+      bodyHtml += chapterHtml + '\n';
+    }
+
+    if (!bodyHtml.trim()) return null;
+
+    // Build a markdown-like response with frontmatter
+    const escapeQuotes = (s: string) => s.replace(/"/g, '\\"');
+    let frontmatter = `---\ntitle: "${escapeQuotes(meta.title || filename.replace(/\.epub$/, ''))}"\ndomain: epub\nfeed: books`;
+    if (meta.author) frontmatter += `\nauthor: "${escapeQuotes(meta.author)}"`;
+    if (meta.language) frontmatter += `\nlang: ${meta.language}`;
+    if (meta.description) frontmatter += `\nexcerpt: "${escapeQuotes(meta.description.slice(0, 200))}"`;
+    frontmatter += '\n---\n\n';
+
+    return frontmatter + bodyHtml;
+  } catch {
+    return null;
+  }
+}
+
+/** Resolve a relative path against a base directory (handles ../ segments). */
+function resolveRelPath(base: string, rel: string): string {
+  // Decode percent-encoded paths first
+  const decoded = decodeURIComponent(rel);
+  const parts = (base + decoded).split('/');
+  const resolved: string[] = [];
+  for (const p of parts) {
+    if (p === '..') resolved.pop();
+    else if (p && p !== '.') resolved.push(p);
+  }
+  return resolved.join('/');
+}
+
 function listFiles(outputPath: string): FileMeta[] {
   if (!existsSync(outputPath)) return [];
 
@@ -539,6 +670,25 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         send404(res);
         return;
       }
+
+      // EPUB files: extract content as frontmatter + HTML (same as markdown articles)
+      if (filename.endsWith('.epub')) {
+        const epubPath = resolveEpubPath(outputPath, filename);
+        if (!epubPath || !epubPath.startsWith(outputPath)) {
+          send404(res);
+          return;
+        }
+        const content = extractEpubContent(epubPath, filename);
+        if (!content) {
+          res.writeHead(500, { 'Content-Type': 'text/plain' });
+          res.end('Failed to extract EPUB content');
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end(content);
+        return;
+      }
+
       const filePath = resolveFilePath(outputPath, filename);
       if (!filePath.startsWith(outputPath) || !existsSync(filePath)) {
         send404(res);
@@ -549,10 +699,11 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
       return;
     }
 
-    // Serve EPUB binary files
-    if (url.pathname === '/api/epub') {
+    // Serve EPUB embedded resources (images, fonts, etc.)
+    if (url.pathname === '/api/epub-resource') {
       const filename = url.searchParams.get('name');
-      if (!filename || filename.includes('..') || filename.includes('/') || !filename.endsWith('.epub')) {
+      const innerPath = url.searchParams.get('path');
+      if (!filename || !innerPath || filename.includes('..') || innerPath.includes('..')) {
         send404(res);
         return;
       }
@@ -561,11 +712,23 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         send404(res);
         return;
       }
-      const data = readFileSync(epubPath);
+      const data = extractEpubFile(epubPath, innerPath);
+      if (!data) {
+        send404(res);
+        return;
+      }
+      // Determine content type from extension
+      const ext = innerPath.split('.').pop()?.toLowerCase() || '';
+      const contentTypes: Record<string, string> = {
+        'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png',
+        'gif': 'image/gif', 'svg': 'image/svg+xml', 'webp': 'image/webp',
+        'css': 'text/css', 'woff': 'font/woff', 'woff2': 'font/woff2',
+        'ttf': 'font/ttf', 'otf': 'font/otf',
+      };
       res.writeHead(200, {
-        'Content-Type': 'application/epub+zip',
+        'Content-Type': contentTypes[ext] || 'application/octet-stream',
         'Content-Length': data.length.toString(),
-        'Cache-Control': 'max-age=3600',
+        'Cache-Control': 'max-age=86400',
       });
       res.end(data);
       return;

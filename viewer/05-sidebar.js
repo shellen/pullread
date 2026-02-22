@@ -345,15 +345,6 @@ async function loadFile(index) {
     _loadFileAbort = controller;
     var targetFile = file.filename;
 
-    // EPUB files use their own rendering path
-    if (file.filename.endsWith('.epub')) {
-      await preloadAnnotations(file.filename);
-      if (activeFile !== targetFile) return;
-      renderEpub(file.filename, file);
-      renderNotesPanel();
-      return;
-    }
-
     // Load annotations first so favorite state is available for header render
     await preloadAnnotations(file.filename);
     if (activeFile !== targetFile) return;

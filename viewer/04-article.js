@@ -181,7 +181,6 @@ function goHome() {
   _sidebarView = 'home'; syncSidebarTabs();
   activeFile = null;
   document.title = 'PullRead';
-  if (typeof destroyEpub === 'function') destroyEpub();
   renderFileList();
   renderDashboard();
   var toc = document.getElementById('toc-container');
@@ -233,9 +232,6 @@ function dashLoadArticle(filename) {
 }
 
 function renderArticle(text, filename) {
-  // Clean up any active EPUB before showing a markdown article
-  if (typeof destroyEpub === 'function') destroyEpub();
-
   const { meta, body: rawBodyText } = parseFrontmatter(text);
   let body = rawBodyText;
   const content = document.getElementById('content');
@@ -377,20 +373,27 @@ function renderArticle(text, filename) {
     }
   }
 
-  // Strip the leading H1 from markdown body if it matches the title (avoid duplication)
-  let articleBody = cleanMarkdown(rawBody);
-  if (meta && meta.title) {
-    var h1Match = articleBody.match(/^\s*#\s+(.+)\s*\n/);
-    if (h1Match) {
-      var normalize = function(s) { return s.toLowerCase().replace(/[\u2018\u2019\u201C\u201D]/g, "'").replace(/[^a-z0-9]/g, ''); };
-      // Strip if title matches, or if it's a review (title always duplicated in body)
-      if (normalize(h1Match[1]) === normalize(meta.title) || isReviewArticle) {
-        articleBody = articleBody.slice(h1Match[0].length);
+  // EPUB content is already HTML — skip markdown processing
+  var isEpub = meta && meta.domain === 'epub';
+
+  if (isEpub) {
+    html += sanitizeHtml(rawBody);
+  } else {
+    // Strip the leading H1 from markdown body if it matches the title (avoid duplication)
+    let articleBody = cleanMarkdown(rawBody);
+    if (meta && meta.title) {
+      var h1Match = articleBody.match(/^\s*#\s+(.+)\s*\n/);
+      if (h1Match) {
+        var normalize = function(s) { return s.toLowerCase().replace(/[\u2018\u2019\u201C\u201D]/g, "'").replace(/[^a-z0-9]/g, ''); };
+        // Strip if title matches, or if it's a review (title always duplicated in body)
+        if (normalize(h1Match[1]) === normalize(meta.title) || isReviewArticle) {
+          articleBody = articleBody.slice(h1Match[0].length);
+        }
       }
     }
-  }
 
-  html += sanitizeHtml(marked.parse(articleBody));
+    html += sanitizeHtml(marked.parse(articleBody));
+  }
 
   // Deduplicate images: remove consecutive/nearby img tags with the same src
   html = (function dedupeImages(h) {

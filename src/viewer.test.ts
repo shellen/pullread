@@ -201,51 +201,10 @@ describe('sync progress', () => {
 describe('EPUB support', () => {
   const rootDir = join(__dirname, '..');
 
-  test('viewer.html includes epub.js script tag', () => {
-    const html = readFileSync(join(rootDir, 'viewer.html'), 'utf-8');
-    expect(html).toContain('epubjs');
-    expect(html).toContain('epub.min.js');
-  });
-
-  test('viewer.html has epub-viewer container', () => {
-    const html = readFileSync(join(rootDir, 'viewer.html'), 'utf-8');
-    expect(html).toContain('id="epub-viewer"');
-  });
-
-  test('04a-epub.js defines renderEpub function', () => {
-    const epub = readFileSync(join(rootDir, 'viewer', '04a-epub.js'), 'utf-8');
-    expect(epub).toMatch(/function\s+renderEpub/);
-  });
-
-  test('04a-epub.js defines destroyEpub function', () => {
-    const epub = readFileSync(join(rootDir, 'viewer', '04a-epub.js'), 'utf-8');
-    expect(epub).toMatch(/function\s+destroyEpub/);
-  });
-
-  test('04a-epub.js defines epub navigation functions', () => {
-    const epub = readFileSync(join(rootDir, 'viewer', '04a-epub.js'), 'utf-8');
-    expect(epub).toMatch(/function\s+epubPrev/);
-    expect(epub).toMatch(/function\s+epubNext/);
-    expect(epub).toMatch(/function\s+epubGoToChapter/);
-  });
-
-  test('05-sidebar.js routes .epub files to renderEpub', () => {
-    const sidebar = readFileSync(join(rootDir, 'viewer', '05-sidebar.js'), 'utf-8');
-    expect(sidebar).toContain("'.epub'");
-    expect(sidebar).toContain('renderEpub');
-  });
-
-  test('04-article.js calls destroyEpub on navigation', () => {
+  test('04-article.js skips markdown parsing for epub content', () => {
     const article = readFileSync(join(rootDir, 'viewer', '04-article.js'), 'utf-8');
-    expect(article).toContain('destroyEpub');
-  });
-
-  test('viewer.css includes epub styles', () => {
-    const css = readFileSync(join(rootDir, 'viewer.css'), 'utf-8');
-    expect(css).toContain('.epub-controls');
-    expect(css).toContain('.epub-area');
-    expect(css).toContain('.epub-nav-btn');
-    expect(css).toContain('.epub-toc-list');
+    expect(article).toContain("domain === 'epub'");
+    expect(article).toContain('isEpub');
   });
 
   test('writer.ts exports listEpubFiles', () => {
@@ -253,11 +212,29 @@ describe('EPUB support', () => {
     expect(writer).toMatch(/export\s+function\s+listEpubFiles/);
   });
 
-  test('viewer.ts imports listEpubFiles and serves /api/epub', () => {
+  test('viewer.ts serves EPUB content via /api/file', () => {
     const viewer = readFileSync(join(rootDir, 'src', 'viewer.ts'), 'utf-8');
     expect(viewer).toContain('listEpubFiles');
-    expect(viewer).toContain('/api/epub');
-    expect(viewer).toContain('application/epub+zip');
+    expect(viewer).toContain('extractEpubContent');
+    expect(viewer).toContain('.epub');
+  });
+
+  test('viewer.ts serves EPUB resources via /api/epub-resource', () => {
+    const viewer = readFileSync(join(rootDir, 'src', 'viewer.ts'), 'utf-8');
+    expect(viewer).toContain('/api/epub-resource');
+    expect(viewer).toContain('extractEpubFile');
+  });
+
+  test('viewer.ts rewrites EPUB image paths to /api/epub-resource', () => {
+    const viewer = readFileSync(join(rootDir, 'src', 'viewer.ts'), 'utf-8');
+    expect(viewer).toContain('/api/epub-resource?name=');
+  });
+
+  test('viewer.ts parses EPUB metadata from OPF', () => {
+    const viewer = readFileSync(join(rootDir, 'src', 'viewer.ts'), 'utf-8');
+    expect(viewer).toContain('dc:title');
+    expect(viewer).toContain('dc:creator');
+    expect(viewer).toContain('container.xml');
   });
 });
 
