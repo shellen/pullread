@@ -201,7 +201,7 @@
     position: fixed;
     top: 48px;
     right: 10px;
-    width: 260px;
+    width: 300px;
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 8px;
@@ -237,7 +237,7 @@
     color: var(--fg);
     border: 1px solid var(--border);
     border-radius: 4px;
-    padding: 3px 8px;
+    padding: 4px 6px;
     font-size: 12px;
     cursor: pointer;
   }
@@ -1092,7 +1092,7 @@
     position: absolute;
     top: calc(100% + 4px);
     right: 0;
-    width: 180px;
+    width: 210px;
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 10px;
