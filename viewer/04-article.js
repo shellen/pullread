@@ -436,6 +436,13 @@ function renderArticle(text, filename) {
   content.innerHTML = html;
   document.title = (meta && meta.title) || filename || 'PullRead';
 
+  // Set article language for TTS and CSS :lang() selectors
+  if (meta && meta.lang) {
+    content.setAttribute('lang', meta.lang);
+  } else {
+    content.removeAttribute('lang');
+  }
+
   // Apply review-content class for link-blog styling on review articles
   if (isReviewArticle) {
     content.classList.add('review-content');

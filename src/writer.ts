@@ -17,6 +17,7 @@ export interface ArticleData {
   author?: string;
   excerpt?: string;
   thumbnail?: string;
+  lang?: string;
 }
 
 export function generateFilename(title: string, bookmarkedAt: string): string {
@@ -24,6 +25,9 @@ export function generateFilename(title: string, bookmarkedAt: string): string {
 
   let slug = title
     .replace(/^\[Private\]\s*/i, '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\u00df/g, 'ss')
     .toLowerCase()
     .replace(/['']/g, '')
     .replace(/[^a-z0-9]+/g, '-')
@@ -48,6 +52,10 @@ domain: ${data.domain}`;
 
   if (data.feed) {
     frontmatter += `\nfeed: ${data.feed}`;
+  }
+
+  if (data.lang) {
+    frontmatter += `\nlang: ${data.lang}`;
   }
 
   if (data.author) {
@@ -191,6 +199,9 @@ export interface Notebook {
 /** Export a notebook as markdown to outputPath/notebooks/{slug}.md */
 export function exportNotebook(outputPath: string, notebook: Notebook): string {
   const slug = (notebook.title || notebook.id)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\u00df/g, 'ss')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
@@ -238,6 +249,9 @@ ${body}`;
 /** Remove an exported notebook markdown file */
 export function removeExportedNotebook(outputPath: string, notebook: Notebook): void {
   const slug = (notebook.title || notebook.id)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\u00df/g, 'ss')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')

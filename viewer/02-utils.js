@@ -1,3 +1,8 @@
+// Fold accented characters to ASCII for accent-insensitive search
+function foldAccents(s) {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
 // Frontmatter
 function parseFrontmatter(text) {
   const match = text.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);

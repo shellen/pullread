@@ -374,7 +374,10 @@ async function playBrowserTTS(filename) {
 
   const utterance = new SpeechSynthesisUtterance(plainText);
   utterance.rate = ttsSpeed;
-  utterance.lang = navigator.language || 'en-US';
+  // Use article's language if available (from html lang attribute extracted during content fetch),
+  // fall back to browser locale
+  var articleLang = document.querySelector('.content-wrap')?.getAttribute('lang');
+  utterance.lang = articleLang || navigator.language || 'en-US';
   ttsSynthUtterance = utterance;
 
   // Estimate total duration (browser TTS doesn't give real progress)

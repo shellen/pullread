@@ -27,6 +27,26 @@ describe('generateFilename', () => {
     const filename = generateFilename('[Private] Secret Article', '2024-01-29T12:00:00Z');
     expect(filename).toBe('2024-01-29-secret-article.md');
   });
+
+  test('handles French accented characters', () => {
+    const filename = generateFilename('Les Misérables de Victor Hugo', '2024-01-29T12:00:00Z');
+    expect(filename).toBe('2024-01-29-les-miserables-de-victor-hugo.md');
+  });
+
+  test('handles Spanish accented characters', () => {
+    const filename = generateFilename('Ángeles y señales en España', '2024-01-29T12:00:00Z');
+    expect(filename).toBe('2024-01-29-angeles-y-senales-en-espana.md');
+  });
+
+  test('handles German umlauts and eszett', () => {
+    const filename = generateFilename('Über die Größe der Städte', '2024-01-29T12:00:00Z');
+    expect(filename).toBe('2024-01-29-uber-die-grosse-der-stadte.md');
+  });
+
+  test('handles Italian accented characters', () => {
+    const filename = generateFilename('Perché la città è bella', '2024-01-29T12:00:00Z');
+    expect(filename).toBe('2024-01-29-perche-la-citta-e-bella.md');
+  });
 });
 
 describe('generateMarkdown', () => {
@@ -71,6 +91,19 @@ describe('generateMarkdown', () => {
     });
 
     expect(md).toContain('title: "Article with \\"quotes\\""');
+  });
+
+  test('includes lang when present', () => {
+    const md = generateMarkdown({
+      title: 'Article en français',
+      url: 'https://example.fr/article',
+      bookmarkedAt: '2024-01-29T12:00:00Z',
+      domain: 'example.fr',
+      content: 'Contenu de l\'article',
+      lang: 'fr'
+    });
+
+    expect(md).toContain('lang: fr');
   });
 
   test('includes feed name when present', () => {

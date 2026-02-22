@@ -305,11 +305,13 @@ function filterFiles() {
         }
 
         // Plain text search — match against title, domain, feed, tags
-        return f.title.toLowerCase().includes(tl) ||
-          f.domain.toLowerCase().includes(tl) ||
-          f.feed.toLowerCase().includes(tl) ||
-          (notes?.tags || []).some(t => t.toLowerCase().includes(tl)) ||
-          (notes?.machineTags || []).some(t => t.toLowerCase().includes(tl));
+        // Use accent-folded comparison so "cafe" matches "café" etc.
+        var folded = foldAccents(t);
+        return foldAccents(f.title).includes(folded) ||
+          foldAccents(f.domain).includes(folded) ||
+          foldAccents(f.feed).includes(folded) ||
+          (notes?.tags || []).some(tg => foldAccents(tg).includes(folded)) ||
+          (notes?.machineTags || []).some(tg => foldAccents(tg).includes(folded));
       });
     });
   });
