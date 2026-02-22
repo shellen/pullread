@@ -2,7 +2,7 @@
 // ABOUTME: Serves viewer UI and provides API for listing/reading articles
 
 import { createServer, IncomingMessage, ServerResponse } from 'http';
-import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, mkdirSync, watch, unlinkSync } from 'fs';
+import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, mkdirSync, watch, unlinkSync, copyFileSync } from 'fs';
 import { join, extname, dirname } from 'path';
 import { exec, execFile } from 'child_process';
 import { homedir } from 'os';
@@ -137,6 +137,42 @@ function saveJsonFile(path: string, data: unknown): void {
   writeFileSync(path, JSON.stringify(data, null, 2));
 }
 
+/** Copy bundled classic books into the output directory and tag them */
+function installBundledBooks(outputPath: string): void {
+  const booksDir = join(__dirname, '..', 'data', 'books');
+  if (!existsSync(booksDir)) return;
+
+  let entries: string[];
+  try {
+    entries = readdirSync(booksDir).filter(f => f.endsWith('.md'));
+  } catch { return; }
+
+  if (entries.length === 0) return;
+
+  const allNotes = loadJsonFile(NOTES_PATH) as Record<string, any>;
+  let notesChanged = false;
+
+  for (const filename of entries) {
+    const dest = join(outputPath, filename);
+    if (!existsSync(dest)) {
+      copyFileSync(join(booksDir, filename), dest);
+    }
+
+    // Ensure "classicbooks" tag exists in notes.json
+    const note = allNotes[filename] || { articleNote: '', annotations: [], tags: [], isFavorite: false };
+    if (!Array.isArray(note.tags)) note.tags = [];
+    if (!note.tags.includes('classicbooks')) {
+      note.tags.push('classicbooks');
+      allNotes[filename] = note;
+      notesChanged = true;
+    }
+  }
+
+  if (notesChanged) {
+    saveJsonFile(NOTES_PATH, allNotes);
+  }
+}
+
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -235,6 +271,9 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
 
   // Normalize any legacy dashed machine tags
   migrateDashedTags();
+
+  // Install bundled classic books and tag them
+  installBundledBooks(outputPath);
 
   // Backfill favicons for existing articles in the background
   (async () => {

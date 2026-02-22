@@ -143,11 +143,22 @@ function settingsSyncPreset(btn, val) {
 }
 
 function settingsSyncCustom(val) {
-  val = val.trim();
+  val = normalizeSyncInterval(val.trim());
   var hidden = document.getElementById('sp-sync-interval');
   if (hidden) hidden.value = val || 'manual';
   var presets = document.getElementById('sp-sync-presets');
   if (presets) presets.querySelectorAll('button').forEach(function(b) { b.classList.remove('active'); });
+}
+
+function normalizeSyncInterval(s) {
+  if (!s) return '';
+  s = s.toLowerCase().replace(/\s+/g, '');
+  var m = s.match(/^(\d+)\s*(m|min|mins|minutes?)$/);
+  if (m) return m[1] + 'm';
+  var h = s.match(/^(\d+)\s*(h|hr|hrs|hours?)$/);
+  if (h) return h[1] + 'h';
+  if (/^\d+$/.test(s)) return s + 'm';
+  return s;
 }
 
 function settingsBtnSelect(btn, hiddenId, val) {
