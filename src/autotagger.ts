@@ -15,7 +15,8 @@ const AUTOTAG_PROMPT = `Extract 3-8 machine tags from this article for relationa
 - Themes (e.g., "regulation", "opensource", "privacy", "fundraising")
 
 Return ONLY a valid JSON array of lowercase tag strings with no spaces or dashes. No explanation, no markdown formatting — just the raw JSON array.
-Example: ["artificialintelligence","openai","regulation","samaltman","safety"]`;
+Example: ["artificialintelligence","openai","regulation","samaltman","safety"]
+For non-English articles, use English tags where a clear English equivalent exists, but keep proper nouns and culturally specific terms in their original language.`;
 
 interface AutotagResult {
   machineTags: string[];

@@ -54,6 +54,36 @@ describe('extractArticle', () => {
   });
 });
 
+describe('extractArticle — language detection', () => {
+  test('extracts lang attribute from html element', () => {
+    const html = `<html lang="fr"><head><title>Article en français</title></head>
+      <body><article><p>Ceci est le premier paragraphe de l'article avec assez de contenu.</p>
+      <p>Voici le deuxième paragraphe avec plus de contenu substantiel.</p>
+      <p>Et un troisième paragraphe pour s'assurer que Readability fonctionne correctement.</p>
+      </article></body></html>`;
+    const result = extractArticle(html, 'https://example.fr/article');
+    expect(result).not.toBeNull();
+    expect(result!.lang).toBe('fr');
+  });
+
+  test('extracts base language from lang with region', () => {
+    const html = `<html lang="de-DE"><head><title>Deutscher Artikel</title></head>
+      <body><article><p>Dies ist der erste Absatz des Artikels mit genug Inhalt.</p>
+      <p>Hier ist der zweite Absatz mit mehr inhaltlichem Material für die Extraktion.</p>
+      <p>Und ein dritter Absatz, um sicherzustellen, dass alles korrekt funktioniert.</p>
+      </article></body></html>`;
+    const result = extractArticle(html, 'https://example.de/artikel');
+    expect(result).not.toBeNull();
+    expect(result!.lang).toBe('de');
+  });
+
+  test('returns undefined lang when html has no lang attribute', () => {
+    const result = extractArticle(SAMPLE_HTML, 'https://example.com/test');
+    expect(result).not.toBeNull();
+    expect(result!.lang).toBeUndefined();
+  });
+});
+
 describe('extractArticle — X.com/Twitter handling', () => {
   test('generates title from og:description for X.com posts', () => {
     const html = `<html><head>

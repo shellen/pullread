@@ -15,6 +15,7 @@ export interface ExtractedArticle {
   byline?: string;
   excerpt?: string;
   thumbnail?: string;
+  lang?: string;
 }
 
 const turndown = new TurndownService({
@@ -245,7 +246,7 @@ function formatTweetDate(createdAt: string): string {
   try {
     const d = new Date(createdAt);
     if (isNaN(d.getTime())) return '';
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   } catch {
     return '';
   }
@@ -577,6 +578,11 @@ export function extractArticle(html: string, url: string): ExtractedArticle | nu
   const { document } = parseHTML(html);
   // Set document URL for Readability
   Object.defineProperty(document, 'URL', { value: url });
+
+  // Extract document language from <html lang="..."> before Readability mutates the DOM
+  const htmlEl = document.querySelector('html');
+  const lang = htmlEl?.getAttribute('lang')?.split('-')[0] || undefined;
+
   const reader = new Readability(document);
   const article = reader.parse();
 
@@ -597,7 +603,8 @@ export function extractArticle(html: string, url: string): ExtractedArticle | nu
       content: article.content,
       markdown,
       byline: article.byline || undefined,
-      excerpt: article.excerpt || undefined
+      excerpt: article.excerpt || undefined,
+      lang,
     };
   }
 
@@ -837,7 +844,7 @@ function getBrowserHeaders(url: string): Record<string, string> {
   return {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-    'Accept-Language': 'en-US,en;q=0.9',
+    'Accept-Language': 'en-US,en;q=0.9,fr;q=0.8,de;q=0.7,es;q=0.6,it;q=0.5',
     'Accept-Encoding': 'gzip, deflate, br',
     'Cache-Control': 'max-age=0',
     'DNT': '1',
@@ -978,10 +985,11 @@ async function fetchYouTubeTranscript(videoId: string, html: string): Promise<st
       return null;
     }
 
-    // Prefer English manual captions, then auto-generated English, then first available
-    const english = tracks.find(t => t.languageCode === 'en' && t.kind !== 'asr');
+    // Prefer manual captions in English or common languages, then auto-generated, then first available
+    const manualEn = tracks.find(t => t.languageCode === 'en' && t.kind !== 'asr');
+    const manualAny = tracks.find(t => t.kind !== 'asr');
     const autoEn = tracks.find(t => t.languageCode === 'en');
-    const track = english || autoEn || tracks[0];
+    const track = manualEn || manualAny || autoEn || tracks[0];
 
     const captionRes = await fetchWithTimeout(track.baseUrl, {}, FETCH_TIMEOUT_MS);
     if (!captionRes.ok) return null;

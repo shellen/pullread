@@ -250,7 +250,7 @@ async function httpPost(url: string, headers: Record<string, string>, body: stri
   throw new Error('Rate limited after retries');
 }
 
-const SUMMARIZE_PROMPT = `Summarize this article in 2-3 concise sentences. Focus on the key argument or finding. Do not use phrases like "This article discusses" — just state the main points directly.`;
+const SUMMARIZE_PROMPT = `Summarize this article in 2-3 concise sentences. Focus on the key argument or finding. Do not use phrases like "This article discusses" — just state the main points directly. Respond in the same language as the article.`;
 
 async function callAnthropic(apiKey: string, model: string, articleText: string): Promise<SummarizeResult> {
   // Trim to ~6000 words to stay within context limits

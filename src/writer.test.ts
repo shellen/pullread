@@ -1,7 +1,7 @@
 // ABOUTME: Tests for markdown file generation
 // ABOUTME: Verifies filename slugification, frontmatter, and enclosure formatting
 
-import { generateFilename, generateMarkdown, fileSubpath, resolveFilePath, listMarkdownFiles, writeArticle, migrateToDateFolders, exportNotebook } from './writer';
+import { generateFilename, generateMarkdown, fileSubpath, resolveFilePath, listMarkdownFiles, listEpubFiles, writeArticle, migrateToDateFolders, exportNotebook } from './writer';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'fs';
 import { join } from 'path';
 
@@ -26,6 +26,26 @@ describe('generateFilename', () => {
   test('handles Private prefix', () => {
     const filename = generateFilename('[Private] Secret Article', '2024-01-29T12:00:00Z');
     expect(filename).toBe('2024-01-29-secret-article.md');
+  });
+
+  test('handles French accented characters', () => {
+    const filename = generateFilename('Les Misérables de Victor Hugo', '2024-01-29T12:00:00Z');
+    expect(filename).toBe('2024-01-29-les-miserables-de-victor-hugo.md');
+  });
+
+  test('handles Spanish accented characters', () => {
+    const filename = generateFilename('Ángeles y señales en España', '2024-01-29T12:00:00Z');
+    expect(filename).toBe('2024-01-29-angeles-y-senales-en-espana.md');
+  });
+
+  test('handles German umlauts and eszett', () => {
+    const filename = generateFilename('Über die Größe der Städte', '2024-01-29T12:00:00Z');
+    expect(filename).toBe('2024-01-29-uber-die-grosse-der-stadte.md');
+  });
+
+  test('handles Italian accented characters', () => {
+    const filename = generateFilename('Perché la città è bella', '2024-01-29T12:00:00Z');
+    expect(filename).toBe('2024-01-29-perche-la-citta-e-bella.md');
   });
 });
 
@@ -71,6 +91,19 @@ describe('generateMarkdown', () => {
     });
 
     expect(md).toContain('title: "Article with \\"quotes\\""');
+  });
+
+  test('includes lang when present', () => {
+    const md = generateMarkdown({
+      title: 'Article en français',
+      url: 'https://example.fr/article',
+      bookmarkedAt: '2024-01-29T12:00:00Z',
+      domain: 'example.fr',
+      content: 'Contenu de l\'article',
+      lang: 'fr'
+    });
+
+    expect(md).toContain('lang: fr');
   });
 
   test('includes feed name when present', () => {
@@ -221,6 +254,51 @@ describe('listMarkdownFiles', () => {
   });
 });
 
+describe('listEpubFiles', () => {
+  beforeEach(() => {
+    cleanTestDir();
+    mkdirSync(TEST_DIR, { recursive: true });
+  });
+  afterAll(cleanTestDir);
+
+  test('finds .epub files in root and subdirectories', () => {
+    writeFileSync(join(TEST_DIR, 'book-one.epub'), 'fake epub');
+    const subdir = join(TEST_DIR, 'books');
+    mkdirSync(subdir, { recursive: true });
+    writeFileSync(join(subdir, 'book-two.epub'), 'fake epub 2');
+
+    const files = listEpubFiles(TEST_DIR);
+    expect(files).toHaveLength(2);
+    expect(files.some(f => f.includes('book-one.epub'))).toBe(true);
+    expect(files.some(f => f.includes('book-two.epub'))).toBe(true);
+  });
+
+  test('ignores .md files', () => {
+    writeFileSync(join(TEST_DIR, 'article.md'), 'markdown');
+    writeFileSync(join(TEST_DIR, 'book.epub'), 'epub');
+
+    const files = listEpubFiles(TEST_DIR);
+    expect(files).toHaveLength(1);
+    expect(files[0]).toContain('book.epub');
+  });
+
+  test('skips favicons and notebooks directories', () => {
+    writeFileSync(join(TEST_DIR, 'book.epub'), 'ok');
+    mkdirSync(join(TEST_DIR, 'favicons'), { recursive: true });
+    writeFileSync(join(TEST_DIR, 'favicons', 'not-this.epub'), 'skip');
+    mkdirSync(join(TEST_DIR, 'notebooks'), { recursive: true });
+    writeFileSync(join(TEST_DIR, 'notebooks', 'not-this-either.epub'), 'skip');
+
+    const files = listEpubFiles(TEST_DIR);
+    expect(files).toHaveLength(1);
+    expect(files[0]).toContain('book.epub');
+  });
+
+  test('returns empty array for non-existent directory', () => {
+    expect(listEpubFiles('/tmp/does-not-exist-pullread')).toEqual([]);
+  });
+});
+
 describe('writeArticle', () => {
   beforeEach(() => {
     cleanTestDir();
@@ -246,6 +324,31 @@ describe('writeArticle', () => {
 
     // NOT in root
     expect(existsSync(join(TEST_DIR, '2024-03-15-test-article.md'))).toBe(false);
+  });
+
+  test('appends numeric suffix on filename collision', () => {
+    const data = {
+      title: 'World News',
+      url: 'https://example.com/a',
+      bookmarkedAt: '2024-03-15T12:00:00Z',
+      domain: 'example.com',
+      content: 'First article',
+    };
+
+    const first = writeArticle(TEST_DIR, data);
+    expect(first).toBe('2024-03-15-world-news.md');
+
+    const second = writeArticle(TEST_DIR, { ...data, url: 'https://other.com/b', content: 'Second article' });
+    expect(second).toBe('2024-03-15-world-news-2.md');
+
+    const third = writeArticle(TEST_DIR, { ...data, url: 'https://third.com/c', content: 'Third article' });
+    expect(third).toBe('2024-03-15-world-news-3.md');
+
+    // All three files exist with correct content
+    const dir = join(TEST_DIR, '2024', '03');
+    expect(readFileSync(join(dir, '2024-03-15-world-news.md'), 'utf-8')).toContain('First article');
+    expect(readFileSync(join(dir, '2024-03-15-world-news-2.md'), 'utf-8')).toContain('Second article');
+    expect(readFileSync(join(dir, '2024-03-15-world-news-3.md'), 'utf-8')).toContain('Third article');
   });
 });
 

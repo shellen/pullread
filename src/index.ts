@@ -175,6 +175,7 @@ async function syncFeed(
       let author: string | undefined;
       let excerpt: string | undefined;
       let thumbnail: string | undefined;
+      let lang: string | undefined;
 
       if (entry.enclosure) {
         content = entry.annotation || 'No description available.';
@@ -193,6 +194,7 @@ async function syncFeed(
         author = article.byline;
         excerpt = article.excerpt;
         thumbnail = article.thumbnail;
+        lang = article.lang;
       }
 
       const filename = writeArticle(outputPath, {
@@ -206,7 +208,8 @@ async function syncFeed(
         enclosure: entry.enclosure,
         author,
         excerpt,
-        thumbnail
+        thumbnail,
+        lang
       });
 
       storage.markProcessed({
@@ -327,6 +330,7 @@ async function sync(feedFilter?: string, retryFailed = false): Promise<void> {
                 feed: 'inbox',
                 author: article.byline,
                 excerpt: article.excerpt,
+                lang: article.lang,
               });
               storage.markProcessed({ url: item.url, title: article.title || item.url, bookmarkedAt: item.addedAt, outputFile: filename });
               console.log(`  Saved: ${filename}`);
@@ -521,7 +525,8 @@ if (command === 'sync') {
           feed: 'import',
           annotation: entry.annotation,
           author: article.byline,
-          excerpt: article.excerpt
+          excerpt: article.excerpt,
+          lang: article.lang,
         });
 
         storage.markProcessed({

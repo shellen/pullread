@@ -4,14 +4,14 @@
 import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, mkdirSync, watch, unlinkSync, copyFileSync } from 'fs';
 import { join, extname, dirname } from 'path';
-import { exec, execFile } from 'child_process';
+import { exec, execFile, execFileSync } from 'child_process';
 import { homedir } from 'os';
 import { VIEWER_HTML } from './viewer-html';
 import { summarizeText, loadLLMConfig, saveLLMConfig, loadLLMSettings, saveLLMSettings, getDefaultModel, isAppleAvailable, KNOWN_MODELS, LLMConfig, LLMSettings } from './summarizer';
 import { autotagText, autotagBatch, saveMachineTags, hasMachineTags, migrateDashedTags } from './autotagger';
 import { APP_ICON } from './app-icon';
 import { fetchAndExtract } from './extractor';
-import { generateMarkdown, writeArticle, ArticleData, downloadFavicon, resolveFilePath, listMarkdownFiles, migrateToDateFolders, exportNotebook, removeExportedNotebook } from './writer';
+import { generateMarkdown, writeArticle, ArticleData, downloadFavicon, resolveFilePath, listMarkdownFiles, listEpubFiles, migrateToDateFolders, exportNotebook, removeExportedNotebook } from './writer';
 import { loadTTSConfig, saveTTSConfig, generateSpeech, getAudioContentType, getKokoroStatus, preloadKokoro, getCachedAudioPath, createTtsSession, generateSessionChunk, TTS_VOICES, TTS_MODELS } from './tts';
 import { listSiteLogins, removeSiteLogin, saveSiteLoginCookies } from './cookies';
 
@@ -47,6 +47,388 @@ export function parseFrontmatter(content: string): Record<string, string> {
     }
   }
   return meta;
+}
+
+interface EpubMeta {
+  title: string;
+  author: string;
+  description: string;
+  language: string;
+  coverPath: string;
+}
+
+/** Extract metadata from an EPUB file by reading its OPF document. */
+function parseEpubMeta(epubPath: string): EpubMeta {
+  const fallback: EpubMeta = { title: '', author: '', description: '', language: '', coverPath: '' };
+  try {
+    // EPUB is a ZIP; use unzip to extract META-INF/container.xml
+    const containerXml = execFileSync('unzip', ['-p', epubPath, 'META-INF/container.xml'], {
+      encoding: 'utf-8',
+      timeout: 3000,
+      maxBuffer: 64 * 1024,
+    });
+    // Find the rootfile path (e.g. OEBPS/content.opf or content.opf)
+    const rfMatch = containerXml.match(/rootfile[^>]*full-path="([^"]+)"/);
+    if (!rfMatch) return fallback;
+
+    const opfPath = rfMatch[1];
+    const opfDir = opfPath.includes('/') ? opfPath.slice(0, opfPath.lastIndexOf('/') + 1) : '';
+    const opfXml = execFileSync('unzip', ['-p', epubPath, opfPath], {
+      encoding: 'utf-8',
+      timeout: 3000,
+      maxBuffer: 256 * 1024,
+    });
+
+    // Parse Dublin Core metadata from OPF
+    const titleMatch = opfXml.match(/<dc:title[^>]*>([^<]+)<\/dc:title>/i);
+    const authorMatch = opfXml.match(/<dc:creator[^>]*>([^<]+)<\/dc:creator>/i);
+    const descMatch = opfXml.match(/<dc:description[^>]*>([^<]+)<\/dc:description>/i);
+    const langMatch = opfXml.match(/<dc:language[^>]*>([^<]+)<\/dc:language>/i);
+
+    // Find cover image
+    let coverPath = '';
+    // EPUB 3: properties="cover-image"
+    const coverItemMatch = opfXml.match(/<item\s+[^>]*properties="[^"]*cover-image[^"]*"[^>]*href="([^"]+)"/i)
+      || opfXml.match(/<item\s+[^>]*href="([^"]+)"[^>]*properties="[^"]*cover-image[^"]*"/i);
+    if (coverItemMatch) {
+      coverPath = opfDir + coverItemMatch[1];
+    }
+    // EPUB 2 fallback: <meta name="cover" content="item-id"/>
+    if (!coverPath) {
+      const coverMetaMatch = opfXml.match(/<meta\s+name="cover"\s+content="([^"]+)"/i)
+        || opfXml.match(/<meta\s+content="([^"]+)"\s+name="cover"/i);
+      if (coverMetaMatch) {
+        const coverId = coverMetaMatch[1];
+        const coverHrefMatch = opfXml.match(new RegExp('<item\\s+[^>]*id="' + coverId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '"[^>]*href="([^"]+)"', 'i'));
+        if (coverHrefMatch) {
+          coverPath = opfDir + coverHrefMatch[1];
+        }
+      }
+    }
+
+    return {
+      title: titleMatch ? titleMatch[1].trim() : '',
+      author: authorMatch ? authorMatch[1].trim() : '',
+      description: descMatch ? descMatch[1].trim().replace(/<[^>]+>/g, '').slice(0, 300) : '',
+      language: langMatch ? langMatch[1].trim().split('-')[0] : '',
+      coverPath,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+/** Resolve an EPUB filename to its full path in the output directory. */
+function resolveEpubPath(outputPath: string, filename: string): string | null {
+  const epubPaths = listEpubFiles(outputPath);
+  for (const p of epubPaths) {
+    if (require('path').basename(p) === filename) return p;
+  }
+  return null;
+}
+
+/** Extract a single file from an EPUB (ZIP) as a Buffer. */
+function extractEpubFile(epubPath: string, innerPath: string): Buffer | null {
+  try {
+    return execFileSync('unzip', ['-p', epubPath, innerPath], {
+      timeout: 5000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extract readable HTML content from an EPUB by parsing its spine.
+ * Returns frontmatter + HTML body, similar to how markdown articles are served.
+ * Image src attributes are rewritten to /api/epub-resource?name=...&path=...
+ * Chapters are wrapped in <div class="epub-chapter"> with IDs for navigation.
+ * Includes embedded TOC nav and cover image support.
+ */
+function extractEpubContent(epubPath: string, filename: string): string | null {
+  try {
+    const meta = parseEpubMeta(epubPath);
+
+    // Read container.xml to find OPF
+    const containerXml = execFileSync('unzip', ['-p', epubPath, 'META-INF/container.xml'], {
+      encoding: 'utf-8', timeout: 3000, maxBuffer: 64 * 1024,
+    });
+    const rfMatch = containerXml.match(/rootfile[^>]*full-path="([^"]+)"/);
+    if (!rfMatch) return null;
+
+    const opfPath = rfMatch[1];
+    const opfDir = opfPath.includes('/') ? opfPath.slice(0, opfPath.lastIndexOf('/') + 1) : '';
+    const opfXml = execFileSync('unzip', ['-p', epubPath, opfPath], {
+      encoding: 'utf-8', timeout: 3000, maxBuffer: 512 * 1024,
+    });
+
+    // Build manifest: id → { href, mediaType, properties }
+    const manifest: Record<string, { href: string; mediaType: string; properties: string }> = {};
+    const manifestRe = /<item\s+([^>]+)>/gi;
+    let mm;
+    while ((mm = manifestRe.exec(opfXml)) !== null) {
+      const attrs = mm[1];
+      const idMatch = attrs.match(/id="([^"]+)"/);
+      const hrefMatch = attrs.match(/href="([^"]+)"/);
+      const typeMatch = attrs.match(/media-type="([^"]+)"/);
+      const propsMatch = attrs.match(/properties="([^"]+)"/);
+      if (idMatch && hrefMatch) {
+        manifest[idMatch[1]] = {
+          href: hrefMatch[1],
+          mediaType: typeMatch ? typeMatch[1] : '',
+          properties: propsMatch ? propsMatch[1] : '',
+        };
+      }
+    }
+
+    // Parse spine order
+    const spineRe = /<itemref\s+[^>]*idref="([^"]+)"[^>]*>/gi;
+    const spineIds: string[] = [];
+    let sm;
+    while ((sm = spineRe.exec(opfXml)) !== null) {
+      spineIds.push(sm[1]);
+    }
+
+    // --- Cover image detection ---
+    const encFilename = encodeURIComponent(filename);
+    let coverImagePath = '';
+
+    // EPUB 3: properties="cover-image" on manifest item
+    for (const id of Object.keys(manifest)) {
+      if (manifest[id].properties.includes('cover-image')) {
+        coverImagePath = opfDir + manifest[id].href;
+        break;
+      }
+    }
+    // EPUB 2 fallback: <meta name="cover" content="item-id"/>
+    if (!coverImagePath) {
+      const coverMetaMatch = opfXml.match(/<meta\s+name="cover"\s+content="([^"]+)"/i)
+        || opfXml.match(/<meta\s+content="([^"]+)"\s+name="cover"/i);
+      if (coverMetaMatch && manifest[coverMetaMatch[1]]) {
+        coverImagePath = opfDir + manifest[coverMetaMatch[1]].href;
+      }
+    }
+
+    // --- TOC parsing ---
+    // Build href-to-chapter-index map as we process spine
+    const hrefToChapterIdx: Record<string, number> = {};
+    let chapterIndex = 0;
+    for (const id of spineIds) {
+      const item = manifest[id];
+      if (!item || !item.mediaType.includes('html')) continue;
+      hrefToChapterIdx[item.href] = chapterIndex;
+      chapterIndex++;
+    }
+
+    let tocHtml = '';
+
+    // EPUB 3: look for nav document (properties includes "nav")
+    let navItemId = '';
+    for (const id of Object.keys(manifest)) {
+      if (manifest[id].properties.includes('nav')) {
+        navItemId = id;
+        break;
+      }
+    }
+
+    if (navItemId) {
+      try {
+        const navPath = opfDir + manifest[navItemId].href;
+        const navDir = navPath.includes('/') ? navPath.slice(0, navPath.lastIndexOf('/') + 1) : opfDir;
+        const navXml = execFileSync('unzip', ['-p', epubPath, navPath], {
+          encoding: 'utf-8', timeout: 5000, maxBuffer: 1024 * 1024,
+        });
+        // Extract the <nav epub:type="toc"> element content
+        const tocMatch = navXml.match(/<nav[^>]*epub:type="toc"[^>]*>([\s\S]*?)<\/nav>/i);
+        if (tocMatch) {
+          tocHtml = rewriteTocHrefs(tocMatch[1], navDir, opfDir, hrefToChapterIdx);
+        }
+      } catch { /* nav parsing is best-effort */ }
+    }
+
+    // EPUB 2 fallback: NCX table of contents
+    if (!tocHtml) {
+      for (const id of Object.keys(manifest)) {
+        if (manifest[id].mediaType === 'application/x-dtbncx+xml') {
+          try {
+            const ncxPath = opfDir + manifest[id].href;
+            const ncxDir = ncxPath.includes('/') ? ncxPath.slice(0, ncxPath.lastIndexOf('/') + 1) : opfDir;
+            const ncxXml = execFileSync('unzip', ['-p', epubPath, ncxPath], {
+              encoding: 'utf-8', timeout: 5000, maxBuffer: 1024 * 1024,
+            });
+            tocHtml = parseNcxToTocHtml(ncxXml, ncxDir, opfDir, hrefToChapterIdx);
+          } catch { /* NCX parsing is best-effort */ }
+          break;
+        }
+      }
+    }
+
+    // --- Extract each spine document with chapter wrappers ---
+    let bodyHtml = '';
+    chapterIndex = 0;
+
+    for (const id of spineIds) {
+      const item = manifest[id];
+      if (!item || !item.mediaType.includes('html')) continue;
+
+      const innerPath = opfDir + item.href;
+      const chapterXml = execFileSync('unzip', ['-p', epubPath, innerPath], {
+        encoding: 'utf-8', timeout: 5000, maxBuffer: 2 * 1024 * 1024,
+      });
+
+      // Extract <body> content
+      const bodyMatch = chapterXml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+      if (!bodyMatch) continue;
+      let chapterHtml = bodyMatch[1];
+
+      // Resolve relative resource paths for images and links
+      const chapterDir = innerPath.includes('/') ? innerPath.slice(0, innerPath.lastIndexOf('/') + 1) : opfDir;
+
+      // Rewrite image src to /api/epub-resource
+      chapterHtml = chapterHtml.replace(
+        /(<img[^>]*\s+src=")([^"]+)(")/gi,
+        function(_match, before, src, after) {
+          if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:')) return before + src + after;
+          const resolved = resolveRelPath(chapterDir, src);
+          return before + '/api/epub-resource?name=' + encFilename + '&path=' + encodeURIComponent(resolved) + after;
+        }
+      );
+      // Also rewrite image src in xlink:href (SVG images in EPUB)
+      chapterHtml = chapterHtml.replace(
+        /(xlink:href="|href=")([^"]+\.(jpe?g|png|gif|svg|webp))(")/gi,
+        function(_match, before, src, _ext, after) {
+          if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:')) return before + src + after;
+          const resolved = resolveRelPath(chapterDir, src);
+          return before + '/api/epub-resource?name=' + encFilename + '&path=' + encodeURIComponent(resolved) + after;
+        }
+      );
+
+      // Convert epub:type to data-epub-type so it survives DOMPurify sanitization
+      chapterHtml = chapterHtml.replace(/epub:type=/gi, 'data-epub-type=');
+
+      // Wrap in chapter div with ID for navigation
+      bodyHtml += '<div class="epub-chapter" id="epub-ch-' + chapterIndex + '">\n';
+      bodyHtml += chapterHtml;
+      bodyHtml += '\n</div>\n';
+      chapterIndex++;
+    }
+
+    if (!bodyHtml.trim()) return null;
+
+    // Prepend cover image if found
+    let coverHtml = '';
+    if (coverImagePath) {
+      const coverUrl = '/api/epub-resource?name=' + encFilename + '&path=' + encodeURIComponent(coverImagePath);
+      coverHtml = '<div class="epub-cover"><img src="' + coverUrl + '" alt="Cover" class="epub-cover-img"></div>\n';
+    }
+
+    // Prepend hidden TOC nav for frontend to read
+    let tocNav = '';
+    if (tocHtml) {
+      tocNav = '<nav class="epub-toc" hidden>' + tocHtml + '</nav>\n';
+    }
+
+    // Build a markdown-like response with frontmatter
+    const escapeQuotes = (s: string) => s.replace(/"/g, '\\"');
+    let frontmatter = `---\ntitle: "${escapeQuotes(meta.title || filename.replace(/\.epub$/, ''))}"\ndomain: epub\nfeed: books`;
+    if (meta.author) frontmatter += `\nauthor: "${escapeQuotes(meta.author)}"`;
+    if (meta.language) frontmatter += `\nlang: ${meta.language}`;
+    if (meta.description) frontmatter += `\nexcerpt: "${escapeQuotes(meta.description.slice(0, 200))}"`;
+    if (coverImagePath) frontmatter += `\nimage: /api/epub-resource?name=${encFilename}&path=${encodeURIComponent(coverImagePath)}`;
+    frontmatter += `\nepub_chapters: ${chapterIndex}`;
+    frontmatter += '\n---\n\n';
+
+    return frontmatter + tocNav + coverHtml + bodyHtml;
+  } catch {
+    return null;
+  }
+}
+
+/** Rewrite TOC hrefs from EPUB 3 nav document to point to chapter IDs. */
+function rewriteTocHrefs(
+  tocInnerHtml: string,
+  navDir: string,
+  opfDir: string,
+  hrefToChapterIdx: Record<string, number>
+): string {
+  return tocInnerHtml.replace(
+    /href="([^"]+)"/gi,
+    function(_match, href) {
+      const [filePart, fragment] = href.split('#');
+      // Resolve relative path from nav document to get the path relative to OPF dir
+      const resolved = resolveRelPath(navDir, filePart);
+      // Strip opfDir prefix to get the href as it appears in the manifest
+      const manifestHref = resolved.startsWith(opfDir) ? resolved.slice(opfDir.length) : resolved;
+
+      const chIdx = hrefToChapterIdx[manifestHref] ?? hrefToChapterIdx[decodeURIComponent(manifestHref)];
+      if (chIdx !== undefined) {
+        if (fragment) {
+          // Sub-section: use the original fragment ID (it exists in the chapter HTML)
+          return 'href="#' + fragment + '"';
+        }
+        return 'href="#epub-ch-' + chIdx + '"';
+      }
+      // If we can't map it, try with the fragment
+      if (fragment) return 'href="#' + fragment + '"';
+      return 'href="#"';
+    }
+  );
+}
+
+/** Parse EPUB 2 NCX <navMap> into HTML <ol> for the TOC. */
+function parseNcxToTocHtml(
+  ncxXml: string,
+  ncxDir: string,
+  opfDir: string,
+  hrefToChapterIdx: Record<string, number>
+): string {
+  const navMapMatch = ncxXml.match(/<navMap>([\s\S]*)<\/navMap>/i);
+  if (!navMapMatch) return '';
+
+  function parseNavPoints(xml: string): string {
+    let html = '<ol>';
+    // Split on navPoint opening tags to find each entry
+    const segments = xml.split(/<navPoint[^>]*>/i);
+    for (let i = 1; i < segments.length; i++) {
+      const seg = segments[i];
+      const labelMatch = seg.match(/<navLabel>\s*<text>([^<]*)<\/text>/i);
+      const srcMatch = seg.match(/<content\s+src="([^"]+)"/i);
+      if (labelMatch && srcMatch) {
+        const label = labelMatch[1].trim();
+        const src = srcMatch[1];
+        const [filePart, fragment] = src.split('#');
+        const resolved = resolveRelPath(ncxDir, filePart);
+        const manifestHref = resolved.startsWith(opfDir) ? resolved.slice(opfDir.length) : resolved;
+        const chIdx = hrefToChapterIdx[manifestHref] ?? hrefToChapterIdx[decodeURIComponent(manifestHref)];
+
+        let hrefAttr: string;
+        if (chIdx !== undefined) {
+          hrefAttr = fragment ? '#' + fragment : '#epub-ch-' + chIdx;
+        } else {
+          hrefAttr = fragment ? '#' + fragment : '#';
+        }
+        html += '<li><a href="' + hrefAttr + '">' + label.replace(/</g, '&lt;') + '</a></li>';
+      }
+    }
+    html += '</ol>';
+    return html;
+  }
+
+  return parseNavPoints(navMapMatch[1]);
+}
+
+/** Resolve a relative path against a base directory (handles ../ segments). */
+function resolveRelPath(base: string, rel: string): string {
+  // Decode percent-encoded paths first
+  const decoded = decodeURIComponent(rel);
+  const parts = (base + decoded).split('/');
+  const resolved: string[] = [];
+  for (const p of parts) {
+    if (p === '..') resolved.pop();
+    else if (p && p !== '.') resolved.push(p);
+  }
+  return resolved.join('/');
 }
 
 function listFiles(outputPath: string): FileMeta[] {
@@ -97,6 +479,41 @@ function listFiles(outputPath: string): FileMeta[] {
       });
     } catch {
       // Skip unreadable files
+    }
+  }
+
+  // Add EPUB files
+  const epubPaths = listEpubFiles(outputPath);
+  for (const fullPath of epubPaths) {
+    const name = require('path').basename(fullPath);
+    try {
+      const stat = statSync(fullPath);
+      if (!stat.isFile()) continue;
+      const meta = parseEpubMeta(fullPath);
+      const encName = encodeURIComponent(name);
+      const coverImage = meta.coverPath
+        ? '/api/epub-resource?name=' + encName + '&path=' + encodeURIComponent(meta.coverPath)
+        : '';
+      files.push({
+        filename: name,
+        title: meta.title || name.replace(/\.epub$/, '').replace(/[-_]/g, ' '),
+        url: '',
+        domain: 'epub',
+        bookmarked: stat.mtime.toISOString(),
+        feed: 'books',
+        author: meta.author || '',
+        mtime: stat.mtime.toISOString(),
+        hasSummary: false,
+        summaryProvider: '',
+        summaryModel: '',
+        excerpt: meta.description || '',
+        image: coverImage,
+        enclosureUrl: '',
+        enclosureType: '',
+        enclosureDuration: '',
+      });
+    } catch {
+      // Skip unreadable EPUBs
     }
   }
 
@@ -262,7 +679,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
   let filesChangedAt = Date.now();
   try {
     watch(outputPath, { recursive: true }, (event, filename) => {
-      if (filename && filename.endsWith('.md')) {
+      if (filename && (filename.endsWith('.md') || filename.endsWith('.epub'))) {
         filesChangedAt = Date.now();
       }
     });
@@ -454,6 +871,25 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         send404(res);
         return;
       }
+
+      // EPUB files: extract content as frontmatter + HTML (same as markdown articles)
+      if (filename.endsWith('.epub')) {
+        const epubPath = resolveEpubPath(outputPath, filename);
+        if (!epubPath || !epubPath.startsWith(outputPath)) {
+          send404(res);
+          return;
+        }
+        const content = extractEpubContent(epubPath, filename);
+        if (!content) {
+          res.writeHead(500, { 'Content-Type': 'text/plain' });
+          res.end('Failed to extract EPUB content');
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end(content);
+        return;
+      }
+
       const filePath = resolveFilePath(outputPath, filename);
       if (!filePath.startsWith(outputPath) || !existsSync(filePath)) {
         send404(res);
@@ -461,6 +897,41 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
       }
       res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end(readFileSync(filePath, 'utf-8'));
+      return;
+    }
+
+    // Serve EPUB embedded resources (images, fonts, etc.)
+    if (url.pathname === '/api/epub-resource') {
+      const filename = url.searchParams.get('name');
+      const innerPath = url.searchParams.get('path');
+      if (!filename || !innerPath || filename.includes('..') || innerPath.includes('..')) {
+        send404(res);
+        return;
+      }
+      const epubPath = resolveEpubPath(outputPath, filename);
+      if (!epubPath || !epubPath.startsWith(outputPath)) {
+        send404(res);
+        return;
+      }
+      const data = extractEpubFile(epubPath, innerPath);
+      if (!data) {
+        send404(res);
+        return;
+      }
+      // Determine content type from extension
+      const ext = innerPath.split('.').pop()?.toLowerCase() || '';
+      const contentTypes: Record<string, string> = {
+        'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png',
+        'gif': 'image/gif', 'svg': 'image/svg+xml', 'webp': 'image/webp',
+        'css': 'text/css', 'woff': 'font/woff', 'woff2': 'font/woff2',
+        'ttf': 'font/ttf', 'otf': 'font/otf',
+      };
+      res.writeHead(200, {
+        'Content-Type': contentTypes[ext] || 'application/octet-stream',
+        'Content-Length': data.length.toString(),
+        'Cache-Control': 'max-age=86400',
+      });
+      res.end(data);
       return;
     }
 

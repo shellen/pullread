@@ -17,6 +17,7 @@ export interface ArticleData {
   author?: string;
   excerpt?: string;
   thumbnail?: string;
+  lang?: string;
 }
 
 export function generateFilename(title: string, bookmarkedAt: string): string {
@@ -24,6 +25,9 @@ export function generateFilename(title: string, bookmarkedAt: string): string {
 
   let slug = title
     .replace(/^\[Private\]\s*/i, '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\u00df/g, 'ss')
     .toLowerCase()
     .replace(/['']/g, '')
     .replace(/[^a-z0-9]+/g, '-')
@@ -48,6 +52,10 @@ domain: ${data.domain}`;
 
   if (data.feed) {
     frontmatter += `\nfeed: ${data.feed}`;
+  }
+
+  if (data.lang) {
+    frontmatter += `\nlang: ${data.lang}`;
   }
 
   if (data.author) {
@@ -131,9 +139,42 @@ export function listMarkdownFiles(dir: string): string[] {
   return results;
 }
 
+/** Recursively list all .epub files, skipping favicons/ and notebooks/ directories. */
+export function listEpubFiles(dir: string): string[] {
+  if (!existsSync(dir)) return [];
+  const results: string[] = [];
+  const SKIP = new Set(['favicons', 'notebooks']);
+
+  function walk(current: string) {
+    let entries: string[];
+    try { entries = readdirSync(current); } catch { return; }
+    for (const name of entries) {
+      if (SKIP.has(name)) continue;
+      const full = join(current, name);
+      try {
+        const stat = statSync(full);
+        if (stat.isDirectory()) {
+          walk(full);
+        } else if (stat.isFile() && extname(name) === '.epub') {
+          results.push(full);
+        }
+      } catch { continue; }
+    }
+  }
+
+  walk(dir);
+  return results;
+}
+
 export function writeArticle(outputPath: string, data: ArticleData): string {
-  const filename = generateFilename(data.title, data.bookmarkedAt);
-  const fullPath = join(outputPath, fileSubpath(filename));
+  let filename = generateFilename(data.title, data.bookmarkedAt);
+  let fullPath = join(outputPath, fileSubpath(filename));
+
+  // Avoid overwriting an existing file with a different URL
+  for (let i = 2; i <= 99 && existsSync(fullPath); i++) {
+    filename = filename.replace(/(-\d+)?\.md$/, `-${i}.md`);
+    fullPath = join(outputPath, fileSubpath(filename));
+  }
 
   const dir = dirname(fullPath);
   if (!existsSync(dir)) {
@@ -191,6 +232,9 @@ export interface Notebook {
 /** Export a notebook as markdown to outputPath/notebooks/{slug}.md */
 export function exportNotebook(outputPath: string, notebook: Notebook): string {
   const slug = (notebook.title || notebook.id)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\u00df/g, 'ss')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
@@ -238,6 +282,9 @@ ${body}`;
 /** Remove an exported notebook markdown file */
 export function removeExportedNotebook(outputPath: string, notebook: Notebook): void {
   const slug = (notebook.title || notebook.id)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\u00df/g, 'ss')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')

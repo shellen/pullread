@@ -26,11 +26,11 @@ if (newVersion) {
 
 const version = pkg.version;
 
-// Update site/index.html: "Version X.Y.Z" inside the hero badge
+// Update site/index.html: "Version X.Y.Z" or "__VERSION__" placeholder inside the hero badge
 const site = readFileSync(SITE_PATH, 'utf-8');
-const siteUpdated = site.replace(/Version \d+\.\d+\.\d+/, `Version ${version}`);
-const siteHasVersion = /Version \d+\.\d+\.\d+/.test(site);
-if (!siteHasVersion) {
+const siteVersionRe = /Version (?:\d+\.\d+\.\d+|__VERSION__)/;
+const siteUpdated = site.replace(siteVersionRe, `Version ${version}`);
+if (!siteVersionRe.test(site)) {
   console.log('site/index.html — no version string found, skipping');
 } else if (site === siteUpdated) {
   console.log(`site/index.html — already ${version}`);
