@@ -2,11 +2,11 @@
 // ABOUTME: Syncs RSS and Atom feeds to markdown files
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
-import { join } from 'path';
+import { join, basename } from 'path';
 import { homedir } from 'os';
 import { fetchFeed, FeedEntry } from './feed';
 import { fetchAndExtract, FetchOptions, shouldSkipUrl, classifyFetchError } from './extractor';
-import { writeArticle } from './writer';
+import { writeArticle, listMarkdownFiles, resolveFilePath } from './writer';
 import { Storage } from './storage';
 import { startViewer } from './viewer';
 import { summarizeText, loadLLMConfig } from './summarizer';
@@ -387,16 +387,14 @@ if (command === 'sync') {
   }
 
   (async () => {
-    const { readdirSync } = require('fs');
-    const { extname } = require('path');
-    const files = readdirSync(config.outputPath)
-      .filter((f: string) => extname(f) === '.md');
+    const allPaths = listMarkdownFiles(config.outputPath);
 
     let summarized = 0;
     let skipped = 0;
 
-    for (const file of files) {
-      const filePath = join(config.outputPath, file);
+    for (const fullPath of allPaths) {
+      const file = basename(fullPath);
+      const filePath = fullPath;
       const content = readFileSync(filePath, 'utf-8');
 
       // Check if already has summary

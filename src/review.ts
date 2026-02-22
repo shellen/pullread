@@ -1,10 +1,11 @@
 // ABOUTME: Weekly review generation — thematic overview of recently bookmarked articles
 // ABOUTME: Uses configured LLM (or Apple Intelligence) to produce a digest
 
-import { readdirSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
-import { join, dirname } from 'path';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { join, dirname, basename } from 'path';
 import { homedir } from 'os';
 import { summarizeText } from './summarizer';
+import { listMarkdownFiles, resolveFilePath } from './writer';
 
 interface ArticleMeta {
   title: string;
@@ -40,15 +41,16 @@ export function getRecentArticles(outputPath: string, days: number = 7): Article
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
 
-  const files = readdirSync(outputPath)
-    .filter(f => f.endsWith('.md') && !f.startsWith('_'))
-    .sort()
-    .reverse();
+  const allPaths = listMarkdownFiles(outputPath);
+  const files = allPaths
+    .map(f => ({ name: basename(f), fullPath: f }))
+    .filter(f => !f.name.startsWith('_'))
+    .sort((a, b) => b.name.localeCompare(a.name));
 
   const articles: ArticleMeta[] = [];
   for (const file of files) {
     try {
-      const text = readFileSync(join(outputPath, file), 'utf-8');
+      const text = readFileSync(file.fullPath, 'utf-8');
       const meta = parseFrontmatter(text);
       if (!meta) continue;
 

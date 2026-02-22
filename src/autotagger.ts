@@ -2,9 +2,10 @@
 // ABOUTME: Extracts topic, entity, and theme tags for relational mapping between articles
 
 import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { join, basename } from 'path';
 import { homedir } from 'os';
 import { summarizeText, loadLLMConfig, LLMConfig, Provider, getDefaultModel } from './summarizer';
+import { listMarkdownFiles, resolveFilePath } from './writer';
 
 const NOTES_PATH = join(homedir(), '.config', 'pullread', 'notes.json');
 
@@ -155,9 +156,6 @@ export async function autotagBatch(
   outputPath: string,
   options: { minSize?: number; config?: LLMConfig; force?: boolean } = {}
 ): Promise<{ tagged: number; skipped: number; failed: number }> {
-  const { readdirSync } = require('fs');
-  const { extname } = require('path');
-
   const minSize = options.minSize ?? 500;
   const force = options.force ?? false;
   const llmConfig = options.config || loadLLMConfig();
@@ -165,8 +163,9 @@ export async function autotagBatch(
     throw new Error('No LLM configuration found. Configure an API key in settings.');
   }
 
-  const files: string[] = readdirSync(outputPath)
-    .filter((f: string) => extname(f) === '.md' && !f.startsWith('_'));
+  const files: string[] = listMarkdownFiles(outputPath)
+    .map(f => basename(f))
+    .filter(f => !f.startsWith('_'));
 
   let tagged = 0;
   let skipped = 0;
@@ -182,7 +181,7 @@ export async function autotagBatch(
       continue;
     }
 
-    const filePath = join(outputPath, file);
+    const filePath = resolveFilePath(outputPath, file);
     const content = readFileSync(filePath, 'utf-8');
 
     // Get article body (strip frontmatter)
