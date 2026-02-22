@@ -163,9 +163,77 @@ jobs:
             src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app
           retention-days: 30
 
+      - name: Upload updater signature
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: updater-sig-${{ matrix.target }}
+          path: src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.sig
+          retention-days: 1
+
       - name: Clean up keychain
         if: always() && env.HAS_SIGNING_CERT == 'true'
         run: security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
+
+  # Assemble updater manifest after both builds finish
+  publish-updater:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download arm64 signature
+        uses: actions/download-artifact@v4
+        with:
+          name: updater-sig-aarch64-apple-darwin
+          path: ./sigs/arm64
+
+      - name: Download x64 signature
+        uses: actions/download-artifact@v4
+        with:
+          name: updater-sig-x86_64-apple-darwin
+          path: ./sigs/x64
+
+      - name: Build latest.json
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="${{ github.ref_name }}"
+          DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          ARM_SIG=$(cat ./sigs/arm64/*.sig)
+          X64_SIG=$(cat ./sigs/x64/*.sig)
+          BASE="https://github.com/${{ github.repository }}/releases/download/${TAG}"
+
+          jq -n \
+            --arg ver "$VERSION" \
+            --arg date "$DATE" \
+            --arg arm_sig "$ARM_SIG" \
+            --arg arm_url "${BASE}/Pull.Read_aarch64.app.tar.gz" \
+            --arg x64_sig "$X64_SIG" \
+            --arg x64_url "${BASE}/Pull.Read_x64.app.tar.gz" \
+            '{
+              version: $ver,
+              notes: "See the assets to download and install this version.",
+              pub_date: $date,
+              platforms: {
+                "darwin-aarch64": { signature: $arm_sig, url: $arm_url },
+                "darwin-x86_64": { signature: $x64_sig, url: $x64_url }
+              }
+            }' > latest.json
+
+          echo "Generated latest.json:"
+          cat latest.json
+
+      - name: Upload latest.json and publish release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.ref_name }}" latest.json --clobber
+          gh release edit "${{ github.ref_name }}" --draft=false
 
   # Auto-update "latest" pre-release on every push to main
   latest-release:
