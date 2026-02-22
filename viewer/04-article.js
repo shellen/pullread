@@ -540,8 +540,13 @@ function renderArticle(text, filename) {
   // Apply syntax highlighting to code blocks
   applySyntaxHighlighting();
 
-  // Generate table of contents
-  generateToc();
+  // Generate table of contents (EPUB uses its own embedded TOC)
+  if (isEpub) {
+    generateEpubToc();
+    setupEpubFootnotes();
+  } else {
+    generateToc();
+  }
 
   // Scroll to top
   document.getElementById('content-pane').scrollTop = 0;
@@ -933,16 +938,187 @@ function updateTocActive() {
   const threshold = paneRect.top + 80;
 
   let activeId = null;
-  const headings = document.querySelectorAll('#content h2[id], #content h3[id]');
 
-  headings.forEach(heading => {
-    if (heading.getBoundingClientRect().top <= threshold) {
-      activeId = heading.id;
+  // For EPUB TOC, track both chapter divs and any anchored elements
+  const isEpubToc = document.querySelector('.epub-toc-list');
+  if (isEpubToc) {
+    // Gather all elements that TOC links point to
+    tocLinks.forEach(function(link) {
+      var targetId = link.getAttribute('data-toc-target');
+      if (!targetId) return;
+      var el = document.getElementById(targetId);
+      if (el && el.getBoundingClientRect().top <= threshold) {
+        activeId = targetId;
+      }
+    });
+    // Update chapter progress
+    var chapters = document.querySelectorAll('#content .epub-chapter');
+    var progressEl = document.getElementById('epub-chapter-progress');
+    if (progressEl && chapters.length > 1) {
+      var currentCh = 0;
+      chapters.forEach(function(ch, i) {
+        if (ch.getBoundingClientRect().top <= threshold) currentCh = i;
+      });
+      progressEl.textContent = 'Chapter ' + (currentCh + 1) + ' of ' + chapters.length;
     }
-  });
+  } else {
+    var headings = document.querySelectorAll('#content h2[id], #content h3[id]');
+    headings.forEach(function(heading) {
+      if (heading.getBoundingClientRect().top <= threshold) {
+        activeId = heading.id;
+      }
+    });
+  }
 
   tocLinks.forEach(link => {
     link.classList.toggle('toc-active', link.getAttribute('data-toc-target') === activeId);
+  });
+}
+
+// ---- EPUB Table of Contents ----
+function generateEpubToc() {
+  const content = document.getElementById('content');
+  const tocContainer = document.getElementById('toc-container');
+  if (!content || !tocContainer) return;
+  tocContainer.innerHTML = '';
+
+  // Look for the hidden epub-toc nav we embedded in the content
+  const epubTocNav = content.querySelector('nav.epub-toc');
+  if (!epubTocNav) {
+    // Fallback: generate TOC from chapter headings
+    generateToc();
+    return;
+  }
+
+  const panel = document.createElement('div');
+  panel.className = 'toc-panel';
+
+  const label = document.createElement('div');
+  label.className = 'toc-label';
+  label.textContent = 'Contents';
+  panel.appendChild(label);
+
+  // Clone the TOC list from the hidden nav
+  const tocList = epubTocNav.querySelector('ol');
+  if (!tocList) {
+    generateToc();
+    return;
+  }
+
+  const list = tocList.cloneNode(true);
+  list.className = 'toc-list epub-toc-list';
+
+  // Set up click handlers for smooth scrolling
+  list.querySelectorAll('a[href]').forEach(function(a) {
+    var targetId = a.getAttribute('href');
+    if (!targetId || !targetId.startsWith('#')) return;
+    a.setAttribute('data-toc-target', targetId.slice(1));
+    a.onclick = function(e) {
+      e.preventDefault();
+      var target = document.getElementById(targetId.slice(1));
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    };
+  });
+
+  panel.appendChild(list);
+
+  // Show chapter progress
+  var chapters = content.querySelectorAll('.epub-chapter');
+  if (chapters.length > 1) {
+    var progress = document.createElement('div');
+    progress.className = 'epub-chapter-progress';
+    progress.id = 'epub-chapter-progress';
+    panel.appendChild(progress);
+  }
+
+  tocContainer.appendChild(panel);
+
+  // Remove the hidden nav from content (already consumed)
+  epubTocNav.remove();
+}
+
+// ---- EPUB Footnote Pop-ups ----
+function setupEpubFootnotes() {
+  var content = document.getElementById('content');
+  if (!content) return;
+
+  // Find all noteref links
+  var noterefs = content.querySelectorAll('[data-epub-type="noteref"]');
+  noterefs.forEach(function(ref) {
+    ref.classList.add('epub-noteref');
+    ref.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Remove any existing popup
+      var existing = document.querySelector('.epub-footnote-popup');
+      if (existing) existing.remove();
+
+      // Find the footnote target
+      var href = ref.getAttribute('href');
+      if (!href || !href.startsWith('#')) return;
+      var target = document.getElementById(href.slice(1));
+      if (!target) return;
+
+      // Create popup
+      var popup = document.createElement('div');
+      popup.className = 'epub-footnote-popup';
+
+      var popupContent = document.createElement('div');
+      popupContent.className = 'epub-footnote-popup-content';
+      popupContent.innerHTML = sanitizeHtml(target.innerHTML);
+
+      var closeBtn = document.createElement('button');
+      closeBtn.className = 'epub-footnote-close';
+      closeBtn.innerHTML = '&times;';
+      closeBtn.setAttribute('aria-label', 'Close footnote');
+      closeBtn.onclick = function() { popup.remove(); };
+
+      popup.appendChild(closeBtn);
+      popup.appendChild(popupContent);
+
+      // Position the popup near the reference
+      var rect = ref.getBoundingClientRect();
+      var pane = document.getElementById('content-pane');
+      var paneRect = pane.getBoundingClientRect();
+      popup.style.position = 'absolute';
+
+      // Insert into content-pane for proper scrolling
+      pane.appendChild(popup);
+
+      // Position below the reference, centered
+      var popupTop = rect.bottom - paneRect.top + pane.scrollTop + 8;
+      var popupLeft = Math.max(16, rect.left - paneRect.left - 100);
+      // Keep within pane bounds
+      popup.style.top = popupTop + 'px';
+      popup.style.left = popupLeft + 'px';
+      popup.style.maxWidth = Math.min(500, paneRect.width - 32) + 'px';
+
+      // Dismiss on click outside
+      function dismiss(ev) {
+        if (!popup.contains(ev.target) && ev.target !== ref) {
+          popup.remove();
+          document.removeEventListener('click', dismiss);
+        }
+      }
+      setTimeout(function() { document.addEventListener('click', dismiss); }, 0);
+
+      // Dismiss on Escape
+      function dismissKey(ev) {
+        if (ev.key === 'Escape') {
+          popup.remove();
+          document.removeEventListener('keydown', dismissKey);
+        }
+      }
+      document.addEventListener('keydown', dismissKey);
+    });
+  });
+
+  // Visually de-emphasize footnote/endnote sections (they show as popups)
+  content.querySelectorAll('[data-epub-type="footnote"], [data-epub-type="endnote"], [data-epub-type="rearnote"]').forEach(function(el) {
+    el.classList.add('epub-footnote-section');
   });
 }
 
