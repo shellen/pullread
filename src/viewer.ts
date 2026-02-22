@@ -815,8 +815,11 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
     if (url.pathname === '/api/sync-status' && req.method === 'GET') {
       const config = loadJsonFile(join(homedir(), '.config', 'pullread', 'feeds.json')) as Record<string, unknown>;
       const syncInterval = (config as any).syncInterval || '1h';
-      const intervals: Record<string, number> = { '30m': 30, '1h': 60, '4h': 240, '12h': 720 };
-      const minutes = intervals[syncInterval as string] || null;
+      let minutes: number | null = null;
+      const mMatch = String(syncInterval).match(/^(\d+)m$/);
+      const hMatch = String(syncInterval).match(/^(\d+)h$/);
+      if (mMatch) minutes = parseInt(mMatch[1], 10);
+      else if (hMatch) minutes = parseInt(hMatch[1], 10) * 60;
 
       // Check last sync from file mtime
       const outputFiles = existsSync(outputPath) ? readdirSync(outputPath).filter(f => f.endsWith('.md')) : [];

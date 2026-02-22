@@ -225,6 +225,12 @@
     display: flex;
     gap: 4px;
     align-items: center;
+    flex-wrap: wrap;
+  }
+  .settings-dropdown-panel .setting-row > button[data-setting] {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
   }
   .settings-dropdown-panel button {
     background: var(--bg);
@@ -3510,7 +3516,7 @@
     color: var(--fg);
   }
   .settings-btn-group {
-    display: flex; gap: 4px;
+    display: flex; gap: 4px; flex-wrap: wrap;
   }
   .settings-btn-group button {
     border: 1px solid var(--border); border-radius: 6px;

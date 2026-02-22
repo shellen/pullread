@@ -136,6 +136,20 @@ function settingsActivateBtn(container, hiddenId, val) {
   }
 }
 
+function settingsSyncPreset(btn, val) {
+  settingsBtnSelect(btn, 'sp-sync-interval', val);
+  var custom = document.getElementById('sp-sync-custom');
+  if (custom) custom.value = '';
+}
+
+function settingsSyncCustom(val) {
+  val = val.trim();
+  var hidden = document.getElementById('sp-sync-interval');
+  if (hidden) hidden.value = val || 'manual';
+  var presets = document.getElementById('sp-sync-presets');
+  if (presets) presets.querySelectorAll('button').forEach(function(b) { b.classList.remove('active'); });
+}
+
 function settingsBtnSelect(btn, hiddenId, val) {
   var hidden = document.getElementById(hiddenId);
   if (hidden) hidden.value = val;
@@ -402,10 +416,15 @@ function showSettingsPage(scrollToSection) {
       // Sync interval
       h += '<div class="settings-row"><div><label>Auto-sync</label><div class="settings-desc">How often to check for new articles</div></div>';
       var intervals = [['30m','30min'],['1h','1h'],['4h','4h'],['12h','12h'],['manual','Manual']];
-      h += '<div class="settings-btn-group">';
+      var syncIsPreset = intervals.some(function(p) { return p[0] === cfg.syncInterval; });
+      var syncCustom = !syncIsPreset && cfg.syncInterval ? cfg.syncInterval : '';
+      h += '<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">';
+      h += '<div class="settings-btn-group" id="sp-sync-presets">';
       for (var ii = 0; ii < intervals.length; ii++) {
-        h += '<button data-val="' + intervals[ii][0] + '" class="' + (cfg.syncInterval === intervals[ii][0] ? 'active' : '') + '" onclick="settingsBtnSelect(this,\'sp-sync-interval\',\'' + intervals[ii][0] + '\')">' + intervals[ii][1] + '</button>';
+        h += '<button data-val="' + intervals[ii][0] + '" class="' + (cfg.syncInterval === intervals[ii][0] ? 'active' : '') + '" onclick="settingsSyncPreset(this,\'' + intervals[ii][0] + '\')">' + intervals[ii][1] + '</button>';
       }
+      h += '</div>';
+      h += '<input type="text" id="sp-sync-custom" value="' + escapeHtml(syncCustom) + '" placeholder="e.g. 2h" style="width:52px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:12px;font-family:inherit;text-align:center" oninput="settingsSyncCustom(this.value)">';
       h += '</div><input type="hidden" id="sp-sync-interval" value="' + escapeHtml(cfg.syncInterval || '1h') + '">';
       h += '</div>';
 

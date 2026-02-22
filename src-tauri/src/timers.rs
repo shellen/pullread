@@ -15,12 +15,9 @@ fn start_sync_timer(app: &AppHandle) {
     let state = app.state::<sidecar::SidecarState>();
     let interval_str = state.get_sync_interval();
 
-    let duration = match interval_str.as_str() {
-        "30m" => std::time::Duration::from_secs(30 * 60),
-        "1h" => std::time::Duration::from_secs(60 * 60),
-        "4h" => std::time::Duration::from_secs(4 * 60 * 60),
-        "12h" => std::time::Duration::from_secs(12 * 60 * 60),
-        "manual" | _ => return, // No automatic sync
+    let duration = match parse_interval(&interval_str) {
+        Some(d) => d,
+        None => return, // "manual" or unparseable — no automatic sync
     };
 
     log::info!("Starting sync timer: every {}", interval_str);
@@ -88,4 +85,20 @@ fn start_review_timer(app: &AppHandle) {
             }
         }
     });
+}
+
+/// Parse interval strings like "30m", "1h", "4h", "90m" into a Duration.
+/// Returns None for "manual" or unparseable values.
+fn parse_interval(s: &str) -> Option<std::time::Duration> {
+    let s = s.trim();
+    if s == "manual" || s.is_empty() {
+        return None;
+    }
+    if let Some(mins) = s.strip_suffix('m') {
+        mins.parse::<u64>().ok().filter(|&n| n > 0).map(|n| std::time::Duration::from_secs(n * 60))
+    } else if let Some(hrs) = s.strip_suffix('h') {
+        hrs.parse::<u64>().ok().filter(|&n| n > 0).map(|n| std::time::Duration::from_secs(n * 3600))
+    } else {
+        None
+    }
 }
