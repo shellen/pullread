@@ -376,11 +376,7 @@ function showSettingsPage(scrollToSection) {
   html += '<div><h2 style="margin:0">Pull Read</h2>';
   html += '<div style="color:var(--muted);font-size:13px;margin-top:2px">Sync articles to searchable markdown files.</div></div>';
   html += '</div>';
-  html += '<div class="settings-row"><label>Version</label><span id="sp-version" style="color:var(--muted);font-size:13px">Checking\u2026</span></div>';
-  html += '<div class="settings-row" style="gap:12px">';
-  html += '<button id="sp-check-updates-btn" style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer" onclick="settingsCheckForUpdates()">Check for Updates</button>';
-  html += '<span id="sp-update-status" style="font-size:12px;color:var(--muted);align-self:center"></span>';
-  html += '</div>';
+  html += '<div class="settings-row"><label>Version</label><span id="sp-version" style="color:var(--muted);font-size:13px"></span></div>';
   html += '<div class="settings-row" style="gap:12px">';
   html += '<a href="https://pullread.com" target="_blank" rel="noopener" style="font-size:13px;color:var(--link)">pullread.com</a>';
   html += '<a href="/api/log" target="_blank" style="font-size:13px;color:var(--link)">View Logs</a>';
@@ -728,27 +724,6 @@ function settingsPageSaveTimeFormat() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ timeFormat: fmt }),
-  });
-}
-
-function settingsCheckForUpdates() {
-  var btn = document.getElementById('sp-check-updates-btn');
-  var status = document.getElementById('sp-update-status');
-  if (btn) btn.disabled = true;
-  if (status) status.textContent = 'Checking\u2026';
-  fetch('/api/check-updates').then(function(r) { return r.json(); }).then(function(data) {
-    if (btn) btn.disabled = false;
-    if (!status) return;
-    if (data.error) {
-      status.textContent = data.error;
-    } else if (data.updateAvailable) {
-      status.innerHTML = 'v' + escapeHtml(data.latestVersion) + ' available \u2014 <a href="' + escapeHtml(data.releaseUrl) + '" target="_blank" style="color:var(--link)">View release</a>';
-    } else {
-      status.textContent = 'You\u2019re up to date.';
-    }
-  }).catch(function() {
-    if (btn) btn.disabled = false;
-    if (status) status.textContent = 'Could not check for updates.';
   });
 }
 
