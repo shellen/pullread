@@ -4,6 +4,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { mkdirSync } from 'fs';
+import { resolveFilePath } from './writer';
 
 export interface ProcessedEntry {
   url: string;
@@ -64,7 +65,7 @@ export class Storage {
 
     // If the entry was successful and we know the output path, verify the file still exists
     if (entry.status === 'success' && entry.outputFile && this.outputPath) {
-      const filePath = join(this.outputPath, entry.outputFile);
+      const filePath = resolveFilePath(this.outputPath, entry.outputFile);
       if (!existsSync(filePath)) {
         // Output file was deleted — clear the entry so it gets re-synced
         delete this.data.entries[url];

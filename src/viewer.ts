@@ -11,7 +11,7 @@ import { summarizeText, loadLLMConfig, saveLLMConfig, loadLLMSettings, saveLLMSe
 import { autotagText, autotagBatch, saveMachineTags, hasMachineTags, migrateDashedTags } from './autotagger';
 import { APP_ICON } from './app-icon';
 import { fetchAndExtract } from './extractor';
-import { generateMarkdown, writeArticle, ArticleData, downloadFavicon } from './writer';
+import { generateMarkdown, writeArticle, ArticleData, downloadFavicon, resolveFilePath, listMarkdownFiles, migrateToDateFolders, exportNotebook, removeExportedNotebook } from './writer';
 import { loadTTSConfig, saveTTSConfig, generateSpeech, getAudioContentType, getKokoroStatus, preloadKokoro, getCachedAudioPath, createTtsSession, generateSessionChunk, TTS_VOICES, TTS_MODELS } from './tts';
 import { listSiteLogins, removeSiteLogin, saveSiteLoginCookies } from './cookies';
 
@@ -53,11 +53,10 @@ function listFiles(outputPath: string): FileMeta[] {
   if (!existsSync(outputPath)) return [];
 
   const files: FileMeta[] = [];
-  const entries = readdirSync(outputPath);
+  const allPaths = listMarkdownFiles(outputPath);
 
-  for (const name of entries) {
-    if (extname(name) !== '.md') continue;
-    const fullPath = join(outputPath, name);
+  for (const fullPath of allPaths) {
+    const name = require('path').basename(fullPath);
     try {
       const stat = statSync(fullPath);
       if (!stat.isFile()) continue;
@@ -262,12 +261,18 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
   // Watch output directory for .md file changes
   let filesChangedAt = Date.now();
   try {
-    watch(outputPath, (event, filename) => {
+    watch(outputPath, { recursive: true }, (event, filename) => {
       if (filename && filename.endsWith('.md')) {
         filesChangedAt = Date.now();
       }
     });
   } catch {}
+
+  // Move flat dated articles into YYYY/MM/ subfolders
+  const migrated = migrateToDateFolders(outputPath);
+  if (migrated > 0) {
+    console.log(`[Storage] Migrated ${migrated} articles to dated folders`);
+  }
 
   // Normalize any legacy dashed machine tags
   migrateDashedTags();
@@ -449,8 +454,8 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         send404(res);
         return;
       }
-      const filePath = join(outputPath, filename);
-      if (!existsSync(filePath)) {
+      const filePath = resolveFilePath(outputPath, filename);
+      if (!filePath.startsWith(outputPath) || !existsSync(filePath)) {
         send404(res);
         return;
       }
@@ -562,6 +567,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
             updatedAt: new Date().toISOString(),
           };
           saveJsonFile(NOTEBOOKS_PATH, all);
+          try { exportNotebook(outputPath, all[id]); } catch {}
           sendJson(res, { ok: true, id });
         } catch {
           res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -577,6 +583,10 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
           return;
         }
         const all = loadJsonFile(NOTEBOOKS_PATH) as Record<string, any>;
+        const notebook = all[id];
+        if (notebook) {
+          try { removeExportedNotebook(outputPath, notebook); } catch {}
+        }
         delete all[id];
         saveJsonFile(NOTEBOOKS_PATH, all);
         sendJson(res, { ok: true });
@@ -861,12 +871,12 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
       else if (hMatch) minutes = parseInt(hMatch[1], 10) * 60;
 
       // Check last sync from file mtime
-      const outputFiles = existsSync(outputPath) ? readdirSync(outputPath).filter(f => f.endsWith('.md')) : [];
+      const outputFiles = listMarkdownFiles(outputPath);
       let lastSyncFile = null;
       let latestMtime = 0;
       for (const f of outputFiles.slice(-20)) {
         try {
-          const mt = statSync(join(outputPath, f)).mtimeMs;
+          const mt = statSync(f).mtimeMs;
           if (mt > latestMtime) { latestMtime = mt; lastSyncFile = f; }
         } catch {}
       }
@@ -875,7 +885,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         syncInterval,
         intervalMinutes: minutes,
         lastActivity: latestMtime > 0 ? new Date(latestMtime).toISOString() : null,
-        articleCount: outputFiles.length
+        articleCount: outputFiles.length,
       });
       return;
     }
@@ -988,7 +998,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
           return;
         }
 
-        const filePath = join(outputPath, name);
+        const filePath = resolveFilePath(outputPath, name);
         if (!existsSync(filePath)) {
           send404(res);
           return;
@@ -1056,7 +1066,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
 
         let articleText = text;
         if (!articleText && name) {
-          const filePath = join(outputPath, name);
+          const filePath = resolveFilePath(outputPath, name);
           if (!existsSync(filePath)) {
             send404(res);
             return;
@@ -1080,7 +1090,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
 
         // If summarized by filename, write the summary into the markdown frontmatter
         if (name) {
-          writeSummaryToFile(join(outputPath, name), result.summary, provider, result.model);
+          writeSummaryToFile(resolveFilePath(outputPath, name), result.summary, provider, result.model);
         }
 
         sendJson(res, { summary: result.summary, model: result.model, provider });
@@ -1120,7 +1130,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
           return;
         }
 
-        const filePath = join(outputPath, name);
+        const filePath = resolveFilePath(outputPath, name);
         const result = await reprocessFile(filePath);
         if (result.ok) {
           sendJson(res, { ok: true, title: result.title });
@@ -1145,18 +1155,19 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         'Connection': 'keep-alive',
       });
 
-      const allFiles = existsSync(outputPath) ? readdirSync(outputPath).filter(f => f.endsWith('.md')) : [];
+      const allFilePaths = listMarkdownFiles(outputPath);
 
       // Parse frontmatter to get URLs; skip files without a source URL
-      const filesWithUrls: { name: string; domain: string }[] = [];
-      for (const name of allFiles) {
+      const filesWithUrls: { name: string; fullPath: string; domain: string }[] = [];
+      for (const fullPath of allFilePaths) {
+        const name = require('path').basename(fullPath);
         try {
-          const content = readFileSync(join(outputPath, name), 'utf-8');
+          const content = readFileSync(fullPath, 'utf-8');
           const meta = parseFrontmatter(content);
           if (meta.url) {
             let domain = '';
             try { domain = new URL(meta.url).hostname; } catch {}
-            filesWithUrls.push({ name, domain });
+            filesWithUrls.push({ name, fullPath, domain });
           }
         } catch {}
       }
@@ -1170,7 +1181,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
       let lastDomain = '';
 
       for (let i = 0; i < filesWithUrls.length; i++) {
-        const { name, domain } = filesWithUrls[i];
+        const { name, fullPath, domain } = filesWithUrls[i];
 
         // 1-second delay between requests to the same host
         if (domain && domain === lastDomain) {
@@ -1178,7 +1189,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         }
         lastDomain = domain;
 
-        const result = await reprocessFile(join(outputPath, name));
+        const result = await reprocessFile(fullPath);
         const done = i + 1;
 
         if (result.ok) {
@@ -1254,7 +1265,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
           return;
         }
 
-        const filePath = join(outputPath, name);
+        const filePath = resolveFilePath(outputPath, name);
         if (!existsSync(filePath)) {
           send404(res);
           return;
@@ -1311,7 +1322,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
           return;
         }
         const config = loadTTSConfig();
-        const filePath = join(outputPath, name);
+        const filePath = resolveFilePath(outputPath, name);
         if (!existsSync(filePath)) { send404(res); return; }
 
         const content = readFileSync(filePath, 'utf-8');
@@ -1348,7 +1359,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
           return;
         }
 
-        const filePath = join(outputPath, name);
+        const filePath = resolveFilePath(outputPath, name);
         if (!existsSync(filePath)) {
           send404(res);
           return;

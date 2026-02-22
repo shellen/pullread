@@ -2,7 +2,7 @@
 // ABOUTME: Verifies URL tracking and status management
 
 import { Storage } from './storage';
-import { existsSync, unlinkSync, writeFileSync, mkdirSync, rmdirSync } from 'fs';
+import { existsSync, unlinkSync, writeFileSync, mkdirSync, rmdirSync, rmSync } from 'fs';
 import { join } from 'path';
 
 const TEST_DB = '/tmp/pullread-test.db';
@@ -14,11 +14,7 @@ function cleanup() {
   if (existsSync(jsonPath)) unlinkSync(jsonPath);
   if (existsSync(TEST_DB)) unlinkSync(TEST_DB);
   // Clean up test output dir
-  try {
-    const files = require('fs').readdirSync(TEST_OUTPUT);
-    for (const f of files) unlinkSync(join(TEST_OUTPUT, f));
-    rmdirSync(TEST_OUTPUT);
-  } catch {}
+  try { rmSync(TEST_OUTPUT, { recursive: true, force: true }); } catch {}
 }
 
 describe('Storage', () => {
@@ -109,6 +105,27 @@ describe('Storage', () => {
 
     // File gone — should no longer be considered processed
     expect(storage.isProcessed('https://example.com/article')).toBe(false);
+    storage.close();
+  });
+
+  test('isProcessed finds file in dated subfolder', () => {
+    mkdirSync(TEST_OUTPUT, { recursive: true });
+    const outputFile = '2024-01-29-test-article.md';
+    // File is in dated subfolder, not root
+    const subdir = join(TEST_OUTPUT, '2024', '01');
+    mkdirSync(subdir, { recursive: true });
+    writeFileSync(join(subdir, outputFile), '# Test');
+
+    const storage = new Storage(TEST_DB, TEST_OUTPUT);
+    storage.markProcessed({
+      url: 'https://example.com/dated-article',
+      title: 'Test Article',
+      bookmarkedAt: '2024-01-29T12:00:00Z',
+      outputFile
+    });
+
+    // File exists in dated subfolder — should be processed
+    expect(storage.isProcessed('https://example.com/dated-article')).toBe(true);
     storage.close();
   });
 
