@@ -217,6 +217,7 @@ function openNoteInPane(noteId) {
   html += '<button onclick="toggleNotebookPreview()" class="' + (_notebookPreviewMode ? 'active-fav' : '') + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-pen"/></svg> ' + previewLabel + '</button>';
   html += '<button onclick="toggleWritingFocus()" class="' + (_writingFocusActive ? 'active-fav' : '') + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-focus"/></svg> Focus</button>';
   html += '<button onclick="showHighlightPicker()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-pen"/></svg> Insert Highlights</button>';
+  html += '<button onclick="toggleNotebookVoice(this)" id="nb-voice-btn" title="Dictate note"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-mic"/></svg> Dictate</button>';
   html += '<button onclick="checkNotebookGrammar()" id="grammar-check-btn"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Grammar</button>';
   html += '<div class="share-dropdown" style="display:inline-block"><button onclick="toggleNotebookExportDropdown(event)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg> Export\u2026</button></div>';
   html += '<button class="note-delete-btn" onclick="confirmDeleteNote(\'' + escapeHtml(note.id) + '\')" title="Delete note"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-xmark"/></svg> Delete</button>';
@@ -688,6 +689,75 @@ function applyGrammarFix(offset, length, replacement) {
   updateGrammarMirror(ta, []);
   clearTimeout(_grammarDebounceTimeout);
   _grammarDebounceTimeout = setTimeout(function() { runInlineGrammar(ta); }, 500);
+}
+
+// ---- Voice Dictation for Notebook Notes ----
+let _nbVoiceRecognition = null;
+
+function toggleNotebookVoice(btn) {
+  if (_nbVoiceRecognition) {
+    _nbVoiceRecognition.stop();
+    return;
+  }
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    alert('Speech recognition is not supported in this browser. Try Chrome or Safari.');
+    return;
+  }
+
+  const ta = document.querySelector('.note-page .notebook-editor textarea');
+  if (!ta) return;
+
+  const recognition = new SpeechRecognition();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = navigator.language || 'en-US';
+
+  let finalTranscript = '';
+  const originalText = ta.value;
+
+  recognition.onstart = function() {
+    _nbVoiceRecognition = recognition;
+    btn.classList.add('recording');
+    btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-stop"/></svg> Stop';
+  };
+
+  recognition.onresult = function(event) {
+    finalTranscript = '';
+    let interim = '';
+    for (let i = 0; i < event.results.length; i++) {
+      if (event.results[i].isFinal) {
+        finalTranscript += event.results[i][0].transcript;
+      } else {
+        interim += event.results[i][0].transcript;
+      }
+    }
+    const separator = originalText && !originalText.endsWith('\n') && !originalText.endsWith(' ') ? '\n' : '';
+    ta.value = originalText + (finalTranscript || interim ? separator : '') + finalTranscript + interim;
+    ta.scrollTop = ta.scrollHeight;
+    autoGrowTextarea(ta);
+  };
+
+  recognition.onend = function() {
+    _nbVoiceRecognition = null;
+    btn.classList.remove('recording');
+    btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-mic"/></svg> Dictate';
+    if (finalTranscript.trim()) {
+      notebookDebounceSave();
+    }
+  };
+
+  recognition.onerror = function(event) {
+    if (event.error === 'not-allowed') {
+      alert('Microphone access was denied. Please allow microphone access in your browser settings.');
+    }
+    _nbVoiceRecognition = null;
+    btn.classList.remove('recording');
+    btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-mic"/></svg> Dictate';
+  };
+
+  recognition.start();
 }
 
 function openNotebookEditor(id) {
