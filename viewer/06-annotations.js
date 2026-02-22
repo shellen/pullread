@@ -445,7 +445,14 @@ function editHighlightNote(id, e) {
   `;
   popover.onclick = function(ev) { ev.stopPropagation(); };
   pane.appendChild(popover);
-  popover.querySelector('textarea').focus();
+  var ta = popover.querySelector('textarea');
+  ta.addEventListener('keydown', function(ev) {
+    if (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey || !ev.shiftKey)) {
+      ev.preventDefault();
+      saveHighlightNote(id, popover.querySelector('.primary'));
+    }
+  });
+  ta.focus();
 }
 
 function saveHighlightNote(id, btn) {
@@ -538,7 +545,14 @@ function addInlineNote() {
   `;
   popover.onclick = function(e) { e.stopPropagation(); };
   pane.appendChild(popover);
-  popover.querySelector('textarea').focus();
+  var ta = popover.querySelector('textarea');
+  ta.addEventListener('keydown', function(ev) {
+    if (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey || !ev.shiftKey)) {
+      ev.preventDefault();
+      saveInlineNote(popover.querySelector('.primary'));
+    }
+  });
+  ta.focus();
   sel.removeAllRanges();
 }
 
@@ -587,6 +601,15 @@ function showAnnotationPopover(e, ann) {
   `;
   popover.onclick = function(e) { e.stopPropagation(); };
   pane.appendChild(popover);
+  var ta = popover.querySelector('textarea');
+  if (ta) {
+    ta.addEventListener('keydown', function(ev) {
+      if (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey || !ev.shiftKey)) {
+        ev.preventDefault();
+        updateAnnotation(ann.id, popover.querySelector('.primary'));
+      }
+    });
+  }
 }
 
 function deleteAnnotation(id) {
