@@ -150,6 +150,8 @@ function openNotebookInPane(id) {
   const nb = _notebooks[id];
   if (!nb) return;
   activeFile = null;
+  var toc = document.getElementById('toc-container');
+  if (toc) toc.innerHTML = '';
   _activeNotebook = nb;
   if (!nb.notes) nb.notes = [];
 
@@ -188,6 +190,8 @@ function openNoteInPane(noteId) {
   empty.style.display = 'none';
   content.style.display = 'block';
   document.getElementById('margin-notes').innerHTML = '';
+  var toc = document.getElementById('toc-container');
+  if (toc) toc.innerHTML = '';
 
   var nb = _activeNotebook;
   var firstLine = (note.content || '').split('\n')[0].replace(/^#+\s*/, '').trim() || 'Untitled Note';

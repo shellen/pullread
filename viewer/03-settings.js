@@ -250,6 +250,8 @@ function showSettingsPage(scrollToSection) {
   content.style.display = 'block';
   document.title = 'Settings — PullRead';
   document.getElementById('margin-notes').innerHTML = '';
+  var toc = document.getElementById('toc-container');
+  if (toc) toc.innerHTML = '';
   updateSidebarActiveState(prevActive);
 
   var currentTheme = document.body.getAttribute('data-theme') || 'light';
