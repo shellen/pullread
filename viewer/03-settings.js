@@ -74,19 +74,8 @@ function toggleSettingsDropdown() {
       <button data-setting="theme" data-val="high-contrast" onclick="setTheme('high-contrast');updateDropdownState()" ${currentTheme==='high-contrast'?'class="active"':''} title="High contrast">Hi-Con</button>
     </div>
     <label>Font</label>
-    <div class="setting-row">
-      <select onchange="setFont(this.value)" id="font-select" aria-label="Font family">
-        <option value="serif" ${currentFont==='serif'?'selected':''}>Serif</option>
-        <option value="sans" ${currentFont==='sans'?'selected':''}>Sans-serif</option>
-        <option value="system" ${currentFont==='system'?'selected':''}>Charter</option>
-        <option value="mono" ${currentFont==='mono'?'selected':''}>Monospace</option>
-        <option value="inter" ${currentFont==='inter'?'selected':''}>Inter</option>
-        <option value="lora" ${currentFont==='lora'?'selected':''}>Lora</option>
-        <option value="literata" ${currentFont==='literata'?'selected':''}>Literata</option>
-        <option value="source-serif" ${currentFont==='source-serif'?'selected':''}>Source Serif</option>
-        <option value="work-sans" ${currentFont==='work-sans'?'selected':''}>Work Sans</option>
-        <option value="opendyslexic" ${currentFont==='opendyslexic'?'selected':''}>OpenDyslexic</option>
-      </select>
+    <div class="setting-row" style="position:relative">
+      <button onclick="toggleFontPicker()" id="aa-font-picker" style="flex:1;text-align:left;display:flex;justify-content:space-between;align-items:center">${_fontLabels[currentFont]||'Serif'} <span style="opacity:0.5">\u25BE</span></button>
     </div>
     <label>Size</label>
     <div class="setting-row">
@@ -98,28 +87,22 @@ function toggleSettingsDropdown() {
     </div>
     <label>Line height</label>
     <div class="setting-row">
-      <select onchange="setLineHeight(this.value)" aria-label="Line height">
-        <option value="default" ${currentLeading==='default'?'selected':''}>Default</option>
-        <option value="compact" ${currentLeading==='compact'?'selected':''}>Compact</option>
-        <option value="relaxed" ${currentLeading==='relaxed'?'selected':''}>Relaxed</option>
-        <option value="loose" ${currentLeading==='loose'?'selected':''}>Loose</option>
-      </select>
+      <button data-setting="leading" data-val="default" onclick="setLineHeight('default');updateDropdownState()" ${currentLeading==='default'?'class="active"':''}>Default</button>
+      <button data-setting="leading" data-val="compact" onclick="setLineHeight('compact');updateDropdownState()" ${currentLeading==='compact'?'class="active"':''}>Compact</button>
+      <button data-setting="leading" data-val="relaxed" onclick="setLineHeight('relaxed');updateDropdownState()" ${currentLeading==='relaxed'?'class="active"':''}>Relaxed</button>
+      <button data-setting="leading" data-val="loose" onclick="setLineHeight('loose');updateDropdownState()" ${currentLeading==='loose'?'class="active"':''}>Loose</button>
     </div>
     <label>Letter spacing</label>
     <div class="setting-row">
-      <select onchange="setSpacing(this.value)" aria-label="Letter spacing">
-        <option value="default" ${currentSpacing==='default'?'selected':''}>Default</option>
-        <option value="wide" ${currentSpacing==='wide'?'selected':''}>Wide</option>
-        <option value="wider" ${currentSpacing==='wider'?'selected':''}>Wider</option>
-      </select>
+      <button data-setting="spacing" data-val="default" onclick="setSpacing('default');updateDropdownState()" ${currentSpacing==='default'?'class="active"':''}>Default</button>
+      <button data-setting="spacing" data-val="wide" onclick="setSpacing('wide');updateDropdownState()" ${currentSpacing==='wide'?'class="active"':''}>Wide</button>
+      <button data-setting="spacing" data-val="wider" onclick="setSpacing('wider');updateDropdownState()" ${currentSpacing==='wider'?'class="active"':''}>Wider</button>
     </div>
     <label>Content width</label>
     <div class="setting-row">
-      <select onchange="setWidth(this.value)" aria-label="Content width">
-        <option value="narrow" ${currentWidth==='narrow'?'selected':''}>Narrow</option>
-        <option value="default" ${currentWidth==='default'?'selected':''}>Default</option>
-        <option value="wide" ${currentWidth==='wide'?'selected':''}>Wide</option>
-      </select>
+      <button data-setting="width" data-val="narrow" onclick="setWidth('narrow');updateDropdownState()" ${currentWidth==='narrow'?'class="active"':''}>Narrow</button>
+      <button data-setting="width" data-val="default" onclick="setWidth('default');updateDropdownState()" ${currentWidth==='default'?'class="active"':''}>Default</button>
+      <button data-setting="width" data-val="wide" onclick="setWidth('wide');updateDropdownState()" ${currentWidth==='wide'?'class="active"':''}>Wide</button>
     </div>
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0 8px">
     <div class="setting-row">
@@ -130,19 +113,86 @@ function toggleSettingsDropdown() {
   btn.setAttribute('aria-expanded', 'true');
 }
 
+var _fontLabels = {serif:'Serif',sans:'Sans-serif',system:'Charter',mono:'Monospace',inter:'Inter',lora:'Lora',literata:'Literata','source-serif':'Source Serif','work-sans':'Work Sans',opendyslexic:'OpenDyslexic'};
+var _fontOptions = [['serif','Serif'],['sans','Sans-serif'],['system','Charter'],['mono','Monospace'],['inter','Inter'],['lora','Lora'],['literata','Literata'],['source-serif','Source Serif'],['work-sans','Work Sans'],['opendyslexic','OpenDyslexic']];
+
+function toggleFontPicker() {
+  var current = localStorage.getItem('pr-font') || 'serif';
+  settingsCustomSelect('aa-font-picker', _fontOptions, current, function(v) {
+    setFont(v);
+    var btn = document.getElementById('aa-font-picker');
+    if (btn) btn.firstChild.textContent = _fontLabels[v] || v;
+  });
+}
+
+function settingsActivateBtn(container, hiddenId, val) {
+  var hidden = document.getElementById(hiddenId);
+  if (hidden) hidden.value = val;
+  var group = hidden ? hidden.previousElementSibling : null;
+  if (group && group.classList.contains('settings-btn-group')) {
+    group.querySelectorAll('button').forEach(function(b) {
+      b.classList.toggle('active', b.getAttribute('data-val') === val);
+    });
+  }
+}
+
+function settingsBtnSelect(btn, hiddenId, val) {
+  var hidden = document.getElementById(hiddenId);
+  if (hidden) hidden.value = val;
+  btn.parentNode.querySelectorAll('button').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+}
+
+function settingsCustomSelect(btnId, options, currentVal, onSelect) {
+  var existing = document.getElementById(btnId + '-panel');
+  if (existing) { existing.remove(); return; }
+  var btn = document.getElementById(btnId);
+  if (!btn) return;
+  var panel = document.createElement('div');
+  panel.id = btnId + '-panel';
+  panel.className = 'settings-select-panel';
+  panel.style.position = 'absolute';
+  panel.style.top = (btn.offsetHeight + 2) + 'px';
+  panel.style.left = '0';
+  panel.style.right = '0';
+  for (var i = 0; i < options.length; i++) {
+    var opt = document.createElement('button');
+    opt.textContent = options[i][1];
+    opt.setAttribute('data-val', options[i][0]);
+    if (options[i][0] === currentVal) opt.className = 'active';
+    opt.onclick = (function(val) {
+      return function() {
+        onSelect(val);
+        var p = document.getElementById(btnId + '-panel');
+        if (p) p.remove();
+      };
+    })(options[i][0]);
+    panel.appendChild(opt);
+  }
+  btn.parentNode.appendChild(panel);
+  var closeHandler = function(e) {
+    if (!panel.contains(e.target) && e.target !== btn) {
+      panel.remove();
+      document.removeEventListener('click', closeHandler);
+    }
+  };
+  setTimeout(function() { document.addEventListener('click', closeHandler); }, 0);
+}
+
 function updateDropdownState() {
   const panel = document.querySelector('.settings-dropdown-panel');
   if (!panel) return;
   const currentTheme = document.body.getAttribute('data-theme') || 'light';
   const currentSize = localStorage.getItem('pr-size') || 'medium';
-  // Update theme buttons
-  panel.querySelectorAll('[data-setting="theme"]').forEach(b =>
-    b.classList.toggle('active', b.getAttribute('data-val') === currentTheme)
-  );
-  // Update size buttons
-  panel.querySelectorAll('[data-setting="size"]').forEach(b =>
-    b.classList.toggle('active', b.getAttribute('data-val') === currentSize)
-  );
+  const currentLeading = localStorage.getItem('pr-leading') || 'default';
+  const currentSpacing = localStorage.getItem('pr-spacing') || 'default';
+  const currentWidth = localStorage.getItem('pr-width') || 'default';
+  var settings = {theme: currentTheme, size: currentSize, leading: currentLeading, spacing: currentSpacing, width: currentWidth};
+  for (var key in settings) {
+    panel.querySelectorAll('[data-setting="' + key + '"]').forEach(function(b) {
+      b.classList.toggle('active', b.getAttribute('data-val') === settings[key]);
+    });
+  }
 }
 
 // Close settings dropdown when clicking outside
@@ -192,8 +242,14 @@ function showSettingsPage(scrollToSection) {
   html += '<div class="settings-section" id="settings-breaks">';
   html += '<h2>Reading Breaks</h2>';
   html += '<p style="font-size:13px;color:var(--muted);margin-bottom:16px">Get a gentle reminder to take a break after reading for a while. The reminder suggests a classic book or an activity of your choosing.</p>';
+  var breakOpts = [['0','Off'],['10','10m'],['15','15m'],['20','20m'],['25','25m'],['30','30m']];
   html += '<div class="settings-row"><div><label>Timer interval</label><div class="settings-desc">How long before suggesting a break (Off to disable)</div></div>';
-  html += '<select id="sp-break-interval"></select></div>';
+  html += '<div class="settings-btn-group">';
+  for (var bi = 0; bi < breakOpts.length; bi++) {
+    html += '<button class="' + (breakInterval === breakOpts[bi][0] ? 'active' : '') + '" onclick="settingsBtnSelect(this,\'sp-break-interval\',\'' + breakOpts[bi][0] + '\');localStorage.setItem(\'pr-break-interval\',\'' + breakOpts[bi][0] + '\');_breakSessionStart=0">' + breakOpts[bi][1] + '</button>';
+  }
+  html += '</div><input type="hidden" id="sp-break-interval" value="' + escapeHtml(breakInterval) + '">';
+  html += '</div>';
   html += '<div class="settings-row"><div><label>Activity suggestion</label><div class="settings-desc">Leave blank for random suggestions (walk, stretch, tea\u2026)</div></div>';
   html += '<input type="text" id="sp-break-activity" value="' + escapeHtml(breakActivity) + '" placeholder="e.g. Take a walk, Play guitar, Call a friend" style="min-width:200px" onchange="localStorage.setItem(\'pr-break-activity\',this.value)">';
   html += '</div>';
@@ -204,15 +260,15 @@ function showSettingsPage(scrollToSection) {
   html += '<div class="settings-section" id="settings-viewer-mode" style="display:none">';
   html += '<h2>Open In</h2>';
   html += '<div class="settings-row"><div><label>Viewer window</label><div class="settings-desc">Where PullRead opens when you click View Articles</div></div>';
-  html += '<select id="sp-viewer-mode" onchange="settingsPageSaveViewerMode()">';
-  html += '<option value="app">PullRead window</option>';
-  html += '<option value="browser">Default browser</option>';
-  html += '</select></div>';
+  html += '<div class="settings-btn-group">';
+  html += '<button data-val="app" class="active" onclick="settingsBtnSelect(this,\'sp-viewer-mode\',\'app\');settingsPageSaveViewerMode()">PullRead window</button>';
+  html += '<button data-val="browser" onclick="settingsBtnSelect(this,\'sp-viewer-mode\',\'browser\');settingsPageSaveViewerMode()">Default browser</button>';
+  html += '</div><input type="hidden" id="sp-viewer-mode" value="app"></div>';
   html += '<div class="settings-row"><div><label>Time format</label><div class="settings-desc">How times appear in the menu bar</div></div>';
-  html += '<select id="sp-time-format" onchange="settingsPageSaveTimeFormat()">';
-  html += '<option value="12h">12-hour (2:30 PM)</option>';
-  html += '<option value="24h">24-hour (14:30)</option>';
-  html += '</select></div>';
+  html += '<div class="settings-btn-group">';
+  html += '<button data-val="12h" class="active" onclick="settingsBtnSelect(this,\'sp-time-format\',\'12h\');settingsPageSaveTimeFormat()">12-hour</button>';
+  html += '<button data-val="24h" onclick="settingsBtnSelect(this,\'sp-time-format\',\'24h\');settingsPageSaveTimeFormat()">24-hour</button>';
+  html += '</div><input type="hidden" id="sp-time-format" value="12h"></div>';
   html += '</div>';
 
   // ---- Feeds & Sync section (placeholder, loaded async) ----
@@ -295,23 +351,6 @@ function showSettingsPage(scrollToSection) {
   content.innerHTML = html;
   document.getElementById('content-pane').scrollTop = 0;
 
-  // Populate break interval select via DOM API (avoids innerHTML parsing issues)
-  var breakSel = document.getElementById('sp-break-interval');
-  if (breakSel) {
-    var breakChoices = [['0','Off'],['10','10 min'],['15','15 min'],['20','20 min'],['25','25 min'],['30','30 min']];
-    for (var bci = 0; bci < breakChoices.length; bci++) {
-      var opt = document.createElement('option');
-      opt.value = breakChoices[bci][0];
-      opt.textContent = breakChoices[bci][1];
-      if (breakInterval === breakChoices[bci][0]) opt.selected = true;
-      breakSel.appendChild(opt);
-    }
-    breakSel.onchange = function() {
-      localStorage.setItem('pr-break-interval', this.value);
-      _breakSessionStart = 0;
-    };
-    console.log('[PullRead] Break select options:', breakSel.options.length);
-  }
 
   if (scrollToSection) {
     var target = document.getElementById(scrollToSection);
@@ -322,13 +361,11 @@ function showSettingsPage(scrollToSection) {
   if (serverMode) {
     fetch('/api/settings').then(function(r) { return r.json(); }).then(function(data) {
       var sec = document.getElementById('settings-viewer-mode');
-      var sel = document.getElementById('sp-viewer-mode');
-      if (sec && sel) {
-        sel.value = data.viewerMode || 'app';
+      if (sec) {
         sec.style.display = '';
+        settingsActivateBtn(sec, 'sp-viewer-mode', data.viewerMode || 'app');
+        settingsActivateBtn(sec, 'sp-time-format', data.timeFormat || '12h');
       }
-      var timeSel = document.getElementById('sp-time-format');
-      if (timeSel) timeSel.value = data.timeFormat || '12h';
     }).catch(function() {});
   }
 
@@ -364,12 +401,13 @@ function showSettingsPage(scrollToSection) {
 
       // Sync interval
       h += '<div class="settings-row"><div><label>Auto-sync</label><div class="settings-desc">How often to check for new articles</div></div>';
-      h += '<select id="sp-sync-interval">';
-      var intervals = [['30m','Every 30 min'],['1h','Every hour'],['4h','Every 4 hours'],['12h','Every 12 hours'],['manual','Manual only']];
+      var intervals = [['30m','30min'],['1h','1h'],['4h','4h'],['12h','12h'],['manual','Manual']];
+      h += '<div class="settings-btn-group">';
       for (var ii = 0; ii < intervals.length; ii++) {
-        h += '<option value="' + intervals[ii][0] + '"' + (cfg.syncInterval === intervals[ii][0] ? ' selected' : '') + '>' + intervals[ii][1] + '</option>';
+        h += '<button data-val="' + intervals[ii][0] + '" class="' + (cfg.syncInterval === intervals[ii][0] ? 'active' : '') + '" onclick="settingsBtnSelect(this,\'sp-sync-interval\',\'' + intervals[ii][0] + '\')">' + intervals[ii][1] + '</button>';
       }
-      h += '</select></div>';
+      h += '</div><input type="hidden" id="sp-sync-interval" value="' + escapeHtml(cfg.syncInterval || '1h') + '">';
+      h += '</div>';
 
       // Browser cookies
       h += '<div class="settings-row"><div><label>Chrome Cookies</label><div class="settings-desc">Use Chrome login cookies for paywalled sites (local only)</div></div>';
@@ -378,12 +416,13 @@ function showSettingsPage(scrollToSection) {
 
       // Max age for feed entries
       h += '<div class="settings-row"><div><label>Max article age</label><div class="settings-desc">Skip feed entries older than this (0 = no limit)</div></div>';
-      h += '<select id="sp-max-age">';
-      var ages = [[0,'No limit'],[30,'30 days'],[90,'3 months'],[180,'6 months'],[365,'1 year']];
+      var ages = [[0,'None'],[30,'30d'],[90,'3mo'],[180,'6mo'],[365,'1yr']];
+      h += '<div class="settings-btn-group">';
       for (var ai = 0; ai < ages.length; ai++) {
-        h += '<option value="' + ages[ai][0] + '"' + (cfg.maxAgeDays === ages[ai][0] ? ' selected' : '') + '>' + ages[ai][1] + '</option>';
+        h += '<button data-val="' + ages[ai][0] + '" class="' + (cfg.maxAgeDays === ages[ai][0] ? 'active' : '') + '" onclick="settingsBtnSelect(this,\'sp-max-age\',\'' + ages[ai][0] + '\')">' + ages[ai][1] + '</button>';
       }
-      h += '</select></div>';
+      h += '</div><input type="hidden" id="sp-max-age" value="' + (cfg.maxAgeDays || 0) + '">';
+      h += '</div>';
 
       // Feed list
       var FEED_COLLAPSE_LIMIT = 5;
@@ -476,22 +515,26 @@ function showSettingsPage(scrollToSection) {
         { id: 'openai', label: 'OpenAI — premium' },
         { id: 'elevenlabs', label: 'ElevenLabs — premium' },
       ];
+      var ttsShortLabels = {kokoro:'Kokoro',browser:'Browser',openai:'OpenAI',elevenlabs:'ElevenLabs'};
       var h = '<h2>Voice Playback</h2>';
       h += '<div class="settings-row"><div><label>Provider</label><div class="settings-desc">Choose how articles are read aloud</div></div>';
-      h += '<select id="sp-tts-provider" onchange="settingsPageTTSChanged()">';
+      h += '<div class="settings-btn-group">';
       for (var i = 0; i < providers.length; i++) {
-        h += '<option value="' + providers[i].id + '"' + (data.provider === providers[i].id ? ' selected' : '') + '>' + providers[i].label + '</option>';
+        h += '<button data-val="' + providers[i].id + '" class="' + (data.provider === providers[i].id ? 'active' : '') + '" onclick="settingsBtnSelect(this,\'sp-tts-provider\',\'' + providers[i].id + '\');settingsPageTTSChanged()">' + (ttsShortLabels[providers[i].id] || providers[i].id) + '</button>';
       }
-      h += '</select></div>';
+      h += '</div><input type="hidden" id="sp-tts-provider" value="' + escapeHtml(data.provider || 'kokoro') + '">';
+      h += '</div>';
 
-      // Voice select
+      // Voice picker (custom dropdown)
       if (data.voices) {
-        h += '<div class="settings-row" id="sp-tts-voice-row"><label>Voice</label>';
-        h += '<select id="sp-tts-voice">';
         var prov = data.provider || 'browser';
         var voices = data.voices[prov] || [];
-        h += settingsRenderVoiceOptions(prov, voices, data.voice);
-        h += '</select></div>';
+        var voiceLabel = data.voice || '';
+        for (var vi = 0; vi < voices.length; vi++) { if (voices[vi].id === data.voice) { voiceLabel = voices[vi].label; break; } }
+        h += '<div class="settings-row" id="sp-tts-voice-row" style="position:relative"><label>Voice</label>';
+        h += '<button onclick="toggleTTSVoicePicker()" id="sp-tts-voice-btn" style="flex:1;text-align:left;display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;cursor:pointer;font-family:inherit;min-width:160px">' + escapeHtml(voiceLabel || 'Select voice') + ' <span style="opacity:0.5">\u25BE</span></button>';
+        h += '<input type="hidden" id="sp-tts-voice" value="' + escapeHtml(data.voice || '') + '">';
+        h += '</div>';
       }
 
       // Model / quality select
@@ -507,12 +550,13 @@ function showSettingsPage(scrollToSection) {
           h += '</div>';
         } else {
           h += '<div class="settings-row" id="sp-tts-model-row"><label>Model</label>';
-          h += '<select id="sp-tts-model">';
           var models = data.models[data.provider] || [];
+          h += '<div class="settings-btn-group">';
           for (var mi = 0; mi < models.length; mi++) {
-            h += '<option value="' + models[mi].id + '"' + (data.model === models[mi].id ? ' selected' : '') + '>' + escapeHtml(models[mi].label) + '</option>';
+            h += '<button data-val="' + models[mi].id + '" class="' + (data.model === models[mi].id ? 'active' : '') + '" onclick="settingsBtnSelect(this,\'sp-tts-model\',\'' + models[mi].id + '\')">' + escapeHtml(models[mi].label) + '</button>';
           }
-          h += '</select></div>';
+          h += '</div><input type="hidden" id="sp-tts-model" value="' + escapeHtml(data.model || '') + '">';
+          h += '</div>';
         }
       }
 
@@ -577,14 +621,16 @@ function showSettingsPage(scrollToSection) {
       h += '<p style="font-size:13px;color:var(--muted);margin-bottom:16px">Choose a provider for article summaries and auto-tagging.</p>';
 
       // Default provider selector
+      var llmShortLabels = {apple:'Apple',anthropic:'Claude',openai:'OpenAI',gemini:'Gemini',openrouter:'OpenRouter'};
       h += '<div class="settings-row"><div><label>Provider</label>';
       h += '<div class="settings-desc">Used for summaries and auto-tagging</div></div>';
-      h += '<select id="sp-llm-default" onchange="settingsPageLLMProviderChanged()">';
+      h += '<div class="settings-btn-group">';
       for (var i = 0; i < providerList.length; i++) {
         var p = providerList[i];
-        h += '<option value="' + p.id + '"' + (defaultProv === p.id ? ' selected' : '') + '>' + p.label + '</option>';
+        h += '<button data-val="' + p.id + '" class="' + (defaultProv === p.id ? 'active' : '') + '" onclick="settingsBtnSelect(this,\'sp-llm-default\',\'' + p.id + '\');settingsPageLLMProviderChanged()">' + (llmShortLabels[p.id] || p.id) + '</button>';
       }
-      h += '</select></div>';
+      h += '</div><input type="hidden" id="sp-llm-default" value="' + escapeHtml(defaultProv) + '">';
+      h += '</div>';
 
       // Apple Intelligence section
       h += '<div id="sp-llm-apple-info" style="display:' + (defaultProv === 'apple' ? 'block' : 'none') + ';padding:10px 12px;margin-top:8px;background:color-mix(in srgb, var(--fg) 4%, transparent);border-radius:8px;font-size:12px;color:var(--muted);line-height:1.6">';
@@ -689,31 +735,23 @@ function settingsPageLLMProviderChanged() {
   }
 }
 
-var KOKORO_VOICE_GROUPS = { af: 'American Female', am: 'American Male', bf: 'British Female', bm: 'British Male' };
-function settingsRenderVoiceOptions(provider, voices, selectedVoice) {
-  if (provider !== 'kokoro') {
-    return voices.map(function(v) {
-      return '<option value="' + v.id + '"' + (selectedVoice === v.id ? ' selected' : '') + '>' + escapeHtml(v.label) + '</option>';
-    }).join('');
-  }
-  var groups = {};
-  var order = [];
-  for (var i = 0; i < voices.length; i++) {
-    var prefix = voices[i].id.substring(0, 2);
-    if (!groups[prefix]) { groups[prefix] = []; order.push(prefix); }
-    groups[prefix].push(voices[i]);
-  }
-  var html = '';
-  for (var g = 0; g < order.length; g++) {
-    var key = order[g];
-    html += '<optgroup label="' + (KOKORO_VOICE_GROUPS[key] || key) + '">';
-    for (var j = 0; j < groups[key].length; j++) {
-      var v = groups[key][j];
-      html += '<option value="' + v.id + '"' + (selectedVoice === v.id ? ' selected' : '') + '>' + escapeHtml(v.label) + '</option>';
-    }
-    html += '</optgroup>';
-  }
-  return html;
+
+function toggleTTSVoicePicker() {
+  var sec = document.getElementById('settings-voice');
+  var data = sec ? sec._ttsData : null;
+  if (!data || !data.voices) return;
+  var provider = document.getElementById('sp-tts-provider').value;
+  var voices = data.voices[provider] || [];
+  var current = document.getElementById('sp-tts-voice').value;
+  var options = voices.map(function(v) { return [v.id, v.label]; });
+  settingsCustomSelect('sp-tts-voice-btn', options, current, function(val) {
+    var hidden = document.getElementById('sp-tts-voice');
+    if (hidden) hidden.value = val;
+    var btn = document.getElementById('sp-tts-voice-btn');
+    var label = val;
+    for (var i = 0; i < voices.length; i++) { if (voices[i].id === val) { label = voices[i].label; break; } }
+    if (btn) btn.firstChild.textContent = label;
+  });
 }
 
 function settingsPageTTSChanged() {
@@ -726,13 +764,23 @@ function settingsPageTTSChanged() {
   if (keyRow) keyRow.style.display = isCloud ? 'flex' : 'none';
   if (kokoroStatus) kokoroStatus.style.display = provider === 'kokoro' ? 'block' : 'none';
 
-  // Update voice/model dropdowns
+  // Update voice picker button label
   if (data) {
-    var voiceSelect = document.getElementById('sp-tts-voice');
-    var modelSelect = document.getElementById('sp-tts-model');
-    if (voiceSelect && data.voices && data.voices[provider]) {
-      voiceSelect.innerHTML = settingsRenderVoiceOptions(provider, data.voices[provider], '');
-    } else if (voiceSelect) { voiceSelect.innerHTML = ''; }
+    var voiceBtn = document.getElementById('sp-tts-voice-btn');
+    var voiceHidden = document.getElementById('sp-tts-voice');
+    if (voiceBtn && data.voices && data.voices[provider]) {
+      var voices = data.voices[provider];
+      var firstVoice = voices.length > 0 ? voices[0] : null;
+      if (firstVoice) {
+        if (voiceHidden) voiceHidden.value = firstVoice.id;
+        voiceBtn.firstChild.textContent = firstVoice.label;
+      } else {
+        if (voiceHidden) voiceHidden.value = '';
+        voiceBtn.firstChild.textContent = 'No voices';
+      }
+    }
+
+    // Update model row
     var modelRow = document.getElementById('sp-tts-model-row');
     if (modelRow && provider === 'kokoro') {
       var label = modelRow.querySelector('label');
@@ -741,11 +789,18 @@ function settingsPageTTSChanged() {
       modelRow.insertAdjacentHTML('beforeend',
         '<span style="font-size:12px">Standard <button onclick="spUpgradeKokoroQuality()" style="margin-left:8px;padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--link);font-size:11px;cursor:pointer;font-family:inherit">Upgrade</button> <span style="color:var(--muted);font-size:11px">Free &middot; 305MB</span></span>'
         + '<input type="hidden" id="sp-tts-model" value="kokoro-v1-q8">');
-    } else if (modelSelect && data.models && data.models[provider]) {
-      modelSelect.innerHTML = data.models[provider].map(function(m) {
-        return '<option value="' + m.id + '">' + escapeHtml(m.label) + '</option>';
-      }).join('');
-    } else if (modelSelect) { modelSelect.innerHTML = ''; }
+    } else if (modelRow && data.models && data.models[provider]) {
+      var label2 = modelRow.querySelector('label');
+      var models = data.models[provider];
+      modelRow.innerHTML = '';
+      if (label2) modelRow.appendChild(label2);
+      var grp = '<div class="settings-btn-group">';
+      for (var mi = 0; mi < models.length; mi++) {
+        grp += '<button data-val="' + models[mi].id + '"' + (mi === 0 ? ' class="active"' : '') + ' onclick="settingsBtnSelect(this,\'sp-tts-model\',\'' + models[mi].id + '\')">' + escapeHtml(models[mi].label) + '</button>';
+      }
+      grp += '</div><input type="hidden" id="sp-tts-model" value="' + (models.length > 0 ? models[0].id : '') + '">';
+      modelRow.insertAdjacentHTML('beforeend', grp);
+    }
   }
 }
 

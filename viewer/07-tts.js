@@ -1318,13 +1318,15 @@ function showTTSSettings() {
     var isCloud = data.provider === 'openai' || data.provider === 'elevenlabs';
     var kokoroInstalled = data.kokoro && data.kokoro.installed;
 
+    var ttsModalLabels = {kokoro:'Kokoro',browser:'Browser',openai:'OpenAI',elevenlabs:'ElevenLabs'};
     card.innerHTML =
       '<h2>Voice Settings</h2>' +
       '<div style="margin:12px 0">' +
         '<label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Provider</label>' +
-        '<select id="tts-provider-select" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px" onchange="ttsSettingsProviderChanged()">' +
-          providers.map(function(p) { return '<option value="' + p.id + '"' + (data.provider === p.id ? ' selected' : '') + '>' + p.label + '</option>'; }).join('') +
-        '</select>' +
+        '<div class="settings-btn-group">' +
+          providers.map(function(p) { return '<button data-val="' + p.id + '" class="' + (data.provider === p.id ? 'active' : '') + '" onclick="settingsBtnSelect(this,\'tts-provider-select\',\'' + p.id + '\');ttsSettingsProviderChanged()">' + (ttsModalLabels[p.id] || p.id) + '</button>'; }).join('') +
+        '</div>' +
+        '<input type="hidden" id="tts-provider-select" value="' + escapeHtml(data.provider || 'kokoro') + '">' +
       '</div>' +
       '<div id="tts-kokoro-settings" style="display:' + (data.provider === 'kokoro' ? 'block' : 'none') + '">' +
         '<div style="background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin:10px 0;font-size:12px;line-height:1.6">' +
@@ -1337,11 +1339,10 @@ function showTTSSettings() {
               : '<span style="color:var(--muted)">Will set up automatically on first listen</span>') +
           '</div>' +
         '</div>' +
-        '<div style="margin:12px 0">' +
+        '<div style="margin:12px 0;position:relative">' +
           '<label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Voice</label>' +
-          '<select id="tts-kokoro-voice" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px">' +
-            renderVoiceOptions('kokoro') +
-          '</select>' +
+          '<button onclick="toggleTTSModalVoicePicker(\'tts-kokoro-voice-btn\',\'tts-kokoro-voice\',\'kokoro\')" id="tts-kokoro-voice-btn" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;cursor:pointer;font-family:inherit">' + escapeHtml(ttsModalGetVoiceLabel('kokoro', data.voice)) + ' <span style="opacity:0.5">\u25BE</span></button>' +
+          '<input type="hidden" id="tts-kokoro-voice" value="' + escapeHtml(data.voice || '') + '">' +
         '</div>' +
         '<div style="margin:12px 0" id="tts-kokoro-quality">' +
           '<label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Quality</label>' +
@@ -1367,17 +1368,14 @@ function showTTSSettings() {
             ? '<div style="font-size:11px;color:#22c55e;margin-top:3px">&#10003; API key saved. Leave blank to keep current key.</div>'
             : '<div style="font-size:11px;color:var(--muted);margin-top:3px">You can get a key from your provider\'s website. This key is only used for reading articles aloud.</div>') +
         '</div>' +
-        '<div style="margin:12px 0" id="tts-voice-row">' +
+        '<div style="margin:12px 0;position:relative" id="tts-voice-row">' +
           '<label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Voice</label>' +
-          '<select id="tts-voice-select" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px" onchange="ttsSettingsModelChanged()">' +
-            renderVoiceOptions(data.provider) +
-          '</select>' +
+          '<button onclick="toggleTTSModalVoicePicker(\'tts-voice-btn\',\'tts-voice-select\',null)" id="tts-voice-btn" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;cursor:pointer;font-family:inherit">' + escapeHtml(ttsModalGetVoiceLabel(data.provider, data.voice)) + ' <span style="opacity:0.5">\u25BE</span></button>' +
+          '<input type="hidden" id="tts-voice-select" value="' + escapeHtml(data.voice || '') + '">' +
         '</div>' +
         '<div style="margin:12px 0" id="tts-model-row">' +
           '<label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Model</label>' +
-          '<select id="tts-model-select" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px" onchange="ttsSettingsModelChanged()">' +
-            renderModelOptions(data.provider) +
-          '</select>' +
+          ttsModalRenderModelBtnGroup(data.provider, data.model) +
         '</div>' +
         '<div style="margin:14px 0;padding:10px 12px;background:var(--code-bg);border:1px solid var(--border);border-radius:6px">' +
           '<label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;cursor:pointer;line-height:1.5">' +
@@ -1396,48 +1394,46 @@ function showTTSSettings() {
   });
 }
 
-var _KOKORO_GROUPS = { af: 'American Female', am: 'American Male', bf: 'British Female', bm: 'British Male' };
-
-function renderKokoroVoiceOptions(voices, sel) {
-  var groups = {};
-  var order = [];
-  for (var i = 0; i < voices.length; i++) {
-    var prefix = voices[i].id.substring(0, 2);
-    if (!groups[prefix]) { groups[prefix] = []; order.push(prefix); }
-    groups[prefix].push(voices[i]);
-  }
-  var html = '';
-  for (var g = 0; g < order.length; g++) {
-    var key = order[g];
-    html += '<optgroup label="' + (_KOKORO_GROUPS[key] || key) + '">';
-    for (var j = 0; j < groups[key].length; j++) {
-      var v = groups[key][j];
-      html += '<option value="' + v.id + '"' + (sel === v.id ? ' selected' : '') + '>' + escapeHtml(v.label) + '</option>';
-    }
-    html += '</optgroup>';
-  }
-  return html;
-}
-
-function renderVoiceOptions(provider, selectedVoice) {
+function ttsModalGetVoiceLabel(provider, voiceId) {
   var overlay = document.querySelector('.modal-overlay');
   var data = overlay && overlay._ttsData;
-  if (!data || !data.voices[provider]) return '';
-  var sel = selectedVoice || data.voice;
+  if (!data || !data.voices || !data.voices[provider]) return voiceId || 'Select voice';
   var voices = data.voices[provider];
-  if (provider === 'kokoro') return renderKokoroVoiceOptions(voices, sel);
-  return voices.map(function(v) {
-    return '<option value="' + v.id + '"' + (sel === v.id ? ' selected' : '') + '>' + escapeHtml(v.label) + '</option>';
-  }).join('');
+  for (var i = 0; i < voices.length; i++) {
+    if (voices[i].id === voiceId) return voices[i].label;
+  }
+  return voices.length > 0 ? voices[0].label : 'Select voice';
 }
 
-function renderModelOptions(provider) {
+function toggleTTSModalVoicePicker(btnId, hiddenId, forcedProvider) {
   var overlay = document.querySelector('.modal-overlay');
   var data = overlay && overlay._ttsData;
-  if (!data || !data.models[provider]) return '';
-  return data.models[provider].map(function(m) {
-    return '<option value="' + m.id + '"' + (data.model === m.id ? ' selected' : '') + '>' + escapeHtml(m.label) + '</option>';
-  }).join('');
+  if (!data || !data.voices) return;
+  var provider = forcedProvider || document.getElementById('tts-provider-select').value;
+  var voices = data.voices[provider] || [];
+  var current = document.getElementById(hiddenId).value;
+  var options = voices.map(function(v) { return [v.id, v.label]; });
+  settingsCustomSelect(btnId, options, current, function(val) {
+    var hidden = document.getElementById(hiddenId);
+    if (hidden) hidden.value = val;
+    var btn = document.getElementById(btnId);
+    var label = val;
+    for (var i = 0; i < voices.length; i++) { if (voices[i].id === val) { label = voices[i].label; break; } }
+    if (btn) btn.firstChild.textContent = label;
+  });
+}
+
+function ttsModalRenderModelBtnGroup(provider, selectedModel) {
+  var overlay = document.querySelector('.modal-overlay');
+  var data = overlay && overlay._ttsData;
+  if (!data || !data.models || !data.models[provider]) return '';
+  var models = data.models[provider];
+  var html = '<div class="settings-btn-group">';
+  for (var i = 0; i < models.length; i++) {
+    html += '<button data-val="' + models[i].id + '" class="' + (selectedModel === models[i].id ? 'active' : '') + '" onclick="settingsBtnSelect(this,\'tts-model-select\',\'' + models[i].id + '\');ttsSettingsModelChanged()">' + escapeHtml(models[i].label) + '</button>';
+  }
+  html += '</div><input type="hidden" id="tts-model-select" value="' + escapeHtml(selectedModel || (models.length > 0 ? models[0].id : '')) + '">';
+  return html;
 }
 
 // Cost estimates per model ($ per 1K characters, based on a ~2000-word / 10K char article)
@@ -1491,33 +1487,40 @@ function ttsSettingsProviderChanged() {
   const data = overlay?._ttsData;
   if (!data) return;
 
-  // Update voice options
-  const voiceSelect = document.getElementById('tts-voice-select');
-  if (data.voices[provider]) {
-    voiceSelect.innerHTML = renderVoiceOptions(provider, '');
-  } else {
-    voiceSelect.innerHTML = '';
-  }
-  // Also update Kokoro voice dropdown
-  const kokoroVoice = document.getElementById('tts-kokoro-voice');
-  if (kokoroVoice && data.voices.kokoro) {
-    kokoroVoice.innerHTML = renderVoiceOptions('kokoro', '');
+  // Update cloud voice picker button
+  var voiceBtn = document.getElementById('tts-voice-btn');
+  var voiceHidden = document.getElementById('tts-voice-select');
+  if (voiceBtn && data.voices && data.voices[provider]) {
+    var firstVoice = data.voices[provider][0];
+    if (voiceHidden) voiceHidden.value = firstVoice ? firstVoice.id : '';
+    voiceBtn.firstChild.textContent = firstVoice ? firstVoice.label : 'No voices';
   }
 
-  // Update model options
-  const modelSelect = document.getElementById('tts-model-select');
-  if (data.models[provider]) {
-    modelSelect.innerHTML = data.models[provider].map(m =>
-      '<option value="' + m.id + '">' + escapeHtml(m.label) + '</option>'
-    ).join('');
-  } else {
-    modelSelect.innerHTML = '';
+  // Update kokoro voice picker button
+  var kokoroBtn = document.getElementById('tts-kokoro-voice-btn');
+  var kokoroHidden = document.getElementById('tts-kokoro-voice');
+  if (kokoroBtn && data.voices && data.voices.kokoro) {
+    var firstKokoro = data.voices.kokoro[0];
+    if (kokoroHidden) kokoroHidden.value = firstKokoro ? firstKokoro.id : '';
+    kokoroBtn.firstChild.textContent = firstKokoro ? firstKokoro.label : 'No voices';
+  }
+
+  // Rebuild model button group
+  var modelRow = document.getElementById('tts-model-row');
+  if (modelRow) {
+    var label = modelRow.querySelector('label');
+    modelRow.innerHTML = '';
+    if (label) modelRow.appendChild(label);
+    if (data.models && data.models[provider]) {
+      var firstModel = data.models[provider][0];
+      modelRow.insertAdjacentHTML('beforeend', ttsModalRenderModelBtnGroup(provider, firstModel ? firstModel.id : ''));
+    }
   }
 
   // Update cost estimate
-  const model = modelSelect.value;
-  const costEl = document.getElementById('tts-cost-estimate');
-  if (costEl) costEl.innerHTML = ttsGetCostHtml(provider, model);
+  var modelHidden = document.getElementById('tts-model-select');
+  var costEl = document.getElementById('tts-cost-estimate');
+  if (costEl) costEl.innerHTML = ttsGetCostHtml(provider, modelHidden ? modelHidden.value : '');
 }
 
 function ttsUpgradeKokoroQuality() {

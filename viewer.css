@@ -3520,6 +3520,20 @@
   }
   .settings-btn-group button:hover { background: var(--sidebar-active); }
   .settings-btn-group button.active { background: var(--link); color: #fff; border-color: var(--link); }
+  .settings-select-panel {
+    position: absolute; z-index: 100;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    max-height: 240px; overflow-y: auto; min-width: 160px;
+  }
+  .settings-select-panel button {
+    display: block; width: 100%; text-align: left;
+    padding: 6px 12px; border: none; background: none;
+    color: var(--fg); font-size: 13px; cursor: pointer;
+    font-family: inherit;
+  }
+  .settings-select-panel button:hover { background: var(--sidebar-hover); }
+  .settings-select-panel button.active { color: var(--link); font-weight: 600; }
   .settings-status {
     font-size: 11px; padding: 2px 8px; border-radius: 4px;
   }
