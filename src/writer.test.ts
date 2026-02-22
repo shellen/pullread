@@ -280,6 +280,31 @@ describe('writeArticle', () => {
     // NOT in root
     expect(existsSync(join(TEST_DIR, '2024-03-15-test-article.md'))).toBe(false);
   });
+
+  test('appends numeric suffix on filename collision', () => {
+    const data = {
+      title: 'World News',
+      url: 'https://example.com/a',
+      bookmarkedAt: '2024-03-15T12:00:00Z',
+      domain: 'example.com',
+      content: 'First article',
+    };
+
+    const first = writeArticle(TEST_DIR, data);
+    expect(first).toBe('2024-03-15-world-news.md');
+
+    const second = writeArticle(TEST_DIR, { ...data, url: 'https://other.com/b', content: 'Second article' });
+    expect(second).toBe('2024-03-15-world-news-2.md');
+
+    const third = writeArticle(TEST_DIR, { ...data, url: 'https://third.com/c', content: 'Third article' });
+    expect(third).toBe('2024-03-15-world-news-3.md');
+
+    // All three files exist with correct content
+    const dir = join(TEST_DIR, '2024', '03');
+    expect(readFileSync(join(dir, '2024-03-15-world-news.md'), 'utf-8')).toContain('First article');
+    expect(readFileSync(join(dir, '2024-03-15-world-news-2.md'), 'utf-8')).toContain('Second article');
+    expect(readFileSync(join(dir, '2024-03-15-world-news-3.md'), 'utf-8')).toContain('Third article');
+  });
 });
 
 describe('migrateToDateFolders', () => {

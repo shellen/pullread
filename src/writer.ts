@@ -140,8 +140,14 @@ export function listMarkdownFiles(dir: string): string[] {
 }
 
 export function writeArticle(outputPath: string, data: ArticleData): string {
-  const filename = generateFilename(data.title, data.bookmarkedAt);
-  const fullPath = join(outputPath, fileSubpath(filename));
+  let filename = generateFilename(data.title, data.bookmarkedAt);
+  let fullPath = join(outputPath, fileSubpath(filename));
+
+  // Avoid overwriting an existing file with a different URL
+  for (let i = 2; i <= 99 && existsSync(fullPath); i++) {
+    filename = filename.replace(/(-\d+)?\.md$/, `-${i}.md`);
+    fullPath = join(outputPath, fileSubpath(filename));
+  }
 
   const dir = dirname(fullPath);
   if (!existsSync(dir)) {
