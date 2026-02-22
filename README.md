@@ -1,5 +1,7 @@
 # PullRead
 
+[![Deploy Site to GitHub Pages](https://github.com/shellen/pullread/actions/workflows/deploy-site.yml/badge.svg)](https://github.com/shellen/pullread/actions/workflows/deploy-site.yml)
+
 **Save articles from your bookmark services as clean, local markdown files.**
 
 PullRead connects to bookmark services like Instapaper, Pinboard, Raindrop, and Omnivore (via their RSS feeds), extracts article content using Mozilla's Readability algorithm, and saves them as beautifully formatted markdown files with YAML frontmatter. It also handles RSS/Atom feeds, podcasts, YouTube videos (with transcripts), and more. Perfect for building a local, searchable reading archive synced to Dropbox, iCloud, or any folder you choose.
