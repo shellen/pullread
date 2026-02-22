@@ -139,6 +139,33 @@ export function listMarkdownFiles(dir: string): string[] {
   return results;
 }
 
+/** Recursively list all .epub files, skipping favicons/ and notebooks/ directories. */
+export function listEpubFiles(dir: string): string[] {
+  if (!existsSync(dir)) return [];
+  const results: string[] = [];
+  const SKIP = new Set(['favicons', 'notebooks']);
+
+  function walk(current: string) {
+    let entries: string[];
+    try { entries = readdirSync(current); } catch { return; }
+    for (const name of entries) {
+      if (SKIP.has(name)) continue;
+      const full = join(current, name);
+      try {
+        const stat = statSync(full);
+        if (stat.isDirectory()) {
+          walk(full);
+        } else if (stat.isFile() && extname(name) === '.epub') {
+          results.push(full);
+        }
+      } catch { continue; }
+    }
+  }
+
+  walk(dir);
+  return results;
+}
+
 export function writeArticle(outputPath: string, data: ArticleData): string {
   let filename = generateFilename(data.title, data.bookmarkedAt);
   let fullPath = join(outputPath, fileSubpath(filename));

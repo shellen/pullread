@@ -4,14 +4,14 @@
 import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, mkdirSync, watch, unlinkSync, copyFileSync } from 'fs';
 import { join, extname, dirname } from 'path';
-import { exec, execFile } from 'child_process';
+import { exec, execFile, execFileSync } from 'child_process';
 import { homedir } from 'os';
 import { VIEWER_HTML } from './viewer-html';
 import { summarizeText, loadLLMConfig, saveLLMConfig, loadLLMSettings, saveLLMSettings, getDefaultModel, isAppleAvailable, KNOWN_MODELS, LLMConfig, LLMSettings } from './summarizer';
 import { autotagText, autotagBatch, saveMachineTags, hasMachineTags, migrateDashedTags } from './autotagger';
 import { APP_ICON } from './app-icon';
 import { fetchAndExtract } from './extractor';
-import { generateMarkdown, writeArticle, ArticleData, downloadFavicon, resolveFilePath, listMarkdownFiles, migrateToDateFolders, exportNotebook, removeExportedNotebook } from './writer';
+import { generateMarkdown, writeArticle, ArticleData, downloadFavicon, resolveFilePath, listMarkdownFiles, listEpubFiles, migrateToDateFolders, exportNotebook, removeExportedNotebook } from './writer';
 import { loadTTSConfig, saveTTSConfig, generateSpeech, getAudioContentType, getKokoroStatus, preloadKokoro, getCachedAudioPath, createTtsSession, generateSessionChunk, TTS_VOICES, TTS_MODELS } from './tts';
 import { listSiteLogins, removeSiteLogin, saveSiteLoginCookies } from './cookies';
 
@@ -47,6 +47,60 @@ export function parseFrontmatter(content: string): Record<string, string> {
     }
   }
   return meta;
+}
+
+interface EpubMeta {
+  title: string;
+  author: string;
+  description: string;
+  language: string;
+}
+
+/** Extract metadata from an EPUB file by reading its OPF document. */
+function parseEpubMeta(epubPath: string): EpubMeta {
+  const fallback: EpubMeta = { title: '', author: '', description: '', language: '' };
+  try {
+    // EPUB is a ZIP; use unzip to extract META-INF/container.xml
+    const containerXml = execFileSync('unzip', ['-p', epubPath, 'META-INF/container.xml'], {
+      encoding: 'utf-8',
+      timeout: 3000,
+      maxBuffer: 64 * 1024,
+    });
+    // Find the rootfile path (e.g. OEBPS/content.opf or content.opf)
+    const rfMatch = containerXml.match(/rootfile[^>]*full-path="([^"]+)"/);
+    if (!rfMatch) return fallback;
+
+    const opfPath = rfMatch[1];
+    const opfXml = execFileSync('unzip', ['-p', epubPath, opfPath], {
+      encoding: 'utf-8',
+      timeout: 3000,
+      maxBuffer: 256 * 1024,
+    });
+
+    // Parse Dublin Core metadata from OPF
+    const titleMatch = opfXml.match(/<dc:title[^>]*>([^<]+)<\/dc:title>/i);
+    const authorMatch = opfXml.match(/<dc:creator[^>]*>([^<]+)<\/dc:creator>/i);
+    const descMatch = opfXml.match(/<dc:description[^>]*>([^<]+)<\/dc:description>/i);
+    const langMatch = opfXml.match(/<dc:language[^>]*>([^<]+)<\/dc:language>/i);
+
+    return {
+      title: titleMatch ? titleMatch[1].trim() : '',
+      author: authorMatch ? authorMatch[1].trim() : '',
+      description: descMatch ? descMatch[1].trim().replace(/<[^>]+>/g, '').slice(0, 300) : '',
+      language: langMatch ? langMatch[1].trim().split('-')[0] : '',
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+/** Resolve an EPUB filename to its full path in the output directory. */
+function resolveEpubPath(outputPath: string, filename: string): string | null {
+  const epubPaths = listEpubFiles(outputPath);
+  for (const p of epubPaths) {
+    if (require('path').basename(p) === filename) return p;
+  }
+  return null;
 }
 
 function listFiles(outputPath: string): FileMeta[] {
@@ -97,6 +151,37 @@ function listFiles(outputPath: string): FileMeta[] {
       });
     } catch {
       // Skip unreadable files
+    }
+  }
+
+  // Add EPUB files
+  const epubPaths = listEpubFiles(outputPath);
+  for (const fullPath of epubPaths) {
+    const name = require('path').basename(fullPath);
+    try {
+      const stat = statSync(fullPath);
+      if (!stat.isFile()) continue;
+      const meta = parseEpubMeta(fullPath);
+      files.push({
+        filename: name,
+        title: meta.title || name.replace(/\.epub$/, '').replace(/[-_]/g, ' '),
+        url: '',
+        domain: 'epub',
+        bookmarked: stat.mtime.toISOString(),
+        feed: 'books',
+        author: meta.author || '',
+        mtime: stat.mtime.toISOString(),
+        hasSummary: false,
+        summaryProvider: '',
+        summaryModel: '',
+        excerpt: meta.description || '',
+        image: '',
+        enclosureUrl: '',
+        enclosureType: '',
+        enclosureDuration: '',
+      });
+    } catch {
+      // Skip unreadable EPUBs
     }
   }
 
@@ -262,7 +347,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
   let filesChangedAt = Date.now();
   try {
     watch(outputPath, { recursive: true }, (event, filename) => {
-      if (filename && filename.endsWith('.md')) {
+      if (filename && (filename.endsWith('.md') || filename.endsWith('.epub'))) {
         filesChangedAt = Date.now();
       }
     });
@@ -461,6 +546,28 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
       }
       res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end(readFileSync(filePath, 'utf-8'));
+      return;
+    }
+
+    // Serve EPUB binary files
+    if (url.pathname === '/api/epub') {
+      const filename = url.searchParams.get('name');
+      if (!filename || filename.includes('..') || filename.includes('/') || !filename.endsWith('.epub')) {
+        send404(res);
+        return;
+      }
+      const epubPath = resolveEpubPath(outputPath, filename);
+      if (!epubPath || !epubPath.startsWith(outputPath)) {
+        send404(res);
+        return;
+      }
+      const data = readFileSync(epubPath);
+      res.writeHead(200, {
+        'Content-Type': 'application/epub+zip',
+        'Content-Length': data.length.toString(),
+        'Cache-Control': 'max-age=3600',
+      });
+      res.end(data);
       return;
     }
 

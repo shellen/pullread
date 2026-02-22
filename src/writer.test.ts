@@ -1,7 +1,7 @@
 // ABOUTME: Tests for markdown file generation
 // ABOUTME: Verifies filename slugification, frontmatter, and enclosure formatting
 
-import { generateFilename, generateMarkdown, fileSubpath, resolveFilePath, listMarkdownFiles, writeArticle, migrateToDateFolders, exportNotebook } from './writer';
+import { generateFilename, generateMarkdown, fileSubpath, resolveFilePath, listMarkdownFiles, listEpubFiles, writeArticle, migrateToDateFolders, exportNotebook } from './writer';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'fs';
 import { join } from 'path';
 
@@ -251,6 +251,51 @@ describe('listMarkdownFiles', () => {
 
   test('returns empty array for non-existent directory', () => {
     expect(listMarkdownFiles('/tmp/does-not-exist-pullread')).toEqual([]);
+  });
+});
+
+describe('listEpubFiles', () => {
+  beforeEach(() => {
+    cleanTestDir();
+    mkdirSync(TEST_DIR, { recursive: true });
+  });
+  afterAll(cleanTestDir);
+
+  test('finds .epub files in root and subdirectories', () => {
+    writeFileSync(join(TEST_DIR, 'book-one.epub'), 'fake epub');
+    const subdir = join(TEST_DIR, 'books');
+    mkdirSync(subdir, { recursive: true });
+    writeFileSync(join(subdir, 'book-two.epub'), 'fake epub 2');
+
+    const files = listEpubFiles(TEST_DIR);
+    expect(files).toHaveLength(2);
+    expect(files.some(f => f.includes('book-one.epub'))).toBe(true);
+    expect(files.some(f => f.includes('book-two.epub'))).toBe(true);
+  });
+
+  test('ignores .md files', () => {
+    writeFileSync(join(TEST_DIR, 'article.md'), 'markdown');
+    writeFileSync(join(TEST_DIR, 'book.epub'), 'epub');
+
+    const files = listEpubFiles(TEST_DIR);
+    expect(files).toHaveLength(1);
+    expect(files[0]).toContain('book.epub');
+  });
+
+  test('skips favicons and notebooks directories', () => {
+    writeFileSync(join(TEST_DIR, 'book.epub'), 'ok');
+    mkdirSync(join(TEST_DIR, 'favicons'), { recursive: true });
+    writeFileSync(join(TEST_DIR, 'favicons', 'not-this.epub'), 'skip');
+    mkdirSync(join(TEST_DIR, 'notebooks'), { recursive: true });
+    writeFileSync(join(TEST_DIR, 'notebooks', 'not-this-either.epub'), 'skip');
+
+    const files = listEpubFiles(TEST_DIR);
+    expect(files).toHaveLength(1);
+    expect(files[0]).toContain('book.epub');
+  });
+
+  test('returns empty array for non-existent directory', () => {
+    expect(listEpubFiles('/tmp/does-not-exist-pullread')).toEqual([]);
   });
 });
 

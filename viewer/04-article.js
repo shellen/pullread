@@ -181,6 +181,7 @@ function goHome() {
   _sidebarView = 'home'; syncSidebarTabs();
   activeFile = null;
   document.title = 'PullRead';
+  if (typeof destroyEpub === 'function') destroyEpub();
   renderFileList();
   renderDashboard();
   var toc = document.getElementById('toc-container');
@@ -232,6 +233,9 @@ function dashLoadArticle(filename) {
 }
 
 function renderArticle(text, filename) {
+  // Clean up any active EPUB before showing a markdown article
+  if (typeof destroyEpub === 'function') destroyEpub();
+
   const { meta, body: rawBodyText } = parseFrontmatter(text);
   let body = rawBodyText;
   const content = document.getElementById('content');
