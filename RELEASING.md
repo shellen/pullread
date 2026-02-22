@@ -30,7 +30,8 @@ The **Build Tauri App** workflow (`.github/workflows/build-tauri.yml`) triggers 
    - Builds the Rust app
    - Signs and notarizes the app bundle and DMG
    - Creates a draft GitHub Release with DMGs and `latest.json` (for auto-updates)
-6. Triggers the site deploy workflow
+
+The **Deploy Site** workflow (`.github/workflows/deploy-site.yml`) triggers independently on `v*` tag pushes, deploying the website to GitHub Pages with the version injected from `package.json`.
 
 After both matrix legs complete, manually publish the draft release.
 
