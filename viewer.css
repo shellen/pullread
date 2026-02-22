@@ -3488,7 +3488,14 @@
   /* Explore stats bar */
   /* Settings page */
   .settings-section {
-    margin-bottom: 32px;
+    margin-bottom: 20px;
+    padding: 20px 24px;
+    background: color-mix(in srgb, var(--fg) 3%, transparent);
+    border-radius: 10px;
+  }
+  .settings-save-bar {
+    margin-bottom: 20px;
+    text-align: right;
   }
   .settings-section h2 {
     font-size: 16px; font-weight: 600; margin: 0 0 16px;

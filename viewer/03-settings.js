@@ -60,6 +60,14 @@ function toggleSettingsDropdown() {
   const currentSpacing = localStorage.getItem('pr-spacing') || 'default';
   const currentWidth = localStorage.getItem('pr-width') || 'default';
 
+  var breakStatus = '';
+  var breakInterval = parseInt(localStorage.getItem('pr-break-interval') || '0', 10);
+  if (breakInterval > 0 && _breakSessionStart > 0) {
+    var breakElapsed = (Date.now() - _breakSessionStart) / 60000;
+    var breakRemaining = Math.max(0, Math.ceil(breakInterval - breakElapsed));
+    breakStatus = '<div style="text-align:center;font-size:11px;color:var(--muted);padding:4px 0">Break in ' + breakRemaining + 'm</div>';
+  }
+
   const panel = document.createElement('div');
   panel.className = 'settings-dropdown-panel';
   panel.setAttribute('role', 'region');
@@ -108,6 +116,7 @@ function toggleSettingsDropdown() {
     <div class="setting-row">
       <button onclick="var p=document.querySelector('.settings-dropdown-panel');if(p)p.remove();var b=document.getElementById('aa-settings-btn');if(b)b.setAttribute('aria-expanded','false');showShortcutsModal()" style="flex:1;text-align:center"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-keyboard"/></svg> Keyboard Shortcuts</button>
     </div>
+    ${breakStatus}
   `;
   document.body.appendChild(panel);
   btn.setAttribute('aria-expanded', 'true');
@@ -261,26 +270,6 @@ function showSettingsPage(scrollToSection) {
   html += '</div>';
   html += '</div>';
 
-  // ---- Reading Breaks section ----
-  var breakInterval = localStorage.getItem('pr-break-interval') || '0';
-  var breakActivity = localStorage.getItem('pr-break-activity') || '';
-  html += '<div class="settings-section" id="settings-breaks">';
-  html += '<h2>Reading Breaks</h2>';
-  html += '<p style="font-size:13px;color:var(--muted);margin-bottom:16px">Get a gentle reminder to take a break after reading for a while. The reminder suggests a classic book or an activity of your choosing.</p>';
-  var breakOpts = [['0','Off'],['10','10m'],['15','15m'],['20','20m'],['25','25m'],['30','30m']];
-  html += '<div class="settings-row"><div><label>Timer interval</label><div class="settings-desc">How long before suggesting a break (Off to disable)</div></div>';
-  html += '<div class="settings-btn-group">';
-  for (var bi = 0; bi < breakOpts.length; bi++) {
-    html += '<button class="' + (breakInterval === breakOpts[bi][0] ? 'active' : '') + '" onclick="settingsBtnSelect(this,\'sp-break-interval\',\'' + breakOpts[bi][0] + '\');localStorage.setItem(\'pr-break-interval\',\'' + breakOpts[bi][0] + '\');_breakSessionStart=0">' + breakOpts[bi][1] + '</button>';
-  }
-  html += '</div><input type="hidden" id="sp-break-interval" value="' + escapeHtml(breakInterval) + '">';
-  html += '</div>';
-  html += '<div class="settings-row"><div><label>Activity suggestion</label><div class="settings-desc">Leave blank for random suggestions (walk, stretch, tea\u2026)</div></div>';
-  html += '<input type="text" id="sp-break-activity" value="' + escapeHtml(breakActivity) + '" placeholder="e.g. Take a walk, Play guitar, Call a friend" style="min-width:200px" onchange="localStorage.setItem(\'pr-break-activity\',this.value)">';
-  html += '</div>';
-  html += '<div style="padding:6px 0"><button onclick="showBreakReminder()" style="font-size:12px;padding:4px 12px;background:var(--sidebar-bg);color:var(--link);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit">Preview break reminder</button></div>';
-  html += '</div>';
-
   // ---- Open In section (Tauri only) ----
   html += '<div class="settings-section" id="settings-viewer-mode" style="display:none">';
   html += '<h2>Open In</h2>';
@@ -327,6 +316,11 @@ function showSettingsPage(scrollToSection) {
   html += '<p style="color:var(--muted);font-size:13px">Loading AI settings...</p>';
   html += '</div>';
 
+  // ---- Save Settings bar ----
+  html += '<div class="settings-save-bar">';
+  html += '<button class="btn-primary" onclick="settingsPageSaveAll()" style="font-size:13px;padding:8px 24px">Save Settings</button>';
+  html += '</div>';
+
   // ---- Notifications section ----
   html += '<div class="settings-section">';
   html += '<h2>Notifications</h2>';
@@ -335,6 +329,26 @@ function showSettingsPage(scrollToSection) {
     + '<span style="flex-shrink:0;font-size:14px">&#9881;</span>'
     + '<span>To change notification preferences, go to <strong style="color:var(--fg)">System Settings &rarr; Notifications &rarr; PullRead</strong>. You can enable or disable alerts, banners, and sounds there.</span>'
     + '</div>';
+  html += '</div>';
+
+  // ---- Reading Breaks section ----
+  var breakInterval = localStorage.getItem('pr-break-interval') || '0';
+  var breakActivity = localStorage.getItem('pr-break-activity') || '';
+  html += '<div class="settings-section" id="settings-breaks">';
+  html += '<h2>Reading Breaks</h2>';
+  html += '<p style="font-size:13px;color:var(--muted);margin-bottom:16px">Get a gentle reminder to take a break after reading for a while. The reminder suggests a classic book or an activity of your choosing.</p>';
+  var breakOpts = [['0','Off'],['10','10m'],['15','15m'],['20','20m'],['25','25m'],['30','30m']];
+  html += '<div class="settings-row"><div><label>Timer interval</label><div class="settings-desc">How long before suggesting a break (Off to disable)</div></div>';
+  html += '<div class="settings-btn-group">';
+  for (var bi = 0; bi < breakOpts.length; bi++) {
+    html += '<button class="' + (breakInterval === breakOpts[bi][0] ? 'active' : '') + '" onclick="settingsBtnSelect(this,\'sp-break-interval\',\'' + breakOpts[bi][0] + '\');localStorage.setItem(\'pr-break-interval\',\'' + breakOpts[bi][0] + '\');_breakSessionStart=0">' + breakOpts[bi][1] + '</button>';
+  }
+  html += '</div><input type="hidden" id="sp-break-interval" value="' + escapeHtml(breakInterval) + '">';
+  html += '</div>';
+  html += '<div class="settings-row"><div><label>Activity suggestion</label><div class="settings-desc">Leave blank for random suggestions (walk, stretch, tea\u2026)</div></div>';
+  html += '<input type="text" id="sp-break-activity" value="' + escapeHtml(breakActivity) + '" placeholder="e.g. Take a walk, Play guitar, Call a friend" style="min-width:200px" onchange="localStorage.setItem(\'pr-break-activity\',this.value)">';
+  html += '</div>';
+  html += '<div style="padding:6px 0"><button onclick="showBreakReminder()" style="font-size:12px;padding:4px 12px;background:var(--sidebar-bg);color:var(--link);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit">Preview break reminder</button></div>';
   html += '</div>';
 
   // ---- Backup & Restore section ----
@@ -517,10 +531,6 @@ function showSettingsPage(scrollToSection) {
       }
       h += '</div>';
 
-      h += '<div class="settings-row" style="justify-content:flex-end;padding-top:12px">';
-      h += '<button class="btn-primary" onclick="settingsPageSaveConfig()" style="font-size:13px;padding:6px 16px">Save Bookmark Settings</button>';
-      h += '</div>';
-
       sec.innerHTML = h;
       sec._configData = cfg;
     }).catch(function() {
@@ -613,10 +623,6 @@ function showSettingsPage(scrollToSection) {
       }
       h += '</div>';
 
-      h += '<div class="settings-row" style="justify-content:flex-end;padding-top:8px">';
-      h += '<button class="btn-primary" onclick="settingsPageSaveTTS()" style="font-size:13px;padding:6px 16px">Save Voice Settings</button>';
-      h += '</div>';
-
       sec.innerHTML = h;
       sec._ttsData = data;
     }).catch(function() {
@@ -696,10 +702,6 @@ function showSettingsPage(scrollToSection) {
 
         h += '</div>';
       }
-
-      h += '<div class="settings-row" style="justify-content:flex-end;padding-top:12px">';
-      h += '<button class="btn-primary" onclick="settingsPageSaveLLM()" style="font-size:13px;padding:6px 16px">Save</button>';
-      h += '</div>';
 
       sec.innerHTML = h;
     }).catch(function() {
@@ -848,7 +850,7 @@ function spUpgradeKokoroQuality() {
   }
 }
 
-function settingsPageSaveTTS() {
+function settingsPageSaveTTS(skipRefresh) {
   var provider = document.getElementById('sp-tts-provider').value;
   var config = { provider: provider };
 
@@ -866,7 +868,7 @@ function settingsPageSaveTTS() {
     if (model) config.model = model.value;
   }
 
-  fetch('/api/tts-settings', {
+  return fetch('/api/tts-settings', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(config),
@@ -877,14 +879,14 @@ function settingsPageSaveTTS() {
       ttsCurrentIndex = -1;
       if (ttsAudio) { ttsAudio.pause(); ttsAudio.src = ''; ttsAudio = null; }
       renderAudioPlayer();
-      showSettingsPage(); // Refresh to show updated state
+      if (!skipRefresh) showSettingsPage();
     } else {
       alert('Failed to save voice settings.');
     }
   });
 }
 
-function settingsPageSaveLLM() {
+function settingsPageSaveLLM(skipRefresh) {
   var defaultProvider = document.getElementById('sp-llm-default').value;
   var cloudProviders = ['anthropic', 'openai', 'gemini', 'openrouter'];
   var providers = {};
@@ -899,7 +901,7 @@ function settingsPageSaveLLM() {
     if (Object.keys(entry).length > 0) providers[p] = entry;
   }
 
-  fetch('/api/settings', {
+  return fetch('/api/settings', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ defaultProvider: defaultProvider, providers: providers }),
@@ -907,10 +909,21 @@ function settingsPageSaveLLM() {
     if (r.ok) {
       llmProvider = defaultProvider;
       llmConfigured = true;
-      showSettingsPage(); // Refresh to show updated state
+      if (!skipRefresh) showSettingsPage();
     } else {
       alert('Failed to save AI settings.');
     }
+  });
+}
+
+function settingsPageSaveAll() {
+  var saves = [];
+  if (document.getElementById('sp-output-path')) saves.push(settingsPageSaveConfig(true));
+  if (document.getElementById('sp-tts-provider')) saves.push(settingsPageSaveTTS(true));
+  if (document.getElementById('sp-llm-default')) saves.push(settingsPageSaveLLM(true));
+  if (saves.length === 0) return;
+  Promise.all(saves).then(function() {
+    showSettingsPage();
   });
 }
 
@@ -930,7 +943,7 @@ function revealOutputFolder() {
   fetch('/api/reveal-folder', { method: 'POST' }).catch(function() {});
 }
 
-function settingsPageSaveConfig() {
+function settingsPageSaveConfig(skipRefresh) {
   var outputPath = document.getElementById('sp-output-path').value.trim();
   var syncInterval = document.getElementById('sp-sync-interval').value;
   var cookies = document.getElementById('sp-cookies').checked;
@@ -939,12 +952,12 @@ function settingsPageSaveConfig() {
   var cfg = sec ? sec._configData : {};
   var feeds = cfg.feeds || {};
 
-  fetch('/api/config', {
+  return fetch('/api/config', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ outputPath: outputPath, feeds: feeds, syncInterval: syncInterval, useBrowserCookies: cookies, maxAgeDays: maxAge })
   }).then(function(r) {
-    if (r.ok) showSettingsPage();
+    if (r.ok) { if (!skipRefresh) showSettingsPage(); }
     else alert('Failed to save feed settings.');
   });
 }
