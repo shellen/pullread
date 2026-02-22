@@ -54,7 +54,10 @@ PullRead connects to bookmark services like Instapaper, Pinboard, Raindrop, and 
 - **RSS auto-discovery** - Paste a blog URL and PullRead finds the RSS/Atom feed automatically
 - **Clean article extraction** - Uses Mozilla's Readability algorithm (same as Firefox Reader View)
 - **YouTube support** - Embeds video thumbnail with full transcript when available
-- **X.com/Twitter support** - Generates meaningful titles from tweet content
+- **X.com/Twitter support** - Generates meaningful titles from tweet content, embeds videos as inline players, and extracts long-form X articles
+- **Site logins** - Log in to paywalled sites (Medium, X.com, etc.) via a built-in webview; cookies stored securely in macOS Keychain
+- **Reading break reminders** - Configurable break timer with bundled classic books from Project Gutenberg
+- **Onboarding tour** - 6-step guided tour on first launch with re-launch from Settings or Dashboard
 - **Markdown output** - Converts HTML to clean, readable markdown with YAML frontmatter
 - **Intelligent deduplication** - Tracks processed URLs to avoid re-fetching
 - **Retry mechanism** - Failed extractions are tracked and can be retried later
@@ -448,6 +451,9 @@ Bun CLI Binary (TypeScript)
 - **No dock icon** - Runs as a menu bar accessory (dock icon appears when viewer is open)
 - **Article reader** - Built-in two-pane markdown viewer in a native WebView window
 - **Highlights & notes** - Select text to highlight, add inline annotations, and write article-level notes
+- **Site logins** - Authenticate to paywalled sites via built-in webview; cookies stored in macOS Keychain
+- **Reading breaks** - Configurable break timer with bundled classic books to read during breaks
+- **Onboarding tour** - 6-step guided tour on first launch; re-launch from Settings or Dashboard
 - **Weekly reviews** - Scheduled AI summaries of your recent reading (daily, weekly, or on-demand)
 - **Bookmark import** - Import a `bookmarks.html` file from any browser or service
 - **RSS auto-discovery** - Paste a blog URL and the app finds the feed automatically
@@ -471,13 +477,13 @@ The platform abstraction layer (`src-tauri/src/platform/`) provides a `PlatformS
 
 These features use native macOS APIs and are available only on macOS:
 
-- **Keychain integration** - API keys stored securely in macOS Keychain
+- **Keychain integration** - API keys and site login cookies stored securely in macOS Keychain
 - **Grammar checking** - Local grammar check via NSSpellChecker
 - **Spotlight indexing** - Articles indexed for macOS search (via Swift helper)
 - **Share Extension** - Accept URLs from macOS Share sheet (via companion appex)
 - **Shortcuts/Siri** - "Save article", "Sync feeds" via App Intents
 
-On other platforms, these features degrade gracefully (API keys in config file, no grammar check, no system search indexing).
+On other platforms, these features degrade gracefully (API keys in config file, no site login cookies, no grammar check, no system search indexing).
 
 ### Article Reader
 
@@ -485,16 +491,17 @@ The built-in article reader (**View Articles** in the menu bar) is a two-pane we
 
 #### Highlights & Notes
 
-Select any text in an article to see a floating toolbar with highlight color options (yellow, green, blue, pink) and an "Add note" button. Click an existing highlight to change its color, add a note to it, or delete it.
+Select any text in an article to see a floating toolbar with highlight color options (yellow, green, blue, pink) and an "Add note" button. Click an existing highlight to change its color, add a note to it, or delete it. Press **Enter** to save a note (Shift+Enter for newline).
 
 - **Highlights** are saved per-article at `~/.config/pullread/highlights.json` — each highlight can optionally carry a note
 - **Notes** are saved per-article at `~/.config/pullread/notes.json`
 - **Article-level notes** can be written in a collapsible "Notes" panel at the bottom of each article
 - **Voice notes** — click the microphone button to dictate notes hands-free via Web Speech API
 - **Inline annotations** attach a note to a specific text passage, shown with a marker icon
-- **Tags** can be added to any article via the Notes panel (press Enter or comma to add)
+- **Tags** are shown in the article header (press Enter or comma to add)
 - **Favorites** mark articles with a heart icon in the sidebar
 - Sidebar items show indicator dots for favorites (heart), highlights (yellow), notes (blue), and summaries
+- Feed source and clickable author names shown in article metadata
 
 #### Summaries
 
@@ -687,7 +694,8 @@ pullread/
 │   ├── autotagger.ts              # Machine tagging using LLM providers
 │   ├── tts.ts                     # Text-to-speech (Kokoro, OpenAI, ElevenLabs)
 │   ├── review.ts                  # Weekly review generation
-│   └── *.test.ts                  # Unit tests (86 tests across 5 suites)
+│   ├── cookies.ts                 # Site login cookie management
+│   └── *.test.ts                  # Unit tests (194 tests across 7 suites)
 │
 ├── src-tauri/                     # Tauri desktop app (Rust)
 │   ├── src/
@@ -696,6 +704,7 @@ pullread/
 │   │   ├── tray.rs                # System tray menu (14 items)
 │   │   ├── sidecar.rs             # Bun binary lifecycle management
 │   │   ├── commands.rs            # IPC commands, viewer window, deep links
+│   │   ├── keychain.rs            # macOS Keychain access for site login cookies
 │   │   ├── notifications.rs       # Cross-platform notification helpers
 │   │   ├── timers.rs              # Sync/review scheduling
 │   │   └── platform/              # OS-specific services
@@ -734,6 +743,7 @@ pullread/
 │   ├── download-kokoro-model.sh   # Downloads Kokoro TTS model for bundling
 │   ├── bundle-kokoro.ts           # Copies Kokoro runtime files to Tauri resources
 │   ├── embed-viewer.ts            # Inlines viewer modules into viewer-html.ts
+│   ├── fetch-gutenberg.ts         # Downloads Project Gutenberg books for break reading
 │   └── setup-signing-secrets.sh   # Configures GitHub Actions signing secrets
 │
 ├── .github/workflows/
@@ -749,6 +759,7 @@ pullread/
 ├── TAURI_MIGRATION_ASSESSMENT.md  # Tauri migration analysis
 ├── models.json                    # LLM model registry (single source of truth)
 ├── package.json                   # Node dependencies
+├── data/books/                    # Bundled classic books for break reading
 ├── feeds.json.example             # Configuration template
 └── dist/                          # Compiled CLI binaries (gitignored)
 
@@ -915,13 +926,13 @@ npm test
 
 ### Test Coverage
 
-86 tests across 5 suites:
+194 tests across 7 suites:
 
 - **Content extraction** (`extractor.test.ts` — 28 tests)
   - Readability algorithm
   - HTML to Markdown conversion
   - YouTube URL detection and video ID extraction
-  - X.com/Twitter title generation
+  - X.com/Twitter title generation and video embeds
   - Edge cases (empty content, timeouts)
 
 - **Feed parsing** (`feed.test.ts` — 26 tests)
@@ -933,6 +944,15 @@ npm test
 - **Bookmark import** (`bookmarks.test.ts` — 19 tests)
   - Browser bookmark HTML parsing
   - Folder and tag extraction
+
+- **Cookie management** (`cookies.test.ts`)
+  - Site login cookie parsing and formatting
+  - Cookie header generation
+
+- **Viewer** (`viewer.test.ts`)
+  - Viewer HTML generation and embedding
+  - Bundled book installation
+  - Tag migration
 
 - **Database operations** (`storage.test.ts` — 7 tests)
   - URL tracking
