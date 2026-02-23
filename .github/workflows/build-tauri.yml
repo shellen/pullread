@@ -163,19 +163,11 @@ jobs:
             src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app
           retention-days: 30
 
-      - name: Upload updater signature
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: actions/upload-artifact@v4
-        with:
-          name: updater-sig-${{ matrix.target }}
-          path: src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.sig
-          retention-days: 1
-
       - name: Clean up keychain
         if: always() && env.HAS_SIGNING_CERT == 'true'
         run: security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
 
-  # Assemble updater manifest after both builds finish
+  # Sign update bundles, build updater manifest, and publish the release
   publish-updater:
     needs: build
     if: startsWith(github.ref, 'refs/tags/')
@@ -187,27 +179,47 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download arm64 signature
-        uses: actions/download-artifact@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          name: updater-sig-aarch64-apple-darwin
-          path: ./sigs/arm64
+          node-version: '22'
 
-      - name: Download x64 signature
-        uses: actions/download-artifact@v4
-        with:
-          name: updater-sig-x86_64-apple-darwin
-          path: ./sigs/x64
+      - name: Install Tauri CLI
+        run: npm install -g @tauri-apps/cli
 
-      - name: Build latest.json
+      - name: Download update bundles from release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION=$(node -p "require('./package.json').version")
           TAG="${{ github.ref_name }}"
+          mkdir -p ./bundles
+          gh release download "$TAG" -p '*.app.tar.gz' -D ./bundles
+          ls -la ./bundles/
+
+      - name: Sign bundles and build latest.json
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION=$(node -p "require('./package.json').version")
           DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          ARM_SIG=$(cat ./sigs/arm64/*.sig)
-          X64_SIG=$(cat ./sigs/x64/*.sig)
           BASE="https://github.com/${{ github.repository }}/releases/download/${TAG}"
 
+          # Sign each bundle
+          for bundle in ./bundles/*.tar.gz; do
+            echo "Signing $bundle..."
+            tauri signer sign -k "$TAURI_SIGNING_PRIVATE_KEY" -p "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" "$bundle"
+            echo "Signature:"
+            cat "${bundle}.sig"
+            echo ""
+          done
+
+          # Read signatures
+          ARM_SIG=$(cat ./bundles/Pull.Read_aarch64.app.tar.gz.sig)
+          X64_SIG=$(cat ./bundles/Pull.Read_x64.app.tar.gz.sig)
+
+          # Build latest.json
           jq -n \
             --arg ver "$VERSION" \
             --arg date "$DATE" \
@@ -232,8 +244,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload "${{ github.ref_name }}" latest.json --clobber
-          gh release edit "${{ github.ref_name }}" --draft=false
+          TAG="${{ github.ref_name }}"
+          gh release upload "$TAG" latest.json --clobber
+          gh release edit "$TAG" --draft=false
+          echo "Published release $TAG"
 
   # Auto-update "latest" pre-release on every push to main
   latest-release:
@@ -282,4 +296,3 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
