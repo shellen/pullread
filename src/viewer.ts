@@ -2044,14 +2044,30 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
     // Log viewer — serves the sidecar log file as plain text
     if (url.pathname === '/api/log' && req.method === 'GET') {
       const logFile = '/tmp/pullread.log';
+      const logOld = '/tmp/pullread.log.old';
+      let content = '';
+      // Include rotated log for context, then current log
+      if (existsSync(logOld)) {
+        content += readFileSync(logOld, 'utf-8');
+      }
       if (existsSync(logFile)) {
-        const content = readFileSync(logFile, 'utf-8');
-        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end(content);
-      } else {
+        content += readFileSync(logFile, 'utf-8');
+      }
+      if (!content) {
         res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
         res.end('No log file found.');
+        return;
       }
+      // Return only the last ~200 KB to avoid sending huge payloads
+      const MAX_RESPONSE = 200 * 1024;
+      if (content.length > MAX_RESPONSE) {
+        const trimmed = content.slice(-MAX_RESPONSE);
+        // Start at the first complete line
+        const firstNewline = trimmed.indexOf('\n');
+        content = '--- log trimmed ---\n' + (firstNewline >= 0 ? trimmed.slice(firstNewline + 1) : trimmed);
+      }
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end(content);
       return;
     }
 
