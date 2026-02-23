@@ -212,15 +212,15 @@ function toggleShareDropdown(e) {
     <button onclick="startNotebookFromArticle()"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-pen"/></svg> Write About This</button>
     <hr>
     <div class="share-group-label">Share to</div>
-    <a href="https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}" target="_blank" rel="noopener"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-linkedin"/></svg> LinkedIn</a>
-    <a href="https://bsky.app/intent/compose?text=${encodedText}" target="_blank" rel="noopener"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-bluesky"/></svg> Bluesky</a>
-    <a href="https://mastodon.social/share?text=${encodedText}" target="_blank" rel="noopener"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-mastodon"/></svg> Mastodon</a>
-    <a href="https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}" target="_blank" rel="noopener"><svg class="share-icon" viewBox="0 0 320 512"><use href="#i-facebook"/></svg> Facebook</a>
-    <a href="https://www.threads.net/intent/post?text=${encodedText}" target="_blank" rel="noopener"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-threads"/></svg> Threads</a>
+    <button onclick="prOpenExternal('https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}')"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-linkedin"/></svg> LinkedIn</button>
+    <button onclick="prOpenExternal('https://bsky.app/intent/compose?text=${encodedText}')"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-bluesky"/></svg> Bluesky</button>
+    <button onclick="prOpenExternal('https://mastodon.social/share?text=${encodedText}')"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-mastodon"/></svg> Mastodon</button>
+    <button onclick="prOpenExternal('https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}')"><svg class="share-icon" viewBox="0 0 320 512"><use href="#i-facebook"/></svg> Facebook</button>
+    <button onclick="prOpenExternal('https://www.threads.net/intent/post?text=${encodedText}')"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-threads"/></svg> Threads</button>
     <hr>
     <div class="share-group-label">Send</div>
-    <a href="mailto:?subject=${encodedTitle}&body=${encodedText}" target="_blank"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-envelope"/></svg> Email</a>
-    <a href="sms:&body=${encodedText}"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-comment"/></svg> Messages</a>
+    <button onclick="prOpenExternal('mailto:?subject=${encodedTitle}&body=${encodedText}')"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-envelope"/></svg> Email</button>
+    <button onclick="prOpenExternal('sms:&body=${encodedText}')"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-comment"/></svg> Messages</button>
   `;
 
   e.target.closest('.share-dropdown').appendChild(panel);
@@ -413,20 +413,13 @@ async function doExportMarkdown(copyOnly) {
     return;
   }
 
-  // Download as file
-  const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = activeFile;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  // Download as file using native save dialog when in Tauri
+  const saved = await prSaveFile(md, activeFile, 'text/markdown;charset=utf-8');
 
   // Close modal
   const overlay = document.querySelector('.modal-overlay');
   if (overlay) overlay.remove();
+  if (saved) showToast('Markdown exported');
 }
 
 // Close share dropdown when clicking outside

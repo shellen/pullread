@@ -61,6 +61,62 @@ window.prNotify = async function (title, body) {
   }
 };
 
+/**
+ * Open a URL in the system default browser.
+ * Uses Tauri shell plugin when available, falls back to window.open.
+ */
+window.prOpenExternal = async function (url) {
+  if (window.PR_TAURI) {
+    try {
+      const shell = window.__TAURI__.shell || await import('@tauri-apps/plugin-shell');
+      await shell.open(url);
+      return;
+    } catch (e) {
+      console.warn('Tauri shell open failed, falling back:', e);
+    }
+  }
+  window.open(url, '_blank');
+};
+
+/**
+ * Save content to a file with a native save dialog.
+ * Uses Tauri dialog plugin + server endpoint when available,
+ * falls back to blob download in browser mode.
+ */
+window.prSaveFile = async function (content, defaultFilename, mimeType) {
+  if (window.PR_TAURI) {
+    try {
+      const dialog = window.__TAURI__.dialog || await import('@tauri-apps/plugin-dialog');
+      const ext = defaultFilename.split('.').pop() || 'md';
+      const filePath = await dialog.save({
+        defaultPath: defaultFilename,
+        filters: [{ name: ext.toUpperCase() + ' file', extensions: [ext] }],
+      });
+      if (!filePath) return false; // User cancelled
+      var res = await fetch('/api/write-export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: filePath, content: content }),
+      });
+      if (!res.ok) throw new Error('Server write failed');
+      return true;
+    } catch (e) {
+      console.warn('Tauri save failed, falling back to blob download:', e);
+    }
+  }
+  // Fallback: blob download
+  var blob = new Blob([content], { type: mimeType || 'text/plain;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = defaultFilename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  return true;
+};
+
 // Log Tauri detection result
 if (window.PR_TAURI) {
   console.log('[PullRead] Running inside Tauri WebView');

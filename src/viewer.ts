@@ -2066,6 +2066,27 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
       return;
     }
 
+    // Write exported content to a user-chosen file path (used by Tauri save dialog)
+    if (url.pathname === '/api/write-export' && req.method === 'POST') {
+      const body = await readBody(req);
+      try {
+        const { path: filePath, content } = JSON.parse(body);
+        if (!filePath || typeof filePath !== 'string') {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Missing path' }));
+          return;
+        }
+        const dir = dirname(filePath);
+        if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+        writeFileSync(filePath, content, 'utf-8');
+        sendJson(res, { ok: true, path: filePath });
+      } catch (e: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message || 'Write failed' }));
+      }
+      return;
+    }
+
     send404(res);
   });
 

@@ -816,15 +816,10 @@ function exportNotebook() {
   if (nb.title) md += '# ' + nb.title + '\n\n';
   md += getAllNotesContent(nb) + '\n';
 
-  const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = (nb.title || 'notebook').replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '.md';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  var filename = (nb.title || 'notebook').replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '.md';
+  prSaveFile(md, filename, 'text/markdown;charset=utf-8').then(function(saved) {
+    if (saved) showToast('Notebook exported');
+  });
 }
 
 function toggleNotebookExportDropdown(e) {
@@ -852,9 +847,6 @@ function toggleNotebookExportDropdown(e) {
 function exportNotebookPdf() {
   if (!_activeNotebook) return;
   var nb = _activeNotebook;
-  // Render the notebook as a clean printable page and trigger print-to-PDF
-  var win = window.open('', '_blank');
-  if (!win) { alert('Please allow popups to export as PDF.'); return; }
   var bodyHtml = sanitizeHtml(marked.parse(getAllNotesContent(nb) || ''));
   var sources = (nb.sources || []);
   var sourcesHtml = '';
@@ -869,7 +861,7 @@ function exportNotebookPdf() {
   }
   var tags = (nb.tags || []);
   var tagsHtml = tags.length ? '<p><strong>Tags:</strong> ' + tags.map(function(t) { return escapeHtml(t); }).join(', ') + '</p>' : '';
-  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + escapeHtml(nb.title || 'Notebook') + '</title>'
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + escapeHtml(nb.title || 'Notebook') + '</title>'
     + '<style>body{font-family:Georgia,serif;max-width:700px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}'
     + 'h1{font-size:28px;margin-bottom:4px}h2,h3{margin-top:1.5em}'
     + 'blockquote{border-left:3px solid #ccc;margin:1em 0;padding:0.5em 1em;color:#555}'
@@ -880,9 +872,22 @@ function exportNotebookPdf() {
     + '<h1>' + escapeHtml(nb.title || 'Untitled') + '</h1>'
     + '<div class="meta">Notebook' + (nb.updatedAt ? ' &middot; Updated ' + new Date(nb.updatedAt).toLocaleDateString() : '') + '</div>'
     + bodyHtml + sourcesHtml + tagsHtml
-    + '<script>window.onload=function(){window.print();}<\/script>'
-    + '</body></html>');
-  win.document.close();
+    + '</body></html>';
+
+  // Use a hidden iframe instead of window.open (blocked in Tauri WebKit)
+  var existing = document.getElementById('pr-print-frame');
+  if (existing) existing.remove();
+  var iframe = document.createElement('iframe');
+  iframe.id = 'pr-print-frame';
+  iframe.style.cssText = 'position:fixed;top:-10000px;left:-10000px;width:800px;height:600px;border:none;';
+  document.body.appendChild(iframe);
+  iframe.contentDocument.open();
+  iframe.contentDocument.write(html);
+  iframe.contentDocument.close();
+  iframe.onload = function() {
+    iframe.contentWindow.print();
+    setTimeout(function() { iframe.remove(); }, 1000);
+  };
 }
 
 function showHighlightPicker() {
