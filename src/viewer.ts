@@ -1131,6 +1131,40 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
       return;
     }
 
+    // Per-feed sync status
+    if (url.pathname === '/api/feed-status' && req.method === 'GET') {
+      const statusPath = join(CONFIG_DIR, 'feed-status.json');
+      sendJson(res, loadJsonFile(statusPath));
+      return;
+    }
+
+    // Retry a single feed sync
+    if (url.pathname === '/api/retry-feed' && req.method === 'POST') {
+      const body = JSON.parse(await readBody(req));
+      const { name, url: feedUrl } = body;
+      if (!name || !feedUrl) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'name and url required' }));
+        return;
+      }
+      const statusPath = join(CONFIG_DIR, 'feed-status.json');
+      try {
+        const { fetchFeed } = await import('./feed');
+        const entries = await fetchFeed(feedUrl);
+        const status = loadJsonFile(statusPath);
+        status[name] = { ok: true, lastSync: new Date().toISOString(), entries: entries.length };
+        saveJsonFile(statusPath, status);
+        sendJson(res, { ok: true, entries: entries.length });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        const status = loadJsonFile(statusPath);
+        status[name] = { ok: false, lastSync: new Date().toISOString(), error: message };
+        saveJsonFile(statusPath, status);
+        sendJson(res, { ok: false, error: message });
+      }
+      return;
+    }
+
     // App config API (feeds.json — output path, feeds, sync interval, browser cookies)
     if (url.pathname === '/api/config') {
       if (req.method === 'GET') {
@@ -2044,14 +2078,30 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
     // Log viewer — serves the sidecar log file as plain text
     if (url.pathname === '/api/log' && req.method === 'GET') {
       const logFile = '/tmp/pullread.log';
+      const logOld = '/tmp/pullread.log.old';
+      let content = '';
+      // Include rotated log for context, then current log
+      if (existsSync(logOld)) {
+        content += readFileSync(logOld, 'utf-8');
+      }
       if (existsSync(logFile)) {
-        const content = readFileSync(logFile, 'utf-8');
-        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end(content);
-      } else {
+        content += readFileSync(logFile, 'utf-8');
+      }
+      if (!content) {
         res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
         res.end('No log file found.');
+        return;
       }
+      // Return only the last ~200 KB to avoid sending huge payloads
+      const MAX_RESPONSE = 200 * 1024;
+      if (content.length > MAX_RESPONSE) {
+        const trimmed = content.slice(-MAX_RESPONSE);
+        // Start at the first complete line
+        const firstNewline = trimmed.indexOf('\n');
+        content = '--- log trimmed ---\n' + (firstNewline >= 0 ? trimmed.slice(firstNewline + 1) : trimmed);
+      }
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end(content);
       return;
     }
 
@@ -2063,6 +2113,27 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
       exec(`open "${folder}"`, (err) => {
         sendJson(res, { ok: !err });
       });
+      return;
+    }
+
+    // Write exported content to a user-chosen file path (used by Tauri save dialog)
+    if (url.pathname === '/api/write-export' && req.method === 'POST') {
+      const body = await readBody(req);
+      try {
+        const { path: filePath, content } = JSON.parse(body);
+        if (!filePath || typeof filePath !== 'string') {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Missing path' }));
+          return;
+        }
+        const dir = dirname(filePath);
+        if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+        writeFileSync(filePath, content, 'utf-8');
+        sendJson(res, { ok: true, path: filePath });
+      } catch (e: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message || 'Write failed' }));
+      }
       return;
     }
 

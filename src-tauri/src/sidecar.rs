@@ -217,14 +217,25 @@ pub fn log_path() -> String {
     "/tmp/pullread.log".to_string()
 }
 
-/// Append a line to the log file
+/// Maximum log file size before rotation (~512 KB)
+const MAX_LOG_SIZE: u64 = 512 * 1024;
+
+/// Append a line to the log file, rotating when it exceeds MAX_LOG_SIZE.
 fn append_log(message: &str) {
     use std::io::Write;
+    let path = log_path();
+    // Rotate: rename current log to .old and start fresh
+    if let Ok(meta) = std::fs::metadata(&path) {
+        if meta.len() > MAX_LOG_SIZE {
+            let old = format!("{}.old", path);
+            let _ = std::fs::rename(&path, &old);
+        }
+    }
     let timestamp = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
     if let Ok(mut f) = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
-        .open(log_path())
+        .open(&path)
     {
         let _ = writeln!(f, "[{}] {}", timestamp, message);
     }
@@ -403,12 +414,11 @@ pub async fn ensure_viewer_running(app: &AppHandle) -> Result<u16, String> {
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     }
 
-    // Even if health check times out, the server might still be starting
-    log::warn!(
-        "Viewer health check timed out, proceeding with port {}",
+    log::warn!("Viewer health check timed out on port {}", port);
+    Err(format!(
+        "Server failed to start within 10 seconds on port {}",
         port
-    );
-    Ok(port)
+    ))
 }
 
 /// Run the review command using spawn + kill pattern.

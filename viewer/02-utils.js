@@ -71,6 +71,10 @@ function cleanMarkdown(md) {
   // Collapse linked images where link URL = image URL: [![alt](url)](url) → ![alt](url)
   md = md.replace(/\[!\[([^\]]*)\]\(([^)]+)\)\]\(\2\)/g, '![$1]($2)');
 
+  // Fix escaped brackets around links: \[[text](url)\] → &#91;text link&#93;
+  // marked.js mishandles \] after a link, swallowing the closing bracket
+  md = md.replace(/\\\[(\[[^\]]+\]\([^)]+\))\\\]/g, '&#91;$1&#93;');
+
   // Simplify Substack CDN proxy URLs in images — these are extremely long and contain
   // commas/colons that break marked.js. Extract the real image URL from inside.
   // e.g. ![alt](https://substackcdn.com/image/fetch/w_1456,c_limit,.../https%3A%2F%2Fsubstack-post-media...)

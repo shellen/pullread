@@ -209,18 +209,19 @@ function toggleShareDropdown(e) {
     <div class="share-group-label">Actions</div>
     <button onclick="copyArticleLink()"><svg class="share-icon" viewBox="0 0 640 512"><use href="#i-link"/></svg> Copy Link</button>
     <button onclick="showExportMarkdownModal()"><svg class="share-icon" viewBox="0 0 640 512"><use href="#i-cloud-download"/></svg> Export Markdown</button>
+    <button onclick="exportArticlePdf()"><svg class="share-icon" viewBox="0 0 640 512"><use href="#i-cloud-download"/></svg> Export PDF</button>
     <button onclick="startNotebookFromArticle()"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-pen"/></svg> Write About This</button>
     <hr>
     <div class="share-group-label">Share to</div>
-    <a href="https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}" target="_blank" rel="noopener"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-linkedin"/></svg> LinkedIn</a>
-    <a href="https://bsky.app/intent/compose?text=${encodedText}" target="_blank" rel="noopener"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-bluesky"/></svg> Bluesky</a>
-    <a href="https://mastodon.social/share?text=${encodedText}" target="_blank" rel="noopener"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-mastodon"/></svg> Mastodon</a>
-    <a href="https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}" target="_blank" rel="noopener"><svg class="share-icon" viewBox="0 0 320 512"><use href="#i-facebook"/></svg> Facebook</a>
-    <a href="https://www.threads.net/intent/post?text=${encodedText}" target="_blank" rel="noopener"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-threads"/></svg> Threads</a>
+    <button onclick="prOpenExternal('https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}')"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-linkedin"/></svg> LinkedIn</button>
+    <button onclick="prOpenExternal('https://bsky.app/intent/compose?text=${encodedText}')"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-bluesky"/></svg> Bluesky</button>
+    <button onclick="prOpenExternal('https://mastodon.social/share?text=${encodedText}')"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-mastodon"/></svg> Mastodon</button>
+    <button onclick="prOpenExternal('https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}')"><svg class="share-icon" viewBox="0 0 320 512"><use href="#i-facebook"/></svg> Facebook</button>
+    <button onclick="prOpenExternal('https://www.threads.net/intent/post?text=${encodedText}')"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-threads"/></svg> Threads</button>
     <hr>
     <div class="share-group-label">Send</div>
-    <a href="mailto:?subject=${encodedTitle}&body=${encodedText}" target="_blank"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-envelope"/></svg> Email</a>
-    <a href="sms:&body=${encodedText}"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-comment"/></svg> Messages</a>
+    <button onclick="prOpenExternal('mailto:?subject=${encodedTitle}&body=${encodedText}')"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-envelope"/></svg> Email</button>
+    <button onclick="prOpenExternal('sms:&body=${encodedText}')"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-comment"/></svg> Messages</button>
   `;
 
   e.target.closest('.share-dropdown').appendChild(panel);
@@ -413,20 +414,179 @@ async function doExportMarkdown(copyOnly) {
     return;
   }
 
-  // Download as file
-  const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = activeFile;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  // Download as file using native save dialog when in Tauri
+  const saved = await prSaveFile(md, activeFile, 'text/markdown;charset=utf-8');
 
   // Close modal
   const overlay = document.querySelector('.modal-overlay');
   if (overlay) overlay.remove();
+  if (saved) showToast('Markdown exported');
+}
+
+function exportArticlePdf() {
+  // Close share dropdown
+  var panel = document.querySelector('.share-dropdown-panel');
+  if (panel) panel.remove();
+
+  if (!activeFile) return;
+
+  var hasHighlights = articleHighlights.length > 0;
+  var hasNotes = articleNotes.articleNote || (articleNotes.annotations && articleNotes.annotations.length > 0);
+  var file = allFiles.find(function(f) { return f.filename === activeFile; });
+  var hasSummary = file && file.hasSummary;
+  var hasTags = (articleNotes.tags && articleNotes.tags.length > 0) || (articleNotes.machineTags && articleNotes.machineTags.length > 0);
+
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Export PDF');
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+  var optionsHtml = '';
+  optionsHtml += '<div class="export-option"><input type="checkbox" id="pdf-summary" checked ' + (hasSummary ? '' : 'disabled') + '><label for="pdf-summary">Include summary</label>' + (hasSummary ? '' : '<span class="export-hint">none available</span>') + '</div>';
+  optionsHtml += '<div class="export-option"><input type="checkbox" id="pdf-highlights" checked ' + (hasHighlights ? '' : 'disabled') + '><label for="pdf-highlights">Include highlights</label>' + (hasHighlights ? '<span class="export-hint">' + articleHighlights.length + '</span>' : '<span class="export-hint">none</span>') + '</div>';
+  optionsHtml += '<div class="export-option"><input type="checkbox" id="pdf-notes" checked ' + (hasNotes ? '' : 'disabled') + '><label for="pdf-notes">Include notes</label>' + (hasNotes ? '' : '<span class="export-hint">none</span>') + '</div>';
+  optionsHtml += '<div class="export-option"><input type="checkbox" id="pdf-tags" checked ' + (hasTags ? '' : 'disabled') + '><label for="pdf-tags">Include tags</label>' + (hasTags ? '<span class="export-hint">' + [...(articleNotes.tags || []), ...(articleNotes.machineTags || [])].length + '</span>' : '<span class="export-hint">none</span>') + '</div>';
+
+  overlay.innerHTML = '\
+    <div class="modal-card" onclick="event.stopPropagation()" style="max-width:400px">\
+      <h2>Export PDF</h2>\
+      <p>Choose what to include in the exported PDF:</p>\
+      ' + optionsHtml + '\
+      <div class="modal-actions">\
+        <button class="btn-secondary" onclick="this.closest(\'.modal-overlay\').remove()">Cancel</button>\
+        <button class="btn-primary" onclick="doExportArticlePdf()">Export PDF</button>\
+      </div>\
+    </div>\
+  ';
+  document.body.appendChild(overlay);
+}
+
+async function doExportArticlePdf() {
+  if (!activeFile) return;
+
+  var inclSummary = document.getElementById('pdf-summary')?.checked;
+  var inclHighlights = document.getElementById('pdf-highlights')?.checked;
+  var inclNotes = document.getElementById('pdf-notes')?.checked;
+  var inclTags = document.getElementById('pdf-tags')?.checked;
+
+  // Close modal
+  var overlay = document.querySelector('.modal-overlay');
+  if (overlay) overlay.remove();
+
+  var file = allFiles.find(function(f) { return f.filename === activeFile; });
+  var title = (file && file.title) || activeFile;
+  var author = file && file.author;
+  var domain = file && file.domain;
+  var bookmarked = file && file.bookmarked;
+  var sourceUrl = file && file.url;
+
+  // Fetch raw markdown and render to HTML
+  var rawText = '';
+  if (serverMode) {
+    var res = await fetch('/api/file?name=' + encodeURIComponent(activeFile));
+    if (res.ok) rawText = await res.text();
+  }
+  if (!rawText) return;
+
+  var parsed = parseFrontmatter(rawText);
+  var bodyHtml = sanitizeHtml(marked.parse(cleanMarkdown(parsed.body)));
+
+  // Build metadata line
+  var metaParts = [];
+  if (author) metaParts.push(escapeHtml(author));
+  if (domain) metaParts.push(escapeHtml(domain));
+  if (bookmarked) metaParts.push('Saved ' + escapeHtml(bookmarked.slice(0, 10)));
+  var metaHtml = metaParts.length ? '<div class="meta">' + metaParts.join(' &middot; ') + '</div>' : '';
+
+  // Tags
+  var tagsHtml = '';
+  if (inclTags) {
+    var allTags = [...(articleNotes.tags || []), ...(articleNotes.machineTags || [])];
+    if (allTags.length) {
+      tagsHtml = '<div class="meta"><strong>Tags:</strong> ' + allTags.map(function(t) { return escapeHtml(t); }).join(', ') + '</div>';
+    }
+  }
+
+  // Summary
+  var summaryHtml = '';
+  if (inclSummary && parsed.meta && parsed.meta.summary) {
+    summaryHtml = '<blockquote class="summary"><strong>Summary:</strong> ' + escapeHtml(parsed.meta.summary) + '</blockquote>';
+  }
+
+  // Highlights
+  var highlightsHtml = '';
+  if (inclHighlights && articleHighlights.length > 0) {
+    highlightsHtml = '<hr><h2>Highlights</h2><ul>';
+    for (var i = 0; i < articleHighlights.length; i++) {
+      var hl = articleHighlights[i];
+      highlightsHtml += '<li><blockquote>' + escapeHtml(hl.text) + '</blockquote>';
+      if (hl.note) highlightsHtml += '<p><em>' + escapeHtml(hl.note) + '</em></p>';
+      highlightsHtml += '</li>';
+    }
+    highlightsHtml += '</ul>';
+  }
+
+  // Notes
+  var notesHtml = '';
+  if (inclNotes) {
+    var hasArticleNote = articleNotes.articleNote && articleNotes.articleNote.trim();
+    var hasAnnotations = articleNotes.annotations && articleNotes.annotations.length > 0;
+    if (hasArticleNote || hasAnnotations) {
+      notesHtml = '<hr><h2>Notes</h2>';
+      if (hasArticleNote) {
+        notesHtml += '<p>' + escapeHtml(articleNotes.articleNote.trim()) + '</p>';
+      }
+      if (hasAnnotations) {
+        notesHtml += '<ul>';
+        for (var j = 0; j < articleNotes.annotations.length; j++) {
+          var ann = articleNotes.annotations[j];
+          notesHtml += '<li><blockquote>' + escapeHtml(ann.text) + '</blockquote>';
+          notesHtml += '<p><em>' + escapeHtml(ann.note) + '</em></p></li>';
+        }
+        notesHtml += '</ul>';
+      }
+    }
+  }
+
+  // Source link
+  var sourceHtml = sourceUrl ? '<hr><p class="meta">Source: ' + escapeHtml(sourceUrl) + '</p>' : '';
+
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + escapeHtml(title) + '</title>'
+    + '<style>body{font-family:Georgia,serif;max-width:700px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}'
+    + 'h1{font-size:28px;margin-bottom:4px}h2,h3{margin-top:1.5em}'
+    + 'blockquote{border-left:3px solid #ccc;margin:1em 0;padding:0.5em 1em;color:#555}'
+    + 'blockquote.summary{background:#f9f9f4;border-left-color:#b8a940;border-radius:4px}'
+    + 'code{background:#f5f5f5;padding:2px 4px;border-radius:3px;font-size:0.9em}'
+    + 'pre{background:#f5f5f5;padding:12px;border-radius:6px;overflow-x:auto}'
+    + 'img{max-width:100%;height:auto}'
+    + '.meta{font-size:13px;color:#888;margin-bottom:24px}'
+    + '@media print{body{margin:0;max-width:none}}</style></head><body>'
+    + '<h1>' + escapeHtml(title) + '</h1>'
+    + metaHtml
+    + tagsHtml
+    + summaryHtml
+    + bodyHtml
+    + highlightsHtml
+    + notesHtml
+    + sourceHtml
+    + '</body></html>';
+
+  // Use a hidden iframe to trigger print (works in Tauri WebKit)
+  var existing = document.getElementById('pr-print-frame');
+  if (existing) existing.remove();
+  var iframe = document.createElement('iframe');
+  iframe.id = 'pr-print-frame';
+  iframe.style.cssText = 'position:fixed;top:-10000px;left:-10000px;width:800px;height:600px;border:none;';
+  document.body.appendChild(iframe);
+  iframe.contentDocument.open();
+  iframe.contentDocument.write(html);
+  iframe.contentDocument.close();
+  iframe.onload = function() {
+    iframe.contentWindow.print();
+    setTimeout(function() { iframe.remove(); }, 1000);
+  };
 }
 
 // Close share dropdown when clicking outside

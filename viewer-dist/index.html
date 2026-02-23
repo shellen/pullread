@@ -16,10 +16,10 @@
   }
   @media (prefers-color-scheme: dark) {
     body { background: #1a1a1a; color: #ccc; }
+    .error-box { background: #2a2a2a; border-color: #444; }
+    a { color: #6db3f2; }
   }
-  .loader {
-    text-align: center;
-  }
+  .loader { text-align: center; max-width: 360px; padding: 0 20px; }
   .spinner {
     width: 32px;
     height: 32px;
@@ -30,12 +30,80 @@
     margin: 0 auto 16px;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+  .error-box {
+    display: none;
+    background: #fafafa;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 16px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .error-box button {
+    margin-top: 12px;
+    padding: 8px 16px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background: #fff;
+    color: #333;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .error-box button:hover { background: #f0f0f0; }
 </style>
 </head>
 <body>
   <div class="loader">
-    <div class="spinner"></div>
-    <p>Starting PullRead&hellip;</p>
+    <div class="spinner" id="spinner"></div>
+    <p id="status">Starting PullRead&hellip;</p>
+    <div class="error-box" id="error-box">
+      <p><strong>PullRead couldn't connect to its server.</strong></p>
+      <p>Try quitting and reopening the app. If the problem persists, check the log file.</p>
+      <button onclick="window.location.reload()">Try Again</button>
+      <button onclick="window.open('http://127.0.0.1:7777','_blank')">Open in Browser</button>
+    </div>
   </div>
+  <script>
+    (function() {
+      var ports = [7777, 7778];
+      var start = Date.now();
+      var timeout = 15000;
+      var interval = 500;
+
+      function tryConnect() {
+        if (Date.now() - start > timeout) {
+          document.getElementById('spinner').style.display = 'none';
+          document.getElementById('status').style.display = 'none';
+          document.getElementById('error-box').style.display = 'block';
+          return;
+        }
+
+        var pending = ports.length;
+        var found = false;
+        for (var i = 0; i < ports.length; i++) {
+          (function(port) {
+            fetch('http://127.0.0.1:' + port + '/api/files', { mode: 'no-cors' })
+              .then(function(r) {
+                if (!found && (r.ok || r.type === 'opaque')) {
+                  found = true;
+                  window.location.href = 'http://localhost:' + port;
+                }
+              })
+              .catch(function() {})
+              .finally(function() {
+                pending--;
+                if (pending === 0 && !found) {
+                  setTimeout(tryConnect, interval);
+                }
+              });
+          })(ports[i]);
+        }
+      }
+
+      tryConnect();
+    })();
+  </script>
 </body>
 </html>
