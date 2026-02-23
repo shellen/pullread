@@ -423,12 +423,57 @@ async function doExportMarkdown(copyOnly) {
   if (saved) showToast('Markdown exported');
 }
 
-async function exportArticlePdf() {
+function exportArticlePdf() {
   // Close share dropdown
   var panel = document.querySelector('.share-dropdown-panel');
   if (panel) panel.remove();
 
   if (!activeFile) return;
+
+  var hasHighlights = articleHighlights.length > 0;
+  var hasNotes = articleNotes.articleNote || (articleNotes.annotations && articleNotes.annotations.length > 0);
+  var file = allFiles.find(function(f) { return f.filename === activeFile; });
+  var hasSummary = file && file.hasSummary;
+  var hasTags = (articleNotes.tags && articleNotes.tags.length > 0) || (articleNotes.machineTags && articleNotes.machineTags.length > 0);
+
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Export PDF');
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+  var optionsHtml = '';
+  optionsHtml += '<div class="export-option"><input type="checkbox" id="pdf-summary" checked ' + (hasSummary ? '' : 'disabled') + '><label for="pdf-summary">Include summary</label>' + (hasSummary ? '' : '<span class="export-hint">none available</span>') + '</div>';
+  optionsHtml += '<div class="export-option"><input type="checkbox" id="pdf-highlights" checked ' + (hasHighlights ? '' : 'disabled') + '><label for="pdf-highlights">Include highlights</label>' + (hasHighlights ? '<span class="export-hint">' + articleHighlights.length + '</span>' : '<span class="export-hint">none</span>') + '</div>';
+  optionsHtml += '<div class="export-option"><input type="checkbox" id="pdf-notes" checked ' + (hasNotes ? '' : 'disabled') + '><label for="pdf-notes">Include notes</label>' + (hasNotes ? '' : '<span class="export-hint">none</span>') + '</div>';
+  optionsHtml += '<div class="export-option"><input type="checkbox" id="pdf-tags" checked ' + (hasTags ? '' : 'disabled') + '><label for="pdf-tags">Include tags</label>' + (hasTags ? '<span class="export-hint">' + [...(articleNotes.tags || []), ...(articleNotes.machineTags || [])].length + '</span>' : '<span class="export-hint">none</span>') + '</div>';
+
+  overlay.innerHTML = '\
+    <div class="modal-card" onclick="event.stopPropagation()" style="max-width:400px">\
+      <h2>Export PDF</h2>\
+      <p>Choose what to include in the exported PDF:</p>\
+      ' + optionsHtml + '\
+      <div class="modal-actions">\
+        <button class="btn-secondary" onclick="this.closest(\'.modal-overlay\').remove()">Cancel</button>\
+        <button class="btn-primary" onclick="doExportArticlePdf()">Export PDF</button>\
+      </div>\
+    </div>\
+  ';
+  document.body.appendChild(overlay);
+}
+
+async function doExportArticlePdf() {
+  if (!activeFile) return;
+
+  var inclSummary = document.getElementById('pdf-summary')?.checked;
+  var inclHighlights = document.getElementById('pdf-highlights')?.checked;
+  var inclNotes = document.getElementById('pdf-notes')?.checked;
+  var inclTags = document.getElementById('pdf-tags')?.checked;
+
+  // Close modal
+  var overlay = document.querySelector('.modal-overlay');
+  if (overlay) overlay.remove();
 
   var file = allFiles.find(function(f) { return f.filename === activeFile; });
   var title = (file && file.title) || activeFile;
@@ -455,15 +500,24 @@ async function exportArticlePdf() {
   if (bookmarked) metaParts.push('Saved ' + escapeHtml(bookmarked.slice(0, 10)));
   var metaHtml = metaParts.length ? '<div class="meta">' + metaParts.join(' &middot; ') + '</div>' : '';
 
+  // Tags
+  var tagsHtml = '';
+  if (inclTags) {
+    var allTags = [...(articleNotes.tags || []), ...(articleNotes.machineTags || [])];
+    if (allTags.length) {
+      tagsHtml = '<div class="meta"><strong>Tags:</strong> ' + allTags.map(function(t) { return escapeHtml(t); }).join(', ') + '</div>';
+    }
+  }
+
   // Summary
   var summaryHtml = '';
-  if (parsed.meta && parsed.meta.summary) {
+  if (inclSummary && parsed.meta && parsed.meta.summary) {
     summaryHtml = '<blockquote class="summary"><strong>Summary:</strong> ' + escapeHtml(parsed.meta.summary) + '</blockquote>';
   }
 
   // Highlights
   var highlightsHtml = '';
-  if (articleHighlights.length > 0) {
+  if (inclHighlights && articleHighlights.length > 0) {
     highlightsHtml = '<hr><h2>Highlights</h2><ul>';
     for (var i = 0; i < articleHighlights.length; i++) {
       var hl = articleHighlights[i];
@@ -472,6 +526,28 @@ async function exportArticlePdf() {
       highlightsHtml += '</li>';
     }
     highlightsHtml += '</ul>';
+  }
+
+  // Notes
+  var notesHtml = '';
+  if (inclNotes) {
+    var hasArticleNote = articleNotes.articleNote && articleNotes.articleNote.trim();
+    var hasAnnotations = articleNotes.annotations && articleNotes.annotations.length > 0;
+    if (hasArticleNote || hasAnnotations) {
+      notesHtml = '<hr><h2>Notes</h2>';
+      if (hasArticleNote) {
+        notesHtml += '<p>' + escapeHtml(articleNotes.articleNote.trim()) + '</p>';
+      }
+      if (hasAnnotations) {
+        notesHtml += '<ul>';
+        for (var j = 0; j < articleNotes.annotations.length; j++) {
+          var ann = articleNotes.annotations[j];
+          notesHtml += '<li><blockquote>' + escapeHtml(ann.text) + '</blockquote>';
+          notesHtml += '<p><em>' + escapeHtml(ann.note) + '</em></p></li>';
+        }
+        notesHtml += '</ul>';
+      }
+    }
   }
 
   // Source link
@@ -489,9 +565,11 @@ async function exportArticlePdf() {
     + '@media print{body{margin:0;max-width:none}}</style></head><body>'
     + '<h1>' + escapeHtml(title) + '</h1>'
     + metaHtml
+    + tagsHtml
     + summaryHtml
     + bodyHtml
     + highlightsHtml
+    + notesHtml
     + sourceHtml
     + '</body></html>';
 
