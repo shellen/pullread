@@ -414,12 +414,11 @@ pub async fn ensure_viewer_running(app: &AppHandle) -> Result<u16, String> {
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     }
 
-    // Even if health check times out, the server might still be starting
-    log::warn!(
-        "Viewer health check timed out, proceeding with port {}",
+    log::warn!("Viewer health check timed out on port {}", port);
+    Err(format!(
+        "Server failed to start within 10 seconds on port {}",
         port
-    );
-    Ok(port)
+    ))
 }
 
 /// Run the review command using spawn + kill pattern.
