@@ -1,6 +1,6 @@
 {
   "name": "pullread",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Sync Drafty bookmarks to markdown files",
   "main": "src/index.ts",
   "scripts": {
