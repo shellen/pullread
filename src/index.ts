@@ -19,6 +19,29 @@ const DEFAULT_DB_PATH = join(DEFAULT_CONFIG_DIR, 'pullread.db');
 const DEFAULT_CONFIG_PATH = join(DEFAULT_CONFIG_DIR, 'feeds.json');
 
 const SYNC_PROGRESS_PATH = join(DEFAULT_CONFIG_DIR, '.sync-progress');
+const FEED_STATUS_PATH = join(DEFAULT_CONFIG_DIR, 'feed-status.json');
+
+interface FeedStatus {
+  ok: boolean;
+  lastSync: string;
+  entries?: number;
+  error?: string;
+}
+
+function loadFeedStatus(): Record<string, FeedStatus> {
+  if (!existsSync(FEED_STATUS_PATH)) return {};
+  try {
+    return JSON.parse(readFileSync(FEED_STATUS_PATH, 'utf-8'));
+  } catch {
+    return {};
+  }
+}
+
+function saveFeedStatus(status: Record<string, FeedStatus>): void {
+  try {
+    writeFileSync(FEED_STATUS_PATH, JSON.stringify(status, null, 2));
+  } catch {}
+}
 
 interface SyncProgress {
   status: 'syncing';
@@ -111,7 +134,7 @@ async function syncFeed(
   fetchOptions: FetchOptions = {},
   progress?: SyncProgress,
   maxAgeDays?: number
-): Promise<{ success: number; failed: number }> {
+): Promise<{ success: number; failed: number; feedError?: string }> {
   console.log(`\nSyncing ${feedName}...`);
 
   let entries: FeedEntry[];
@@ -119,8 +142,9 @@ async function syncFeed(
     entries = await fetchFeed(feedUrl);
     console.log(`  Found ${entries.length} entries`);
   } catch (err) {
+    const feedError = `Failed to fetch feed: ${err instanceof Error ? err.message : err}`;
     console.error(`  Error fetching feed: ${err instanceof Error ? err.message : err}`);
-    return { success: 0, failed: 0 };
+    return { success: 0, failed: 0, feedError };
   }
 
   // Filter out entries older than maxAgeDays
@@ -290,14 +314,24 @@ async function sync(feedFilter?: string, retryFailed = false): Promise<void> {
     };
     writeSyncProgress(progress);
 
+    const feedStatus = loadFeedStatus();
+
     for (let i = 0; i < feedEntries.length; i++) {
       const [name, url] = feedEntries[i];
       progress.feed = name;
       progress.feedIndex = i + 1;
       writeSyncProgress(progress);
-      const { success, failed } = await syncFeed(name, url, storage, config.outputPath, retryFailed, fetchOptions, progress, config.maxAgeDays);
+      const { success, failed, feedError } = await syncFeed(name, url, storage, config.outputPath, retryFailed, fetchOptions, progress, config.maxAgeDays);
       totalSuccess += success;
       totalFailed += failed;
+
+      const now = new Date().toISOString();
+      if (feedError) {
+        feedStatus[name] = { ok: false, lastSync: now, error: feedError };
+      } else {
+        feedStatus[name] = { ok: true, lastSync: now, entries: success };
+      }
+      saveFeedStatus(feedStatus);
     }
 
     // Process inbox items (saved from URL scheme, share extension, services menu)

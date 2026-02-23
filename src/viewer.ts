@@ -1131,6 +1131,40 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
       return;
     }
 
+    // Per-feed sync status
+    if (url.pathname === '/api/feed-status' && req.method === 'GET') {
+      const statusPath = join(CONFIG_DIR, 'feed-status.json');
+      sendJson(res, loadJsonFile(statusPath));
+      return;
+    }
+
+    // Retry a single feed sync
+    if (url.pathname === '/api/retry-feed' && req.method === 'POST') {
+      const body = JSON.parse(await readBody(req));
+      const { name, url: feedUrl } = body;
+      if (!name || !feedUrl) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'name and url required' }));
+        return;
+      }
+      const statusPath = join(CONFIG_DIR, 'feed-status.json');
+      try {
+        const { fetchFeed } = await import('./feed');
+        const entries = await fetchFeed(feedUrl);
+        const status = loadJsonFile(statusPath);
+        status[name] = { ok: true, lastSync: new Date().toISOString(), entries: entries.length };
+        saveJsonFile(statusPath, status);
+        sendJson(res, { ok: true, entries: entries.length });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        const status = loadJsonFile(statusPath);
+        status[name] = { ok: false, lastSync: new Date().toISOString(), error: message };
+        saveJsonFile(statusPath, status);
+        sendJson(res, { ok: false, error: message });
+      }
+      return;
+    }
+
     // App config API (feeds.json — output path, feeds, sync interval, browser cookies)
     if (url.pathname === '/api/config') {
       if (req.method === 'GET') {

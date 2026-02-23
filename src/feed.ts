@@ -289,6 +289,8 @@ const WELL_KNOWN_FEED_PATHS = [
  * Buttondown, WordPress, etc.).
  */
 export async function discoverFeed(url: string): Promise<{ feedUrl: string; title: string | null } | null> {
+  url = await transformPlatformUrl(url);
+
   const response = await fetch(url);
   if (!response.ok) return null;
   const text = await response.text();
@@ -334,6 +336,60 @@ export async function discoverFeed(url: string): Promise<{ feedUrl: string; titl
   }
 
   return null;
+}
+
+/**
+ * Transform platform-specific URLs (YouTube, Reddit) into RSS feed URLs.
+ * Returns the original URL if no platform pattern matches.
+ */
+export async function transformPlatformUrl(url: string): Promise<string> {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return url;
+  }
+
+  const host = parsed.hostname.replace(/^www\./, '');
+
+  // YouTube: /channel/UCxxx → feed URL directly
+  if (host === 'youtube.com') {
+    // Already a feed URL
+    if (parsed.pathname.startsWith('/feeds/')) return url;
+
+    const channelMatch = parsed.pathname.match(/^\/channel\/(UC[a-zA-Z0-9_-]+)/);
+    if (channelMatch) {
+      return `https://www.youtube.com/feeds/videos.xml?channel_id=${channelMatch[1]}`;
+    }
+
+    // YouTube: /@handle → fetch page to find channel ID
+    const handleMatch = parsed.pathname.match(/^\/@([\w.-]+)/);
+    if (handleMatch) {
+      try {
+        const response = await fetch(`https://www.youtube.com/@${handleMatch[1]}`);
+        if (response.ok) {
+          const html = await response.text();
+          // Look for channel ID in page source
+          const idMatch = html.match(/"externalId"\s*:\s*"(UC[a-zA-Z0-9_-]+)"/)
+            || html.match(/<meta\s+itemprop="identifier"\s+content="(UC[a-zA-Z0-9_-]+)"/)
+            || html.match(/\/channel\/(UC[a-zA-Z0-9_-]+)/);
+          if (idMatch) {
+            return `https://www.youtube.com/feeds/videos.xml?channel_id=${idMatch[1]}`;
+          }
+        }
+      } catch {}
+    }
+  }
+
+  // Reddit: /r/subreddit → append .rss
+  if (host === 'reddit.com') {
+    const subredditMatch = parsed.pathname.match(/^\/r\/([\w]+)\/?$/);
+    if (subredditMatch) {
+      return `https://www.reddit.com/r/${subredditMatch[1]}/.rss`;
+    }
+  }
+
+  return url;
 }
 
 export async function fetchFeed(url: string): Promise<FeedEntry[]> {

@@ -1,7 +1,7 @@
 // ABOUTME: Tests for RSS and Atom feed parsing
 // ABOUTME: Verifies extraction of entries from various feed formats
 
-import { parseFeed, parseFeedTitle, discoverFeedUrl } from './feed';
+import { parseFeed, parseFeedTitle, discoverFeedUrl, transformPlatformUrl } from './feed';
 
 const ATOM_FEED = `<?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
@@ -474,5 +474,37 @@ describe('discoverFeedUrl', () => {
 
   test('returns null for empty HTML', () => {
     expect(discoverFeedUrl('', 'https://example.com')).toBeNull();
+  });
+});
+
+describe('transformPlatformUrl', () => {
+  test('transforms YouTube /channel/UCxxx URL to feed URL', async () => {
+    const result = await transformPlatformUrl('https://www.youtube.com/channel/UCBcRF18a7Qf58cCRy5xuWwQ');
+    expect(result).toBe('https://www.youtube.com/feeds/videos.xml?channel_id=UCBcRF18a7Qf58cCRy5xuWwQ');
+  });
+
+  test('transforms YouTube /channel/UCxxx URL without www', async () => {
+    const result = await transformPlatformUrl('https://youtube.com/channel/UCBcRF18a7Qf58cCRy5xuWwQ');
+    expect(result).toBe('https://www.youtube.com/feeds/videos.xml?channel_id=UCBcRF18a7Qf58cCRy5xuWwQ');
+  });
+
+  test('transforms Reddit subreddit URL to RSS', async () => {
+    const result = await transformPlatformUrl('https://www.reddit.com/r/javascript');
+    expect(result).toBe('https://www.reddit.com/r/javascript/.rss');
+  });
+
+  test('transforms Reddit URL without www', async () => {
+    const result = await transformPlatformUrl('https://reddit.com/r/programming/');
+    expect(result).toBe('https://www.reddit.com/r/programming/.rss');
+  });
+
+  test('passes through non-matching URLs unchanged', async () => {
+    const result = await transformPlatformUrl('https://example.com/blog');
+    expect(result).toBe('https://example.com/blog');
+  });
+
+  test('passes through already-RSS YouTube feed URLs', async () => {
+    const result = await transformPlatformUrl('https://www.youtube.com/feeds/videos.xml?channel_id=UCxxx');
+    expect(result).toBe('https://www.youtube.com/feeds/videos.xml?channel_id=UCxxx');
   });
 });

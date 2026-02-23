@@ -495,7 +495,7 @@ function showSettingsPage(scrollToSection) {
         + '</div>';
       h += '<div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6">'
         + 'Paste a bookmark feed URL from Instapaper, Pinboard, Raindrop, or Pocket. '
-        + 'You can also subscribe to newsletters (Substack, Ghost, Buttondown) and blogs \u2014 just paste the web address.'
+        + 'You can also subscribe to newsletters (Substack, Ghost, Buttondown), blogs, YouTube channels, and Reddit subreddits \u2014 just paste the web address.'
         + '</div>';
       h += '<div style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;padding:8px 10px;background:color-mix(in srgb, var(--fg) 4%, transparent);border-radius:6px;font-size:11px;color:var(--muted)">'
         + '<span style="flex-shrink:0">&#128196;</span>'
@@ -531,6 +531,24 @@ function showSettingsPage(scrollToSection) {
 
       sec.innerHTML = h;
       sec._configData = cfg;
+
+      // Load per-feed sync status and show error badges
+      fetch('/api/feed-status').then(function(r) { return r.json(); }).then(function(feedStatus) {
+        for (var si = 0; si < feedNames.length; si++) {
+          var statusName = feedNames[si];
+          var st = feedStatus[statusName];
+          if (!st || st.ok) continue;
+          var row = document.getElementById('feed-row-' + si);
+          if (!row) continue;
+          var infoDiv = row.querySelector('div[style*="cursor:pointer"]');
+          if (!infoDiv) continue;
+          var errDiv = document.createElement('div');
+          errDiv.style.cssText = 'font-size:11px;color:#dc2626;margin-top:2px;display:flex;align-items:center;gap:6px';
+          errDiv.innerHTML = '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(st.error || 'Sync failed') + '</span>'
+            + '<button onclick="event.stopPropagation();settingsRetryFeed(\'' + escapeJsStr(statusName) + '\',\'' + escapeJsStr(feeds[statusName]) + '\',' + si + ')" style="flex-shrink:0;font-size:10px;padding:2px 8px;background:#dc2626;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:inherit">Retry</button>';
+          infoDiv.appendChild(errDiv);
+        }
+      }).catch(function() {});
     }).catch(function() {
       var sec = document.getElementById('settings-feeds');
       if (sec) sec.innerHTML = '<h2>Bookmarks &amp; Sync</h2><p style="color:var(--muted);font-size:13px">Could not load feed configuration.</p>';
@@ -1062,6 +1080,27 @@ function settingsSaveEditFeed(rowIndex, oldName) {
   if (newName !== oldName) delete sec._configData.feeds[oldName];
   sec._configData.feeds[newName] = newUrl;
   settingsPageSaveConfig();
+}
+
+function settingsRetryFeed(name, feedUrl, rowIndex) {
+  var row = document.getElementById('feed-row-' + rowIndex);
+  var errDiv = row ? row.querySelector('div[style*="color:#dc2626"]') : null;
+  if (errDiv) errDiv.innerHTML = '<span style="color:var(--muted)">Retrying\u2026</span>';
+  fetch('/api/retry-feed', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: name, url: feedUrl })
+  }).then(function(r) { return r.json(); }).then(function(result) {
+    if (result.ok) {
+      if (errDiv) errDiv.remove();
+      showToast(name + ': OK (' + result.entries + ' entries)');
+    } else {
+      if (errDiv) errDiv.innerHTML = '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(result.error || 'Retry failed') + '</span>';
+      showToast(name + ': still failing');
+    }
+  }).catch(function() {
+    if (errDiv) errDiv.innerHTML = '<span>Retry failed</span>';
+  });
 }
 
 function settingsImportOPML() {
