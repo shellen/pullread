@@ -208,8 +208,27 @@ function showGuideModal() {
     <h2>Support</h2>
     <p>Need help? Email us at <a href="mailto:support@alittledrive.com">support@alittledrive.com</a> and we'll get back to you as soon as we can.</p>
 
-    <h2>Open Source Licenses</h2>
-    <p>PullRead uses open-source software including <strong>Kokoro TTS</strong> (Apache 2.0, by hexgrad), <strong>ONNX Runtime</strong> (MIT, by Microsoft), <strong>Mozilla Readability</strong> (Apache 2.0), <strong>Turndown</strong> (MIT), <strong>marked</strong> (MIT), and <strong>highlight.js</strong> (BSD 3-Clause). Kokoro was trained on audio data including Koniwa (CC BY 3.0) and SIWIS (CC BY 4.0). Full license texts are included in the app bundle at <code>Contents/Resources/Licenses/</code>.</p>
+    <h2>Acknowledgements</h2>
+
+    <h3>Open Source Software</h3>
+    <p>PullRead uses open-source software including <strong>Kokoro TTS</strong> (Apache 2.0, by hexgrad), <strong>ONNX Runtime</strong> (MIT, by Microsoft), <strong>Mozilla Readability</strong> (Apache 2.0), <strong>Turndown</strong> (MIT), <strong>marked</strong> (MIT), <strong>highlight.js</strong> (BSD 3-Clause), <strong>Mermaid</strong> (MIT), and <strong>DOMPurify</strong> (Apache 2.0 / MPL 2.0). Kokoro was trained on audio data including Koniwa (CC BY 3.0) and SIWIS (CC BY 4.0).</p>
+
+    <h3>Fonts</h3>
+    <p>PullRead bundles the following typefaces for offline reading, all under the <strong>SIL Open Font License 1.1</strong>:</p>
+    <ul style="margin:8px 0 8px 20px;line-height:1.8">
+      <li><strong>Work Sans</strong> by Wei Huang</li>
+      <li><strong>Inter</strong> by Rasmus Andersson</li>
+      <li><strong>Lora</strong> by Cyreal</li>
+      <li><strong>Literata</strong> by TypeTogether</li>
+      <li><strong>Source Serif</strong> by Frank Grie&szlig;hammer / Adobe</li>
+      <li><strong>OpenDyslexic</strong> by Abbie Gonzalez</li>
+    </ul>
+    <p>The SIL Open Font License permits free use, redistribution, and bundling of these fonts with software. Font files are sourced via <a href="https://fontsource.org" target="_blank" rel="noopener">Fontsource</a>.</p>
+
+    <h3>Icons</h3>
+    <p>UI icons are based on <strong>Font Awesome Free</strong> (CC BY 4.0 / SIL OFL 1.1) by Fonticons, Inc.</p>
+
+    <p style="margin-top:16px">Full license texts are included in the app bundle at <code>Contents/Resources/Licenses/</code>.</p>
   `;
   document.title = 'PullRead Guide';
   document.getElementById('content-pane').scrollTop = 0;

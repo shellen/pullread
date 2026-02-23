@@ -28,6 +28,12 @@
   "devDependencies": {
     "@babel/core": "^7.28.6",
     "@babel/preset-env": "^7.28.6",
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/literata": "^5.2.8",
+    "@fontsource/lora": "^5.2.8",
+    "@fontsource/opendyslexic": "^5.2.5",
+    "@fontsource/source-serif-4": "^5.2.9",
+    "@fontsource/work-sans": "^5.2.8",
     "@types/bun": "^1.3.8",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.1.0",
