@@ -382,7 +382,7 @@ function showSettingsPage(scrollToSection) {
   html += '<a href="/api/log" target="_blank" style="font-size:13px;color:var(--link)">View Logs</a>';
   html += '<button style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit" onclick="showTour()">Show Tour</button>';
   html += '</div>';
-  html += '<div class="settings-row"><span style="color:var(--muted);font-size:12px">\u00A9 A Little Drive LLC</span></div>';
+  html += '<div class="settings-row" style="gap:12px"><span style="color:var(--muted);font-size:12px">\u00A9 A Little Drive LLC</span><a href="mailto:support@alittledrive.com" style="font-size:12px;color:var(--muted)">support@alittledrive.com</a></div>';
   html += '</div>';
 
   content.innerHTML = html;

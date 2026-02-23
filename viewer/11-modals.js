@@ -138,6 +138,16 @@ function showGuideModal() {
     <h2>Browser Cookies</h2>
     <p>Enable browser cookies in Settings to access paywalled content from sites like NYTimes or WSJ. PullRead supports <strong>Chrome, Arc, Brave, and Edge</strong>. Cookies stay on your Mac and are never uploaded.</p>
 
+    <h2>Save from Any Browser (Bookmarklet)</h2>
+    <p>PullRead includes a bookmarklet you can drag to your browser's bookmarks bar. Click it on any web page to save the article to PullRead for your next sync.</p>
+    <p><strong>To install:</strong></p>
+    <ol>
+      <li>Make sure your bookmarks bar is visible (<kbd>Cmd+Shift+B</kbd> in Chrome/Edge, View &rarr; Show Favorites Bar in Safari).</li>
+      <li>Drag this link to your bookmarks bar: <a href="javascript:void(window.location='pullread://save?url='+encodeURIComponent(location.href)+'&amp;title='+encodeURIComponent(document.title))" onclick="event.preventDefault()" style="padding:4px 12px;background:var(--link);color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:500;cursor:grab">Save to PullRead</a></li>
+      <li>Visit any article and click the bookmarklet to save it.</li>
+    </ol>
+    <p>Alternatively, press <strong>a</strong> in PullRead to add an article by URL, or re-run the <strong>Tour</strong> from Settings to see the installation step again.</p>
+
     <h2>Importing Bookmarks</h2>
     <p>Import bookmarks.html files exported from Chrome, Safari, Firefox, or Pocket directly from Settings or via the CLI with <code>pullread import &lt;file&gt;</code>.</p>
 
@@ -195,6 +205,9 @@ function showGuideModal() {
     <h3>What happens when I use AI summaries?</h3>
     <p>When you click Summarize, article text is sent to your selected LLM provider (Anthropic, OpenAI, Gemini, or OpenRouter) using your own API key. Apple Intelligence processes entirely on-device. Summaries are saved locally in the article's frontmatter. The same applies to auto-tagging and weekly reviews.</p>
 
+    <h2>Support</h2>
+    <p>Need help? Email us at <a href="mailto:support@alittledrive.com">support@alittledrive.com</a> and we'll get back to you as soon as we can.</p>
+
     <h2>Open Source Licenses</h2>
     <p>PullRead uses open-source software including <strong>Kokoro TTS</strong> (Apache 2.0, by hexgrad), <strong>ONNX Runtime</strong> (MIT, by Microsoft), <strong>Mozilla Readability</strong> (Apache 2.0), <strong>Turndown</strong> (MIT), <strong>marked</strong> (MIT), and <strong>highlight.js</strong> (BSD 3-Clause). Kokoro was trained on audio data including Koniwa (CC BY 3.0) and SIWIS (CC BY 4.0). Full license texts are included in the app bundle at <code>Contents/Resources/Licenses/</code>.</p>
   `;
@@ -251,6 +264,7 @@ function getOnboardingSteps() {
   var steps = [
     { id: 'welcome', render: renderStepWelcome },
     { id: 'setup', render: renderStepSetup, setupOnly: true },
+    { id: 'bookmarklet', render: renderStepBookmarklet },
     { id: 'reading', render: renderStepReading },
     { id: 'search', render: renderStepSearch },
     { id: 'listening', render: renderStepListening },
@@ -355,6 +369,25 @@ function renderStepSetup() {
     + '</div>';
 
   return html;
+}
+
+function renderStepBookmarklet() {
+  var bookmarkletCode = "javascript:void(window.location='pullread://save?url='+encodeURIComponent(location.href)+'&title='+encodeURIComponent(document.title))";
+  return '<h2>Save from Any Browser</h2>'
+    + '<p class="ob-subtitle">Drag this button to your bookmarks bar to save articles with one click.</p>'
+    + '<div class="ob-glass-card" style="text-align:center;padding:24px 16px">'
+    + '<div style="margin-bottom:16px">'
+    + '<a href="' + escapeHtml(bookmarkletCode) + '" onclick="event.preventDefault()" style="display:inline-block;padding:10px 24px;background:var(--link);color:#fff;border-radius:8px;font-size:15px;font-weight:600;text-decoration:none;cursor:grab;box-shadow:0 2px 8px rgba(0,0,0,0.15)" title="Drag me to your bookmarks bar"><svg class="icon icon-sm" style="vertical-align:-2px;margin-right:6px;color:#fff" aria-hidden="true"><use href="#i-pin"/></svg>Save to PullRead</a>'
+    + '</div>'
+    + '<div style="font-size:13px;color:var(--muted);line-height:1.6">'
+    + '<strong>How to install:</strong> Drag the button above to your browser\u2019s bookmarks bar.<br>'
+    + 'Then click it on any page to save the article to PullRead.'
+    + '</div>'
+    + '</div>'
+    + '<div class="ob-glass-card" style="margin-top:12px">'
+    + '<div class="ob-method"><div class="ob-method-icon"><svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg></div><div><div class="ob-method-title">Bookmarks bar not visible?</div><div class="ob-method-desc">In Chrome or Edge: <kbd>Cmd+Shift+B</kbd> &middot; In Safari: View &rarr; Show Favorites Bar &middot; In Firefox: View &rarr; Toolbars &rarr; Bookmarks Toolbar</div></div></div>'
+    + '<div class="ob-method"><div class="ob-method-icon"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg></div><div><div class="ob-method-title">Or add by URL</div><div class="ob-method-desc">Press <kbd>a</kbd> in PullRead to save any URL directly, or use the Add Article button in the sidebar.</div></div></div>'
+    + '</div>';
 }
 
 function renderStepReading() {
