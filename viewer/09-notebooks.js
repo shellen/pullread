@@ -155,13 +155,14 @@ function openNotebookInPane(id) {
   _activeNotebook = nb;
   if (!nb.notes) nb.notes = [];
 
+  // Always render the sidebar so New Note button and notes list appear
+  renderFileList();
+
   if (nb.notes.length && !_activeNoteId) {
     openNoteInPane(nb.notes[0].id);
   } else if (_activeNoteId) {
     openNoteInPane(_activeNoteId);
   } else {
-    // Empty state — needs its own render since openNoteInPane won't be called
-    renderFileList();
     var content = document.getElementById('content');
     var empty = document.getElementById('empty-state');
     empty.style.display = 'none';
@@ -175,7 +176,16 @@ function openNotebookInPane(id) {
 
 // Render a single note as a full-page editor in the content pane
 function openNoteInPane(noteId) {
-  if (!_activeNotebook) return;
+  if (!_activeNotebook) {
+    // Re-initialize notebook (e.g. after Settings cleared it)
+    getOrCreateSingleNotebook().then(function(nb) {
+      _activeNotebook = nb;
+      _sidebarView = 'notebooks'; syncSidebarTabs();
+      renderFileList();
+      openNoteInPane(noteId);
+    });
+    return;
+  }
   var note = (_activeNotebook.notes || []).find(function(n) { return n.id === noteId; });
   if (!note) return;
 

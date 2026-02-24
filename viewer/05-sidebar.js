@@ -532,6 +532,10 @@ function syncSidebarTabs() {
   if (pinnedContainer) pinnedContainer.style.display = _sidebarView === 'home' ? '' : 'none';
   var pinBtn = document.getElementById('search-pin');
   if (pinBtn && _sidebarView !== 'home') pinBtn.style.display = 'none';
+
+  // Hide read toggle only applies to articles
+  var hideReadBtn = document.getElementById('hide-read-toggle');
+  if (hideReadBtn) hideReadBtn.style.display = _sidebarView === 'home' ? '' : 'none';
 }
 
 let _writingFocusActive = false;

@@ -80,19 +80,17 @@ function renderDashboard() {
   }
 
   // Explore — top tags and quick filters
-  var topTags = [];
+  var tagMap = {};
   for (var ef of allFiles) {
     var en = allNotesIndex[ef.filename];
     var et = [];
     if (en && en.tags) et.push.apply(et, en.tags);
     if (en && en.machineTags) et.push.apply(et, en.machineTags);
     for (var etag of et) {
-      var found = topTags.find(function(t) { return t[0] === etag; });
-      if (found) found[1]++;
-      else topTags.push([etag, 1]);
+      tagMap[etag] = (tagMap[etag] || 0) + 1;
     }
   }
-  topTags.sort(function(a, b) { return b[1] - a[1]; });
+  var topTags = Object.entries(tagMap).sort(function(a, b) { return b[1] - a[1]; });
   var hasBooks = allFiles.some(function(f) { return f.domain === 'epub'; });
   var hasPodcasts = allFiles.some(function(f) { return f.enclosureUrl && f.enclosureType && f.enclosureType.startsWith('audio/'); });
   if (topTags.length > 0 || hasBooks || hasPodcasts) {
@@ -213,9 +211,10 @@ function goHome() {
   activeFile = null;
   document.title = 'PullRead';
   renderFileList();
-  renderDashboard();
   var toc = document.getElementById('toc-container');
   if (toc) toc.innerHTML = '';
+  // Defer dashboard render so sidebar becomes interactive first
+  requestAnimationFrame(renderDashboard);
 }
 
 function dashScrollLeft(btn) {
