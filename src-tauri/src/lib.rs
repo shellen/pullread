@@ -87,6 +87,7 @@ pub fn run() {
             commands::trigger_sync,
             commands::trigger_review,
             commands::get_log_content,
+            commands::print_webview,
             auth::open_site_login,
             auth::list_site_logins,
             auth::remove_site_login,

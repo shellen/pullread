@@ -176,6 +176,7 @@ function handleTagInput(e, getTagsArray, onAdd) {
 
 // Print styled HTML content using the system print dialog (Save as PDF on macOS).
 // Uses @media print to hide the Pullread UI and show only the export content.
+// In Tauri, invokes native print_webview command since JS window.print() is blocked.
 var _prPrintStyles = 'font-family:Georgia,serif;max-width:700px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222';
 function prPrintHtml(bodyContent) {
   var container = document.createElement('div');
@@ -207,6 +208,35 @@ function prPrintHtml(bodyContent) {
     window.removeEventListener('afterprint', cleanup);
   }
   window.addEventListener('afterprint', cleanup);
-  window.print();
-  setTimeout(cleanup, 120000);
+
+  if (window.PR_TAURI && window.__TAURI__) {
+    window.__TAURI__.core.invoke('print_webview').then(function() {
+      setTimeout(cleanup, 500);
+    }).catch(function(err) {
+      console.warn('Native print failed, falling back to save:', err);
+      cleanup();
+      prPrintFallback(bodyContent);
+    });
+  } else {
+    window.print();
+    setTimeout(cleanup, 120000);
+  }
+}
+
+// Fallback: save as HTML file when native print is unavailable
+function prPrintFallback(bodyContent) {
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Export</title>'
+    + '<style>body{' + _prPrintStyles + '}'
+    + 'h1{font-size:28px;margin-bottom:4px}h2,h3{margin-top:1.5em}'
+    + 'blockquote{border-left:3px solid #ccc;margin:1em 0;padding:0.5em 1em;color:#555}'
+    + 'blockquote.summary{background:#f9f9f4;border-left-color:#b8a940;border-radius:4px}'
+    + 'code{background:#f5f5f5;padding:2px 4px;border-radius:3px;font-size:0.9em}'
+    + 'pre{background:#f5f5f5;padding:12px;border-radius:6px;overflow-x:auto}'
+    + 'img{max-width:100%;height:auto}'
+    + '.meta{font-size:13px;color:#888;margin-bottom:24px}'
+    + '</style></head><body>' + bodyContent + '</body></html>';
+  var filename = (activeFile || 'export').replace(/\.md$/, '') + '.html';
+  prSaveFile(html, filename, 'text/html;charset=utf-8').then(function(saved) {
+    if (saved) showToast('Saved as HTML — open in browser to print as PDF');
+  });
 }

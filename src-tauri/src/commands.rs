@@ -120,6 +120,16 @@ pub async fn get_log_content() -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| format!("Cannot read log: {}", e))
 }
 
+/// Tauri command: trigger native print dialog on the viewer webview
+#[tauri::command]
+pub async fn print_webview(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("viewer") {
+        window.print().map_err(|e| format!("Print failed: {}", e))
+    } else {
+        Err("Viewer window not found".to_string())
+    }
+}
+
 /// Handle a pullread:// deep link URL
 pub async fn handle_deep_link(app: &AppHandle, url: &str) {
     log::info!("Deep link received: {}", url);
