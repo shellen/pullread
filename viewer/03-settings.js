@@ -648,8 +648,13 @@ function showSettingsPage(scrollToSection) {
       if (sec) sec.innerHTML = '<h2>Voice Playback</h2><p style="color:var(--muted);font-size:13px">Could not load voice settings.</p>';
     });
 
-    // Load LLM settings async (multi-provider)
-    fetch('/api/settings').then(function(r) { return r.json(); }).then(function(data) {
+    // Load LLM settings and model catalog concurrently
+    Promise.all([
+      fetch('/api/settings').then(function(r) { return r.json(); }),
+      fetch('/api/models').then(function(r) { return r.json(); }).catch(function() { return {}; }),
+    ]).then(function(results) {
+      var data = results[0];
+      var modelCatalog = results[1];
       var sec = document.getElementById('settings-ai');
       if (!sec) return;
       var llm = data.llm || {};
@@ -657,31 +662,33 @@ function showSettingsPage(scrollToSection) {
       var provs = llm.providers || {};
       var appleAvailable = llm.appleAvailable || false;
 
-      var providerList = [
-        { id: 'apple', label: 'Apple Intelligence (on-device)' },
-        { id: 'anthropic', label: 'Anthropic (Claude)' },
-        { id: 'openai', label: 'OpenAI' },
-        { id: 'gemini', label: 'Google Gemini' },
-        { id: 'openrouter', label: 'OpenRouter' },
-      ];
-      var cloudProviders = [
-        { id: 'anthropic', label: 'Anthropic (Claude)', placeholder: 'sk-ant-...' },
-        { id: 'openai', label: 'OpenAI', placeholder: 'sk-...' },
-        { id: 'gemini', label: 'Google Gemini', placeholder: 'AIza...' },
-        { id: 'openrouter', label: 'OpenRouter', placeholder: 'sk-or-...' },
-      ];
+      // Build provider/cloud lists from model catalog, with sensible fallbacks
+      var providerOrder = ['apple', 'anthropic', 'openai', 'gemini', 'openrouter'];
+      var llmShortLabels = {apple:'Apple',anthropic:'Claude',openai:'OpenAI',gemini:'Gemini',openrouter:'OpenRouter'};
+      var cloudProviders = [];
+      for (var pi = 0; pi < providerOrder.length; pi++) {
+        var pid = providerOrder[pi];
+        if (pid === 'apple') continue;
+        var catEntry = modelCatalog[pid] || {};
+        cloudProviders.push({
+          id: pid,
+          label: catEntry.label || llmShortLabels[pid] || pid,
+          placeholder: catEntry.keyPlaceholder || '',
+          models: catEntry.models || [],
+          defaultModel: catEntry.default || '',
+        });
+      }
 
       var h = '<h2>AI Summaries &amp; Tagging</h2>';
       h += '<p style="font-size:13px;color:var(--muted);margin-bottom:16px">Choose a provider for article summaries and auto-tagging.</p>';
 
       // Default provider selector
-      var llmShortLabels = {apple:'Apple',anthropic:'Claude',openai:'OpenAI',gemini:'Gemini',openrouter:'OpenRouter'};
       h += '<div class="settings-row"><div><label>Provider</label>';
       h += '<div class="settings-desc">Used for summaries and auto-tagging</div></div>';
       h += '<div class="settings-btn-group">';
-      for (var i = 0; i < providerList.length; i++) {
-        var p = providerList[i];
-        h += '<button data-val="' + p.id + '" class="' + (defaultProv === p.id ? 'active' : '') + '" onclick="settingsBtnSelect(this,\'sp-llm-default\',\'' + p.id + '\');settingsPageLLMProviderChanged()">' + (llmShortLabels[p.id] || p.id) + '</button>';
+      for (var i = 0; i < providerOrder.length; i++) {
+        var p = providerOrder[i];
+        h += '<button data-val="' + p + '" class="' + (defaultProv === p ? 'active' : '') + '" onclick="settingsBtnSelect(this,\'sp-llm-default\',\'' + p + '\');settingsPageLLMProviderChanged()">' + (llmShortLabels[p] || p) + '</button>';
       }
       h += '</div><input type="hidden" id="sp-llm-default" value="' + escapeHtml(defaultProv) + '">';
       h += '</div>';
@@ -701,6 +708,8 @@ function showSettingsPage(scrollToSection) {
         var pConfig = provs[cp.id] || {};
         var hasKey = pConfig.hasKey || false;
         var visible = defaultProv === cp.id;
+        var savedModel = pConfig.model || '';
+        var isCustom = savedModel && cp.models.indexOf(savedModel) === -1;
 
         h += '<div id="sp-llm-section-' + cp.id + '" style="display:' + (visible ? 'block' : 'none') + ';margin-top:8px">';
 
@@ -710,12 +719,27 @@ function showSettingsPage(scrollToSection) {
 
         h += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">';
         h += '<label style="font-size:12px;min-width:55px;color:var(--muted)">API Key</label>';
-        h += '<input type="password" id="sp-llm-key-' + cp.id + '" placeholder="' + (hasKey ? '••••••••' : cp.placeholder) + '" style="flex:1;min-width:0">';
+        h += '<input type="password" id="sp-llm-key-' + cp.id + '" placeholder="' + (hasKey ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : cp.placeholder) + '" style="flex:1;min-width:0">';
         h += '</div>';
 
+        // Model dropdown
         h += '<div style="display:flex;gap:8px;align-items:center">';
         h += '<label style="font-size:12px;min-width:55px;color:var(--muted)">Model</label>';
-        h += '<input type="text" id="sp-llm-model-' + cp.id + '" value="' + escapeHtml(pConfig.model || '') + '" placeholder="default" style="flex:1;min-width:0;font-size:12px">';
+        h += '<select id="sp-llm-model-' + cp.id + '" onchange="settingsPageModelChanged(\'' + cp.id + '\')" style="flex:1;min-width:0;font-size:12px;padding:6px 8px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px">';
+        h += '<option value=""' + (!savedModel ? ' selected' : '') + '>' + escapeHtml(cp.defaultModel || 'default') + ' (default)</option>';
+        for (var mi = 0; mi < cp.models.length; mi++) {
+          var m = cp.models[mi];
+          if (m === cp.defaultModel) continue;
+          h += '<option value="' + escapeHtml(m) + '"' + (savedModel === m ? ' selected' : '') + '>' + escapeHtml(m) + '</option>';
+        }
+        h += '<option value="__custom"' + (isCustom ? ' selected' : '') + '>Custom\u2026</option>';
+        h += '</select>';
+        h += '</div>';
+
+        // Custom model text input (hidden unless custom selected)
+        h += '<div id="sp-llm-custom-' + cp.id + '" style="display:' + (isCustom ? 'flex' : 'none') + ';gap:8px;align-items:center;margin-top:6px">';
+        h += '<label style="font-size:12px;min-width:55px;color:var(--muted)"></label>';
+        h += '<input type="text" id="sp-llm-custom-input-' + cp.id + '" value="' + escapeHtml(isCustom ? savedModel : '') + '" placeholder="model-id" style="flex:1;min-width:0;font-size:12px">';
         h += '</div>';
 
         h += '</div>';
@@ -764,6 +788,12 @@ function settingsPageLLMProviderChanged() {
   }
 }
 
+function settingsPageModelChanged(providerId) {
+  var sel = document.getElementById('sp-llm-model-' + providerId);
+  var customDiv = document.getElementById('sp-llm-custom-' + providerId);
+  if (!sel || !customDiv) return;
+  customDiv.style.display = sel.value === '__custom' ? 'flex' : 'none';
+}
 
 function toggleTTSVoicePicker() {
   var sec = document.getElementById('settings-voice');
@@ -891,10 +921,16 @@ function settingsPageSaveLLM(skipRefresh) {
   for (var i = 0; i < cloudProviders.length; i++) {
     var p = cloudProviders[i];
     var keyInput = document.getElementById('sp-llm-key-' + p);
-    var modelInput = document.getElementById('sp-llm-model-' + p);
+    var modelSelect = document.getElementById('sp-llm-model-' + p);
+    var customInput = document.getElementById('sp-llm-custom-input-' + p);
     var entry = {};
     if (keyInput && keyInput.value) entry.apiKey = keyInput.value;
-    if (modelInput && modelInput.value) entry.model = modelInput.value;
+    // Read model from dropdown, or from custom input if "Custom" selected
+    var modelVal = '';
+    if (modelSelect) {
+      modelVal = modelSelect.value === '__custom' ? (customInput ? customInput.value.trim() : '') : modelSelect.value;
+    }
+    if (modelVal) entry.model = modelVal;
     if (Object.keys(entry).length > 0) providers[p] = entry;
   }
 

@@ -1329,6 +1329,18 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
       }
     }
 
+    // Model catalog for Settings UI
+    if (url.pathname === '/api/models' && req.method === 'GET') {
+      try {
+        const modelsPath = join(__dirname, '..', 'models.json');
+        const data = JSON.parse(readFileSync(modelsPath, 'utf-8'));
+        sendJson(res, data.providers || {});
+      } catch {
+        sendJson(res, {});
+      }
+      return;
+    }
+
     // Version and update check
     if (url.pathname === '/api/check-updates' && req.method === 'GET') {
       try {
