@@ -225,7 +225,7 @@ async function init() {
   if (savedSpacing && savedSpacing !== 'default') setSpacing(savedSpacing);
   if (savedWidth && savedWidth !== 'default') setWidth(savedWidth);
   if (savedSidebar === '0' || window.innerWidth <= 768) {
-    document.getElementById('sidebar').classList.add('collapsed');
+    document.getElementById('drawer').classList.add('collapsed');
     document.getElementById('sidebar-toggle-btn').setAttribute('aria-expanded', 'false');
   }
 

@@ -21,13 +21,15 @@ function setSize(size) {
   localStorage.setItem('pr-size', size);
 }
 
-function toggleSidebar() {
-  const sidebar = document.getElementById('sidebar');
-  sidebar.classList.toggle('collapsed');
-  const isCollapsed = sidebar.classList.contains('collapsed');
+function toggleDrawer() {
+  const drawer = document.getElementById('drawer');
+  drawer.classList.toggle('collapsed');
+  const isCollapsed = drawer.classList.contains('collapsed');
   localStorage.setItem('pr-sidebar', isCollapsed ? '0' : '1');
   document.getElementById('sidebar-toggle-btn').setAttribute('aria-expanded', !isCollapsed);
 }
+// Keep legacy name for any callers
+var toggleSidebar = toggleDrawer;
 
 function setLineHeight(val) {
   document.body.className = document.body.className.replace(/leading-\w+/g, '');

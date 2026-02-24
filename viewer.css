@@ -270,10 +270,81 @@
     position: relative;
   }
 
-  /* Sidebar */
+  /* Nav rail (narrow sidebar) */
   .sidebar {
-    width: 300px;
-    min-width: 300px;
+    width: 64px;
+    min-width: 64px;
+    background: var(--sidebar-bg);
+    border-right: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .sidebar-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 12px 4px 8px;
+    cursor: pointer;
+    color: var(--fg);
+    text-decoration: none;
+    flex-shrink: 0;
+  }
+  .sidebar-brand .icon { width: 20px; height: 20px; }
+  .sidebar-brand-text {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--muted);
+  }
+  .sidebar-nav-rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 0;
+    width: 100%;
+  }
+  .nav-rail-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 4px;
+    width: 56px;
+    background: none;
+    border: none;
+    border-radius: 8px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+    font-family: inherit;
+  }
+  .nav-rail-btn .icon { width: 18px; height: 18px; }
+  .nav-rail-label {
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1;
+  }
+  .nav-rail-btn:hover { background: var(--sidebar-hover); color: var(--fg); }
+  .nav-rail-btn.active { background: var(--sidebar-active); color: var(--fg); }
+  .sidebar-rail-spacer { flex: 1; }
+  .sidebar-rail-bottom {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 0 8px;
+    width: 100%;
+  }
+
+  /* Drawer (article list panel) */
+  .drawer {
+    width: 280px;
+    min-width: 280px;
     background: var(--sidebar-bg);
     border-right: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
     display: flex;
@@ -281,15 +352,13 @@
     transition: margin-left 0.2s ease, opacity 0.2s ease;
     overflow: visible;
   }
-  .sidebar.collapsed {
-    margin-left: -300px;
+  .drawer.collapsed {
+    margin-left: -280px;
     opacity: 0;
     pointer-events: none;
     overflow: hidden;
   }
-
-  /* Sidebar header (replaces full-width toolbar) */
-  .sidebar-header {
+  .drawer-header {
     display: flex;
     align-items: center;
     padding: 10px 12px;
@@ -297,23 +366,23 @@
     flex-shrink: 0;
     border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
   }
-  .sidebar-header .brand {
+  .drawer-title {
     flex: 1;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fg);
   }
-  .sidebar-header-actions {
+  .drawer-header-actions {
     display: flex;
     align-items: center;
     gap: 2px;
   }
-  .sidebar-header-actions .sidebar-toggle {
-    margin-left: 2px;
-  }
 
-  /* Floating sidebar toggle (visible when sidebar is collapsed) */
+  /* Floating toggle (visible when drawer is collapsed) */
   .sidebar-toggle-float {
     position: absolute;
     top: 10px;
-    left: 10px;
+    left: 74px;
     z-index: 15;
     background: var(--sidebar-bg);
     border: 1px solid var(--border);
@@ -330,7 +399,7 @@
   .sidebar-toggle-float:hover {
     border-color: var(--muted);
   }
-  .sidebar.collapsed ~ .sidebar-toggle-float {
+  .drawer.collapsed ~ .sidebar-toggle-float {
     display: flex;
   }
 
@@ -1266,20 +1335,22 @@
 
   /* Tablet */
   @media (max-width: 768px) {
-    .sidebar {
+    .sidebar { display: none; }
+    .drawer {
       position: absolute;
       z-index: 20;
       height: 100vh;
       box-shadow: 4px 0 16px rgba(0,0,0,0.1);
     }
-    .sidebar.collapsed {
-      margin-left: -300px;
+    .drawer.collapsed {
+      margin-left: -280px;
     }
+    .sidebar-toggle-float { left: 10px; }
     .content-wrap {
       padding: 24px 20px 80px;
     }
-    .sidebar.collapsed ~ .content-pane .content-wrap,
-    .sidebar.collapsed ~ .content-pane .dashboard {
+    .drawer.collapsed ~ .content-pane .content-wrap,
+    .drawer.collapsed ~ .content-pane .dashboard {
       padding-top: 52px;
     }
     .article-header h1 {
@@ -1303,24 +1374,21 @@
 
   /* Mobile */
   @media (max-width: 480px) {
-    .sidebar-header {
+    .drawer-header {
       padding: 8px 10px 4px;
     }
-    .brand {
-      font-size: 13px;
-    }
-    .sidebar {
+    .drawer {
       width: 260px;
       min-width: 260px;
     }
-    .sidebar.collapsed {
+    .drawer.collapsed {
       margin-left: -260px;
     }
     .content-wrap {
       padding: 16px 14px 72px;
     }
-    .sidebar.collapsed ~ .content-pane .content-wrap,
-    .sidebar.collapsed ~ .content-pane .dashboard {
+    .drawer.collapsed ~ .content-pane .content-wrap,
+    .drawer.collapsed ~ .content-pane .dashboard {
       padding-top: 56px;
     }
     .article-header h1 {
@@ -1406,31 +1474,7 @@
     word-spacing: 0.1em;
   }
 
-  /* Sidebar footer */
-  .sidebar-footer {
-    padding: 6px 8px;
-  }
-  .sidebar-settings-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    width: 100%;
-    padding: 7px 0;
-    font-size: 12px;
-    color: var(--muted);
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    cursor: pointer;
-    font-family: inherit;
-    transition: color 0.12s, background 0.12s, border-color 0.12s;
-  }
-  .sidebar-settings-btn:hover {
-    color: var(--fg);
-    background: color-mix(in srgb, var(--fg) 6%, transparent);
-    border-color: color-mix(in srgb, var(--fg) 15%, transparent);
-  }
+  /* Sidebar footer (unused — nav rail has settings button) */
 
   /* Audio player panel */
   /* TTS reading cursor — subtle left border on the paragraph being read */
@@ -1612,7 +1656,7 @@
   }
   /* Add bottom padding to content pane when bottom bar is visible */
   .app.has-bottom-bar .content-scroll { padding-bottom: 80px; }
-  .app.has-bottom-bar .sidebar { padding-bottom: 80px; }
+  .app.has-bottom-bar .drawer { padding-bottom: 80px; }
   .tts-speed-popup {
     position: fixed;
     background: var(--bg);
@@ -3094,30 +3138,7 @@
     font-size: 11px; color: var(--muted);
   }
 
-  /* Sidebar nav tabs */
-  .sidebar-nav {
-    display: flex;
-    padding: 8px 8px 0;
-    gap: 2px;
-  }
-  .sidebar-nav-tab {
-    flex: 1;
-    padding: 7px 0;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--muted);
-    background: transparent;
-    border: none;
-    border-bottom: 2px solid transparent;
-    cursor: pointer;
-    transition: color 0.15s, border-color 0.15s;
-    font-family: inherit;
-  }
-  .sidebar-nav-tab:hover { color: var(--fg); }
-  .sidebar-nav-tab.active {
-    color: var(--fg);
-    border-bottom-color: var(--link);
-  }
+  /* Sidebar nav tabs (unused — nav rail replaces these) */
 
   /* Reading progress bar */
   .reading-progress {
@@ -3304,6 +3325,7 @@
 
   /* Hide main UI when mini mode is active */
   body.mini-mode .sidebar,
+  body.mini-mode .drawer,
   body.mini-mode .content-pane,
   body.mini-mode .sidebar-toggle-float,
   body.mini-mode .aa-settings-btn,
@@ -4060,8 +4082,8 @@
 
   /* Print styles */
   @media print {
-    .toolbar, .sidebar, .sidebar-toggle-float, .skip-link, .margin-notes, .toc-container,
-    .reading-progress, .hl-toolbar, .annotation-popover, .resume-indicator,
+    .toolbar, .sidebar, .drawer, .sidebar-toggle-float, .skip-link, .margin-notes, .toc-container,
+    .reading-progress, .reader-toolbar, .hl-toolbar, .annotation-popover, .resume-indicator,
     .article-actions, #header-tags, .notes-panel, .notes-save-hint,
     .onboarding-overlay, .modal-overlay, .settings-dropdown-panel,
     .bottom-bar, .mini-mode-container, .break-reminder { display: none !important; }

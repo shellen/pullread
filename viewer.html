@@ -71,19 +71,32 @@
 <div class="app" role="application" aria-label="PullRead article reader">
 
   <div class="main">
-    <aside class="sidebar" id="sidebar" aria-label="Article list">
-      <div class="sidebar-header">
-        <span class="brand" onclick="goHome()" role="heading" aria-level="1">PullRead</span>
-        <div class="sidebar-header-actions">
-          <button class="focus-btn" onclick="toggleFocusMode()" aria-label="Toggle focus mode" title="Focus mode (f)" id="focus-btn"><svg class="icon" aria-hidden="true"><use href="#i-focus"/></svg></button>
+    <aside class="sidebar" id="sidebar" aria-label="Navigation">
+      <div class="sidebar-brand" onclick="goHome()" role="heading" aria-level="1">
+        <svg class="icon" aria-hidden="true"><use href="#i-book"/></svg>
+        <span class="sidebar-brand-text">PullRead</span>
+      </div>
+      <nav class="sidebar-nav-rail" id="sidebar-nav">
+        <button class="nav-rail-btn active" data-view="home" onclick="switchSidebarView('home')" aria-label="Home" title="Home"><svg class="icon" aria-hidden="true"><use href="#i-globe"/></svg><span class="nav-rail-label">Home</span></button>
+        <button class="nav-rail-btn" data-view="notebooks" onclick="switchSidebarView('notebooks')" aria-label="Notebook" title="Notebook"><svg class="icon" aria-hidden="true"><use href="#i-pen"/></svg><span class="nav-rail-label">Notebook</span></button>
+        <button class="nav-rail-btn" onclick="showExplorePage()" aria-label="Explore" title="Explore"><svg class="icon" aria-hidden="true"><use href="#i-tags"/></svg><span class="nav-rail-label">Explore</span></button>
+      </nav>
+      <div class="sidebar-rail-spacer"></div>
+      <div class="sidebar-rail-bottom">
+        <button class="nav-rail-btn" onclick="toggleFocusMode()" aria-label="Focus mode" title="Focus mode (f)" id="focus-btn"><svg class="icon" aria-hidden="true"><use href="#i-focus"/></svg><span class="nav-rail-label">Focus</span></button>
+        <button class="nav-rail-btn" onclick="showSettingsPage()" aria-label="Settings" title="Settings"><svg class="icon" aria-hidden="true"><use href="#i-gear"/></svg><span class="nav-rail-label">Settings</span></button>
+        <button class="nav-rail-btn" onclick="toggleDrawer()" aria-label="Toggle article list" title="Toggle list ([)" id="sidebar-toggle-btn"><svg class="icon" aria-hidden="true"><use href="#i-bars"/></svg><span class="nav-rail-label">List</span></button>
+      </div>
+    </aside>
+
+    <div class="drawer" id="drawer" aria-label="Article list">
+      <div class="drawer-header">
+        <span class="drawer-title" id="drawer-title">Articles</span>
+        <div class="drawer-header-actions">
           <button class="toolbar-icon-btn" onclick="toggleQuickAdd()" aria-label="Add article by URL" title="Add URL" id="quick-add-btn"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg></button>
           <button class="toolbar-icon-btn" onclick="refreshArticleList()" aria-label="Refresh articles" title="Refresh" id="refresh-btn"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></button>
-          <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Collapse sidebar" aria-expanded="true" id="sidebar-toggle-btn"><svg class="icon" aria-hidden="true"><use href="#i-bars"/></svg></button>
+          <button class="toolbar-icon-btn" onclick="toggleDrawer()" aria-label="Close drawer" title="Close"><svg class="icon" aria-hidden="true"><use href="#i-xmark"/></svg></button>
         </div>
-      </div>
-      <div class="sidebar-nav" id="sidebar-nav">
-        <button class="sidebar-nav-tab active" data-view="home" onclick="switchSidebarView('home')">Home</button>
-        <button class="sidebar-nav-tab" data-view="notebooks" onclick="switchSidebarView('notebooks')">Notebook</button>
       </div>
       <div class="sidebar-search" role="search">
         <label for="search" class="sr-only">Search articles</label>
@@ -104,12 +117,9 @@
       </div>
       <div class="file-list" id="file-list" role="listbox" aria-label="Articles"></div>
       <div class="sync-status" id="sync-status" aria-live="polite"></div>
-      <div class="sidebar-footer">
-        <button class="sidebar-settings-btn" onclick="showSettingsPage()" aria-label="Settings"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px"><use href="#i-gear"/></svg> Settings</button>
-      </div>
-    </aside>
+    </div>
 
-    <button class="sidebar-toggle-float" onclick="toggleSidebar()" aria-label="Show sidebar" id="sidebar-toggle-float"><svg class="icon" aria-hidden="true"><use href="#i-bars"/></svg></button>
+    <button class="sidebar-toggle-float" onclick="toggleDrawer()" aria-label="Show article list" id="sidebar-toggle-float"><svg class="icon" aria-hidden="true"><use href="#i-bars"/></svg></button>
 
     <button class="aa-settings-btn" id="aa-settings-btn" onclick="toggleSettingsDropdown()" aria-label="Reader settings" aria-expanded="false">Aa</button>
 

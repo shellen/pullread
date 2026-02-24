@@ -336,10 +336,10 @@ async function loadFile(index) {
   updateSidebarActiveState(prevActive);
   removeHlToolbar();
 
-  // Auto-close sidebar on mobile after selecting an article
+  // Auto-close drawer on mobile after selecting an article
   if (window.innerWidth <= 768) {
-    const sidebar = document.getElementById('sidebar');
-    if (!sidebar.classList.contains('collapsed')) sidebar.classList.add('collapsed');
+    const drawer = document.getElementById('drawer');
+    if (!drawer.classList.contains('collapsed')) drawer.classList.add('collapsed');
   }
 
   // Dropped files store content in memory — render directly without a server fetch
@@ -519,9 +519,13 @@ function openSingleNotebook() {
 }
 
 function syncSidebarTabs() {
-  document.querySelectorAll('.sidebar-nav-tab').forEach(function(t) {
+  document.querySelectorAll('.nav-rail-btn[data-view]').forEach(function(t) {
     t.classList.toggle('active', t.dataset.view === _sidebarView);
   });
+  // Update drawer title to reflect current view
+  var drawerTitle = document.getElementById('drawer-title');
+  if (drawerTitle) drawerTitle.textContent = _sidebarView === 'notebooks' ? 'Notebook' : 'Articles';
+
   // Always show file list and count — articles + notebooks visible on all tabs
   var fileCount = document.getElementById('file-count');
   var fileList = document.getElementById('file-list');
