@@ -1,13 +1,11 @@
 // ABOUTME: Automatic machine tagging of articles using LLM providers
 // ABOUTME: Extracts topic, entity, and theme tags for relational mapping between articles
 
-import { readFileSync, existsSync } from 'fs';
-import { join, basename } from 'path';
-import { homedir } from 'os';
+import { readFileSync } from 'fs';
+import { basename } from 'path';
 import { summarizeText, loadLLMConfig, LLMConfig, Provider, getDefaultModel } from './summarizer';
 import { listMarkdownFiles, resolveFilePath } from './writer';
-
-const NOTES_PATH = join(homedir(), '.config', 'pullread', 'notes.json');
+import { loadAnnotation, saveAnnotation, allNotes } from './annotations';
 
 const AUTOTAG_PROMPT = `Extract 3-8 machine tags from this article for relational mapping. Tags should help identify connections between articles. Include:
 - Main topics (e.g., "artificialintelligence", "climatechange", "economics")
@@ -23,22 +21,6 @@ interface AutotagResult {
   model: string;
 }
 
-function loadNotesFile(): Record<string, any> {
-  if (!existsSync(NOTES_PATH)) return {};
-  try {
-    return JSON.parse(readFileSync(NOTES_PATH, 'utf-8'));
-  } catch {
-    return {};
-  }
-}
-
-function saveNotesFile(notes: Record<string, any>): void {
-  const dir = join(homedir(), '.config', 'pullread');
-  if (!existsSync(dir)) {
-    require('fs').mkdirSync(dir, { recursive: true });
-  }
-  require('fs').writeFileSync(NOTES_PATH, JSON.stringify(notes, null, 2));
-}
 
 /**
  * Extract machine tags from article text using the configured LLM.
@@ -104,49 +86,38 @@ function parseTagsFromResponse(response: string): string[] {
 }
 
 /**
- * Check if an article already has machine tags in notes.json.
+ * Check if an article already has machine tags.
  */
 export function hasMachineTags(filename: string): boolean {
-  const notes = loadNotesFile();
-  const entry = notes[filename];
-  return entry?.machineTags && Array.isArray(entry.machineTags) && entry.machineTags.length > 0;
+  const annot = loadAnnotation(filename);
+  return annot.machineTags.length > 0;
 }
 
 /**
- * Save machine tags for an article into notes.json.
- * Preserves existing user tags and other note data.
+ * Save machine tags for an article. Preserves existing user data.
  */
 export function saveMachineTags(filename: string, machineTags: string[]): void {
-  const notes = loadNotesFile();
-  const existing = notes[filename] || {
-    articleNote: '',
-    annotations: [],
-    tags: [],
-    isFavorite: false
-  };
-  existing.machineTags = machineTags;
-  notes[filename] = existing;
-  saveNotesFile(notes);
+  const existing = loadAnnotation(filename);
+  saveAnnotation(filename, { ...existing, machineTags });
 }
 
 /**
- * Strip dashes from all existing machine tags in notes.json.
+ * Strip dashes from all existing machine tags.
  * Idempotent — safe to call multiple times.
  */
 export function migrateDashedTags(): number {
-  const notes = loadNotesFile();
+  const notes = allNotes();
   let migrated = 0;
-  for (const key of Object.keys(notes)) {
-    const entry = notes[key];
-    if (entry?.machineTags && Array.isArray(entry.machineTags)) {
+  for (const [filename, entry] of Object.entries(notes)) {
+    if (entry.machineTags && entry.machineTags.length > 0) {
       const fixed = entry.machineTags.map((t: string) => t.replace(/[\s\-]+/g, ''));
       if (fixed.some((t: string, i: number) => t !== entry.machineTags[i])) {
-        entry.machineTags = fixed;
+        const annot = loadAnnotation(filename);
+        saveAnnotation(filename, { ...annot, machineTags: fixed });
         migrated++;
       }
     }
   }
-  if (migrated > 0) saveNotesFile(notes);
   return migrated;
 }
 

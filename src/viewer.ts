@@ -9,6 +9,7 @@ import { homedir } from 'os';
 import { VIEWER_HTML } from './viewer-html';
 import { summarizeText, loadLLMConfig, saveLLMConfig, loadLLMSettings, saveLLMSettings, getDefaultModel, isAppleAvailable, KNOWN_MODELS, LLMConfig, LLMSettings } from './summarizer';
 import { autotagText, autotagBatch, saveMachineTags, hasMachineTags, migrateDashedTags } from './autotagger';
+import { initAnnotations, loadAnnotation, saveAnnotation, allHighlights, allNotes, migrateMonolithicFiles } from './annotations';
 import { APP_ICON } from './app-icon';
 import { fetchAndExtract } from './extractor';
 import { generateMarkdown, writeArticle, ArticleData, downloadFavicon, resolveFilePath, listMarkdownFiles, listEpubFiles, migrateToDateFolders, exportNotebook, removeExportedNotebook } from './writer';
@@ -531,8 +532,6 @@ function listFiles(outputPath: string): FileMeta[] {
 // App config and data paths
 const CONFIG_DIR = join(homedir(), '.config', 'pullread');
 const FEEDS_PATH = join(CONFIG_DIR, 'feeds.json');
-const HIGHLIGHTS_PATH = join(CONFIG_DIR, 'highlights.json');
-const NOTES_PATH = join(CONFIG_DIR, 'notes.json');
 const APP_SETTINGS_PATH = join(CONFIG_DIR, 'settings.json');
 const NOTEBOOKS_PATH = join(CONFIG_DIR, 'notebooks.json');
 const APP_VERSION = require('../package.json').version as string;
@@ -566,27 +565,17 @@ function installBundledBooks(outputPath: string): void {
 
   if (entries.length === 0) return;
 
-  const allNotes = loadJsonFile(NOTES_PATH) as Record<string, any>;
-  let notesChanged = false;
-
   for (const filename of entries) {
     const dest = join(outputPath, filename);
     if (!existsSync(dest)) {
       copyFileSync(join(booksDir, filename), dest);
     }
 
-    // Ensure "classicbooks" tag exists in notes.json
-    const note = allNotes[filename] || { articleNote: '', annotations: [], tags: [], isFavorite: false };
-    if (!Array.isArray(note.tags)) note.tags = [];
-    if (!note.tags.includes('classicbooks')) {
-      note.tags.push('classicbooks');
-      allNotes[filename] = note;
-      notesChanged = true;
+    // Ensure "classicbooks" tag exists in annotation sidecar
+    const annot = loadAnnotation(filename);
+    if (!annot.tags.includes('classicbooks')) {
+      saveAnnotation(filename, { ...annot, tags: [...annot.tags, 'classicbooks'] });
     }
-  }
-
-  if (notesChanged) {
-    saveJsonFile(NOTES_PATH, allNotes);
   }
 }
 
@@ -691,6 +680,15 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
   if (migrated > 0) {
     console.log(`[Storage] Migrated ${migrated} articles to dated folders`);
   }
+
+  // Migrate monolithic highlights.json + notes.json to per-article .annot.json sidecars
+  const migration = migrateMonolithicFiles(outputPath, CONFIG_DIR);
+  if (migration.migrated > 0 || migration.orphaned > 0) {
+    console.log(`[Storage] Migrated ${migration.migrated} annotations to sidecars (${migration.orphaned} orphaned)`);
+  }
+
+  // Load annotation sidecars into memory
+  initAnnotations(outputPath, CONFIG_DIR);
 
   // Normalize any legacy dashed machine tags
   migrateDashedTags();
@@ -940,11 +938,10 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
     if (url.pathname === '/api/highlights') {
       if (req.method === 'GET') {
         const name = url.searchParams.get('name');
-        const allHighlights = loadJsonFile(HIGHLIGHTS_PATH) as Record<string, unknown[]>;
         if (name) {
-          sendJson(res, allHighlights[name] || []);
+          sendJson(res, loadAnnotation(name).highlights);
         } else {
-          sendJson(res, allHighlights);
+          sendJson(res, allHighlights());
         }
         return;
       }
@@ -957,9 +954,8 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
             res.end(JSON.stringify({ error: 'name is required' }));
             return;
           }
-          const allHighlights = loadJsonFile(HIGHLIGHTS_PATH) as Record<string, unknown[]>;
-          allHighlights[name] = highlights || [];
-          saveJsonFile(HIGHLIGHTS_PATH, allHighlights);
+          const existing = loadAnnotation(name);
+          saveAnnotation(name, { ...existing, highlights: highlights || [] });
           sendJson(res, { ok: true });
         } catch (err) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -973,11 +969,11 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
     if (url.pathname === '/api/notes') {
       if (req.method === 'GET') {
         const name = url.searchParams.get('name');
-        const allNotes = loadJsonFile(NOTES_PATH) as Record<string, unknown>;
         if (name) {
-          sendJson(res, allNotes[name] || { articleNote: '', annotations: [], tags: [], isFavorite: false });
+          const annot = loadAnnotation(name);
+          sendJson(res, { articleNote: annot.articleNote, annotations: annot.annotations, tags: annot.tags, isFavorite: annot.isFavorite, ...(annot.machineTags.length ? { machineTags: annot.machineTags } : {}) });
         } else {
-          sendJson(res, allNotes);
+          sendJson(res, allNotes());
         }
         return;
       }
@@ -990,17 +986,14 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
             res.end(JSON.stringify({ error: 'name is required' }));
             return;
           }
-          const allNotes = loadJsonFile(NOTES_PATH) as Record<string, any>;
-          const existing = allNotes[name] || {};
-          allNotes[name] = {
+          const existing = loadAnnotation(name);
+          saveAnnotation(name, {
+            ...existing,
             articleNote: articleNote || '',
             annotations: annotations || [],
             tags: tags || [],
             isFavorite: !!isFavorite,
-            // Preserve machine tags — they're managed by the autotagger, not the UI
-            ...(existing.machineTags ? { machineTags: existing.machineTags } : {})
-          };
-          saveJsonFile(NOTES_PATH, allNotes);
+          });
           sendJson(res, { ok: true });
         } catch (err) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -1512,8 +1505,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
 
         // Check if already tagged
         if (hasMachineTags(name)) {
-          const allNotes = loadJsonFile(NOTES_PATH) as Record<string, any>;
-          sendJson(res, { machineTags: allNotes[name]?.machineTags || [], cached: true });
+          sendJson(res, { machineTags: loadAnnotation(name).machineTags, cached: true });
           return;
         }
 
@@ -1915,10 +1907,10 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
 
     // Backup API — export all user data as a single JSON download
     if (url.pathname === '/api/backup' && req.method === 'GET') {
-      const backupFiles = ['feeds.json', 'settings.json', 'highlights.json', 'notes.json', 'notebooks.json', 'inbox.json'];
+      const backupFiles = ['feeds.json', 'settings.json', 'notebooks.json', 'inbox.json'];
       const backup: Record<string, unknown> = {
         _pullread_backup: true,
-        _version: '1',
+        _version: '2',
         _createdAt: new Date().toISOString(),
       };
       for (const f of backupFiles) {
@@ -1927,6 +1919,9 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
           try { backup[f] = JSON.parse(readFileSync(p, 'utf-8')); } catch {}
         }
       }
+      // Build highlights and notes from sidecar cache for backward-compatible backup
+      backup['highlights.json'] = allHighlights();
+      backup['notes.json'] = allNotes();
       // Include sync database if it exists
       const dbPath = join(CONFIG_DIR, 'pullread.json');
       if (existsSync(dbPath)) {
@@ -1951,13 +1946,30 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
           res.end(JSON.stringify({ error: 'Not a valid PullRead backup file' }));
           return;
         }
-        const restorableFiles = ['feeds.json', 'settings.json', 'highlights.json', 'notes.json', 'notebooks.json', 'inbox.json', 'pullread.json'];
+        const restorableFiles = ['feeds.json', 'settings.json', 'notebooks.json', 'inbox.json', 'pullread.json'];
         let restored = 0;
         for (const f of restorableFiles) {
           if (body[f] && typeof body[f] === 'object') {
             saveJsonFile(join(CONFIG_DIR, f), body[f]);
             restored++;
           }
+        }
+        // Restore highlights and notes as per-article sidecars
+        const restoredHighlights = body['highlights.json'] || {};
+        const restoredNotes = body['notes.json'] || {};
+        const allFilenames = new Set([...Object.keys(restoredHighlights), ...Object.keys(restoredNotes)]);
+        for (const filename of allFilenames) {
+          const highlights = restoredHighlights[filename] || [];
+          const note = restoredNotes[filename] || {};
+          saveAnnotation(filename, {
+            highlights: Array.isArray(highlights) ? highlights : [],
+            articleNote: note.articleNote || '',
+            annotations: note.annotations || [],
+            tags: note.tags || [],
+            machineTags: note.machineTags || [],
+            isFavorite: !!note.isFavorite,
+          });
+          restored++;
         }
         sendJson(res, { ok: true, restored });
       } catch {
