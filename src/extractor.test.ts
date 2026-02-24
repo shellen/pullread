@@ -5,7 +5,7 @@ import {
   extractArticle, resolveRelativeUrls, simplifySubstackUrl, isYouTubeUrl, extractYouTubeId,
   matchPaperSource, fixPdfLigatures, stripRunningHeaders, buildParagraphs, extractPdfTitle,
   parseCaptionTracks, extractTweetId, isThreadsUrl, formatTweetMarkdown, fetchAndExtract,
-  stripEmbedNoise,
+  stripEmbedNoise, htmlToMarkdown,
   type FxTweet
 } from './extractor';
 
@@ -261,6 +261,25 @@ describe('stripEmbedNoise', () => {
     const md = '# Title\n\nSome article text.\n\n## Subtitle\n\nMore text.';
     const result = stripEmbedNoise(md);
     expect(result).toBe(md);
+  });
+});
+
+describe('htmlToMarkdown', () => {
+  test('converts HTML to markdown with resolved URLs', () => {
+    const html = '<p>Hello <strong>world</strong></p><p>A <a href="/page">link</a></p>';
+    const result = htmlToMarkdown(html, 'https://example.com/article');
+    expect(result).toContain('Hello **world**');
+    expect(result).toContain('[link](https://example.com/page)');
+  });
+
+  test('converts Substack-style feed content to clean markdown', () => {
+    const html = '<h2>Introduction</h2><p>This is the first paragraph of a Substack article.</p>'
+      + '<p>It has <em>formatting</em> and <a href="https://example.com">links</a>.</p>';
+    const result = htmlToMarkdown(html, 'https://newcomer.co/p/some-article');
+    expect(result).toContain('## Introduction');
+    expect(result).toContain('first paragraph');
+    expect(result).toContain('_formatting_');
+    expect(result).toContain('[links](https://example.com)');
   });
 });
 

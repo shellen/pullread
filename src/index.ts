@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from '
 import { join, basename } from 'path';
 import { homedir } from 'os';
 import { fetchFeed, FeedEntry } from './feed';
-import { fetchAndExtract, FetchOptions, shouldSkipUrl, classifyFetchError } from './extractor';
+import { fetchAndExtract, FetchOptions, shouldSkipUrl, classifyFetchError, htmlToMarkdown } from './extractor';
 import { writeArticle, listMarkdownFiles, resolveFilePath } from './writer';
 import { Storage } from './storage';
 import { startViewer } from './viewer';
@@ -216,19 +216,25 @@ async function syncFeed(
           }
         }
 
-        if (!article) {
+        // Use RSS feed HTML when it has more content than web extraction
+        const feedMarkdown = entry.contentHtml
+          ? htmlToMarkdown(entry.contentHtml, entry.url) : '';
+        const extractedMarkdown = article?.markdown || '';
+
+        if (!extractedMarkdown && !feedMarkdown) {
           console.log(`      Skipped: Could not extract content`);
           storage.markFailed(entry.url, 'No extractable content');
           failed++;
           continue;
         }
 
-        content = article.markdown;
-        title = article.title || entry.title;
-        author = article.byline || entry.author;
-        excerpt = article.excerpt;
-        thumbnail = article.thumbnail;
-        lang = article.lang;
+        content = feedMarkdown.length > extractedMarkdown.length
+          ? feedMarkdown : extractedMarkdown;
+        title = article?.title || entry.title;
+        author = article?.byline || entry.author;
+        excerpt = article?.excerpt;
+        thumbnail = article?.thumbnail;
+        lang = article?.lang;
       }
 
       const filename = writeArticle(outputPath, {

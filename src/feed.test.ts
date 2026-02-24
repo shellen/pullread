@@ -86,6 +86,31 @@ describe('parseFeed - Atom', () => {
     const entries = parseFeed(ATOM_FEED);
     expect(entries[0].domain).toBe('example.com');
   });
+
+  test('preserves contentHtml when Atom content is substantial', () => {
+    const longContent = '<p>' + 'This is a full article paragraph. '.repeat(10) + '</p>';
+    const feed = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Full Content Feed</title>
+  <entry>
+    <title>Full Article</title>
+    <link href="https://newcomer.co/p/test-article"/>
+    <id>urn:uuid:full-1</id>
+    <updated>2024-06-01T12:00:00Z</updated>
+    <content type="html">${longContent.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</content>
+  </entry>
+</feed>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].contentHtml).toBeDefined();
+    expect(entries[0].contentHtml!.length).toBeGreaterThan(200);
+    expect(entries[0].annotation).toBeDefined();
+  });
+
+  test('does not set contentHtml for short Atom content', () => {
+    const entries = parseFeed(ATOM_FEED);
+    expect(entries[0].contentHtml).toBeUndefined();
+    expect(entries[0].annotation).toBe('Some annotation text');
+  });
 });
 
 describe('parseFeed - RSS', () => {

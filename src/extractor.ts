@@ -144,6 +144,11 @@ export function shouldSkipUrl(url: string): string | null {
  * Sites like NPR include "Download / Embed / Transcript" sections with
  * raw iframe HTML shown as visible text, which Readability captures.
  */
+/** Convert raw HTML (e.g. from RSS feed content) to clean markdown. */
+export function htmlToMarkdown(html: string, baseUrl: string): string {
+  return stripEmbedNoise(resolveRelativeUrls(turndown.turndown(html), baseUrl));
+}
+
 export function stripEmbedNoise(markdown: string): string {
   // Remove lines containing raw <iframe as visible text
   markdown = markdown.replace(/^.*<\s*iframe\b[^]*?(?:>|$).*$/gm, '');
