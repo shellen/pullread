@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FAQ — Pull Read</title>
+<meta name="description" content="Frequently asked questions about Pull Read. Setup, feeds, highlights, AI features, Obsidian integration, and more.">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://pullread.com/faq">
+<meta property="og:title" content="FAQ — Pull Read">
+<meta property="og:description" content="Frequently asked questions about Pull Read. Setup, feeds, highlights, AI features, Obsidian integration, and more.">
+<meta property="og:image" content="https://pullread.com/og-image.png">
+<meta property="og:site_name" content="Pull Read">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --teal: #2a9d8f;
+    --teal-dark: #21867a;
+    --teal-subtle: #f0faf8;
+    --orange: #e76f51;
+    --fg: #111111;
+    --body: #374151;
+    --muted: #6b7280;
+    --light: #9ca3af;
+    --bg: #fafaf9;
+    --white: #ffffff;
+    --border: #e5e7eb;
+    --border-light: #f3f4f6;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* ── Nav ── */
+  nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: rgba(250, 250, 249, 0.8);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    padding: 0 32px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 17px;
+    color: var(--fg);
+    text-decoration: none;
+    letter-spacing: -0.02em;
+  }
+
+  .nav-brand svg { flex-shrink: 0; }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    list-style: none;
+  }
+
+  .nav-links a {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: color 0.15s;
+    padding: 6px 14px;
+    border-radius: 8px;
+  }
+
+  .nav-links a:hover { color: var(--fg); }
+  .nav-links a.active { color: var(--fg); }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 22px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 15px;
+    font-family: inherit;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border: none;
+    cursor: pointer;
+    letter-spacing: -0.01em;
+  }
+
+  .btn-sm {
+    padding: 8px 18px;
+    font-size: 14px;
+    border-radius: 8px;
+  }
+
+  .btn-teal {
+    background: var(--teal);
+    color: var(--white);
+  }
+
+  .btn-teal:hover {
+    background: var(--teal-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(42, 157, 143, 0.3);
+  }
+
+  /* ── Page header ── */
+  .page-header {
+    padding: 120px 32px 48px;
+    text-align: center;
+    max-width: 700px;
+    margin: 0 auto;
+  }
+
+  .page-header h1 {
+    font-size: clamp(32px, 5vw, 48px);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1.1;
+    margin-bottom: 12px;
+  }
+
+  .page-header p {
+    font-size: 18px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  /* ── FAQ sections ── */
+  .faq {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 0 32px 100px;
+  }
+
+  .faq-section {
+    margin-bottom: 48px;
+  }
+
+  .faq-section-title {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--teal);
+    display: inline-block;
+  }
+
+  .faq-item {
+    margin-bottom: 24px;
+  }
+
+  .faq-item summary {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--fg);
+    cursor: pointer;
+    padding: 12px 0;
+    list-style: none;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    line-height: 1.4;
+  }
+
+  .faq-item summary::-webkit-details-marker { display: none; }
+
+  .faq-item summary::before {
+    content: "+";
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    border-radius: 50%;
+    background: var(--teal-subtle);
+    color: var(--teal);
+    font-size: 16px;
+    font-weight: 700;
+    transition: all 0.2s;
+  }
+
+  .faq-item[open] summary::before {
+    content: "\2212";
+    background: var(--teal);
+    color: var(--white);
+  }
+
+  .faq-answer {
+    padding: 0 0 8px 34px;
+    color: var(--body);
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  .faq-answer p {
+    margin-bottom: 12px;
+  }
+
+  .faq-answer p:last-child {
+    margin-bottom: 0;
+  }
+
+  .faq-answer code {
+    background: var(--border-light);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  }
+
+  .faq-answer pre {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    padding: 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 12px 0;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .faq-answer pre code {
+    background: none;
+    padding: 0;
+    font-size: 13px;
+    color: inherit;
+  }
+
+  .faq-answer ul, .faq-answer ol {
+    margin: 8px 0 12px 20px;
+  }
+
+  .faq-answer li {
+    margin-bottom: 4px;
+  }
+
+  .faq-answer strong {
+    color: var(--fg);
+  }
+
+  .faq-answer a {
+    color: var(--teal);
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  .faq-answer a:hover {
+    text-decoration: underline;
+  }
+
+  /* ── Toc ── */
+  .faq-toc {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 48px;
+  }
+
+  .faq-toc a {
+    display: inline-block;
+    padding: 6px 14px;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+
+  .faq-toc a:hover {
+    border-color: var(--teal);
+    color: var(--teal);
+    background: var(--teal-subtle);
+  }
+
+  /* ── Footer ── */
+  footer {
+    border-top: 1px solid var(--border-light);
+    padding: 36px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 900px;
+    margin: 0 auto;
+    font-size: 13px;
+    color: var(--light);
+  }
+
+  footer a {
+    color: var(--muted);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+
+  footer a:hover { color: var(--fg); }
+
+  .footer-links {
+    display: flex;
+    gap: 20px;
+    list-style: none;
+  }
+
+  /* ── Reveal animation ── */
+  .reveal {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.5s ease;
+  }
+
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* ── Mobile ── */
+  @media (max-width: 640px) {
+    nav { padding: 0 20px; }
+    .nav-links { display: none; }
+    .page-header { padding: 100px 20px 32px; }
+    .faq { padding: 0 20px 64px; }
+    footer {
+      flex-direction: column;
+      gap: 12px;
+      text-align: center;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav>
+  <a href="/" class="nav-brand">
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+      <rect x="1" y="1" width="26" height="26" rx="6" fill="#2a9d8f"/>
+      <rect x="5" y="5" width="18" height="20" rx="2" fill="#fff"/>
+      <rect x="8" y="10" width="12" height="2" rx="1" fill="#444"/>
+      <rect x="8" y="14" width="12" height="2" rx="1" fill="#444"/>
+      <rect x="8" y="18" width="8" height="2" rx="1" fill="#444"/>
+      <path d="M17 3v6l2-1.5L21 9V3z" fill="#e76f51"/>
+    </svg>
+    Pull Read
+  </a>
+  <ul class="nav-links">
+    <li><a href="/">Home</a></li>
+    <li><a href="/releases">Releases</a></li>
+    <li><a href="/faq" class="active">FAQ</a></li>
+    <li><a href="https://github.com/shellen/pullread/releases/download/latest/PullRead.dmg" class="btn btn-sm btn-teal">Download</a></li>
+  </ul>
+</nav>
+
+<!-- Header -->
+<div class="page-header">
+  <h1>FAQ</h1>
+  <p>Everything you need to know about Pull Read.</p>
+</div>
+
+<!-- Section links -->
+<div class="faq" style="padding-bottom: 0;">
+  <div class="faq-toc">
+    <a href="#getting-started">Getting Started</a>
+    <a href="#feeds">Feeds & Content</a>
+    <a href="#reading">Reading & Highlights</a>
+    <a href="#ai">AI Features</a>
+    <a href="#data">Data & Privacy</a>
+    <a href="#obsidian">Obsidian</a>
+    <a href="#troubleshooting">Troubleshooting</a>
+  </div>
+</div>
+
+<!-- FAQ content -->
+<div class="faq">
+
+  <!-- Getting Started -->
+  <div class="faq-section reveal" id="getting-started">
+    <h2 class="faq-section-title">Getting Started</h2>
+
+    <details class="faq-item">
+      <summary>What is Pull Read?</summary>
+      <div class="faq-answer">
+        <p>Pull Read is a macOS menu bar app for reading RSS feeds, bookmarked articles, and ebooks. It saves everything as local Markdown files, so your reading library is always yours &mdash; searchable, portable, and never locked into a platform.</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary>How do I install it?</summary>
+      <div class="faq-answer">
+        <p>Download the DMG from the <a href="https://github.com/shellen/pullread/releases/download/latest/PullRead.dmg">releases page</a>, drag Pull Read to your Applications folder, and launch it. It lives in your menu bar &mdash; click the icon to open the viewer or access settings.</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary>Where are my articles stored?</summary>
+      <div class="faq-answer">
+        <p>Articles are saved as Markdown files in <code>~/Documents/PullRead</code> by default, organized in date folders (<code>2024/02/article-title.md</code>). You can change this path in Settings. Since they're plain Markdown with YAML frontmatter, you can read them with any text editor, Obsidian, or other Markdown tools.</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary>Does it work offline?</summary>
+      <div class="faq-answer">
+        <p>Yes. Once articles are synced, everything works offline &mdash; reading, highlighting, notes, search, and text-to-speech (with Apple's built-in voices). AI features and feed syncing need an internet connection.</p>
+      </div>
+    </details>
+  </div>
+
+  <!-- Feeds & Content -->
+  <div class="faq-section reveal" id="feeds">
+    <h2 class="faq-section-title">Feeds & Content</h2>
+
+    <details class="faq-item">
+      <summary>What kinds of feeds can I subscribe to?</summary>
+      <div class="faq-answer">
+        <p>Pull Read supports RSS, Atom, RDF, and JSON Feed formats. It also has smart URL resolution &mdash; paste a YouTube channel URL, a Reddit subreddit, or a blog homepage, and Pull Read will find the feed for you.</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary>Can I import feeds from another reader?</summary>
+      <div class="faq-answer">
+        <p>Yes. Pull Read supports OPML import. Export your subscriptions from your current reader as an OPML file, then import it in Settings &gt; Feeds.</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary>Can I save individual articles without subscribing to a feed?</summary>
+      <div class="faq-answer">
+        <p>Yes, several ways:</p>
+        <ul>
+          <li><strong>Quick Add</strong> &mdash; Click the + button in the sidebar and paste a URL</li>
+          <li><strong>Bookmarklet</strong> &mdash; Drag the bookmarklet from the setup tour to your browser's bookmarks bar, then click it on any page</li>
+          <li><strong>Drop a file</strong> &mdash; Drag a <code>.md</code> file into the Pull Read window</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary>Does it support podcasts?</summary>
+      <div class="faq-answer">
+        <p>Yes. Any RSS feed with audio enclosures shows up as a podcast with an inline player. You'll see episode descriptions and can play audio directly in the reader.</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary>Can I read ebooks?</summary>
+      <div class="faq-answer">
+        <p>Yes. Drop an EPUB file into your Pull Read folder and it appears in your library with chapter navigation, table of contents, and cover images. Search for <code>is:book</code> to filter your book collection.</p>
+      </div>
+    </details>
+  </div>
+
+  <!-- Reading & Highlights -->
+  <div class="faq-section reveal" id="reading">
+    <h2 class="faq-section-title">Reading & Highlights</h2>
+
+    <details class="faq-item">
+      <summary>How do I highlight text?</summary>
+      <div class="faq-answer">
+        <p>Select any text in an article and a highlight toolbar appears. Choose a color (yellow, green, blue, or pink) and optionally add a note. Highlights are saved automatically and shown as footnotes in the margin.</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary>What's the difference between highlights, notes, and notebooks?</summary>
+      <div class="faq-answer">
+        <ul>
+          <li><strong>Highlights</strong> &mdash; Selected passages in an article, with optional inline notes</li>
+          <li><strong>Article notes</strong> &mdash; Your thoughts about an article as a whole, visible in the notes panel</li>
+          <li><strong>Notebooks</strong> &mdash; Freeform notes for synthesis and original writing, optionally linked to source articles</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary>How does search work?</summary>
+      <div class="faq-answer">
+        <p>The search bar supports plain text and operators:</p>
+        <ul>
+          <li><code>is:favorite</code> <code>is:unread</code> <code>is:podcast</code> <code>is:book</code></li>
+          <li><code>has:summary</code> <code>has:highlights</code> <code>has:notes</code> <code>has:tags</code></li>
+          <li><code>tag:philosophy</code> <code>feed:newsletter</code> <code>domain:nytimes.com</code></li>
+          <li><code>author:name</code></li>
+          <li>Combine with <code>OR</code>: <code>tag:ai OR tag:ml</code></li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary>Can I read with text-to-speech?</summary>
+      <div class="faq-answer">
+        <p>Yes. Pull Read supports four TTS providers:</p>
+        <ul>
+          <li><strong>Apple (built-in)</strong> &mdash; Works offline, uses macOS system voices</li>
+          <li><strong>ElevenLabs</strong> &mdash; High-quality neural voices (API key required)</li>
+          <li><strong>OpenAI</strong> &mdash; Natural-sounding voices (API key required)</li>
+          <li><strong>Kokoro</strong> &mdash; Open-source local voices, no API key needed</li>
+        </ul>
+        <p>Click the speaker icon on any article to start listening.</p>
+      </div>
+    </details>
+  </div>
+
+  <!-- AI Features -->
+  <div class="faq-section reveal" id="ai">
+    <h2 class="faq-section-title">AI Features</h2>
+
+    <details class="faq-item">
+      <summary>What AI features are available?</summary>
+      <div class="faq-answer">
+        <ul>
+          <li><strong>Article summaries</strong> &mdash; One-click summaries of any article</li>
+          <li><strong>Auto-tagging</strong> &mdash; AI-generated topic tags for your library</li>
+          <li><strong>Daily/Weekly reviews</strong> &mdash; AI-written digests of your recent reading</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary>Which AI providers are supported?</summary>
+      <div class="faq-answer">
+        <p>Pull Read works with multiple providers &mdash; bring your own API key:</p>
+        <ul>
+          <li><strong>Anthropic</strong> (Claude)</li>
+          <li><strong>OpenAI</strong> (GPT)</li>
+          <li><strong>Google</strong> (Gemini)</li>
+          <li><strong>Apple Intelligence</strong> (on supported Macs, no key needed)</li>
+          <li><strong>OpenRouter</strong> (access to many models via one key)</li>
+        </ul>
+        <p>Configure your provider and API key in Settings &gt; AI.</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary>Are my articles sent to AI providers?</summary>
+      <div class="faq-answer">
+        <p>Only when you explicitly request it &mdash; by clicking Summarize, running auto-tagging, or generating a review. Pull Read never sends article content to any server in the background. Your reading habits stay private.</p>
+      </div>
+    </details>
+  </div>
+
+  <!-- Data & Privacy -->
+  <div class="faq-section reveal" id="data">
+    <h2 class="faq-section-title">Data & Privacy</h2>
+
+    <details class="faq-item">
+      <summary>Where is my data stored?</summary>
+      <div class="faq-answer">
+        <p>Everything is local:</p>
+        <ul>
+          <li><strong>Articles</strong> &mdash; Markdown files in your chosen output folder</li>
+          <li><strong>Highlights, notes, tags</strong> &mdash; JSON files in <code>~/.config/pullread/</code></li>
+          <li><strong>Feed configuration</strong> &mdash; <code>~/.config/pullread/feeds.json</code></li>
+        </ul>
+        <p>Pull Read has no account system and no cloud service. Your data never leaves your machine unless you explicitly use an AI feature.</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary>Can I back up my data?</summary>
+      <div class="faq-answer">
+        <p>Yes. Go to Settings &gt; Data and click <strong>Export Backup</strong>. This creates a single JSON file with all your configuration, highlights, notes, and notebooks. Use <strong>Import Backup</strong> to restore.</p>
+        <p>Your articles are already plain Markdown files, so any file backup solution (Time Machine, iCloud, Dropbox) works for those.</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary>Can I sync across devices?</summary>
+      <div class="faq-answer">
+        <p>Articles can be synced by putting the output folder in iCloud Drive, Dropbox, or any file sync service. Full annotation sync across devices is on the roadmap.</p>
+      </div>
+    </details>
+  </div>
+
+  <!-- Obsidian -->
+  <div class="faq-section reveal" id="obsidian">
+    <h2 class="faq-section-title">Obsidian Integration</h2>
+
+    <details class="faq-item">
+      <summary>Can I use Pull Read with Obsidian?</summary>
+      <div class="faq-answer">
+        <p>Yes. Since Pull Read saves articles as Markdown with YAML frontmatter, they're natively readable in Obsidian. The simplest setup: point your PullRead output path to a subfolder inside your Obsidian vault (e.g. <code>~/Obsidian/MyVault/reading/</code>).</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary>How do I set it up?</summary>
+      <div class="faq-answer">
+        <ol>
+          <li>Open Pull Read Settings</li>
+          <li>Change your output folder to a subfolder of your Obsidian vault, like <code>~/Obsidian/MyVault/reading</code></li>
+          <li>Your articles will appear in Obsidian's file explorer and be searchable, linkable, and queryable with Dataview</li>
+        </ol>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary>What frontmatter properties are available?</summary>
+      <div class="faq-answer">
+        <p>Every article includes these properties that Obsidian and Dataview can use:</p>
+<pre><code>---
+title: "Article Title"
+url: https://example.com/article
+author: "Author Name"
+domain: example.com
+feed: newsletter-name
+bookmarked: 2024-01-29T19:05:18Z
+lang: en
+excerpt: "First 300 characters..."
+---</code></pre>
+        <p>This means you can write Dataview queries like:</p>
+<pre><code>```dataview
+TABLE author, domain, bookmarked
+FROM "reading"
+WHERE feed = "tech-newsletter"
+SORT bookmarked DESC
+```</code></pre>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary>Can I link to articles from my other notes?</summary>
+      <div class="faq-answer">
+        <p>Yes. Since articles live inside your vault, standard Obsidian <code>[[wikilinks]]</code> work. Link to any article from your daily notes, project notes, or anywhere else in your vault.</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary>Do I need an Obsidian plugin?</summary>
+      <div class="faq-answer">
+        <p>No. Pull Read's output is standard Markdown with standard YAML frontmatter. No plugin required. Dataview is recommended for querying your reading library but isn't necessary for basic use.</p>
+      </div>
+    </details>
+  </div>
+
+  <!-- Troubleshooting -->
+  <div class="faq-section reveal" id="troubleshooting">
+    <h2 class="faq-section-title">Troubleshooting</h2>
+
+    <details class="faq-item">
+      <summary>The app shows a blank page on launch</summary>
+      <div class="faq-answer">
+        <p>On some Intel Macs, the internal server may take a moment to start. Wait a few seconds and click the menu bar icon again. If it persists, quit and relaunch the app. This was improved in <a href="/releases#v0.3.4">v0.3.4</a>.</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary>A feed shows an error in Settings</summary>
+      <div class="faq-answer">
+        <p>Feed health monitoring (added in v0.3.4) will show error status for feeds that can't be fetched. Common causes:</p>
+        <ul>
+          <li>The feed URL changed or the site went offline</li>
+          <li>The site blocks automated requests (try a different URL)</li>
+          <li>The URL isn't actually a feed (try the site's homepage &mdash; Pull Read will auto-discover the feed)</li>
+        </ul>
+        <p>Click the <strong>Retry</strong> button next to the error to try again.</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary>How do I update Pull Read?</summary>
+      <div class="faq-answer">
+        <p>Pull Read checks for updates automatically. When a new version is available, you'll see a notification in the menu bar. Click it to download and install the update. You can also check <a href="/releases">Releases</a> to see what's new.</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary>Something else isn't working</summary>
+      <div class="faq-answer">
+        <p>Check the app logs: open Pull Read, go to Settings, and scroll to the bottom of the About section for the log file path. If you've found a bug, please <a href="https://github.com/shellen/pullread/issues">open an issue on GitHub</a>.</p>
+      </div>
+    </details>
+  </div>
+
+</div>
+
+<!-- Footer -->
+<footer>
+  <a href="https://alittledrive.com" style="font-weight: 600; letter-spacing: -0.01em;">A Little Drive</a>
+  <ul class="footer-links">
+    <li><a href="/privacy">Privacy</a></li>
+    <li><a href="/terms">Terms</a></li>
+    <li><a href="/releases">Releases</a></li>
+    <li><a href="/faq">FAQ</a></li>
+  </ul>
+</footer>
+
+<script>
+// Scroll reveal
+var revealEls = document.querySelectorAll('.reveal');
+var observer = new IntersectionObserver(function(entries) {
+  entries.forEach(function(entry) {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+      observer.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.1 });
+revealEls.forEach(function(el) { observer.observe(el); });
+</script>
+
+</body>
+</html>
