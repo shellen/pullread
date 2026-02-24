@@ -509,10 +509,10 @@ function showSettingsPage(scrollToSection) {
         { name: 'Daring Fireball', url: 'https://daringfireball.net/feeds/main' },
         { name: 'Heather Cox Richardson', url: 'https://heathercoxrichardson.substack.com' },
         { name: 'Kottke.org', url: 'https://feeds.kottke.org/main' },
-        { name: 'Craig Mod', url: 'https://craigmod.com' },
+        { name: 'Craig Mod', url: 'https://craigmod.com/rss/' },
         { name: 'Aeon Essays', url: 'https://aeon.co/feed.rss' },
         { name: 'Longreads', url: 'https://longreads.com/feed/' },
-        { name: 'The Marginalian', url: 'https://www.themarginalian.org' },
+        { name: 'The Marginalian', url: 'https://www.themarginalian.org/feed/' },
       ];
       // Filter out feeds already added
       var existingUrls = Object.values(feeds).map(function(u) { return u.toLowerCase(); });
