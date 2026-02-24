@@ -2582,11 +2582,11 @@
   .podcast-player { margin: 1em 0; padding: 12px; background: var(--code-bg); border-radius: 8px; display: flex; align-items: center; gap: 10px; }
   .podcast-player audio { flex: 1; min-width: 0; height: 36px; }
   .podcast-duration { font-size: 13px; color: var(--muted); white-space: nowrap; }
-  .podcast-description { margin: 0.5em 0 1em; font-size: 13px; color: var(--muted); }
-  .podcast-description summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+  .podcast-description { margin: 1em 0; }
+  .podcast-description summary { cursor: pointer; font-size: 14px; font-weight: 500; color: var(--muted); }
   .podcast-description summary:hover { color: var(--fg); }
-  .podcast-description > div { margin-top: 8px; line-height: 1.5; color: var(--fg); }
-  .podcast-description > div p { margin: 0.5em 0; }
+  .podcast-description > div { margin-top: 12px; color: var(--fg); }
+  .podcast-description > div p { margin: 0.8em 0; }
 
   /* Review article link list — link-blog style */
   .review-content ul {

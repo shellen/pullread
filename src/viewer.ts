@@ -484,6 +484,7 @@ function listFiles(outputPath: string): FileMeta[] {
 
   // Add EPUB files
   const epubPaths = listEpubFiles(outputPath);
+  if (epubPaths.length) console.log(`[EPUB] Found ${epubPaths.length} file(s):`, epubPaths.map(p => require('path').basename(p)));
   for (const fullPath of epubPaths) {
     const name = require('path').basename(fullPath);
     try {
@@ -512,8 +513,8 @@ function listFiles(outputPath: string): FileMeta[] {
         enclosureType: '',
         enclosureDuration: '',
       });
-    } catch {
-      // Skip unreadable EPUBs
+    } catch (err) {
+      console.error(`[EPUB] Failed to index ${name}:`, err);
     }
   }
 

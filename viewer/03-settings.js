@@ -379,6 +379,7 @@ function showSettingsPage(scrollToSection) {
   html += '<div class="settings-row"><label>Version</label><span id="sp-version" style="color:var(--muted);font-size:13px"></span></div>';
   html += '<div class="settings-row" style="gap:12px">';
   html += '<a href="https://pullread.com" target="_blank" rel="noopener" style="font-size:13px;color:var(--link)">pullread.com</a>';
+  html += '<a href="#" onclick="prOpenExternal(\'https://pullread.com/releases#v\' + (window._prCurrentVersion || \'0.3.4\'));return false" style="font-size:13px;color:var(--link)">What\'s New</a>';
   html += '<a href="/api/log" target="_blank" style="font-size:13px;color:var(--link)">View Logs</a>';
   html += '<button style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit" onclick="showTour()">Show Tour</button>';
   html += '</div>';
@@ -411,6 +412,7 @@ function showSettingsPage(scrollToSection) {
     fetch('/api/check-updates').then(function(r) { return r.json(); }).then(function(data) {
       var el = document.getElementById('sp-version');
       if (el) el.textContent = data.currentVersion || 'unknown';
+      if (data.currentVersion) window._prCurrentVersion = data.currentVersion;
     }).catch(function() {
       var el = document.getElementById('sp-version');
       if (el) el.textContent = 'unknown';

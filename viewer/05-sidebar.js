@@ -273,6 +273,8 @@ function filterFiles() {
         if (tl === 'is:unread') return !readArticles.has(f.filename);
         // Operator: is:podcast / has:audio
         if (tl === 'is:podcast' || tl === 'has:audio') return !!(f.enclosureUrl && f.enclosureType && f.enclosureType.startsWith('audio/'));
+        // Operator: is:epub / is:book
+        if (tl === 'is:epub' || tl === 'is:book') return f.domain === 'epub';
         // Operator: has:summary
         if (tl === 'has:summary') return f.hasSummary;
         // Operator: has:highlights
