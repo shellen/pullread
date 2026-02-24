@@ -1001,7 +1001,11 @@ function settingsAddRecFeed(name, url) {
     if (!sec._configData.feeds) sec._configData.feeds = {};
     sec._configData.feeds[name] = url;
   }
-  settingsPageSaveConfig();
+  var pane = document.getElementById('content-pane');
+  var scrollPos = pane ? pane.scrollTop : 0;
+  settingsPageSaveConfig().then(function() {
+    if (pane) pane.scrollTop = scrollPos;
+  });
 }
 
 async function settingsAddFeed() {
