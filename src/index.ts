@@ -204,7 +204,17 @@ async function syncFeed(
       if (entry.enclosure) {
         content = entry.annotation || 'No description available.';
       } else {
-        const article = await fetchAndExtract(entry.url, fetchOptions);
+        let article = await fetchAndExtract(entry.url, fetchOptions);
+
+        // Retry once if extraction returned suspiciously short content
+        if (article && article.markdown.length < 200) {
+          console.log(`      Short content (${article.markdown.length} chars), retrying after delay...`);
+          await new Promise(r => setTimeout(r, 3_000));
+          const retry = await fetchAndExtract(entry.url, fetchOptions);
+          if (retry && retry.markdown.length > article.markdown.length) {
+            article = retry;
+          }
+        }
 
         if (!article) {
           console.log(`      Skipped: Could not extract content`);
