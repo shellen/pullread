@@ -340,6 +340,12 @@ async function loadFile(index) {
     if (!sidebar.classList.contains('collapsed')) sidebar.classList.add('collapsed');
   }
 
+  // Dropped files store content in memory — render directly without a server fetch
+  if (file._content) {
+    renderArticle(file._content, file.filename);
+    return;
+  }
+
   if (serverMode) {
     // Abort any in-flight article fetch so stale responses don't overwrite
     if (_loadFileAbort) _loadFileAbort.abort();
