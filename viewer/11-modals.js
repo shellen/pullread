@@ -206,7 +206,7 @@ function showGuideModal() {
     <p>When you click Summarize, article text is sent to your selected LLM provider (Anthropic, OpenAI, Gemini, or OpenRouter) using your own API key. Apple Intelligence processes entirely on-device. Summaries are saved locally in the article's frontmatter. The same applies to auto-tagging and weekly reviews.</p>
 
     <h2>Support</h2>
-    <p>Need help? Email us at <a href="mailto:support@alittledrive.com">support@alittledrive.com</a> and we'll get back to you as soon as we can.</p>
+    <p>Need help? Email us at <a href="#" onclick="prOpenExternal('mailto:support@alittledrive.com');return false">support@alittledrive.com</a> and we'll get back to you as soon as we can.</p>
 
     <h2>Acknowledgements</h2>
 
