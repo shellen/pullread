@@ -215,7 +215,7 @@ async function syncFeed(
 
         content = article.markdown;
         title = article.title || entry.title;
-        author = article.byline;
+        author = article.byline || entry.author;
         excerpt = article.excerpt;
         thumbnail = article.thumbnail;
         lang = article.lang;
@@ -558,7 +558,7 @@ if (command === 'sync') {
           content: article.markdown,
           feed: 'import',
           annotation: entry.annotation,
-          author: article.byline,
+          author: article.byline || entry.author,
           excerpt: article.excerpt,
           lang: article.lang,
         });

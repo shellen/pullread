@@ -19,6 +19,7 @@ export interface FeedEntry {
   domain: string;
   annotation?: string;
   enclosure?: Enclosure;
+  author?: string;
 }
 
 type FeedType = 'atom' | 'rss' | 'rdf' | 'json';
@@ -78,13 +79,18 @@ function parseJsonFeed(text: string): FeedEntry[] {
       };
     }
 
+    // JSON Feed author: item.author.name (v1.0) or item.authors[0].name (v1.1)
+    const jsonAuthor = item.authors?.[0]?.name || item.author?.name || '';
+    const jsonAuthorStr = typeof jsonAuthor === 'string' ? jsonAuthor.trim() : '';
+
     return {
       title: item.title || 'Untitled',
       url,
       updatedAt: item.date_published || item.date_modified || '',
       domain,
       annotation: annotation || undefined,
-      enclosure
+      enclosure,
+      author: jsonAuthorStr || undefined
     };
   });
 }
@@ -96,6 +102,17 @@ function parseJsonFeedTitle(text: string): string | null {
   } catch {
     return null;
   }
+}
+
+function extractAtomAuthorName(author: any): string | undefined {
+  if (!author) return undefined;
+  if (typeof author === 'string') return author.trim() || undefined;
+  // Atom author: { name: "...", uri: "...", email: "..." } — we only want name
+  if (author.name) {
+    const name = typeof author.name === 'string' ? author.name : String(author.name);
+    return name.trim() || undefined;
+  }
+  return undefined;
 }
 
 function resolveAtomLink(link: any): string {
@@ -116,6 +133,9 @@ function parseAtomFeed(feed: any): FeedEntry[] {
 
   const entries = Array.isArray(feed.entry) ? feed.entry : [feed.entry];
 
+  // Feed-level author (Atom allows <author> on <feed> as default for entries)
+  const feedAuthor = extractAtomAuthorName(feed.author);
+
   return entries.map((entry: any) => {
     const url = resolveAtomLink(entry.link);
     const domain = new URL(url).hostname.replace(/^www\./, '');
@@ -127,12 +147,15 @@ function parseAtomFeed(feed: any): FeedEntry[] {
       annotation = extractTextFromHtml(entry.content['#text']);
     }
 
+    const author = extractAtomAuthorName(entry.author) || feedAuthor;
+
     return {
       title: extractTitle(entry.title),
       url,
       updatedAt: entry.updated,
       domain,
-      annotation: annotation || undefined
+      annotation: annotation || undefined,
+      author: author || undefined
     };
   });
 }
@@ -175,13 +198,22 @@ function parseRssFeed(rss: any): FeedEntry[] {
       };
     }
 
+    // RSS author: <dc:creator> or <author> (often an email address)
+    const rawAuthor = item['dc:creator'] || item.author || '';
+    const authorStr = typeof rawAuthor === 'string' ? rawAuthor.trim() : '';
+    // Strip email format like "email (Name)" → "Name"
+    const authorName = authorStr.includes('@')
+      ? (authorStr.match(/\(([^)]+)\)/)?.[1] || '').trim()
+      : authorStr;
+
     return [{
       title: extractTitle(item.title),
       url,
       updatedAt: parseRssDate(item.pubDate),
       domain,
       annotation: description || undefined,
-      enclosure
+      enclosure,
+      author: authorName || undefined
     }];
   });
 }
@@ -204,12 +236,16 @@ function parseRdfFeed(rdf: any): FeedEntry[] {
     let updatedAt = dateStr;
     try { updatedAt = new Date(dateStr).toISOString(); } catch {}
 
+    const rdfAuthor = item['dc:creator'] || '';
+    const rdfAuthorStr = typeof rdfAuthor === 'string' ? rdfAuthor.trim() : '';
+
     return {
       title: extractTitle(item.title),
       url,
       updatedAt,
       domain,
-      annotation: description || undefined
+      annotation: description || undefined,
+      author: rdfAuthorStr || undefined
     };
   });
 }

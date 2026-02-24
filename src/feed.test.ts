@@ -623,3 +623,146 @@ describe('discoverFeedUrl - JSON Feed', () => {
     expect(discoverFeedUrl(html, 'https://example.com')).toBe('https://example.com/feed.json');
   });
 });
+
+describe('parseFeed - author extraction', () => {
+  test('extracts author name from Atom entry', () => {
+    const feed = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Daring Fireball</title>
+  <entry>
+    <title>Test Post</title>
+    <link rel="alternate" href="https://example.com/article"/>
+    <id>urn:uuid:1</id>
+    <updated>2024-01-29T12:00:00Z</updated>
+    <author>
+      <name>John Gruber</name>
+      <uri>http://daringfireball.net/</uri>
+    </author>
+  </entry>
+</feed>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].author).toBe('John Gruber');
+  });
+
+  test('inherits feed-level Atom author when entry has none', () => {
+    const feed = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Single Author Blog</title>
+  <author>
+    <name>Jane Doe</name>
+  </author>
+  <entry>
+    <title>No Entry Author</title>
+    <link href="https://example.com/post"/>
+    <id>urn:uuid:2</id>
+    <updated>2024-01-29T12:00:00Z</updated>
+  </entry>
+</feed>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].author).toBe('Jane Doe');
+  });
+
+  test('extracts dc:creator from RSS entry', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Multi-Author Blog</title>
+    <item>
+      <title>Guest Post</title>
+      <link>https://example.com/guest</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <dc:creator>Alice Smith</dc:creator>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].author).toBe('Alice Smith');
+  });
+
+  test('strips email from RSS author field', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Email Author</title>
+    <item>
+      <title>Test</title>
+      <link>https://example.com/test</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <author>noreply@example.com (Bob Jones)</author>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].author).toBe('Bob Jones');
+  });
+
+  test('omits author when RSS author is bare email', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Bare Email</title>
+    <item>
+      <title>Test</title>
+      <link>https://example.com/test</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <author>noreply@example.com</author>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].author).toBeUndefined();
+  });
+
+  test('extracts dc:creator from RDF entry', () => {
+    const entries = parseFeed(RDF_FEED);
+    expect(entries[0].author).toBe('testuser');
+  });
+
+  test('omits author when RDF entry has no dc:creator', () => {
+    const entries = parseFeed(RDF_FEED);
+    expect(entries[1].author).toBeUndefined();
+  });
+
+  test('extracts author from JSON Feed v1.1 authors array', () => {
+    const feed = JSON.stringify({
+      version: 'https://jsonfeed.org/version/1.1',
+      title: 'Authored Feed',
+      items: [{
+        id: '1',
+        title: 'Post',
+        url: 'https://example.com/post',
+        date_published: '2024-01-29T12:00:00Z',
+        authors: [{ name: 'Carol White', url: 'https://example.com/carol' }]
+      }]
+    });
+    const entries = parseFeed(feed);
+    expect(entries[0].author).toBe('Carol White');
+  });
+
+  test('extracts author from JSON Feed v1.0 author object', () => {
+    const feed = JSON.stringify({
+      version: 'https://jsonfeed.org/version/1',
+      title: 'V1 Feed',
+      items: [{
+        id: '1',
+        title: 'Post',
+        url: 'https://example.com/post',
+        date_published: '2024-01-29T12:00:00Z',
+        author: { name: 'Dan Brown' }
+      }]
+    });
+    const entries = parseFeed(feed);
+    expect(entries[0].author).toBe('Dan Brown');
+  });
+
+  test('omits author when none present in any format', () => {
+    const entries = parseFeed(ATOM_FEED);
+    expect(entries[0].author).toBeUndefined();
+
+    const rssEntries = parseFeed(RSS_FEED);
+    expect(rssEntries[0].author).toBeUndefined();
+
+    const jsonEntries = parseFeed(JSON_FEED);
+    expect(jsonEntries[0].author).toBeUndefined();
+  });
+});
