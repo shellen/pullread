@@ -1,12 +1,11 @@
 # ABOUTME: Scheduled workflow that checks models.json for stale/deprecated LLM models
-# ABOUTME: Opens a GitHub Issue when models need updating — no manual CLI work required
+# ABOUTME: Checks live provider APIs and deprecation dates, opens a GitHub Issue when updates needed
 
 name: Check LLM Models
 
 on:
   schedule:
-    # Run on the 1st and 15th of each month at 9am UTC
-    - cron: '0 9 1,15 * *'
+    - cron: '0 9 * * 1'  # Every Monday at 9am UTC
   workflow_dispatch:
 
 permissions:
@@ -20,100 +19,46 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Check for stale models
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Check model availability against provider APIs
+        id: api-check
+        continue-on-error: true
+        run: bun scripts/check-models.ts 2>&1 | tee check-output.txt
+
+      - name: Open or update issue if models need attention
+        if: steps.api-check.outcome == 'failure'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -euo pipefail
-
-          MODELS_FILE="models.json"
-          ISSUES=""
-          WARNINGS=""
           TODAY=$(date +%Y-%m-%d)
-          TODAY_EPOCH=$(date -d "$TODAY" +%s)
+          OUTPUT=$(cat check-output.txt)
 
-          echo "Checking models.json as of $TODAY..."
+          BODY="## LLM Model Check — $TODAY
 
-          # Check deprecation dates in models.json
-          DEPRECATIONS=$(python3 -c "
-          import json, sys
-          from datetime import datetime, timedelta
+          \`\`\`
+          $OUTPUT
+          \`\`\`
 
-          with open('$MODELS_FILE') as f:
-              config = json.load(f)
+          ### How to fix
 
-          today = datetime.strptime('$TODAY', '%Y-%m-%d')
-          issues = []
-          warnings = []
+          1. Edit \`models.json\` — remove deprecated models, update defaults, add new models
+          2. Run \`bun test src/models.test.ts\` to validate
+          3. Provider docs: [Anthropic](https://docs.anthropic.com/en/docs/about-claude/models) · [OpenAI](https://platform.openai.com/docs/models) · [Gemini](https://ai.google.dev/gemini-api/docs/models) · [OpenRouter](https://openrouter.ai/models)"
 
-          for provider, data in config.get('providers', {}).items():
-              deps = data.get('deprecations', {})
-              models = data.get('models', [])
-              default = data.get('default', '')
+          EXISTING=$(gh issue list --label "model-maintenance" --state open --json number --jq '.[0].number // empty' 2>/dev/null || true)
 
-              # Check deprecation dates
-              for model, date_str in deps.items():
-                  dep_date = datetime.strptime(date_str, '%Y-%m-%d')
-                  days = (dep_date - today).days
-
-                  if days <= 0:
-                      issues.append(f'**{provider}/{model}** — deprecated since {date_str} (PAST DUE)')
-                      # Check if this deprecated model is still in the active models list
-                      if model in models:
-                          issues.append(f'  ↳ Still listed in active models — REMOVE IT')
-                      if model == default:
-                          issues.append(f'  ↳ Still set as DEFAULT — CHANGE IT')
-                  elif days <= 30:
-                      warnings.append(f'**{provider}/{model}** — deprecating in {days} days ({date_str})')
-
-          if issues:
-              print('ISSUES=' + '\\\\n'.join(issues))
-          if warnings:
-              print('WARNINGS=' + '\\\\n'.join(warnings))
-          if not issues and not warnings:
-              print('ALL_CLEAR=true')
-          ")
-
-          eval "$DEPRECATIONS"
-
-          # Build issue body if there are problems
-          if [ -n "${ISSUES:-}" ] || [ -n "${WARNINGS:-}" ]; then
-            BODY="## LLM Model Check — $TODAY\n\n"
-
-            if [ -n "${ISSUES:-}" ]; then
-              BODY+="### Deprecated (action required)\n\n"
-              BODY+=$(echo -e "$ISSUES" | sed 's/^/- /')
-              BODY+="\n\n"
-            fi
-
-            if [ -n "${WARNINGS:-}" ]; then
-              BODY+="### Upcoming Deprecations (heads up)\n\n"
-              BODY+=$(echo -e "$WARNINGS" | sed 's/^/- /')
-              BODY+="\n\n"
-            fi
-
-            BODY+="### How to fix\n\n"
-            BODY+="1. Edit \`models.json\` — remove deprecated models, update defaults, add new models\n"
-            BODY+="2. The next CI build or release will automatically sync changes to Swift via \`sync-swift-models.ts\`\n"
-            BODY+="3. Provider docs: "
-            BODY+="[Anthropic](https://docs.anthropic.com/en/docs/about-claude/models) · "
-            BODY+="[OpenAI](https://platform.openai.com/docs/models) · "
-            BODY+="[Gemini](https://ai.google.dev/gemini-api/docs/models) · "
-            BODY+="[OpenRouter](https://openrouter.ai/models)\n"
-
-            # Check if there's already an open issue with this label
-            EXISTING=$(gh issue list --label "model-maintenance" --state open --json number --jq '.[0].number // empty' 2>/dev/null || true)
-
-            if [ -n "$EXISTING" ]; then
-              echo "Updating existing issue #$EXISTING"
-              gh issue comment "$EXISTING" --body "$(echo -e "$BODY")"
-            else
-              echo "Creating new issue"
-              gh issue create \
-                --title "LLM models need updating ($TODAY)" \
-                --body "$(echo -e "$BODY")" \
-                --label "model-maintenance"
-            fi
+          if [ -n "$EXISTING" ]; then
+            echo "Updating existing issue #$EXISTING"
+            gh issue comment "$EXISTING" --body "$BODY"
           else
-            echo "All models are current. No action needed."
+            echo "Creating new issue"
+            gh issue create \
+              --title "LLM models need updating ($TODAY)" \
+              --body "$BODY" \
+              --label "model-maintenance"
           fi
