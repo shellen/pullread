@@ -1373,6 +1373,11 @@
     .annotation-popover {
       width: 240px;
     }
+    .reader-toolbar { padding: 4px 8px; }
+    .reader-toolbar-title { max-width: 120px; }
+    .reader-toolbar-right button { font-size: 0; padding: 6px; }
+    .reader-toolbar-right button .icon { font-size: initial; }
+    .reader-toolbar-right .toolbar-aa-btn { font-size: 13px; }
     .modal-card {
       padding: 20px 20px;
       width: 94%;
@@ -4092,16 +4097,16 @@
     .toolbar, .sidebar, .drawer, .sidebar-toggle-float, .skip-link, .margin-notes, .toc-container,
     .reading-progress, .reader-toolbar, .hl-toolbar, .annotation-popover, .resume-indicator,
     .article-actions, #header-tags, .notes-panel, .notes-save-hint,
-    .onboarding-overlay, .modal-overlay, .settings-dropdown-panel,
+    .onboarding-overlay, .modal-overlay, .settings-dropdown-panel, .aa-settings-btn,
     .bottom-bar, .mini-mode-container, .break-reminder { display: none !important; }
 
-    body, .app, .main, .content-pane {
+    body, .app, .main, .content-pane, .content-scroll {
       height: auto !important;
       overflow: visible !important;
       background: white !important;
       color: black !important;
     }
-    .content-pane {
+    .content-pane, .content-scroll {
       position: static !important;
     }
     .content-wrap {
