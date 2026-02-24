@@ -480,6 +480,7 @@
     cursor: pointer;
     transition: background 0.12s;
     margin-bottom: 2px;
+    border-left: 3px solid transparent;
   }
   .file-item:hover {
     background: color-mix(in srgb, var(--fg) 5%, transparent);

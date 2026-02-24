@@ -93,7 +93,9 @@ function renderFileItem(f, i) {
   }
   const metaHtml = metaParts.join('<span class="meta-sep"></span>');
 
-  return '<div class="file-item' + isActive + (isRead && !isActive ? ' read' : '') + '" data-index="' + i + '" data-filename="' + escapeHtml(f.filename) + '" onclick="loadFile(' + i + ')" role="option" aria-selected="' + (activeFile === f.filename) + '" tabindex="0" onkeydown="if(event.key===\'Enter\')loadFile(' + i + ')">'
+  const srcColor = sourceColor(f.feed || f.domain);
+
+  return '<div class="file-item' + isActive + (isRead && !isActive ? ' read' : '') + '" data-index="' + i + '" data-filename="' + escapeHtml(f.filename) + '" onclick="loadFile(' + i + ')" role="option" aria-selected="' + (activeFile === f.filename) + '" tabindex="0" onkeydown="if(event.key===\'Enter\')loadFile(' + i + ')" style="border-left-color:' + srcColor + '">'
     + '<div class="file-item-title">' + escapeHtml(f.title) + '</div>'
     + '<div class="file-item-meta">' + metaHtml + favicon + '</div>'
     + indicators
