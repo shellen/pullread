@@ -173,3 +173,40 @@ function handleTagInput(e, getTagsArray, onAdd) {
     e.target.value = '';
   }
 }
+
+// Print styled HTML content using the system print dialog (Save as PDF on macOS).
+// Uses @media print to hide the Pullread UI and show only the export content.
+var _prPrintStyles = 'font-family:Georgia,serif;max-width:700px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222';
+function prPrintHtml(bodyContent) {
+  var container = document.createElement('div');
+  container.id = 'pr-print-content';
+  container.innerHTML = bodyContent;
+  document.body.appendChild(container);
+
+  var style = document.createElement('style');
+  style.id = 'pr-print-style';
+  style.textContent =
+    '#pr-print-content { display: none; } ' +
+    '@media print { ' +
+    '  body > *:not(#pr-print-content) { display: none !important; } ' +
+    '  #pr-print-content { display: block !important; ' + _prPrintStyles + ' } ' +
+    '  #pr-print-content h1 { font-size:28px;margin-bottom:4px } ' +
+    '  #pr-print-content h2,#pr-print-content h3 { margin-top:1.5em } ' +
+    '  #pr-print-content blockquote { border-left:3px solid #ccc;margin:1em 0;padding:0.5em 1em;color:#555 } ' +
+    '  #pr-print-content blockquote.summary { background:#f9f9f4;border-left-color:#b8a940;border-radius:4px } ' +
+    '  #pr-print-content code { background:#f5f5f5;padding:2px 4px;border-radius:3px;font-size:0.9em } ' +
+    '  #pr-print-content pre { background:#f5f5f5;padding:12px;border-radius:6px;overflow-x:auto } ' +
+    '  #pr-print-content img { max-width:100%;height:auto } ' +
+    '  #pr-print-content .meta { font-size:13px;color:#888;margin-bottom:24px } ' +
+    '}';
+  document.head.appendChild(style);
+
+  function cleanup() {
+    if (container.parentNode) container.remove();
+    if (style.parentNode) style.remove();
+    window.removeEventListener('afterprint', cleanup);
+  }
+  window.addEventListener('afterprint', cleanup);
+  window.print();
+  setTimeout(cleanup, 120000);
+}

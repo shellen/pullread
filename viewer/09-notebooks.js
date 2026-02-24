@@ -871,33 +871,11 @@ function exportNotebookPdf() {
   }
   var tags = (nb.tags || []);
   var tagsHtml = tags.length ? '<p><strong>Tags:</strong> ' + tags.map(function(t) { return escapeHtml(t); }).join(', ') + '</p>' : '';
-  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + escapeHtml(nb.title || 'Notebook') + '</title>'
-    + '<style>body{font-family:Georgia,serif;max-width:700px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}'
-    + 'h1{font-size:28px;margin-bottom:4px}h2,h3{margin-top:1.5em}'
-    + 'blockquote{border-left:3px solid #ccc;margin:1em 0;padding:0.5em 1em;color:#555}'
-    + 'code{background:#f5f5f5;padding:2px 4px;border-radius:3px;font-size:0.9em}'
-    + 'pre{background:#f5f5f5;padding:12px;border-radius:6px;overflow-x:auto}'
-    + '.meta{font-size:13px;color:#888;margin-bottom:24px}'
-    + '@media print{body{margin:0;max-width:none}}</style></head><body>'
-    + '<h1>' + escapeHtml(nb.title || 'Untitled') + '</h1>'
+  var content = '<h1>' + escapeHtml(nb.title || 'Untitled') + '</h1>'
     + '<div class="meta">Notebook' + (nb.updatedAt ? ' &middot; Updated ' + new Date(nb.updatedAt).toLocaleDateString() : '') + '</div>'
-    + bodyHtml + sourcesHtml + tagsHtml
-    + '</body></html>';
+    + bodyHtml + sourcesHtml + tagsHtml;
 
-  // Use a hidden iframe instead of window.open (blocked in Tauri WebKit)
-  var existing = document.getElementById('pr-print-frame');
-  if (existing) existing.remove();
-  var iframe = document.createElement('iframe');
-  iframe.id = 'pr-print-frame';
-  iframe.style.cssText = 'position:fixed;top:-10000px;left:-10000px;width:800px;height:600px;border:none;';
-  document.body.appendChild(iframe);
-  iframe.contentDocument.open();
-  iframe.contentDocument.write(html);
-  iframe.contentDocument.close();
-  iframe.onload = function() {
-    iframe.contentWindow.print();
-    setTimeout(function() { iframe.remove(); }, 1000);
-  };
+  prPrintHtml(content);
 }
 
 function showHighlightPicker() {
