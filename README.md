@@ -813,6 +813,18 @@ feeds.json
                └── 2024-01-29-article-title.md
 ```
 
+### Feed Content Preservation
+
+Many RSS, Atom, and RDF feeds include the full article HTML in their `content:encoded` or `<content>` fields. PullRead preserves this raw HTML on the `contentHtml` field of each feed entry and compares it against the separately web-extracted content — whichever produces more markdown wins.
+
+**Why this matters:** Some sites (notably Substack) serve the complete article body in their feed XML but return minimal or paywalled content when PullRead fetches the webpage directly. Without feed content preservation, these articles would appear empty or require a manual "re-fetch from source."
+
+**Rules for feed parsers:**
+- All feed format parsers (Atom, RSS, RDF, JSON Feed) **must** preserve raw HTML content when it exceeds 200 characters
+- The content is stored on `FeedEntry.contentHtml` as a raw HTML string
+- The ingestion pipeline (`index.ts`) converts both feed HTML and web-extracted HTML to markdown via `htmlToMarkdown()`, then keeps whichever is longer
+- Never strip HTML from feed content before evaluating its length — `extractTextFromHtml()` is for generating short annotation/description text only, not for content comparison
+
 ### Storage Format
 
 The processed URL database is stored as SQLite at `~/.config/pullread/pullread.db`, tracking URL status (processed/failed), titles, timestamps, and output file paths.

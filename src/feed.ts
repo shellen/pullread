@@ -197,8 +197,10 @@ function parseRssFeed(rss: any): FeedEntry[] {
 
     // Preserve full HTML from content:encoded (RSS 2.0 full-content feeds)
     const rawContentEncoded = item['content:encoded'] || item['content\\:encoded'];
-    const contentHtml = typeof rawContentEncoded === 'string' && rawContentEncoded.trim().length > 200
-      ? rawContentEncoded.trim() : undefined;
+    const contentEncodedStr = typeof rawContentEncoded === 'string' ? rawContentEncoded
+      : rawContentEncoded?.__cdata || '';
+    const contentHtml = contentEncodedStr.trim().length > 200
+      ? contentEncodedStr.trim() : undefined;
 
     let enclosure: Enclosure | undefined;
     if (item.enclosure) {
@@ -244,6 +246,13 @@ function parseRdfFeed(rdf: any): FeedEntry[] {
       ? extractTextFromHtml(extractTitle(item.description))
       : undefined;
 
+    // Preserve full HTML from content:encoded (RDF feeds can include it)
+    const rawContentEncoded = item['content:encoded'] || item['content\\:encoded'];
+    const contentEncodedStr = typeof rawContentEncoded === 'string' ? rawContentEncoded
+      : rawContentEncoded?.__cdata || '';
+    const contentHtml = contentEncodedStr.trim().length > 200
+      ? contentEncodedStr.trim() : undefined;
+
     // Dublin Core date (dc:date) is ISO 8601
     const dateStr = item['dc:date'] || item.pubDate || '';
     let updatedAt = dateStr;
@@ -258,6 +267,7 @@ function parseRdfFeed(rdf: any): FeedEntry[] {
       updatedAt,
       domain,
       annotation: description || undefined,
+      contentHtml: contentHtml || undefined,
       author: rdfAuthorStr || undefined
     };
   });

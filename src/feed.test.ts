@@ -389,6 +389,36 @@ describe('parseFeed - RDF/RSS 1.0 (Pinboard)', () => {
     expect(second.title).toBe('Another Pinboard Bookmark');
     expect(second.annotation).toBeUndefined();
   });
+
+  test('preserves contentHtml from content:encoded in RDF', () => {
+    const longContent = '<p>' + 'Full article text from RDF feed source. '.repeat(10) + '</p>';
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+ xmlns="http://purl.org/rss/1.0/"
+ xmlns:dc="http://purl.org/dc/elements/1.1/"
+ xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel rdf:about="https://example.com/">
+    <title>Test RDF</title>
+    <link>https://example.com/</link>
+  </channel>
+  <item rdf:about="https://example.com/full-article">
+    <title>Full Content RDF Item</title>
+    <link>https://example.com/full-article</link>
+    <dc:date>2025-03-01T12:00:00Z</dc:date>
+    <description>Short summary</description>
+    <content:encoded><![CDATA[${longContent}]]></content:encoded>
+  </item>
+</rdf:RDF>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].contentHtml).toBeDefined();
+    expect(entries[0].contentHtml!.length).toBeGreaterThan(200);
+    expect(entries[0].annotation).toBe('Short summary');
+  });
+
+  test('does not set contentHtml for RDF items without content:encoded', () => {
+    const entries = parseFeed(RDF_FEED);
+    expect(entries[0].contentHtml).toBeUndefined();
+  });
 });
 
 describe('parseFeedTitle', () => {
