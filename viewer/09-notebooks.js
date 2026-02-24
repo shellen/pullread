@@ -244,7 +244,7 @@ function openNoteInPane(noteId) {
     html += '<div class="notebook-preview">' + sanitizeHtml(marked.parse(note.content || '*Start writing...*')) + '</div>';
   } else {
     html += '<div class="notebook-editor-wrap"><div class="notebook-editor">'
-      + '<textarea placeholder="Start writing... Use markdown for formatting.">' + escapeHtml(note.content || '') + '</textarea>'
+      + '<textarea placeholder="Start writing... Use Markdown for formatting.">' + escapeHtml(note.content || '') + '</textarea>'
       + '</div></div>';
   }
 

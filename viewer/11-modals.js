@@ -59,13 +59,13 @@ function showGuideModal() {
     </div>
 
     <h2>What is PullRead?</h2>
-    <p>PullRead syncs your bookmarks and RSS feeds into clean markdown files you can read, search, highlight, and keep forever. Articles are stored locally on your Mac.</p>
+    <p>PullRead syncs your bookmarks and RSS feeds into clean Markdown files you can read, search, highlight, and keep forever. Articles are stored locally on your Mac.</p>
 
     <h2>Dashboard</h2>
     <p>When you first open PullRead, the dashboard shows a personalized overview of your reading: articles you're in the middle of, recent reviews, favorites, and the latest additions. Click any card to jump straight to that article, or click the PullRead logo to return to the dashboard.</p>
 
     <h2>How does syncing work?</h2>
-    <p>PullRead fetches new items from your configured feeds (Instapaper, Pinboard, Raindrop, RSS, etc.) and extracts the article content into markdown. You can sync manually from the menu bar, or set an automatic interval in Settings (every 30 min, 1 hour, 4 hours, or 12 hours).</p>
+    <p>PullRead fetches new items from your configured feeds (Instapaper, Pinboard, Raindrop, RSS, etc.) and extracts the article content into Markdown. You can sync manually from the menu bar, or set an automatic interval in Settings (every 30 min, 1 hour, 4 hours, or 12 hours).</p>
 
     <h2>What are reviews?</h2>
     <p>Reviews are AI-generated thematic summaries of your recent reading. You can schedule them daily or weekly in Settings. Daily reviews cover the past 24 hours; weekly reviews cover the past 7 days. They require a configured LLM provider (Anthropic, OpenAI, Gemini, OpenRouter, or Apple Intelligence).</p>
@@ -182,7 +182,7 @@ function showGuideModal() {
     <h2>FAQ</h2>
 
     <h3>Where are my articles stored?</h3>
-    <p>Articles are saved as markdown files in the output folder you configure in Settings (e.g., <code>~/Dropbox/Articles</code>). They're plain text files you can open in any editor. Highlights, notes, and settings are stored in <code>~/.config/pullread/</code>.</p>
+    <p>Articles are saved as Markdown files in the output folder you configure in Settings (e.g., <code>~/Dropbox/Articles</code>). They're plain text files you can open in any editor. Highlights, notes, and settings are stored in <code>~/.config/pullread/</code>.</p>
 
     <h3>Do I need an API key?</h3>
     <p>Only for AI features (summaries, auto-tagging, reviews, and paid TTS). Reading, highlighting, searching, and browser TTS are all free with no API key. Apple Intelligence (macOS 26+) works without a key too.</p>
@@ -330,7 +330,7 @@ function renderStepWelcome() {
   var title = _tourMode ? "What\u2019s in PullRead" : 'Welcome to PullRead';
   var subtitle = _tourMode
     ? 'A quick look at what you can do with your reading library.'
-    : 'Save articles as clean, local markdown you can read anywhere. Install our bookmarking shortcut or use PullRead with your favorite service.';
+    : 'Save articles as clean, local Markdown you can read anywhere. Install our bookmarking shortcut or use PullRead with your favorite service.';
   return '<div style="text-align:center;padding:12px 0">'
     + '<div style="margin-bottom:12px"><svg class="icon" style="width:48px;height:48px;color:var(--link)" aria-hidden="true"><use href="#i-book"/></svg></div>'
     + '<h2>' + title + '</h2>'
@@ -445,7 +445,7 @@ function renderStepReady() {
   return '<div style="text-align:center;padding:12px 0">'
     + '<div style="margin-bottom:12px"><svg class="icon" style="width:48px;height:48px;color:var(--link)" aria-hidden="true"><use href="#i-play"/></svg></div>'
     + '<h2>' + (_tourMode ? 'That\u2019s the Tour' : 'Ready to Go') + '</h2>'
-    + '<p class="ob-subtitle">' + (_tourMode ? 'Here are some keyboard shortcuts to remember:' : 'PullRead will fetch your bookmarked articles and save them as markdown. Here are some keyboard shortcuts to get started:') + '</p>'
+    + '<p class="ob-subtitle">' + (_tourMode ? 'Here are some keyboard shortcuts to remember:' : 'PullRead will fetch your bookmarked articles and save them as Markdown. Here are some keyboard shortcuts to get started:') + '</p>'
     + '</div>'
     + '<div class="ob-shortcuts">'
     + '<kbd>j</kbd> / <kbd>&rarr;</kbd> <span>Next article</span>'
