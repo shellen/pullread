@@ -2146,6 +2146,7 @@
   .pr-highlight.hl-blue { background: rgba(66, 165, 245, 0.3); }
   .pr-highlight.hl-pink { background: rgba(236, 64, 122, 0.3); }
   [data-theme="dark"] .pr-highlight { color: #1a1a1a; }
+  [data-theme="dark"] .pr-highlight a { color: #1a1a1a; text-decoration: underline; }
   [data-theme="dark"] .pr-highlight.hl-yellow { background: rgba(255, 235, 59, 0.7); }
   [data-theme="dark"] .pr-highlight.hl-green { background: rgba(76, 175, 80, 0.6); }
   [data-theme="dark"] .pr-highlight.hl-blue { background: rgba(66, 165, 245, 0.6); }
@@ -2157,6 +2158,7 @@
   [data-theme="sepia"] .pr-highlight.hl-pink { background: rgba(216, 27, 96, 0.3); }
   /* High-contrast: boost alpha so highlights are clearly visible on pure black */
   [data-theme="high-contrast"] .pr-highlight { color: #111; }
+  [data-theme="high-contrast"] .pr-highlight a { color: #111; text-decoration: underline; }
   [data-theme="high-contrast"] .pr-highlight.hl-yellow { background: rgba(255, 235, 59, 0.75); }
   [data-theme="high-contrast"] .pr-highlight.hl-green { background: rgba(76, 175, 80, 0.65); }
   [data-theme="high-contrast"] .pr-highlight.hl-blue { background: rgba(66, 165, 245, 0.6); }
