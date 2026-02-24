@@ -183,6 +183,11 @@ async fn handle_check_updates(app: &AppHandle) {
                                             .title("Update Installed")
                                             .kind(MessageDialogKind::Info)
                                             .show(move |_| {
+                                                // Kill sidecar before restart — app.restart()
+                                                // calls std::process::exit() which skips
+                                                // RunEvent::Exit cleanup
+                                                let state = app3.state::<sidecar::SidecarState>();
+                                                state.stop_all();
                                                 app3.restart();
                                             });
                                     }

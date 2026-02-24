@@ -3090,7 +3090,7 @@ dependencies = [
 
 [[package]]
 name = "pullread"
-version = "0.2.1"
+version = "0.3.4"
 dependencies = [
  "chrono",
  "dirs 6.0.0",
