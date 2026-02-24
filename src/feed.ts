@@ -3,6 +3,8 @@
 
 import { XMLParser } from 'fast-xml-parser';
 
+const FEED_HEADERS = { 'User-Agent': 'PullRead/1.0 (+https://pullread.com)' };
+
 export interface Enclosure {
   url: string;
   type: string;
@@ -301,7 +303,7 @@ export function parseFeedTitle(text: string): string | null {
 }
 
 export async function fetchFeedTitle(url: string): Promise<string | null> {
-  const response = await fetch(url);
+  const response = await fetch(url, { headers: FEED_HEADERS });
   if (!response.ok) return null;
   const xml = await response.text();
   return parseFeedTitle(xml);
@@ -364,7 +366,7 @@ const WELL_KNOWN_FEED_PATHS = [
 export async function discoverFeed(url: string): Promise<{ feedUrl: string; title: string | null } | null> {
   url = await transformPlatformUrl(url);
 
-  const response = await fetch(url);
+  const response = await fetch(url, { headers: FEED_HEADERS });
   if (!response.ok) return null;
   const text = await response.text();
 
@@ -378,7 +380,7 @@ export async function discoverFeed(url: string): Promise<{ feedUrl: string; titl
   const feedUrl = discoverFeedUrl(text, url);
   if (feedUrl) {
     try {
-      const feedResponse = await fetch(feedUrl);
+      const feedResponse = await fetch(feedUrl, { headers: FEED_HEADERS });
       if (feedResponse.ok) {
         const feedXml = await feedResponse.text();
         const feedTitle = parseFeedTitle(feedXml);
@@ -396,7 +398,7 @@ export async function discoverFeed(url: string): Promise<{ feedUrl: string; titl
   for (const path of WELL_KNOWN_FEED_PATHS) {
     const candidate = baseOrigin + path;
     try {
-      const probeRes = await fetch(candidate, { redirect: 'follow' });
+      const probeRes = await fetch(candidate, { redirect: 'follow', headers: FEED_HEADERS });
       if (!probeRes.ok) continue;
       const probeText = await probeRes.text();
       const probeTitle = parseFeedTitle(probeText);
@@ -439,7 +441,7 @@ export async function transformPlatformUrl(url: string): Promise<string> {
     const handleMatch = parsed.pathname.match(/^\/@([\w.-]+)/);
     if (handleMatch) {
       try {
-        const response = await fetch(`https://www.youtube.com/@${handleMatch[1]}`);
+        const response = await fetch(`https://www.youtube.com/@${handleMatch[1]}`, { headers: FEED_HEADERS });
         if (response.ok) {
           const html = await response.text();
           // Look for channel ID in page source
@@ -466,7 +468,7 @@ export async function transformPlatformUrl(url: string): Promise<string> {
 }
 
 export async function fetchFeed(url: string): Promise<FeedEntry[]> {
-  const response = await fetch(url);
+  const response = await fetch(url, { headers: FEED_HEADERS });
   if (!response.ok) {
     throw new Error(`Failed to fetch feed: ${response.status}`);
   }
