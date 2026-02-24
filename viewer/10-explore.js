@@ -70,6 +70,9 @@ function showTagCloud() {
   discoverHtml += makeQf('Has Highlights', 'has:highlights', 'amber');
   discoverHtml += makeQf('Has Notes', 'has:notes', '');
   discoverHtml += makeQf('Has Tags', 'has:tags', '');
+  discoverHtml += makeQf('Podcasts', 'is:podcast', '');
+  var bookCount = allFiles.filter(function(f) { return f.domain === 'epub'; }).length;
+  if (bookCount > 0) discoverHtml += makeQf('Books', 'is:book', '');
   const sortedFeeds = Object.entries(feedCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
   for (const [feed] of sortedFeeds) {
     discoverHtml += makeQf(escapeHtml(feed), 'feed:' + feed, '');

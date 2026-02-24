@@ -1,4 +1,4 @@
-// ABOUTME: Tests for RSS and Atom feed parsing
+// ABOUTME: Tests for RSS, Atom, and JSON feed parsing
 // ABOUTME: Verifies extraction of entries from various feed formats
 
 import { parseFeed, parseFeedTitle, discoverFeedUrl, transformPlatformUrl } from './feed';
@@ -506,5 +506,120 @@ describe('transformPlatformUrl', () => {
   test('passes through already-RSS YouTube feed URLs', async () => {
     const result = await transformPlatformUrl('https://www.youtube.com/feeds/videos.xml?channel_id=UCxxx');
     expect(result).toBe('https://www.youtube.com/feeds/videos.xml?channel_id=UCxxx');
+  });
+});
+
+const JSON_FEED = JSON.stringify({
+  version: 'https://jsonfeed.org/version/1.1',
+  title: 'My JSON Feed',
+  home_page_url: 'https://example.com/',
+  feed_url: 'https://example.com/feed.json',
+  items: [
+    {
+      id: '1',
+      title: 'JSON Feed Article',
+      url: 'https://example.com/json-article',
+      content_text: 'This is the article content.',
+      date_published: '2024-01-29T19:05:18Z'
+    },
+    {
+      id: '2',
+      title: 'Second JSON Item',
+      url: 'https://example.com/second',
+      content_html: '<p>HTML content</p>',
+      date_published: '2024-01-28T10:00:00Z'
+    },
+    {
+      id: '3',
+      url: 'https://example.com/no-title',
+      date_published: '2024-01-27T08:00:00Z'
+    }
+  ]
+});
+
+const JSON_FEED_PODCAST = JSON.stringify({
+  version: 'https://jsonfeed.org/version/1.1',
+  title: 'My JSON Podcast',
+  items: [
+    {
+      id: 'ep1',
+      title: 'Episode One',
+      url: 'https://podcast.com/ep1',
+      content_text: 'Episode description here',
+      date_published: '2024-01-29T12:00:00Z',
+      attachments: [
+        {
+          url: 'https://cdn.example.com/ep1.mp3',
+          mime_type: 'audio/mpeg',
+          size_in_bytes: 12345678,
+          duration_in_seconds: 2730
+        }
+      ]
+    }
+  ]
+});
+
+describe('parseFeed - JSON Feed', () => {
+  test('extracts entries from JSON feed', () => {
+    const entries = parseFeed(JSON_FEED);
+    expect(entries).toHaveLength(3);
+  });
+
+  test('parses JSON feed entry fields correctly', () => {
+    const entries = parseFeed(JSON_FEED);
+    const first = entries[0];
+
+    expect(first.title).toBe('JSON Feed Article');
+    expect(first.url).toBe('https://example.com/json-article');
+    expect(first.updatedAt).toBe('2024-01-29T19:05:18Z');
+    expect(first.annotation).toBe('This is the article content.');
+    expect(first.domain).toBe('example.com');
+  });
+
+  test('extracts text from HTML content', () => {
+    const entries = parseFeed(JSON_FEED);
+    const second = entries[1];
+
+    expect(second.annotation).toBe('HTML content');
+  });
+
+  test('handles items without title', () => {
+    const entries = parseFeed(JSON_FEED);
+    const third = entries[2];
+
+    expect(third.title).toBe('Untitled');
+    expect(third.annotation).toBeUndefined();
+  });
+
+  test('extracts domain from URL', () => {
+    const entries = parseFeed(JSON_FEED);
+    expect(entries[0].domain).toBe('example.com');
+  });
+
+  test('parses podcast attachments as enclosures', () => {
+    const entries = parseFeed(JSON_FEED_PODCAST);
+    expect(entries).toHaveLength(1);
+
+    const ep = entries[0];
+    expect(ep.enclosure).toBeDefined();
+    expect(ep.enclosure!.url).toBe('https://cdn.example.com/ep1.mp3');
+    expect(ep.enclosure!.type).toBe('audio/mpeg');
+    expect(ep.enclosure!.length).toBe(12345678);
+    expect(ep.enclosure!.duration).toBe('45:30');
+  });
+});
+
+describe('parseFeedTitle - JSON Feed', () => {
+  test('extracts title from JSON feed', () => {
+    expect(parseFeedTitle(JSON_FEED)).toBe('My JSON Feed');
+  });
+});
+
+describe('discoverFeedUrl - JSON Feed', () => {
+  test('discovers JSON feed from link tag', () => {
+    const html = `<html><head>
+      <link rel="alternate" type="application/feed+json" href="/feed.json" title="JSON Feed">
+    </head><body></body></html>`;
+    expect(discoverFeedUrl(html, 'https://example.com')).toBe('https://example.com/feed.json');
   });
 });

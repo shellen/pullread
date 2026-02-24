@@ -877,6 +877,13 @@
   .dash-empty-hint .subhint {
     font-size: 13px;
   }
+  .dash-explore-pills {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 4px 0 8px;
+  }
+
   .dash-actions {
     display: flex;
     gap: 10px;

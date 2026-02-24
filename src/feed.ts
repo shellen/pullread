@@ -1,4 +1,4 @@
-// ABOUTME: Parses RSS and Atom feeds
+// ABOUTME: Parses RSS, Atom, and JSON feeds
 // ABOUTME: Extracts entries with metadata, annotations, and enclosures
 
 import { XMLParser } from 'fast-xml-parser';
@@ -19,13 +19,81 @@ export interface FeedEntry {
   enclosure?: Enclosure;
 }
 
-type FeedType = 'atom' | 'rss' | 'rdf';
+type FeedType = 'atom' | 'rss' | 'rdf' | 'json';
 
 function detectFeedType(parsed: any): FeedType {
   if (parsed.feed) return 'atom';
   if (parsed.rss) return 'rss';
   if (parsed['rdf:RDF']) return 'rdf';
   throw new Error('Unknown feed format: expected RSS, Atom, or RDF');
+}
+
+function isJsonFeed(text: string): boolean {
+  const trimmed = text.trimStart();
+  if (!trimmed.startsWith('{')) return false;
+  try {
+    const parsed = JSON.parse(trimmed);
+    return typeof parsed.version === 'string' && parsed.version.includes('jsonfeed.org');
+  } catch {
+    return false;
+  }
+}
+
+function formatDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  return m + ':' + String(s).padStart(2, '0');
+}
+
+function parseJsonFeed(text: string): FeedEntry[] {
+  const feed = JSON.parse(text);
+  const items = Array.isArray(feed.items) ? feed.items : [];
+
+  return items.map((item: any) => {
+    const url = item.url || item.external_url || '';
+    let domain = '';
+    try { domain = new URL(url).hostname.replace(/^www\./, ''); } catch {}
+
+    let annotation: string | undefined;
+    if (item.content_text?.trim()) {
+      annotation = item.content_text.trim();
+    } else if (item.content_html?.trim()) {
+      annotation = item.content_html.replace(/<[^>]+>/g, '').trim() || undefined;
+    } else if (item.summary?.trim()) {
+      annotation = item.summary.trim();
+    }
+
+    let enclosure: Enclosure | undefined;
+    if (Array.isArray(item.attachments) && item.attachments.length > 0) {
+      const att = item.attachments[0];
+      enclosure = {
+        url: att.url,
+        type: att.mime_type,
+        length: att.size_in_bytes || undefined,
+        duration: att.duration_in_seconds ? formatDuration(att.duration_in_seconds) : undefined
+      };
+    }
+
+    return {
+      title: item.title || 'Untitled',
+      url,
+      updatedAt: item.date_published || item.date_modified || '',
+      domain,
+      annotation: annotation || undefined,
+      enclosure
+    };
+  });
+}
+
+function parseJsonFeedTitle(text: string): string | null {
+  try {
+    const feed = JSON.parse(text);
+    return feed.title?.trim() || null;
+  } catch {
+    return null;
+  }
 }
 
 function resolveAtomLink(link: any): string {
@@ -180,14 +248,16 @@ function extractTextFromHtml(html: string): string {
   ).trim();
 }
 
-export function parseFeed(xml: string): FeedEntry[] {
+export function parseFeed(text: string): FeedEntry[] {
+  if (isJsonFeed(text)) return parseJsonFeed(text);
+
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: '@_',
     cdataPropName: '__cdata'
   });
 
-  const parsed = parser.parse(xml);
+  const parsed = parser.parse(text);
   const feedType = detectFeedType(parsed);
 
   if (feedType === 'atom') {
@@ -199,7 +269,9 @@ export function parseFeed(xml: string): FeedEntry[] {
   }
 }
 
-export function parseFeedTitle(xml: string): string | null {
+export function parseFeedTitle(text: string): string | null {
+  if (isJsonFeed(text)) return parseJsonFeedTitle(text);
+
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: '@_',
@@ -207,7 +279,7 @@ export function parseFeedTitle(xml: string): string | null {
   });
 
   try {
-    const parsed = parser.parse(xml);
+    const parsed = parser.parse(text);
     const feedType = detectFeedType(parsed);
 
     let title: any;
@@ -249,7 +321,7 @@ export function discoverFeedUrl(html: string, baseUrl: string): string | null {
     const relMatch = tag.match(/rel\s*=\s*["']?\s*alternate\s*["']?/i);
     if (!relMatch) continue;
 
-    const typeMatch = tag.match(/type\s*=\s*["'](application\/(rss|atom)\+xml)["']/i);
+    const typeMatch = tag.match(/type\s*=\s*["'](application\/(rss|atom)\+xml|application\/feed\+json)["']/i);
     if (!typeMatch) continue;
 
     const hrefMatch = tag.match(/href\s*=\s*["']([^"']+)["']/i);
@@ -279,6 +351,7 @@ const WELL_KNOWN_FEED_PATHS = [
   '/index.xml',      // Hugo default
   '/feed/rss',       // Buttondown
   '/blog/rss',       // some platforms put feeds under /blog
+  '/feed.json',      // JSON Feed
 ];
 
 /**

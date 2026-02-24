@@ -79,6 +79,37 @@ function renderDashboard() {
     html += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
   }
 
+  // Explore — top tags and quick filters
+  var topTags = [];
+  for (var ef of allFiles) {
+    var en = allNotesIndex[ef.filename];
+    var et = [];
+    if (en && en.tags) et.push.apply(et, en.tags);
+    if (en && en.machineTags) et.push.apply(et, en.machineTags);
+    for (var etag of et) {
+      var found = topTags.find(function(t) { return t[0] === etag; });
+      if (found) found[1]++;
+      else topTags.push([etag, 1]);
+    }
+  }
+  topTags.sort(function(a, b) { return b[1] - a[1]; });
+  var hasBooks = allFiles.some(function(f) { return f.domain === 'epub'; });
+  var hasPodcasts = allFiles.some(function(f) { return f.enclosureUrl && f.enclosureType && f.enclosureType.startsWith('audio/'); });
+  if (topTags.length > 0 || hasBooks || hasPodcasts) {
+    html += '<div class="dash-section">';
+    html += '<div class="dash-section-header">';
+    html += '<span class="dash-section-title"><svg viewBox="0 0 512 512"><use href="#i-tags"/></svg> Explore</span>';
+    html += '<button class="dash-view-all" onclick="showTagCloud()">View all &rsaquo;</button>';
+    html += '</div>';
+    html += '<div class="dash-explore-pills">';
+    if (hasBooks) html += '<button class="tag-pill" onclick="document.getElementById(\'search\').value=\'is:book\';filterFiles()">Books</button>';
+    if (hasPodcasts) html += '<button class="tag-pill" onclick="document.getElementById(\'search\').value=\'is:podcast\';filterFiles()">Podcasts</button>';
+    for (var ti = 0; ti < Math.min(topTags.length, 12); ti++) {
+      html += '<button class="tag-pill" onclick="document.getElementById(\'search\').value=\'tag:' + escapeJsStr(topTags[ti][0]) + '\';filterFiles()">' + escapeHtml(topTags[ti][0]) + '<span class="tag-count">' + topTags[ti][1] + '</span></button>';
+    }
+    html += '</div></div>';
+  }
+
   // Recent — latest unread articles
   const recent = allFiles.filter(f => !readArticles.has(f.filename) && f.feed !== 'weekly-review' && f.feed !== 'daily-review' && f.domain !== 'pullread').slice(0, 20);
   if (recent.length > 0) {
