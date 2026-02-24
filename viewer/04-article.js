@@ -7,6 +7,10 @@ function renderDashboard() {
   const content = document.getElementById('content');
   empty.style.display = '';
   if (content) content.style.display = 'none';
+  var toolbar = document.getElementById('reader-toolbar');
+  if (toolbar) toolbar.style.display = 'none';
+  var floatingAa = document.getElementById('aa-settings-btn');
+  if (floatingAa) floatingAa.style.display = '';
 
   if (allFiles.length === 0) {
     dash.innerHTML = '<div class="dash-empty-hint"><p class="hint">No articles yet</p><p class="subhint">Add RSS feeds in the tray app, or drop a .md file here</p></div>';
@@ -213,6 +217,10 @@ function goHome() {
   renderFileList();
   var toc = document.getElementById('toc-container');
   if (toc) toc.innerHTML = '';
+  var toolbar = document.getElementById('reader-toolbar');
+  if (toolbar) toolbar.style.display = 'none';
+  var floatingAa = document.getElementById('aa-settings-btn');
+  if (floatingAa) floatingAa.style.display = '';
   // Defer dashboard render so sidebar becomes interactive first
   requestAnimationFrame(renderDashboard);
 }
@@ -307,27 +315,35 @@ function renderArticle(text, filename) {
   // Detect review/summary articles where Summarize doesn't make sense
   const isReviewArticle = meta && (meta.feed === 'weekly-review' || meta.feed === 'daily-review' || meta.domain === 'pullread');
 
-  // Action buttons row — primary actions visible, secondary behind overflow menu
-  html += '<div class="article-actions">';
+  // Populate reader toolbar with action buttons
+  var toolbarActions = '';
   const isFav = articleNotes.isFavorite;
-  html += '<button onclick="toggleFavoriteFromHeader(this)" class="' + (isFav ? 'active-fav' : '') + '" aria-label="' + (isFav ? 'Remove from favorites' : 'Add to favorites') + '" aria-pressed="' + isFav + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg> Favorite</button>';
+  toolbarActions += '<button onclick="toggleFavoriteFromHeader(this)" class="' + (isFav ? 'active-fav' : '') + '" aria-label="' + (isFav ? 'Remove from favorites' : 'Add to favorites') + '" aria-pressed="' + isFav + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg> Favorite</button>';
   if (!isReviewArticle) {
-    html += '<button onclick="summarizeArticle()" id="summarize-btn" aria-label="Summarize article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Summarize</button>';
+    toolbarActions += '<button onclick="summarizeArticle()" id="summarize-btn" aria-label="Summarize article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Summarize</button>';
   }
   var isPodcast = meta && meta.enclosure_url && meta.enclosure_type && meta.enclosure_type.startsWith('audio/');
   var listenLabel = isPodcast ? 'Play' : 'Listen';
-  html += '<div class="play-next-menu" id="play-next-menu">';
-  html += '<button id="listen-btn" onclick="addCurrentToTTSQueue()" aria-label="' + listenLabel + ' article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> ' + listenLabel + '</button>';
-  html += '<button class="play-next-trigger" id="play-next-trigger" onclick="togglePlayNextMenu(event)" aria-label="Queue options" style="display:none"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>';
-  html += '</div>';
+  toolbarActions += '<div class="play-next-menu" id="play-next-menu">';
+  toolbarActions += '<button id="listen-btn" onclick="addCurrentToTTSQueue()" aria-label="' + listenLabel + ' article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> ' + listenLabel + '</button>';
+  toolbarActions += '<button class="play-next-trigger" id="play-next-trigger" onclick="togglePlayNextMenu(event)" aria-label="Queue options" style="display:none"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>';
+  toolbarActions += '</div>';
   if (meta && meta.url) {
-    html += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg> Share</button></div>';
+    toolbarActions += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg> Share</button></div>';
   }
-  // Overflow menu for secondary actions (Notes, Mark Unread)
-  html += '<div class="more-dropdown">';
-  html += '<button onclick="toggleMoreMenu(event)" aria-label="More actions"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-ellipsis"/></svg></button>';
-  html += '</div>';
-  html += '</div>';
+  toolbarActions += '<div class="more-dropdown">';
+  toolbarActions += '<button onclick="toggleMoreMenu(event)" aria-label="More actions"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-ellipsis"/></svg></button>';
+  toolbarActions += '</div>';
+  toolbarActions += '<button onclick="toggleSettingsDropdown()" aria-label="Reader settings" class="toolbar-aa-btn">Aa</button>';
+
+  var toolbarEl = document.getElementById('reader-toolbar-actions');
+  if (toolbarEl) toolbarEl.innerHTML = toolbarActions;
+  var toolbarTitleEl = document.getElementById('reader-toolbar-title');
+  if (toolbarTitleEl) toolbarTitleEl.textContent = (meta && meta.title) || filename;
+  var toolbar = document.getElementById('reader-toolbar');
+  if (toolbar) toolbar.style.display = '';
+  var floatingAa = document.getElementById('aa-settings-btn');
+  if (floatingAa) floatingAa.style.display = 'none';
   // Tags row (populated by renderNotesPanel)
   html += '<div id="header-tags"></div>';
   // Show notebook back-references

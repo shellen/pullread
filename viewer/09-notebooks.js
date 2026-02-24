@@ -152,6 +152,10 @@ function openNotebookInPane(id) {
   activeFile = null;
   var toc = document.getElementById('toc-container');
   if (toc) toc.innerHTML = '';
+  var toolbar = document.getElementById('reader-toolbar');
+  if (toolbar) toolbar.style.display = 'none';
+  var floatingAa = document.getElementById('aa-settings-btn');
+  if (floatingAa) floatingAa.style.display = '';
   _activeNotebook = nb;
   if (!nb.notes) nb.notes = [];
 

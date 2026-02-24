@@ -716,7 +716,7 @@ function scrollToHighlight(id) {
 }
 
 function updateHeaderActions() {
-  const actions = document.querySelector('.article-actions');
+  const actions = document.getElementById('reader-toolbar-actions');
   if (!actions) return;
   const favBtn = actions.querySelector('button');
   if (favBtn) {

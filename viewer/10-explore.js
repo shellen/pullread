@@ -5,6 +5,10 @@ function showTagCloud() {
   const empty = document.getElementById('empty-state');
   empty.style.display = 'none';
   content.style.display = 'block';
+  var toolbar = document.getElementById('reader-toolbar');
+  if (toolbar) toolbar.style.display = 'none';
+  var floatingAa = document.getElementById('aa-settings-btn');
+  if (floatingAa) floatingAa.style.display = '';
 
   // Deselect sidebar — disables highlights/notes on this page
   activeFile = null;
