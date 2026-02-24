@@ -509,10 +509,9 @@ function showSettingsPage(scrollToSection) {
         { name: 'Daring Fireball', url: 'https://daringfireball.net/feeds/main' },
         { name: 'Heather Cox Richardson', url: 'https://heathercoxrichardson.substack.com' },
         { name: 'Kottke.org', url: 'https://feeds.kottke.org/main' },
-        { name: 'Austin Kleon', url: 'https://austinkleon.com' },
         { name: 'Craig Mod', url: 'https://craigmod.com' },
         { name: 'Aeon Essays', url: 'https://aeon.co/feed.rss' },
-        { name: 'Longreads', url: 'https://longreads.com' },
+        { name: 'Longreads', url: 'https://longreads.com/feed/' },
         { name: 'The Marginalian', url: 'https://www.themarginalian.org' },
       ];
       // Filter out feeds already added
