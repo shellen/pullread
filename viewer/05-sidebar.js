@@ -928,7 +928,7 @@ function showBreakReminder() {
   html += '</div>';
 
   content.innerHTML = html;
-  document.getElementById('content-pane').scrollTop = 0;
+  document.getElementById('content-scroll').scrollTop = 0;
 }
 
 function dismissBreakReminder() {

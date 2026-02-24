@@ -231,7 +231,7 @@ function showGuideModal() {
     <p style="margin-top:16px">Full license texts are included in the app bundle at <code>Contents/Resources/Licenses/</code>.</p>
   `;
   document.title = 'PullRead Guide';
-  document.getElementById('content-pane').scrollTop = 0;
+  document.getElementById('content-scroll').scrollTop = 0;
   generateToc();
 }
 

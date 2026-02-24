@@ -262,7 +262,7 @@ function openNoteInPane(noteId) {
   html += '</div>';
   content.innerHTML = html;
 
-  document.getElementById('content-pane').scrollTop = 0;
+  document.getElementById('content-scroll').scrollTop = 0;
 
   // Render diagrams in preview mode
   if (_notebookPreviewMode) {

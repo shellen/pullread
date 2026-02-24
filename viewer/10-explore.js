@@ -189,7 +189,7 @@ function showTagCloud() {
   });
 
   document.title = 'Explore Your Library';
-  document.getElementById('content-pane').scrollTop = 0;
+  document.getElementById('content-scroll').scrollTop = 0;
 }
 
 // Build ontological connections: clusters of articles sharing the same tags

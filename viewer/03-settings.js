@@ -387,7 +387,7 @@ function showSettingsPage(scrollToSection) {
   html += '</div>';
 
   content.innerHTML = html;
-  document.getElementById('content-pane').scrollTop = 0;
+  document.getElementById('content-scroll').scrollTop = 0;
 
 
   if (scrollToSection) {
@@ -1001,7 +1001,7 @@ function settingsAddRecFeed(name, url) {
     if (!sec._configData.feeds) sec._configData.feeds = {};
     sec._configData.feeds[name] = url;
   }
-  var pane = document.getElementById('content-pane');
+  var pane = document.getElementById('content-scroll');
   var scrollPos = pane ? pane.scrollTop : 0;
   settingsPageSaveConfig().then(function() {
     if (pane) pane.scrollTop = scrollPos;

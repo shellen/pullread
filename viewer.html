@@ -22,7 +22,7 @@
 </style>
 </head>
 <body data-theme="light" class="font-serif size-medium">
-<a href="#content-pane" class="skip-link">Skip to content</a>
+<a href="#content-scroll" class="skip-link">Skip to content</a>
 <!-- SVG icon sprite (FontAwesome Free solid/regular, inlined for fully offline use) -->
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
   <symbol id="i-bars" viewBox="0 0 448 512"><path d="M0 96C0 78.3 14.3 64 32 64h384c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zm0 160c0-17.7 14.3-32 32-32h384c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zm448 160c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32h384c17.7 0 32 14.3 32 32z"/></symbol>
@@ -178,13 +178,23 @@
     </div>
 
     <main class="content-pane" id="content-pane" aria-label="Article content">
-      <div class="reading-progress" aria-hidden="true"><div class="reading-progress-bar" id="reading-progress-bar"></div></div>
-      <div class="empty-state" id="empty-state">
-        <div class="dashboard" id="dashboard"></div>
+      <div class="reader-toolbar" id="reader-toolbar" style="display:none">
+        <div class="reader-toolbar-left">
+          <button onclick="navigateArticle(-1)" aria-label="Previous article" title="Previous (&larr;)"><svg class="icon icon-sm"><use href="#i-backward"/></svg></button>
+          <span class="reader-toolbar-title" id="reader-toolbar-title"></span>
+          <button onclick="navigateArticle(1)" aria-label="Next article" title="Next (&rarr;)"><svg class="icon icon-sm"><use href="#i-forward"/></svg></button>
+        </div>
+        <div class="reader-toolbar-right" id="reader-toolbar-actions"></div>
       </div>
-      <article class="content-wrap" id="content" style="display:none;" aria-live="polite"></article>
-      <div class="margin-notes" id="margin-notes" aria-hidden="true"></div>
-      <div class="toc-container" id="toc-container" aria-label="Table of contents"></div>
+      <div class="content-scroll" id="content-scroll">
+        <div class="reading-progress" aria-hidden="true"><div class="reading-progress-bar" id="reading-progress-bar"></div></div>
+        <div class="empty-state" id="empty-state">
+          <div class="dashboard" id="dashboard"></div>
+        </div>
+        <article class="content-wrap" id="content" style="display:none;" aria-live="polite"></article>
+        <div class="margin-notes" id="margin-notes" aria-hidden="true"></div>
+        <div class="toc-container" id="toc-container" aria-label="Table of contents"></div>
+      </div>
     </main>
   </div>
 

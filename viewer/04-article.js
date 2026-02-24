@@ -579,7 +579,7 @@ function renderArticle(text, filename) {
   }
 
   // Scroll to top
-  document.getElementById('content-pane').scrollTop = 0;
+  document.getElementById('content-scroll').scrollTop = 0;
 
   // Reset reading progress
   updateReadingProgress();
@@ -672,7 +672,7 @@ function localizeReviewLinks(container) {
 
 // ---- Reading Progress Bar ----
 function updateReadingProgress() {
-  const pane = document.getElementById('content-pane');
+  const pane = document.getElementById('content-scroll');
   const bar = document.getElementById('reading-progress-bar');
   if (!pane || !bar) return;
   const scrollTop = pane.scrollTop;
@@ -681,7 +681,7 @@ function updateReadingProgress() {
   bar.style.width = Math.min(100, Math.max(0, progress)) + '%';
 }
 
-document.getElementById('content-pane').addEventListener('scroll', function() {
+document.getElementById('content-scroll').addEventListener('scroll', function() {
   updateReadingProgress();
   updateFocusMode();
   updateTocActive();
@@ -728,7 +728,7 @@ function updateFocusMode() {
   const content = document.getElementById('content');
   if (!content || content.style.display === 'none') return;
 
-  const pane = document.getElementById('content-pane');
+  const pane = document.getElementById('content-scroll');
   const paneRect = pane.getBoundingClientRect();
   // Shift the focus point near the top/bottom of the scroll so edge
   // paragraphs still get highlighted instead of being permanently dimmed.
@@ -868,7 +868,7 @@ function saveScrollPosition() {
   if (!activeFile) return;
   clearTimeout(scrollSaveTimeout);
   scrollSaveTimeout = setTimeout(() => {
-    const pane = document.getElementById('content-pane');
+    const pane = document.getElementById('content-scroll');
     if (!pane) return;
     const scrollHeight = pane.scrollHeight - pane.clientHeight;
     if (scrollHeight <= 0) return;
@@ -890,7 +890,7 @@ function restoreScrollPosition(filename) {
   const saved = positions[filename];
   if (!saved || saved.pct < 0.02) return; // Don't restore if near the top
 
-  const pane = document.getElementById('content-pane');
+  const pane = document.getElementById('content-scroll');
   if (!pane) return;
 
   // Show a "resume" indicator
@@ -963,7 +963,7 @@ function updateTocActive() {
   const tocLinks = document.querySelectorAll('.toc-list a');
   if (!tocLinks.length) return;
 
-  const pane = document.getElementById('content-pane');
+  const pane = document.getElementById('content-scroll');
   const paneRect = pane.getBoundingClientRect();
   const threshold = paneRect.top + 80;
 
@@ -1111,11 +1111,11 @@ function setupEpubFootnotes() {
 
       // Position the popup near the reference
       var rect = ref.getBoundingClientRect();
-      var pane = document.getElementById('content-pane');
+      var pane = document.getElementById('content-scroll');
       var paneRect = pane.getBoundingClientRect();
       popup.style.position = 'absolute';
 
-      // Insert into content-pane for proper scrolling
+      // Insert into scroll container for proper scrolling
       pane.appendChild(popup);
 
       // Position below the reference, centered

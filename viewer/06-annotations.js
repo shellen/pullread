@@ -425,7 +425,7 @@ function showHlToolbar(x, y) {
   `;
   bar.style.left = x + 'px';
   bar.style.top = y + 'px';
-  document.getElementById('content-pane').appendChild(bar);
+  document.getElementById('content-scroll').appendChild(bar);
   hlToolbarEl = bar;
 }
 
@@ -443,7 +443,7 @@ function showHighlightContextMenu(e, hl) {
     <button class="hl-note-btn" aria-label="${noteLabel}" onclick="editHighlightNote('${hl.id}', event)">${noteLabel}</button>
     <button class="hl-note-btn" style="color:red;border-color:red" aria-label="Delete highlight" onclick="deleteHighlight('${hl.id}')">Del</button>
   `;
-  const pane = document.getElementById('content-pane');
+  const pane = document.getElementById('content-scroll');
   bar.style.left = (e.clientX - pane.getBoundingClientRect().left) + 'px';
   bar.style.top = (e.clientY - pane.getBoundingClientRect().top + pane.scrollTop - 40) + 'px';
   pane.appendChild(bar);
@@ -466,7 +466,7 @@ function editHighlightNote(id, e) {
   const hl = articleHighlights.find(h => h.id === id);
   if (!hl) return;
 
-  const pane = document.getElementById('content-pane');
+  const pane = document.getElementById('content-scroll');
   const paneRect = pane.getBoundingClientRect();
   const popover = document.createElement('div');
   popover.className = 'annotation-popover';
@@ -544,7 +544,7 @@ document.addEventListener('mouseup', e => {
   // Don't show highlight toolbar on Guide or Explore pages
   if (!activeFile) return;
 
-  const pane = document.getElementById('content-pane');
+  const pane = document.getElementById('content-scroll');
   const range = sel.getRangeAt(0);
   const rect = range.getBoundingClientRect();
   const paneRect = pane.getBoundingClientRect();
@@ -559,7 +559,7 @@ function addInlineNote() {
   const sel = window.getSelection();
   if (!sel || sel.isCollapsed || !sel.toString().trim()) return;
   const anchorText = sel.toString();
-  const pane = document.getElementById('content-pane');
+  const pane = document.getElementById('content-scroll');
   const range = sel.getRangeAt(0);
   const rect = range.getBoundingClientRect();
   const paneRect = pane.getBoundingClientRect();
@@ -623,7 +623,7 @@ function showAnnotationPopover(e, ann) {
   removeAnnotationPopover();
   removeHlToolbar();
 
-  const pane = document.getElementById('content-pane');
+  const pane = document.getElementById('content-scroll');
   const paneRect = pane.getBoundingClientRect();
   const popover = document.createElement('div');
   popover.className = 'annotation-popover';

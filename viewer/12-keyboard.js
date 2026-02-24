@@ -113,7 +113,7 @@ document.addEventListener('keydown', e => {
 
   // Up/Down scroll the content pane; navigate articles at boundaries
   if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-    const pane = document.getElementById('content-pane');
+    const pane = document.getElementById('content-scroll');
     const scrollAmount = 80;
     const atTop = pane.scrollTop <= 0;
     const atBottom = pane.scrollTop + pane.clientHeight >= pane.scrollHeight - 2;
