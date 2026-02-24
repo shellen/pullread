@@ -73,12 +73,16 @@
 
   <div class="main">
     <aside class="sidebar" id="sidebar" aria-label="Navigation">
-      <div class="sidebar-brand" onclick="goHome()" role="heading" aria-level="1">
-        <svg class="icon" aria-hidden="true"><use href="#i-book"/></svg>
-        <span class="sidebar-brand-text">PullRead</span>
+      <div class="sidebar-brand" onclick="goHome()" role="heading" aria-level="1" title="Home">
+        <svg class="brand-icon" viewBox="0 0 40 40" aria-hidden="true">
+          <rect x="4" y="2" width="32" height="36" rx="4" fill="var(--sidebar-active, #e8e8e8)"/>
+          <line x1="11" y1="14" x2="29" y2="14" stroke="var(--fg)" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="11" y1="20" x2="29" y2="20" stroke="var(--fg)" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="11" y1="26" x2="25" y2="26" stroke="var(--fg)" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M26 2v11l3.5-2.5L33 13V2" fill="#e8744f"/>
+        </svg>
       </div>
       <nav class="sidebar-nav-rail" id="sidebar-nav">
-        <button class="nav-rail-btn active" data-view="home" onclick="switchSidebarView('home')" aria-label="Home" title="Home"><svg class="icon" aria-hidden="true"><use href="#i-globe"/></svg><span class="nav-rail-label">Home</span></button>
         <button class="nav-rail-btn" data-view="notebooks" onclick="switchSidebarView('notebooks')" aria-label="Notebook" title="Notebook"><svg class="icon" aria-hidden="true"><use href="#i-pen"/></svg><span class="nav-rail-label">Notebook</span></button>
         <button class="nav-rail-btn" onclick="showTagCloud()" aria-label="Explore" title="Explore"><svg class="icon" aria-hidden="true"><use href="#i-tags"/></svg><span class="nav-rail-label">Explore</span></button>
       </nav>

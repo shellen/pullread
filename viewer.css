@@ -293,13 +293,8 @@
     text-decoration: none;
     flex-shrink: 0;
   }
-  .sidebar-brand .icon { width: 20px; height: 20px; }
-  .sidebar-brand-text {
-    font-size: 9px;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-    color: var(--muted);
-  }
+  .sidebar-brand .brand-icon { width: 32px; height: 32px; }
+  .sidebar-brand:hover .brand-icon rect { fill: var(--border); }
   .sidebar-nav-rail {
     display: flex;
     flex-direction: column;
