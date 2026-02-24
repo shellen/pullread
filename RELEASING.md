@@ -2,48 +2,115 @@
 
 ## Quick Reference
 
-1. Run `bun scripts/bump-version.ts 2.1.0` (updates package.json, site/index.html, and tauri.conf.json)
-2. Commit, push, and merge to `main`
-3. Tag and push: `git tag v2.1.0 && git push origin v2.1.0`
+```bash
+bun scripts/bump-version.ts 0.4.0    # update all version locations
+# update site/releases.html with release notes
+# commit and merge to main
+git tag v0.4.0 && git push origin v0.4.0
+# CI builds, signs, notarizes, and publishes — no manual steps after tagging
+```
 
-The CI pipeline handles building (ARM64 + Intel), signing, notarization, DMG creation, and GitHub Release.
+## Step by Step
+
+### 1. Prep the release
+
+```bash
+# Bump version everywhere (package.json → site → tauri.conf.json → Cargo.toml)
+bun scripts/bump-version.ts X.Y.Z
+
+# Rebuild the embedded viewer (picks up any viewer changes)
+bun run scripts/embed-viewer.ts
+
+# Run the test suite
+bun test
+```
+
+### 2. Update release notes
+
+Add a new entry at the top of `site/releases.html` with the version, subtitle, date, and bullet points. Update the fallback version in `viewer/03-settings.js` (search for `_prCurrentVersion`).
+
+### 3. Commit, merge, and tag
+
+```bash
+git add -p    # stage the version bump + release notes
+git commit -m "Bump version to X.Y.Z"
+git checkout main && git merge <branch> && git push origin main
+git tag vX.Y.Z && git push origin vX.Y.Z
+```
+
+### 4. Wait for CI
+
+The tag push triggers three jobs:
+
+| Job | What it does |
+|-----|-------------|
+| **build** (matrix) | Builds ARM64 + Intel sidecars, signs, notarizes, creates draft release with DMGs |
+| **publish-updater** | Signs update bundles, builds `latest.json`, publishes the release (marks as non-draft) |
+| **deploy-site** | Deploys pullread.com to GitHub Pages |
+
+Monitor with `gh run list --limit 5`. The whole pipeline takes ~12 minutes.
+
+**There is no manual publish step.** The `publish-updater` job calls `gh release edit --draft=false` automatically.
+
+### 5. Verify
+
+- [ ] `gh release view vX.Y.Z` shows both DMGs + `latest.json`
+- [ ] Auto-updater: open an older version of Pull Read, check for update prompt
+- [ ] Site: visit pullread.com/releases and verify the new version appears
 
 ## Version Locations
 
-Run **`bun scripts/bump-version.ts <version>`** to update all locations at once. Or run it without arguments to propagate the version already in `package.json`.
+Run **`bun scripts/bump-version.ts <version>`** to update all four at once:
 
-| File | Key | Updated by |
-|------|-----|------------|
-| `package.json` | `version` | **Source of truth** — edit this or pass version to bump script |
-| `site/index.html` | `Version X.Y.Z` badge | bump-version.ts |
-| `src-tauri/tauri.conf.json` | `version` | bump-version.ts |
-| `src-tauri/Cargo.toml` | `version` | bump-version.ts |
+| File | Key |
+|------|-----|
+| `package.json` | `version` (source of truth) |
+| `site/index.html` | Version badge in hero |
+| `src-tauri/tauri.conf.json` | `version` |
+| `src-tauri/Cargo.toml` | `version` |
 
-## How the Release Pipeline Works
+## How the Pipeline Works
 
-The **Build Tauri App** workflow (`.github/workflows/build-tauri.yml`) triggers on tag pushes matching `v*`:
+The **Build Tauri App** workflow (`.github/workflows/build-tauri.yml`) triggers on:
+- **Tag pushes** (`v*`) — full release: build → sign → notarize → publish
+- **Pushes to main** — rolling build: build → update `latest` prerelease
+- **Pull requests** — build only, upload artifacts for 30 days
 
-1. Builds the Bun CLI sidecar for ARM64 and Intel (matrix build)
-2. Downloads and bundles the Kokoro TTS model (~92MB)
-3. Imports the Apple signing certificate
-4. Signs the sidecar binary with entitlements (for ONNX Runtime native addon loading)
-5. Runs `tauri-apps/tauri-action` which:
-   - Builds the Rust app
-   - Signs and notarizes the app bundle and DMG
-   - Creates a draft GitHub Release with DMGs and `latest.json` (for auto-updates)
+### Build job (runs on macOS, matrix: ARM64 + Intel)
 
-The **Deploy Site** workflow (`.github/workflows/deploy-site.yml`) triggers independently on `v*` tag pushes, deploying the website to GitHub Pages with the version injected from `package.json`.
+1. `bun install` + `bun scripts/embed-viewer.ts` (embed viewer into binary)
+2. `bun build src/index.ts --compile` (compile CLI sidecar for target arch)
+3. `bash scripts/prepare-sidecar.sh` (copy sidecar to Tauri location)
+4. `bash scripts/download-kokoro-model.sh` (fetch TTS model, ~92MB)
+5. Import Apple signing certificate from GitHub Secrets
+6. Sign sidecar with entitlements (`com.apple.security.cs.disable-library-validation`)
+7. `tauri-apps/tauri-action` builds the Rust app, signs/notarizes the bundle and DMG
 
-After both matrix legs complete, manually publish the draft release.
+### Publish-updater job (runs after build, tags only)
 
-## How the "Latest" Download Link Works
+1. Downloads `.tar.gz` bundles from the draft release
+2. Signs each bundle with `tauri signer sign`
+3. Builds `latest.json` with platform-specific signatures and download URLs
+4. Uploads `latest.json` to the release
+5. Publishes the release (`--draft=false`)
 
-The site and README link to:
-```
-https://github.com/shellen/pullread/releases/latest
-```
+### Latest-release job (runs after build, main pushes only)
 
-GitHub's `/releases/latest` always resolves to the most recent **non-prerelease** release. The rolling "latest" tag (updated on every push to main) is marked as a prerelease, so it won't interfere.
+Updates the rolling `latest` prerelease with stable-named DMGs:
+- `PullRead.dmg` (ARM64)
+- `PullRead_Intel.dmg` (Intel)
+
+The homepage download button links to `https://github.com/shellen/pullread/releases/download/latest/PullRead.dmg`, which always serves the most recent main build.
+
+## How Download Links Work
+
+| Link | Resolves to |
+|------|------------|
+| `releases/download/latest/PullRead.dmg` | Rolling build from main (ARM64) |
+| `releases/download/latest/PullRead_Intel.dmg` | Rolling build from main (Intel) |
+| `releases/latest` | Most recent published non-prerelease (tagged release) |
+
+The rolling `latest` release is marked as a **prerelease** so it never steals the "Latest" badge from tagged releases.
 
 ## Required GitHub Secrets
 
@@ -57,38 +124,25 @@ GitHub's `/releases/latest` always resolves to the most recent **non-prerelease*
 | `TAURI_SIGNING_PRIVATE_KEY` | Tauri updater signing private key |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password for the signing key |
 
-Use `scripts/setup-signing-secrets.sh` to configure these, or set them manually.
+Use `scripts/setup-signing-secrets.sh` to configure these.
 
 ## Sidecar Entitlements
 
-The CLI binary (`pullread-cli`) is signed with `src-tauri/entitlements.plist`:
-
-- **`com.apple.security.cs.disable-library-validation`** — Required because `kokoro-js` depends on ONNX Runtime, which has a native `.node` addon. Bun's compiled binary extracts native addons to a temp directory at runtime, and macOS rejects them without this entitlement.
+The CLI binary (`pullread-cli`) is signed with `src-tauri/entitlements.plist` which grants `com.apple.security.cs.disable-library-validation`. This is required because ONNX Runtime (used by Kokoro TTS) has native `.node` addons that Bun extracts to a temp directory at runtime — macOS rejects them without this entitlement.
 
 ## Recovering from a Failed Release
 
-1. **Fix the issue** on a branch and merge to `main`
-2. **Delete the broken tag**: go to the repo's Tags page on GitHub > find the tag > Delete
-3. **Delete the broken GitHub Release** if partially created
-4. **Re-tag**: `git tag v2.1.0 && git push origin v2.1.0`
-5. **Refresh the latest download**: The next push to `main` auto-updates the `latest` tag release via CI
-
-## Checklist for a New Release
-
-- [ ] Run `bun scripts/bump-version.ts X.Y.Z` to update all version locations
-- [ ] Changes merged to `main`
-- [ ] CI build passes on `main` (check Actions tab)
-- [ ] Tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`
-- [ ] Verify draft release appears at https://github.com/shellen/pullread/releases
-- [ ] Both architecture DMGs are attached
-- [ ] `latest.json` is attached (for auto-updates)
-- [ ] Publish the draft release
-- [ ] Verify the DMG downloads and installs correctly
-- [ ] Verify the site deploy triggered
+```bash
+# Fix the issue on a branch, merge to main, then:
+gh release delete vX.Y.Z --yes          # delete the broken release
+git push --delete origin vX.Y.Z         # delete the remote tag
+git tag -d vX.Y.Z                       # delete the local tag
+git tag vX.Y.Z && git push origin vX.Y.Z  # re-tag and push
+```
 
 ## Keeping LLM Models Up to Date
 
-Models are defined in **`models.json`** at the repo root (single source of truth). The CLI and viewer read from it at runtime.
+Models are defined in `models.json` at the repo root. The CLI and viewer read from it at runtime.
 
 **Quarterly maintenance:**
 1. Check each provider's API docs for new models and deprecation notices

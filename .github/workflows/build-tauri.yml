@@ -293,6 +293,6 @@ jobs:
           files: |
             ./release/PullRead.dmg
             ./release/PullRead_Intel.dmg
-          prerelease: false
+          prerelease: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
