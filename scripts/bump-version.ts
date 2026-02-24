@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
-// ABOUTME: Propagates the version from package.json to site/index.html and tauri.conf.json
-// ABOUTME: Run via `bun scripts/bump-version.ts` (or `bun scripts/bump-version.ts 2.1.0` to set a version)
+// ABOUTME: Propagates the version from package.json to site/index.html, tauri.conf.json, and Cargo.toml
+// ABOUTME: Run via `bun scripts/bump-version.ts` (or `bun scripts/bump-version.ts 0.3.5` to set a version)
 
 import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
@@ -9,6 +9,7 @@ const ROOT = join(import.meta.dir, '..');
 const PKG_PATH = join(ROOT, 'package.json');
 const SITE_PATH = join(ROOT, 'site', 'index.html');
 const TAURI_CONF_PATH = join(ROOT, 'src-tauri', 'tauri.conf.json');
+const CARGO_PATH = join(ROOT, 'src-tauri', 'Cargo.toml');
 
 // If a version argument is provided, update package.json first
 const newVersion = process.argv[2];
@@ -47,4 +48,17 @@ if (tauriConf.version === version) {
   tauriConf.version = version;
   writeFileSync(TAURI_CONF_PATH, JSON.stringify(tauriConf, null, 2) + '\n');
   console.log(`tauri.conf.json → ${version}`);
+}
+
+// Update Cargo.toml version
+const cargo = readFileSync(CARGO_PATH, 'utf-8');
+const cargoVersionRe = /^version = "\d+\.\d+\.\d+"/m;
+const cargoUpdated = cargo.replace(cargoVersionRe, `version = "${version}"`);
+if (!cargoVersionRe.test(cargo)) {
+  console.log('Cargo.toml — no version string found, skipping');
+} else if (cargo === cargoUpdated) {
+  console.log(`Cargo.toml — already ${version}`);
+} else {
+  writeFileSync(CARGO_PATH, cargoUpdated);
+  console.log(`Cargo.toml → ${version}`);
 }

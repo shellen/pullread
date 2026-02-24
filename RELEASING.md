@@ -17,6 +17,7 @@ Run **`bun scripts/bump-version.ts <version>`** to update all locations at once.
 | `package.json` | `version` | **Source of truth** — edit this or pass version to bump script |
 | `site/index.html` | `Version X.Y.Z` badge | bump-version.ts |
 | `src-tauri/tauri.conf.json` | `version` | bump-version.ts |
+| `src-tauri/Cargo.toml` | `version` | bump-version.ts |
 
 ## How the Release Pipeline Works
 
