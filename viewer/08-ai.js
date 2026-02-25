@@ -208,6 +208,7 @@ function toggleShareDropdown(e) {
   panel.innerHTML = `
     <div class="share-group-label">Actions</div>
     <button onclick="copyArticleLink()"><svg class="share-icon" viewBox="0 0 640 512"><use href="#i-link"/></svg> Copy Link</button>
+    <button onclick="copyPullReadLink()"><svg class="share-icon" viewBox="0 0 640 512"><use href="#i-link"/></svg> Copy Pull Read Link</button>
     <button onclick="showExportMarkdownModal()"><svg class="share-icon" viewBox="0 0 640 512"><use href="#i-cloud-download"/></svg> Export Markdown</button>
     <button onclick="exportArticlePdf()"><svg class="share-icon" viewBox="0 0 640 512"><use href="#i-cloud-download"/></svg> Export PDF</button>
     <button onclick="startNotebookFromArticle()"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-pen"/></svg> Write About This</button>
@@ -268,6 +269,20 @@ function copyArticleLink() {
     const existing = document.querySelector('.share-dropdown-panel');
     if (existing) {
       const btn = existing.querySelector('button');
+      if (btn) { const orig = btn.innerHTML; btn.innerHTML = '<span class="share-icon">&#10003;</span> Copied!'; setTimeout(() => { btn.innerHTML = orig; }, 1200); }
+    }
+  });
+}
+
+function copyPullReadLink() {
+  const data = getShareData();
+  if (!data) return;
+  const prUrl = `https://pullread.com/link?url=${encodeURIComponent(data.url)}&title=${encodeURIComponent(data.title)}`;
+  navigator.clipboard.writeText(prUrl).then(() => {
+    const existing = document.querySelector('.share-dropdown-panel');
+    if (existing) {
+      const btns = existing.querySelectorAll('button');
+      const btn = btns[1];
       if (btn) { const orig = btn.innerHTML; btn.innerHTML = '<span class="share-icon">&#10003;</span> Copied!'; setTimeout(() => { btn.innerHTML = orig; }, 1200); }
     }
   });
