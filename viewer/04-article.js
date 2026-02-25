@@ -267,6 +267,21 @@ function dashLoadArticle(filename) {
 }
 
 function renderArticle(text, filename) {
+  // Guard against corrupt/binary files that would freeze the UI
+  var MAX_ARTICLE_SIZE = 2 * 1024 * 1024; // 2 MB
+  if (text.length > MAX_ARTICLE_SIZE) {
+    var content = document.getElementById('content');
+    var empty = document.getElementById('empty-state');
+    if (empty) empty.style.display = 'none';
+    if (content) {
+      content.style.display = '';
+      content.innerHTML = '<div class="content-wrap"><h1>File too large</h1>'
+        + '<p>This file is ' + (text.length / 1024 / 1024).toFixed(1) + ' MB, which likely indicates corrupt content. '
+        + 'Expected article files are under 2 MB.</p></div>';
+    }
+    return;
+  }
+
   const { meta, body: rawBodyText } = parseFrontmatter(text);
   let body = rawBodyText;
   const content = document.getElementById('content');
