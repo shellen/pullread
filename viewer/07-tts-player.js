@@ -46,6 +46,162 @@ class PrPlayer extends HTMLElement {
         '</div>' +
         '<div id="audio-queue-list"></div>' +
       '</div>';
+
+    this._initProgressDrag();
+  }
+
+  /** Set up mouse/touch drag on the progress bar for seeking */
+  _initProgressDrag() {
+    var wrap = this.querySelector('#audio-progress-wrap');
+    if (!wrap) return;
+
+    function seekFromEvent(e) {
+      if (!ttsPlaying && ttsCurrentIndex < 0) return;
+      var rect = wrap.getBoundingClientRect();
+      var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      var pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      ttsSeek(pct);
+    }
+
+    function onMove(e) { seekFromEvent(e); }
+    function onEnd() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onEnd);
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onEnd);
+    }
+
+    wrap.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      seekFromEvent(e);
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onEnd);
+    });
+
+    wrap.addEventListener('touchstart', function(e) {
+      e.preventDefault();
+      seekFromEvent(e);
+      document.addEventListener('touchmove', onMove, { passive: false });
+      document.addEventListener('touchend', onEnd);
+    }, { passive: false });
+  }
+
+  /** Toggle the speed slider popup open/closed */
+  _toggleSpeedSlider() {
+    if (this._speedPopup) { this._closeSpeedSlider(); return; }
+
+    var btn = this.querySelector('#tts-speed-btn');
+    var rect = btn.getBoundingClientRect();
+    var count = TTS_SPEEDS.length;
+
+    var popup = document.createElement('div');
+    popup.className = 'tts-speed-popup';
+
+    var majorSpeeds = [0.5, 1.0, 1.5, 2.0];
+    var ticksHtml = '';
+    for (var i = count - 1; i >= 0; i--) {
+      var s = TTS_SPEEDS[i];
+      if (majorSpeeds.indexOf(s) >= 0) {
+        ticksHtml += '<div class="tts-speed-tick">' + s + 'x</div>';
+      } else {
+        ticksHtml += '<div class="tts-speed-tick-dot">\u00b7</div>';
+      }
+    }
+
+    popup.innerHTML =
+      '<div class="tts-speed-popup-value" id="tts-speed-popup-val">' + ttsSpeed + 'x</div>' +
+      '<div class="tts-speed-track-wrap" id="tts-speed-track-wrap">' +
+        '<div class="tts-speed-track" id="tts-speed-track">' +
+          '<div class="tts-speed-thumb" id="tts-speed-thumb"></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="tts-speed-ticks">' + ticksHtml + '</div>';
+
+    document.body.appendChild(popup);
+
+    var popW = popup.offsetWidth;
+    var popH = popup.offsetHeight;
+    var left = rect.left + rect.width / 2 - popW / 2;
+    var top = rect.top - popH - 6;
+    if (left < 4) left = 4;
+    if (top < 4) { top = rect.bottom + 6; }
+    popup.style.left = left + 'px';
+    popup.style.top = top + 'px';
+
+    this._positionThumb();
+    this._speedPopup = popup;
+
+    // Drag handling
+    var trackWrap = document.getElementById('tts-speed-track-wrap');
+    var self = this;
+
+    function onDrag(clientY) {
+      var trackRect = trackWrap.getBoundingClientRect();
+      var pct = (clientY - trackRect.top) / trackRect.height;
+      pct = Math.max(0, Math.min(1, pct));
+      var idx = Math.round((1 - pct) * (count - 1));
+      idx = Math.max(0, Math.min(count - 1, idx));
+      ttsSetSpeed(TTS_SPEEDS[idx]);
+      self._positionThumb();
+    }
+
+    trackWrap.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      onDrag(e.clientY);
+      function onMove(ev) { onDrag(ev.clientY); }
+      function onUp() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+
+    trackWrap.addEventListener('touchstart', function(e) {
+      e.preventDefault();
+      onDrag(e.touches[0].clientY);
+      function onTouchMove(ev) { ev.preventDefault(); onDrag(ev.touches[0].clientY); }
+      function onTouchEnd() {
+        document.removeEventListener('touchmove', onTouchMove);
+        document.removeEventListener('touchend', onTouchEnd);
+      }
+      document.addEventListener('touchmove', onTouchMove, { passive: false });
+      document.addEventListener('touchend', onTouchEnd);
+    }, { passive: false });
+
+    // Close on click outside (delay to avoid catching the opening click)
+    this._speedOutsideClick = function(e) {
+      if (self._speedPopup && !self._speedPopup.contains(e.target) && e.target.id !== 'tts-speed-btn') {
+        self._closeSpeedSlider();
+      }
+    };
+    setTimeout(function() {
+      document.addEventListener('mousedown', self._speedOutsideClick);
+      document.addEventListener('touchstart', self._speedOutsideClick);
+    }, 0);
+  }
+
+  /** Close the speed slider popup */
+  _closeSpeedSlider() {
+    if (this._speedPopup) {
+      this._speedPopup.remove();
+      this._speedPopup = null;
+    }
+    if (this._speedOutsideClick) {
+      document.removeEventListener('mousedown', this._speedOutsideClick);
+      document.removeEventListener('touchstart', this._speedOutsideClick);
+      this._speedOutsideClick = null;
+    }
+  }
+
+  /** Position the speed slider thumb to match current ttsSpeed */
+  _positionThumb() {
+    var thumb = document.getElementById('tts-speed-thumb');
+    if (!thumb) return;
+    var idx = TTS_SPEEDS.indexOf(ttsSpeed);
+    if (idx < 0) idx = TTS_SPEEDS.indexOf(1.0);
+    var pct = 1 - idx / (TTS_SPEEDS.length - 1);
+    thumb.style.top = (pct * 100) + '%';
   }
 
   /** Update all player DOM elements from TTS state */
