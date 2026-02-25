@@ -1244,6 +1244,8 @@
   .font-literata .content-wrap { font-family: "Literata", "Georgia", serif; }
   .font-source-serif .content-wrap { font-family: "Source Serif 4", "Georgia", serif; }
   .font-work-sans .content-wrap { font-family: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .font-instrument-serif .content-wrap { font-family: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .font-instrument-serif .article-header h1 { font-family: "Instrument Serif", "Georgia", serif; font-weight: 400; font-size: 1.8em; }
 
   .content-wrap {
     line-height: 1.7;

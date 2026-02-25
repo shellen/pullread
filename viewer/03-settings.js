@@ -162,8 +162,8 @@ function toggleSettingsDropdown() {
   if (btn) btn.setAttribute('aria-expanded', 'true');
 }
 
-var _fontLabels = {serif:'Serif',sans:'Sans-serif',system:'Charter',mono:'Monospace',inter:'Inter',lora:'Lora',literata:'Literata','source-serif':'Source Serif','work-sans':'Work Sans',opendyslexic:'OpenDyslexic'};
-var _fontOptions = [['serif','Serif'],['sans','Sans-serif'],['system','Charter'],['mono','Monospace'],['inter','Inter'],['lora','Lora'],['literata','Literata'],['source-serif','Source Serif'],['work-sans','Work Sans'],['opendyslexic','OpenDyslexic']];
+var _fontLabels = {serif:'Serif',sans:'Sans-serif',system:'Charter',mono:'Monospace',inter:'Inter',lora:'Lora',literata:'Literata','source-serif':'Source Serif','work-sans':'Work Sans','instrument-serif':'Instrument Serif',opendyslexic:'OpenDyslexic'};
+var _fontOptions = [['serif','Serif'],['sans','Sans-serif'],['system','Charter'],['mono','Monospace'],['inter','Inter'],['lora','Lora'],['literata','Literata'],['source-serif','Source Serif'],['work-sans','Work Sans'],['instrument-serif','Instrument Serif'],['opendyslexic','OpenDyslexic']];
 
 function toggleFontPicker() {
   var current = localStorage.getItem('pr-font') || 'serif';

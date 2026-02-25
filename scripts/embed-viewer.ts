@@ -38,6 +38,9 @@ const FONTS: Array<{ family: string; pkg: string; weight: number; style: string 
   { family: 'Work Sans', pkg: 'work-sans', weight: 600, style: 'normal' },
   { family: 'Work Sans', pkg: 'work-sans', weight: 700, style: 'normal' },
   { family: 'Work Sans', pkg: 'work-sans', weight: 400, style: 'italic' },
+  // Instrument Serif (title font for pairings)
+  { family: 'Instrument Serif', pkg: 'instrument-serif', weight: 400, style: 'normal' },
+  { family: 'Instrument Serif', pkg: 'instrument-serif', weight: 400, style: 'italic' },
   // OpenDyslexic (accessibility reading font)
   { family: 'OpenDyslexic', pkg: 'opendyslexic', weight: 400, style: 'normal' },
   { family: 'OpenDyslexic', pkg: 'opendyslexic', weight: 700, style: 'normal' },
