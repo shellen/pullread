@@ -73,15 +73,30 @@ function generateId() {
   return 'h' + Math.random().toString(36).slice(2, 8);
 }
 
+// Match text in a haystack, falling back to flexible whitespace matching
+// for cross-paragraph selections where \n in the selection may not appear in textContent
+function flexIndexOf(haystack, needle) {
+  var idx = haystack.indexOf(needle);
+  if (idx >= 0) return { index: idx, length: needle.length };
+  var parts = needle.split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) return { index: -1, length: 0 };
+  var pattern = parts.map(function(p) {
+    return p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }).join('\\s*');
+  var m = new RegExp(pattern).exec(haystack);
+  if (m) return { index: m.index, length: m[0].length };
+  return { index: -1, length: 0 };
+}
+
 function getTextContext(text, before, after) {
   // Get surrounding context for anchoring
   const content = document.getElementById('content');
   const fullText = content.textContent || '';
-  const idx = fullText.indexOf(text);
-  if (idx < 0) return { contextBefore: '', contextAfter: '' };
+  var match = flexIndexOf(fullText, text);
+  if (match.index < 0) return { contextBefore: '', contextAfter: '' };
   return {
-    contextBefore: fullText.slice(Math.max(0, idx - 30), idx),
-    contextAfter: fullText.slice(idx + text.length, idx + text.length + 30)
+    contextBefore: fullText.slice(Math.max(0, match.index - 30), match.index),
+    contextAfter: fullText.slice(match.index + match.length, match.index + match.length + 30)
   };
 }
 
@@ -128,9 +143,14 @@ function assignFootnoteNumbers() {
   footnoteEntries = [];
 
   // Collect all anchored elements (highlights and annotation markers)
+  // Cross-paragraph highlights produce multiple marks — only use the first per highlight
   const elements = [];
+  const seenHlIds = new Set();
   content.querySelectorAll('mark[data-hl-id]').forEach(el => {
-    const hl = articleHighlights.find(h => h.id === el.getAttribute('data-hl-id'));
+    const hlId = el.getAttribute('data-hl-id');
+    if (seenHlIds.has(hlId)) return;
+    seenHlIds.add(hlId);
+    const hl = articleHighlights.find(h => h.id === hlId);
     if (hl) elements.push({ el, type: 'highlight', data: hl });
   });
   content.querySelectorAll('.annotation-marker[data-ann-id]').forEach(el => {
@@ -266,6 +286,8 @@ function findAndWrap(container, hl) {
 
   // Find the best match position using context
   let targetGlobalIdx = -1;
+  let matchLength = searchText.length;
+
   if (hl.contextBefore || hl.contextAfter) {
     const ctxBefore = (hl.contextBefore || '').slice(-15);
     const ctxAfter = (hl.contextAfter || '').slice(0, 15);
@@ -278,15 +300,24 @@ function findAndWrap(container, hl) {
   if (targetGlobalIdx < 0) {
     targetGlobalIdx = fullText.indexOf(searchText);
   }
+  // Flexible whitespace fallback for cross-paragraph highlights
+  if (targetGlobalIdx < 0) {
+    var flex = flexIndexOf(fullText, searchText);
+    if (flex.index >= 0) {
+      targetGlobalIdx = flex.index;
+      matchLength = flex.length;
+    }
+  }
   if (targetGlobalIdx < 0) return;
 
-  const endGlobalIdx = targetGlobalIdx + searchText.length;
+  const endGlobalIdx = targetGlobalIdx + matchLength;
 
-  // Walk text nodes to find start and end positions (handles cross-element spans)
+  // Walk text nodes to find start/end positions and collect nodes in range
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
   let charCount = 0;
   let startNode = null, startOffset = 0;
   let endNode = null, endOffset = 0;
+  const textNodes = [];
   let node;
 
   while (node = walker.nextNode()) {
@@ -294,6 +325,9 @@ function findAndWrap(container, hl) {
     if (!startNode && charCount + nodeLen > targetGlobalIdx) {
       startNode = node;
       startOffset = targetGlobalIdx - charCount;
+    }
+    if (startNode) {
+      textNodes.push(node);
     }
     if (startNode && charCount + nodeLen >= endGlobalIdx) {
       endNode = node;
@@ -305,26 +339,30 @@ function findAndWrap(container, hl) {
 
   if (!startNode || !endNode) return;
 
-  try {
-    const range = document.createRange();
-    range.setStart(startNode, startOffset);
-    range.setEnd(endNode, endOffset);
+  // Wrap each text node portion in its own <mark> to avoid splitting paragraphs
+  // Process in reverse so earlier node offsets stay valid
+  for (var i = textNodes.length - 1; i >= 0; i--) {
+    try {
+      var tNode = textNodes[i];
+      var s = (tNode === startNode) ? startOffset : 0;
+      var e = (tNode === endNode) ? endOffset : tNode.textContent.length;
+      if (s >= e) continue;
 
-    const mark = document.createElement('mark');
-    mark.className = 'pr-highlight hl-' + hl.color;
-    mark.setAttribute('data-hl-id', hl.id);
-    mark.onclick = function(e) {
-      e.stopPropagation();
-      showHighlightContextMenu(e, hl);
-    };
+      var range = document.createRange();
+      range.setStart(tNode, s);
+      range.setEnd(tNode, e);
 
-    // extractContents handles cross-element ranges (bold/italic boundaries)
-    // where surroundContents would throw
-    const fragment = range.extractContents();
-    mark.appendChild(fragment);
-    range.insertNode(mark);
-  } catch {
-    return;
+      var mark = document.createElement('mark');
+      mark.className = 'pr-highlight hl-' + hl.color;
+      mark.setAttribute('data-hl-id', hl.id);
+      mark.onclick = function(ev) {
+        ev.stopPropagation();
+        showHighlightContextMenu(ev, hl);
+      };
+      range.surroundContents(mark);
+    } catch (ex) {
+      // Skip this text node portion if wrapping fails
+    }
   }
 }
 

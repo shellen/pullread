@@ -5,6 +5,7 @@ import {
   extractArticle, resolveRelativeUrls, simplifySubstackUrl, isYouTubeUrl, extractYouTubeId,
   matchPaperSource, fixPdfLigatures, stripRunningHeaders, buildParagraphs, extractPdfTitle,
   parseCaptionTracks, extractTweetId, isThreadsUrl, formatTweetMarkdown, fetchAndExtract,
+  stripEmbedNoise,
   type FxTweet
 } from './extractor';
 
@@ -217,6 +218,49 @@ describe('resolveRelativeUrls', () => {
     expect(result).toContain('https://example.com/page1');
     expect(result).toContain('https://example.com/img/2.png');
     expect(result).toContain('https://example.com/page2');
+  });
+});
+
+describe('stripEmbedNoise', () => {
+  test('strips raw iframe code shown as visible text', () => {
+    const md = 'Some intro.\n\n<iframe src="https://www.npr.org/player/embed/123/456" width="100%" height="290" frameborder="0" scrolling="no" title="NPR embedded audio player">\n\nActual article content.';
+    const result = stripEmbedNoise(md);
+    expect(result).not.toContain('iframe');
+    expect(result).toContain('Some intro.');
+    expect(result).toContain('Actual article content.');
+  });
+
+  test('strips Embed heading followed by iframe code', () => {
+    const md = '# The hack that almost broke the internet\n\n## Embed\n<iframe src="https://www.npr.org/player/embed/123/456">\n\nLast month, the world narrowly avoided a cyberattack.';
+    const result = stripEmbedNoise(md);
+    expect(result).not.toContain('Embed');
+    expect(result).not.toContain('iframe');
+    expect(result).toContain('Last month');
+  });
+
+  test('strips bare Download bullet from player UI', () => {
+    const md = '* **Download**\n\nArticle content here.';
+    const result = stripEmbedNoise(md);
+    expect(result).not.toContain('Download');
+    expect(result).toContain('Article content here.');
+  });
+
+  test('preserves normal content with download links', () => {
+    const md = 'You can [download the app](https://example.com/app) here.';
+    const result = stripEmbedNoise(md);
+    expect(result).toContain('download the app');
+  });
+
+  test('collapses excess blank lines', () => {
+    const md = 'First paragraph.\n\n\n\n\n\nSecond paragraph.';
+    const result = stripEmbedNoise(md);
+    expect(result).toBe('First paragraph.\n\n\nSecond paragraph.');
+  });
+
+  test('passes through clean content unchanged', () => {
+    const md = '# Title\n\nSome article text.\n\n## Subtitle\n\nMore text.';
+    const result = stripEmbedNoise(md);
+    expect(result).toBe(md);
   });
 });
 

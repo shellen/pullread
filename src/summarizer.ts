@@ -38,7 +38,7 @@ function loadModelsConfig(): Record<string, { models: string[]; default: string 
     // Fallback if models.json is missing (e.g. standalone binary)
     return {
       anthropic: { models: ['claude-haiku-4-5-20251001', 'claude-sonnet-4-5-20250929', 'claude-opus-4-6'], default: 'claude-haiku-4-5-20251001' },
-      openai: { models: ['gpt-4.1-nano', 'gpt-4.1-mini', 'gpt-5-nano', 'gpt-5-mini', 'gpt-5'], default: 'gpt-4.1-nano' },
+      openai: { models: ['gpt-5-nano', 'gpt-5-mini', 'gpt-5', 'o3-mini'], default: 'gpt-5-nano' },
       gemini: { models: ['gemini-2.5-flash-lite-preview', 'gemini-2.5-flash', 'gemini-2.5-pro'], default: 'gemini-2.5-flash-lite-preview' },
       openrouter: { models: ['anthropic/claude-haiku-4.5', 'google/gemini-2.5-flash', 'anthropic/claude-sonnet-4.5'], default: 'anthropic/claude-haiku-4.5' },
       apple: { models: ['on-device'], default: 'on-device' }
@@ -579,5 +579,5 @@ export async function summarizeText(articleText: string, config?: LLMConfig): Pr
 }
 
 export function getDefaultModel(provider: string): string {
-  return _modelsConfig[provider]?.default || 'gpt-4.1-nano';
+  return _modelsConfig[provider]?.default || 'gpt-5-nano';
 }

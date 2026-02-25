@@ -139,6 +139,28 @@ export function shouldSkipUrl(url: string): string | null {
   return null;
 }
 
+/**
+ * Strip raw embed codes and player UI noise from extracted Markdown.
+ * Sites like NPR include "Download / Embed / Transcript" sections with
+ * raw iframe HTML shown as visible text, which Readability captures.
+ */
+export function stripEmbedNoise(markdown: string): string {
+  // Remove lines containing raw <iframe as visible text
+  markdown = markdown.replace(/^.*<\s*iframe\b[^]*?(?:>|$).*$/gm, '');
+
+  // Remove "Embed" followed by iframe-like code on subsequent lines
+  markdown = markdown.replace(/^#+\s*Embed\s*\n(?:.*<\s*iframe\b.*\n?)*/gm, '');
+
+  // Remove standalone "Download" and "Transcript" list items from player UI
+  // (only when they appear as bare bullets with no meaningful content after)
+  markdown = markdown.replace(/^\*\s+\*?\*?Download\*?\*?\s*$/gm, '');
+
+  // Collapse runs of 3+ blank lines into 2
+  markdown = markdown.replace(/\n{4,}/g, '\n\n\n');
+
+  return markdown.trim();
+}
+
 export function resolveRelativeUrls(markdown: string, baseUrl: string): string {
   let origin: string;
   try {
@@ -587,10 +609,10 @@ export function extractArticle(html: string, url: string): ExtractedArticle | nu
   const article = reader.parse();
 
   if (article && article.content) {
-    const markdown = resolveRelativeUrls(
+    const markdown = stripEmbedNoise(resolveRelativeUrls(
       turndown.turndown(article.content),
       url
-    );
+    ));
     let title = article.title || 'Untitled';
 
     // For social posts, "Untitled" is common — generate a better title

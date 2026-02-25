@@ -172,48 +172,19 @@
   }
 
   .faq-item {
-    margin-bottom: 24px;
+    margin-bottom: 28px;
   }
 
-  .faq-item summary {
+  .faq-question {
     font-size: 16px;
     font-weight: 600;
     color: var(--fg);
-    cursor: pointer;
-    padding: 12px 0;
-    list-style: none;
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
+    padding: 0 0 6px;
     line-height: 1.4;
   }
 
-  .faq-item summary::-webkit-details-marker { display: none; }
-
-  .faq-item summary::before {
-    content: "+";
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    min-width: 24px;
-    border-radius: 50%;
-    background: var(--teal-subtle);
-    color: var(--teal);
-    font-size: 16px;
-    font-weight: 700;
-    transition: all 0.2s;
-  }
-
-  .faq-item[open] summary::before {
-    content: "\2212";
-    background: var(--teal);
-    color: var(--white);
-  }
-
   .faq-answer {
-    padding: 0 0 8px 34px;
+    padding: 0;
     color: var(--body);
     font-size: 15px;
     line-height: 1.7;
@@ -404,55 +375,55 @@
   <div class="faq-section reveal" id="getting-started">
     <h2 class="faq-section-title">Getting Started</h2>
 
-    <details class="faq-item">
-      <summary>What is Pull Read?</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">What is Pull Read?</h3>
       <div class="faq-answer">
         <p>Pull Read is a macOS menu bar app for reading RSS feeds, bookmarked articles, and ebooks. It saves everything as local Markdown files, so your reading library is always yours &mdash; searchable, portable, and never locked into a platform.</p>
       </div>
-    </details>
+    </div>
 
-    <details class="faq-item">
-      <summary>How do I install it?</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">How do I install it?</h3>
       <div class="faq-answer">
         <p>Download the DMG from the <a href="https://github.com/shellen/pullread/releases/download/latest/PullRead.dmg">releases page</a>, drag Pull Read to your Applications folder, and launch it. It lives in your menu bar &mdash; click the icon to open the viewer or access settings.</p>
       </div>
-    </details>
+    </div>
 
-    <details class="faq-item">
-      <summary>Where are my articles stored?</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">Where are my articles stored?</h3>
       <div class="faq-answer">
         <p>Articles are saved as Markdown files in <code>~/Documents/PullRead</code> by default, organized in date folders (<code>2024/02/article-title.md</code>). You can change this path in Settings. Since they're plain Markdown with YAML frontmatter, you can read them with any text editor, Obsidian, or other Markdown tools.</p>
       </div>
-    </details>
+    </div>
 
-    <details class="faq-item">
-      <summary>Does it work offline?</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">Does it work offline?</h3>
       <div class="faq-answer">
         <p>Yes. Once articles are synced, everything works offline &mdash; reading, highlighting, notes, search, and text-to-speech (with Apple's built-in voices). AI features and feed syncing need an internet connection.</p>
       </div>
-    </details>
+    </div>
   </div>
 
   <!-- Feeds & Content -->
   <div class="faq-section reveal" id="feeds">
     <h2 class="faq-section-title">Feeds & Content</h2>
 
-    <details class="faq-item">
-      <summary>What kinds of feeds can I subscribe to?</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">What kinds of feeds can I subscribe to?</h3>
       <div class="faq-answer">
         <p>Pull Read supports RSS, Atom, RDF, and JSON Feed formats. It also has smart URL resolution &mdash; paste a YouTube channel URL, a Reddit subreddit, or a blog homepage, and Pull Read will find the feed for you.</p>
       </div>
-    </details>
+    </div>
 
-    <details class="faq-item">
-      <summary>Can I import feeds from another reader?</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">Can I import feeds from another reader?</h3>
       <div class="faq-answer">
         <p>Yes. Pull Read supports OPML import. Export your subscriptions from your current reader as an OPML file, then import it in Settings &gt; Feeds.</p>
       </div>
-    </details>
+    </div>
 
-    <details class="faq-item">
-      <summary>Can I save individual articles without subscribing to a feed?</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">Can I save individual articles without subscribing to a feed?</h3>
       <div class="faq-answer">
         <p>Yes, several ways:</p>
         <ul>
@@ -461,36 +432,36 @@
           <li><strong>Drop a file</strong> &mdash; Drag a <code>.md</code> file into the Pull Read window</li>
         </ul>
       </div>
-    </details>
+    </div>
 
-    <details class="faq-item">
-      <summary>Does it support podcasts?</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">Does it support podcasts?</h3>
       <div class="faq-answer">
         <p>Yes. Any RSS feed with audio enclosures shows up as a podcast with an inline player. You'll see episode descriptions and can play audio directly in the reader.</p>
       </div>
-    </details>
+    </div>
 
-    <details class="faq-item">
-      <summary>Can I read ebooks?</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">Can I read ebooks?</h3>
       <div class="faq-answer">
         <p>Yes. Drop an EPUB file into your Pull Read folder and it appears in your library with chapter navigation, table of contents, and cover images. Search for <code>is:book</code> to filter your book collection.</p>
       </div>
-    </details>
+    </div>
   </div>
 
   <!-- Reading & Highlights -->
   <div class="faq-section reveal" id="reading">
     <h2 class="faq-section-title">Reading & Highlights</h2>
 
-    <details class="faq-item">
-      <summary>How do I highlight text?</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">How do I highlight text?</h3>
       <div class="faq-answer">
         <p>Select any text in an article and a highlight toolbar appears. Choose a color (yellow, green, blue, or pink) and optionally add a note. Highlights are saved automatically and shown as footnotes in the margin.</p>
       </div>
-    </details>
+    </div>
 
-    <details class="faq-item">
-      <summary>What's the difference between highlights, notes, and notebooks?</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">What's the difference between highlights, notes, and notebooks?</h3>
       <div class="faq-answer">
         <ul>
           <li><strong>Highlights</strong> &mdash; Selected passages in an article, with optional inline notes</li>
@@ -498,10 +469,10 @@
           <li><strong>Notebooks</strong> &mdash; Freeform notes for synthesis and original writing, optionally linked to source articles</li>
         </ul>
       </div>
-    </details>
+    </div>
 
-    <details class="faq-item">
-      <summary>How does search work?</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">How does search work?</h3>
       <div class="faq-answer">
         <p>The search bar supports plain text and operators:</p>
         <ul>
@@ -512,10 +483,10 @@
           <li>Combine with <code>OR</code>: <code>tag:ai OR tag:ml</code></li>
         </ul>
       </div>
-    </details>
+    </div>
 
-    <details class="faq-item">
-      <summary>Can I read with text-to-speech?</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">Can I read with text-to-speech?</h3>
       <div class="faq-answer">
         <p>Yes. Pull Read supports four TTS providers:</p>
         <ul>
@@ -526,15 +497,15 @@
         </ul>
         <p>Click the speaker icon on any article to start listening.</p>
       </div>
-    </details>
+    </div>
   </div>
 
   <!-- AI Features -->
   <div class="faq-section reveal" id="ai">
     <h2 class="faq-section-title">AI Features</h2>
 
-    <details class="faq-item">
-      <summary>What AI features are available?</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">What AI features are available?</h3>
       <div class="faq-answer">
         <ul>
           <li><strong>Article summaries</strong> &mdash; One-click summaries of any article</li>
@@ -542,10 +513,10 @@
           <li><strong>Daily/Weekly reviews</strong> &mdash; AI-written digests of your recent reading</li>
         </ul>
       </div>
-    </details>
+    </div>
 
-    <details class="faq-item">
-      <summary>Which AI providers are supported?</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">Which AI providers are supported?</h3>
       <div class="faq-answer">
         <p>Pull Read works with multiple providers &mdash; bring your own API key:</p>
         <ul>
@@ -557,22 +528,22 @@
         </ul>
         <p>Configure your provider and API key in Settings &gt; AI.</p>
       </div>
-    </details>
+    </div>
 
-    <details class="faq-item">
-      <summary>Are my articles sent to AI providers?</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">Are my articles sent to AI providers?</h3>
       <div class="faq-answer">
         <p>Only when you explicitly request it &mdash; by clicking Summarize, running auto-tagging, or generating a review. Pull Read never sends article content to any server in the background. Your reading habits stay private.</p>
       </div>
-    </details>
+    </div>
   </div>
 
   <!-- Data & Privacy -->
   <div class="faq-section reveal" id="data">
     <h2 class="faq-section-title">Data & Privacy</h2>
 
-    <details class="faq-item">
-      <summary>Where is my data stored?</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">Where is my data stored?</h3>
       <div class="faq-answer">
         <p>Everything is local:</p>
         <ul>
@@ -582,37 +553,37 @@
         </ul>
         <p>Pull Read has no account system and no cloud service. Your data never leaves your machine unless you explicitly use an AI feature.</p>
       </div>
-    </details>
+    </div>
 
-    <details class="faq-item">
-      <summary>Can I back up my data?</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">Can I back up my data?</h3>
       <div class="faq-answer">
         <p>Yes. Go to Settings &gt; Data and click <strong>Export Backup</strong>. This creates a single JSON file with all your configuration, highlights, notes, and notebooks. Use <strong>Import Backup</strong> to restore.</p>
         <p>Your articles are already plain Markdown files, so any file backup solution (Time Machine, iCloud, Dropbox) works for those.</p>
       </div>
-    </details>
+    </div>
 
-    <details class="faq-item">
-      <summary>Can I sync across devices?</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">Can I sync across devices?</h3>
       <div class="faq-answer">
         <p>Articles can be synced by putting the output folder in iCloud Drive, Dropbox, or any file sync service. Full annotation sync across devices is on the roadmap.</p>
       </div>
-    </details>
+    </div>
   </div>
 
   <!-- Obsidian -->
   <div class="faq-section reveal" id="obsidian">
     <h2 class="faq-section-title">Obsidian Integration</h2>
 
-    <details class="faq-item">
-      <summary>Can I use Pull Read with Obsidian?</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">Can I use Pull Read with Obsidian?</h3>
       <div class="faq-answer">
         <p>Yes. Since Pull Read saves articles as Markdown with YAML frontmatter, they're natively readable in Obsidian. The simplest setup: point your PullRead output path to a subfolder inside your Obsidian vault (e.g. <code>~/Obsidian/MyVault/reading/</code>).</p>
       </div>
-    </details>
+    </div>
 
-    <details class="faq-item">
-      <summary>How do I set it up?</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">How do I set it up?</h3>
       <div class="faq-answer">
         <ol>
           <li>Open Pull Read Settings</li>
@@ -620,10 +591,10 @@
           <li>Your articles will appear in Obsidian's file explorer and be searchable, linkable, and queryable with Dataview</li>
         </ol>
       </div>
-    </details>
+    </div>
 
-    <details class="faq-item">
-      <summary>What frontmatter properties are available?</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">What frontmatter properties are available?</h3>
       <div class="faq-answer">
         <p>Every article includes these properties that Obsidian and Dataview can use:</p>
 <pre><code>---
@@ -644,36 +615,36 @@ WHERE feed = "tech-newsletter"
 SORT bookmarked DESC
 ```</code></pre>
       </div>
-    </details>
+    </div>
 
-    <details class="faq-item">
-      <summary>Can I link to articles from my other notes?</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">Can I link to articles from my other notes?</h3>
       <div class="faq-answer">
         <p>Yes. Since articles live inside your vault, standard Obsidian <code>[[wikilinks]]</code> work. Link to any article from your daily notes, project notes, or anywhere else in your vault.</p>
       </div>
-    </details>
+    </div>
 
-    <details class="faq-item">
-      <summary>Do I need an Obsidian plugin?</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">Do I need an Obsidian plugin?</h3>
       <div class="faq-answer">
         <p>No. Pull Read's output is standard Markdown with standard YAML frontmatter. No plugin required. Dataview is recommended for querying your reading library but isn't necessary for basic use.</p>
       </div>
-    </details>
+    </div>
   </div>
 
   <!-- Troubleshooting -->
   <div class="faq-section reveal" id="troubleshooting">
     <h2 class="faq-section-title">Troubleshooting</h2>
 
-    <details class="faq-item">
-      <summary>The app shows a blank page on launch</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">The app shows a blank page on launch</h3>
       <div class="faq-answer">
         <p>On some Intel Macs, the internal server may take a moment to start. Wait a few seconds and click the menu bar icon again. If it persists, quit and relaunch the app. This was improved in <a href="/releases#v0.3.4">v0.3.4</a>.</p>
       </div>
-    </details>
+    </div>
 
-    <details class="faq-item">
-      <summary>A feed shows an error in Settings</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">A feed shows an error in Settings</h3>
       <div class="faq-answer">
         <p>Feed health monitoring (added in v0.3.4) will show error status for feeds that can't be fetched. Common causes:</p>
         <ul>
@@ -683,21 +654,21 @@ SORT bookmarked DESC
         </ul>
         <p>Click the <strong>Retry</strong> button next to the error to try again.</p>
       </div>
-    </details>
+    </div>
 
-    <details class="faq-item">
-      <summary>How do I update Pull Read?</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">How do I update Pull Read?</h3>
       <div class="faq-answer">
         <p>Pull Read checks for updates automatically. When a new version is available, you'll see a notification in the menu bar. Click it to download and install the update. You can also check <a href="/releases">Releases</a> to see what's new.</p>
       </div>
-    </details>
+    </div>
 
-    <details class="faq-item">
-      <summary>Something else isn't working</summary>
+    <div class="faq-item">
+      <h3 class="faq-question">Something else isn't working</h3>
       <div class="faq-answer">
         <p>Check the app logs: open Pull Read, go to Settings, and scroll to the bottom of the About section for the log file path. If you've found a bug, please <a href="https://github.com/shellen/pullread/issues">open an issue on GitHub</a>.</p>
       </div>
-    </details>
+    </div>
   </div>
 
 </div>

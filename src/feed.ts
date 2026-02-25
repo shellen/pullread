@@ -3,6 +3,8 @@
 
 import { XMLParser } from 'fast-xml-parser';
 
+const FEED_HEADERS = { 'User-Agent': 'PullRead/1.0 (+https://pullread.com)' };
+
 export interface Enclosure {
   url: string;
   type: string;
@@ -17,6 +19,7 @@ export interface FeedEntry {
   domain: string;
   annotation?: string;
   enclosure?: Enclosure;
+  author?: string;
 }
 
 type FeedType = 'atom' | 'rss' | 'rdf' | 'json';
@@ -76,13 +79,18 @@ function parseJsonFeed(text: string): FeedEntry[] {
       };
     }
 
+    // JSON Feed author: item.author.name (v1.0) or item.authors[0].name (v1.1)
+    const jsonAuthor = item.authors?.[0]?.name || item.author?.name || '';
+    const jsonAuthorStr = typeof jsonAuthor === 'string' ? jsonAuthor.trim() : '';
+
     return {
       title: item.title || 'Untitled',
       url,
       updatedAt: item.date_published || item.date_modified || '',
       domain,
       annotation: annotation || undefined,
-      enclosure
+      enclosure,
+      author: jsonAuthorStr || undefined
     };
   });
 }
@@ -94,6 +102,17 @@ function parseJsonFeedTitle(text: string): string | null {
   } catch {
     return null;
   }
+}
+
+function extractAtomAuthorName(author: any): string | undefined {
+  if (!author) return undefined;
+  if (typeof author === 'string') return author.trim() || undefined;
+  // Atom author: { name: "...", uri: "...", email: "..." } — we only want name
+  if (author.name) {
+    const name = typeof author.name === 'string' ? author.name : String(author.name);
+    return name.trim() || undefined;
+  }
+  return undefined;
 }
 
 function resolveAtomLink(link: any): string {
@@ -114,6 +133,9 @@ function parseAtomFeed(feed: any): FeedEntry[] {
 
   const entries = Array.isArray(feed.entry) ? feed.entry : [feed.entry];
 
+  // Feed-level author (Atom allows <author> on <feed> as default for entries)
+  const feedAuthor = extractAtomAuthorName(feed.author);
+
   return entries.map((entry: any) => {
     const url = resolveAtomLink(entry.link);
     const domain = new URL(url).hostname.replace(/^www\./, '');
@@ -125,12 +147,15 @@ function parseAtomFeed(feed: any): FeedEntry[] {
       annotation = extractTextFromHtml(entry.content['#text']);
     }
 
+    const author = extractAtomAuthorName(entry.author) || feedAuthor;
+
     return {
       title: extractTitle(entry.title),
       url,
       updatedAt: entry.updated,
       domain,
-      annotation: annotation || undefined
+      annotation: annotation || undefined,
+      author: author || undefined
     };
   });
 }
@@ -173,13 +198,22 @@ function parseRssFeed(rss: any): FeedEntry[] {
       };
     }
 
+    // RSS author: <dc:creator> or <author> (often an email address)
+    const rawAuthor = item['dc:creator'] || item.author || '';
+    const authorStr = typeof rawAuthor === 'string' ? rawAuthor.trim() : '';
+    // Strip email format like "email (Name)" → "Name"
+    const authorName = authorStr.includes('@')
+      ? (authorStr.match(/\(([^)]+)\)/)?.[1] || '').trim()
+      : authorStr;
+
     return [{
       title: extractTitle(item.title),
       url,
       updatedAt: parseRssDate(item.pubDate),
       domain,
       annotation: description || undefined,
-      enclosure
+      enclosure,
+      author: authorName || undefined
     }];
   });
 }
@@ -202,12 +236,16 @@ function parseRdfFeed(rdf: any): FeedEntry[] {
     let updatedAt = dateStr;
     try { updatedAt = new Date(dateStr).toISOString(); } catch {}
 
+    const rdfAuthor = item['dc:creator'] || '';
+    const rdfAuthorStr = typeof rdfAuthor === 'string' ? rdfAuthor.trim() : '';
+
     return {
       title: extractTitle(item.title),
       url,
       updatedAt,
       domain,
-      annotation: description || undefined
+      annotation: description || undefined,
+      author: rdfAuthorStr || undefined
     };
   });
 }
@@ -301,7 +339,7 @@ export function parseFeedTitle(text: string): string | null {
 }
 
 export async function fetchFeedTitle(url: string): Promise<string | null> {
-  const response = await fetch(url);
+  const response = await fetch(url, { headers: FEED_HEADERS });
   if (!response.ok) return null;
   const xml = await response.text();
   return parseFeedTitle(xml);
@@ -364,7 +402,7 @@ const WELL_KNOWN_FEED_PATHS = [
 export async function discoverFeed(url: string): Promise<{ feedUrl: string; title: string | null } | null> {
   url = await transformPlatformUrl(url);
 
-  const response = await fetch(url);
+  const response = await fetch(url, { headers: FEED_HEADERS });
   if (!response.ok) return null;
   const text = await response.text();
 
@@ -378,7 +416,7 @@ export async function discoverFeed(url: string): Promise<{ feedUrl: string; titl
   const feedUrl = discoverFeedUrl(text, url);
   if (feedUrl) {
     try {
-      const feedResponse = await fetch(feedUrl);
+      const feedResponse = await fetch(feedUrl, { headers: FEED_HEADERS });
       if (feedResponse.ok) {
         const feedXml = await feedResponse.text();
         const feedTitle = parseFeedTitle(feedXml);
@@ -396,7 +434,7 @@ export async function discoverFeed(url: string): Promise<{ feedUrl: string; titl
   for (const path of WELL_KNOWN_FEED_PATHS) {
     const candidate = baseOrigin + path;
     try {
-      const probeRes = await fetch(candidate, { redirect: 'follow' });
+      const probeRes = await fetch(candidate, { redirect: 'follow', headers: FEED_HEADERS });
       if (!probeRes.ok) continue;
       const probeText = await probeRes.text();
       const probeTitle = parseFeedTitle(probeText);
@@ -439,7 +477,7 @@ export async function transformPlatformUrl(url: string): Promise<string> {
     const handleMatch = parsed.pathname.match(/^\/@([\w.-]+)/);
     if (handleMatch) {
       try {
-        const response = await fetch(`https://www.youtube.com/@${handleMatch[1]}`);
+        const response = await fetch(`https://www.youtube.com/@${handleMatch[1]}`, { headers: FEED_HEADERS });
         if (response.ok) {
           const html = await response.text();
           // Look for channel ID in page source
@@ -466,7 +504,7 @@ export async function transformPlatformUrl(url: string): Promise<string> {
 }
 
 export async function fetchFeed(url: string): Promise<FeedEntry[]> {
-  const response = await fetch(url);
+  const response = await fetch(url, { headers: FEED_HEADERS });
   if (!response.ok) {
     throw new Error(`Failed to fetch feed: ${response.status}`);
   }

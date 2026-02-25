@@ -38,6 +38,9 @@
     }
   },
   "plugins": {
+    "shell": {
+      "open": "^((mailto:(\\w+|\\?))|(tel:[+\\w]+)|(sms:([+\\w]+|[&?]))|(https?://\\w+)).+"
+    },
     "deep-link": {
       "desktop": {
         "schemes": [
