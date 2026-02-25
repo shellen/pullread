@@ -271,6 +271,37 @@ describe('XSS sanitization', () => {
   });
 });
 
+describe('approxCount', () => {
+  let approxCount: (n: number) => string;
+
+  beforeAll(() => {
+    const rootDir = join(__dirname, '..');
+    const utils = readFileSync(join(rootDir, 'viewer', '02-utils.js'), 'utf-8');
+    const fn = new Function(utils + '\nreturn { approxCount };');
+    approxCount = fn().approxCount;
+  });
+
+  test('returns exact number for 0-99', () => {
+    expect(approxCount(0)).toBe('0');
+    expect(approxCount(1)).toBe('1');
+    expect(approxCount(42)).toBe('42');
+    expect(approxCount(99)).toBe('99');
+  });
+
+  test('rounds down to nearest hundred with + for 100-999', () => {
+    expect(approxCount(100)).toBe('100+');
+    expect(approxCount(247)).toBe('200+');
+    expect(approxCount(999)).toBe('900+');
+  });
+
+  test('shows K+ for 1000+', () => {
+    expect(approxCount(1000)).toBe('1K+');
+    expect(approxCount(1500)).toBe('1K+');
+    expect(approxCount(13000)).toBe('13K+');
+    expect(approxCount(13999)).toBe('13K+');
+  });
+});
+
 describe('timeAgo / timeAgoTitle', () => {
   // Eval the pure functions from the client-side JS so we can unit test them
   let timeAgo: (dateStr: string) => string;

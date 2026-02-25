@@ -1,3 +1,10 @@
+// Abbreviate large numbers: 0-99 exact, 100+ → "100+", 1000+ → "1K+", 13000 → "13K+"
+function approxCount(n) {
+  if (n < 100) return String(n);
+  if (n < 1000) return Math.floor(n / 100) * 100 + '+';
+  return Math.floor(n / 1000) + 'K+';
+}
+
 // Fold accented characters to ASCII for accent-insensitive search
 function foldAccents(s) {
   return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();

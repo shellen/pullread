@@ -20,8 +20,8 @@ function renderFileList() {
   if (isNotebooksTab) {
     countStr = 'Notebook';
   } else {
-    countStr = shown + ' article' + (shown !== 1 ? 's' : '');
-    if (hideRead && shown < total) countStr += ' (' + (total - shown) + ' hidden)';
+    countStr = approxCount(shown) + ' article' + (shown !== 1 ? 's' : '');
+    if (hideRead && shown < total) countStr += ' (' + approxCount(total - shown) + ' hidden)';
   }
   countText.textContent = countStr;
 
@@ -738,7 +738,7 @@ function updateNavCounts() {
   var unreadCount = document.getElementById('nav-count-unread');
   var starredCount = document.getElementById('nav-count-starred');
 
-  if (allCount) allCount.textContent = allFiles.length || '';
+  if (allCount) allCount.textContent = allFiles.length ? approxCount(allFiles.length) : '';
 
   // Count unique sources
   if (sourcesCount) {
@@ -747,7 +747,8 @@ function updateNavCounts() {
       var key = allFiles[i].feed || allFiles[i].domain || '';
       if (key) domains[key] = true;
     }
-    sourcesCount.textContent = Object.keys(domains).length || '';
+    var sc = Object.keys(domains).length;
+    sourcesCount.textContent = sc ? approxCount(sc) : '';
   }
 
   // Count unique tags
@@ -757,7 +758,8 @@ function updateNavCounts() {
       var n = allNotesIndex[fn];
       (n.tags || []).concat(n.machineTags || []).forEach(function(t) { tags[t] = true; });
     }
-    tagsCount.textContent = Object.keys(tags).length || '';
+    var tc = Object.keys(tags).length;
+    tagsCount.textContent = tc ? approxCount(tc) : '';
   }
 
   // Count unread
@@ -766,7 +768,7 @@ function updateNavCounts() {
     for (var j = 0; j < allFiles.length; j++) {
       if (!readArticles.has(allFiles[j].filename)) ur++;
     }
-    unreadCount.textContent = ur || '';
+    unreadCount.textContent = ur ? approxCount(ur) : '';
   }
 
   // Count starred
@@ -775,7 +777,7 @@ function updateNavCounts() {
     for (var fn2 in allNotesIndex) {
       if (allNotesIndex[fn2].isFavorite) st++;
     }
-    starredCount.textContent = st || '';
+    starredCount.textContent = st ? approxCount(st) : '';
   }
 }
 
