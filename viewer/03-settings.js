@@ -21,15 +21,53 @@ function setSize(size) {
   localStorage.setItem('pr-size', size);
 }
 
-function toggleDrawer() {
-  const drawer = document.getElementById('drawer');
-  drawer.classList.toggle('collapsed');
-  const isCollapsed = drawer.classList.contains('collapsed');
-  localStorage.setItem('pr-sidebar', isCollapsed ? '0' : '1');
-  document.getElementById('sidebar-toggle-btn').setAttribute('aria-expanded', !isCollapsed);
+function collapseSidebar() {
+  var sidebar = document.getElementById('sidebar');
+  sidebar.classList.add('collapsed');
+  localStorage.setItem('pr-sidebar', '0');
 }
-// Keep legacy name for any callers
-var toggleSidebar = toggleDrawer;
+
+function expandSidebar() {
+  var sidebar = document.getElementById('sidebar');
+  sidebar.classList.remove('collapsed');
+  localStorage.setItem('pr-sidebar', '1');
+}
+
+function toggleSidebar() {
+  var sidebar = document.getElementById('sidebar');
+  if (sidebar.classList.contains('collapsed')) expandSidebar();
+  else collapseSidebar();
+}
+
+function toggleMobileSidebar() {
+  var sidebar = document.getElementById('sidebar');
+  var overlay = document.getElementById('sidebar-overlay');
+  var isOpen = sidebar.classList.contains('mobile-open');
+  if (isOpen) {
+    closeMobileSidebar();
+  } else {
+    sidebar.classList.add('mobile-open');
+    overlay.classList.add('visible');
+  }
+}
+
+function closeMobileSidebar() {
+  var sidebar = document.getElementById('sidebar');
+  var overlay = document.getElementById('sidebar-overlay');
+  sidebar.classList.remove('mobile-open');
+  overlay.classList.remove('visible');
+}
+
+function openDrawer() {
+  document.getElementById('drawer').classList.add('open');
+}
+
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('open');
+}
+
+// Legacy alias
+var toggleDrawer = toggleSidebar;
 
 function setLineHeight(val) {
   document.body.className = document.body.className.replace(/leading-\w+/g, '');
@@ -52,8 +90,8 @@ function setWidth(val) {
 
 function toggleSettingsDropdown() {
   const existing = document.querySelector('.settings-dropdown-panel');
-  const btn = document.getElementById('aa-settings-btn');
-  if (existing) { existing.remove(); btn.setAttribute('aria-expanded', 'false'); return; }
+  const btn = document.querySelector('.toolbar-aa-btn');
+  if (existing) { existing.remove(); if (btn) btn.setAttribute('aria-expanded', 'false'); return; }
 
   const currentTheme = document.body.getAttribute('data-theme') || 'light';
   const currentFont = localStorage.getItem('pr-font') || 'serif';
@@ -116,12 +154,12 @@ function toggleSettingsDropdown() {
     </div>
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0 8px">
     <div class="setting-row">
-      <button onclick="var p=document.querySelector('.settings-dropdown-panel');if(p)p.remove();var b=document.getElementById('aa-settings-btn');if(b)b.setAttribute('aria-expanded','false');showShortcutsModal()" style="flex:1;text-align:center"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-keyboard"/></svg> Keyboard Shortcuts</button>
+      <button onclick="var p=document.querySelector('.settings-dropdown-panel');if(p)p.remove();var b=document.querySelector('.toolbar-aa-btn');if(b)b.setAttribute('aria-expanded','false');showShortcutsModal()" style="flex:1;text-align:center"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-keyboard"/></svg> Keyboard Shortcuts</button>
     </div>
     ${breakStatus}
   `;
   document.body.appendChild(panel);
-  btn.setAttribute('aria-expanded', 'true');
+  if (btn) btn.setAttribute('aria-expanded', 'true');
 }
 
 var _fontLabels = {serif:'Serif',sans:'Sans-serif',system:'Charter',mono:'Monospace',inter:'Inter',lora:'Lora',literata:'Literata','source-serif':'Source Serif','work-sans':'Work Sans',opendyslexic:'OpenDyslexic'};
@@ -234,9 +272,9 @@ function updateDropdownState() {
 // Close settings dropdown when clicking outside
 document.addEventListener('click', function(e) {
   const panel = document.querySelector('.settings-dropdown-panel');
-  if (panel && !panel.contains(e.target) && !e.target.closest('#aa-settings-btn')) {
+  if (panel && !panel.contains(e.target) && !e.target.closest('.toolbar-aa-btn')) {
     panel.remove();
-    var btn = document.getElementById('aa-settings-btn');
+    var btn = document.querySelector('.toolbar-aa-btn');
     if (btn) btn.setAttribute('aria-expanded', 'false');
   }
 });
@@ -256,8 +294,6 @@ function showSettingsPage(scrollToSection) {
   if (toc) toc.innerHTML = '';
   var toolbar = document.getElementById('reader-toolbar');
   if (toolbar) toolbar.style.display = 'none';
-  var floatingAa = document.getElementById('aa-settings-btn');
-  if (floatingAa) floatingAa.style.display = '';
   updateSidebarActiveState(prevActive);
 
   var currentTheme = document.body.getAttribute('data-theme') || 'light';

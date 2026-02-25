@@ -9,8 +9,6 @@ function renderDashboard() {
   if (content) content.style.display = 'none';
   var toolbar = document.getElementById('reader-toolbar');
   if (toolbar) toolbar.style.display = 'none';
-  var floatingAa = document.getElementById('aa-settings-btn');
-  if (floatingAa) floatingAa.style.display = '';
 
   if (allFiles.length === 0) {
     dash.innerHTML = '<div class="dash-empty-hint"><p class="hint">No articles yet</p><p class="subhint">Add RSS feeds in the tray app, or drop a .md file here</p></div>';
@@ -211,6 +209,7 @@ function dashGenerateReview(days) {
 }
 
 function goHome() {
+  if (_markAsReadDelayTimer) { console.debug('[PR] goHome clearing markAsRead timer'); clearTimeout(_markAsReadDelayTimer); _markAsReadDelayTimer = null; }
   _sidebarView = 'home'; syncSidebarTabs();
   activeFile = null;
   document.title = 'PullRead';
@@ -219,8 +218,6 @@ function goHome() {
   if (toc) toc.innerHTML = '';
   var toolbar = document.getElementById('reader-toolbar');
   if (toolbar) toolbar.style.display = 'none';
-  var floatingAa = document.getElementById('aa-settings-btn');
-  if (floatingAa) floatingAa.style.display = '';
   // Defer dashboard render so sidebar becomes interactive first
   requestAnimationFrame(renderDashboard);
 }
@@ -289,61 +286,59 @@ function renderArticle(text, filename) {
       html += '<h1>' + escapeHtml(meta.title) + '</h1>';
     }
   }
-  html += '<div class="article-byline">';
-  const bylineParts = [];
+  // Author line
   if (meta && meta.author) {
-    // Truncate overly long bylines (e.g. full author bios from PDFs/arxiv)
     var authorText = meta.author;
     if (authorText.length > 80) {
-      // Try to cut at first sentence boundary or period
       var cutoff = authorText.indexOf('. ');
       if (cutoff > 10 && cutoff < 80) authorText = authorText.slice(0, cutoff);
       else authorText = authorText.slice(0, 80).replace(/\s+\S*$/, '') + '\u2026';
     }
-    bylineParts.push('<span class="author" onclick="searchByAuthor(\'' + escapeHtml(authorText).replace(/'/g, "\\'") + '\')" title="Search for articles by this author">' + escapeHtml(authorText) + '</span>');
+    html += '<div class="article-author">By <span class="author" onclick="searchByAuthor(\'' + escapeHtml(authorText).replace(/'/g, "\\'") + '\')" title="Search for articles by this author">' + escapeHtml(authorText) + '</span></div>';
   }
-  if (meta && meta.domain) bylineParts.push('<a href="' + escapeHtml(meta.url || '') + '" target="_blank">' + escapeHtml(meta.domain) + '</a>');
-  if (meta && meta.bookmarked) bylineParts.push(escapeHtml(meta.bookmarked.slice(0, 10)));
-  // Show feed source when it doesn't match the article domain
+  // Metadata line: favicon, domain, date, feed
+  var metaLineParts = [];
+  if (meta && meta.domain) {
+    var faviconImg = meta.domain !== 'pullread' ? '<img class="article-meta-favicon" src="/favicons/' + encodeURIComponent(meta.domain) + '.png" alt="" loading="lazy" onerror="this.style.display=\'none\'">' : '';
+    metaLineParts.push(faviconImg + '<a href="' + escapeHtml(meta.url || '') + '" target="_blank">' + escapeHtml(meta.domain) + '</a>');
+  }
+  if (meta && meta.bookmarked) metaLineParts.push('<span title="' + escapeHtml(timeAgoTitle(meta.bookmarked)) + '">' + escapeHtml(timeAgo(meta.bookmarked)) + '</span>');
   if (meta && meta.feed && meta.domain && !feedMatchesDomain(meta.feed, meta.domain)) {
-    bylineParts.push('<span class="feed-source">via ' + escapeHtml(meta.feed) + '</span>');
+    metaLineParts.push('<span class="feed-source">via ' + escapeHtml(meta.feed) + '</span>');
   }
-  html += bylineParts.join('<span class="sep">&middot;</span>');
-  // Read time will be inserted after rendering
-  html += '</div>';
+  if (metaLineParts.length) {
+    html += '<div class="article-meta">' + metaLineParts.join('<span class="sep">&middot;</span>') + '</div>';
+  }
 
   // Detect review/summary articles where Summarize doesn't make sense
   const isReviewArticle = meta && (meta.feed === 'weekly-review' || meta.feed === 'daily-review' || meta.domain === 'pullread');
 
-  // Populate reader toolbar with action buttons
+  // Populate reader toolbar with action buttons (left side)
   var toolbarActions = '';
   const isFav = articleNotes.isFavorite;
-  toolbarActions += '<button onclick="toggleFavoriteFromHeader(this)" class="' + (isFav ? 'active-fav' : '') + '" aria-label="' + (isFav ? 'Remove from favorites' : 'Add to favorites') + '" aria-pressed="' + isFav + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg> Favorite</button>';
-  if (!isReviewArticle) {
-    toolbarActions += '<button onclick="summarizeArticle()" id="summarize-btn" aria-label="Summarize article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Summarize</button>';
+  toolbarActions += '<button onclick="toggleFavoriteFromHeader(this)" class="toolbar-action-btn' + (isFav ? ' active-fav' : '') + '" aria-label="' + (isFav ? 'Remove from favorites' : 'Add to favorites') + '" aria-pressed="' + isFav + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg><span class="toolbar-action-label"> Star</span></button>';
+  if (meta && meta.url) {
+    toolbarActions += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" class="toolbar-action-btn" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-external"/></svg><span class="toolbar-action-label"> Share</span></button></div>';
   }
+  toolbarActions += '<button onclick="toggleNotesFromHeader()" class="toolbar-action-btn" aria-label="Tags"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-tags"/></svg><span class="toolbar-action-label"> Tag</span></button>';
+  toolbarActions += '<button onclick="markCurrentAsRead()" class="toolbar-action-btn" aria-label="Mark read"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-eye-slash"/></svg><span class="toolbar-action-label"> Mark read</span></button>';
   var isPodcast = meta && meta.enclosure_url && meta.enclosure_type && meta.enclosure_type.startsWith('audio/');
   var listenLabel = isPodcast ? 'Play' : 'Listen';
   toolbarActions += '<div class="play-next-menu" id="play-next-menu">';
-  toolbarActions += '<button id="listen-btn" onclick="addCurrentToTTSQueue()" aria-label="' + listenLabel + ' article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> ' + listenLabel + '</button>';
+  toolbarActions += '<button id="listen-btn" onclick="addCurrentToTTSQueue()" class="toolbar-action-btn" aria-label="' + listenLabel + ' article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg><span class="toolbar-action-label"> ' + listenLabel + '</span></button>';
   toolbarActions += '<button class="play-next-trigger" id="play-next-trigger" onclick="togglePlayNextMenu(event)" aria-label="Queue options" style="display:none"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>';
   toolbarActions += '</div>';
-  if (meta && meta.url) {
-    toolbarActions += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg> Share</button></div>';
+  if (!isReviewArticle) {
+    toolbarActions += '<button onclick="summarizeArticle()" id="summarize-btn" class="toolbar-action-btn" aria-label="Summarize article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg><span class="toolbar-action-label"> AI</span></button>';
   }
   toolbarActions += '<div class="more-dropdown">';
-  toolbarActions += '<button onclick="toggleMoreMenu(event)" aria-label="More actions"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-ellipsis"/></svg></button>';
+  toolbarActions += '<button onclick="toggleMoreMenu(event)" class="toolbar-action-btn" aria-label="More actions"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-ellipsis"/></svg></button>';
   toolbarActions += '</div>';
-  toolbarActions += '<button onclick="toggleSettingsDropdown()" aria-label="Reader settings" class="toolbar-aa-btn">Aa</button>';
 
   var toolbarEl = document.getElementById('reader-toolbar-actions');
   if (toolbarEl) toolbarEl.innerHTML = toolbarActions;
-  var toolbarTitleEl = document.getElementById('reader-toolbar-title');
-  if (toolbarTitleEl) toolbarTitleEl.textContent = (meta && meta.title) || filename;
   var toolbar = document.getElementById('reader-toolbar');
   if (toolbar) toolbar.style.display = '';
-  var floatingAa = document.getElementById('aa-settings-btn');
-  if (floatingAa) floatingAa.style.display = 'none';
   // Tags row (populated by renderNotesPanel)
   html += '<div id="header-tags"></div>';
   // Show notebook back-references
@@ -562,22 +557,15 @@ function renderArticle(text, filename) {
     });
   })(content);
 
-  // Add read time & word count to byline
+  // Add read time to article meta (only for 3+ min articles)
   const articleBodyText = content.textContent || '';
   const { words, minutes } = calculateReadStats(articleBodyText);
-  const bylineEl = content.querySelector('.article-byline');
-  if (bylineEl && words > 50) {
-    const statsSpan = document.createElement('span');
-    statsSpan.className = 'read-stats';
-    if (bylineEl.children.length > 0) {
-      const sep = document.createElement('span');
-      sep.className = 'sep';
-      sep.innerHTML = '&middot;';
-      bylineEl.appendChild(sep);
+  if (minutes >= 3) {
+    var wordStr = words >= 1000 ? (words / 1000).toFixed(1) + 'k' : words;
+    var articleMetaEl = content.querySelector('.article-meta');
+    if (articleMetaEl) {
+      articleMetaEl.innerHTML += '<span class="sep">&middot;</span><span class="read-stats" title="' + wordStr + ' words">' + minutes + ' min read</span>';
     }
-    var wordStr = (words >= 1000 ? (words / 1000).toFixed(1) + 'k' : words) + ' words';
-    statsSpan.innerHTML = minutes + ' min read<span class="word-count"><span class="stat-divider">&middot;</span>' + wordStr + '</span>';
-    bylineEl.appendChild(statsSpan);
   }
 
   // Render diagrams (mermaid, d2) before highlighting

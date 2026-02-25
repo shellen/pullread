@@ -100,12 +100,21 @@ async function migrateAnnotationsIfNeeded() {
     console.log('Migration: ' + migrated + ' migrated, ' + cleaned + ' duplicates cleaned');
     await loadAnnotationsIndex(); // Refresh
     renderFileList();
+    scheduleNavCounts();
   }
 }
 
 // Refresh article list from server
+let _refreshInFlight = false;
+let _refreshQueued = false;
 async function refreshArticleList(silent) {
   if (!serverMode) return;
+  // Re-entrance guard: if a refresh is already running, queue one follow-up
+  if (_refreshInFlight) {
+    _refreshQueued = true;
+    return;
+  }
+  _refreshInFlight = true;
   const btn = document.getElementById('refresh-btn');
   if (!silent) btn.classList.add('spinning');
   try {
@@ -118,6 +127,7 @@ async function refreshArticleList(silent) {
       filteredFiles = allFiles;
       await loadAnnotationsIndex();
       filterFiles();
+      scheduleNavCounts();
       // Highlight new articles with a fade-in effect
       if (silent && allFiles.length > prevCount) {
         requestAnimationFrame(() => {
@@ -140,6 +150,12 @@ async function refreshArticleList(silent) {
     }
   } catch {}
   if (!silent) btn.classList.remove('spinning');
+  _refreshInFlight = false;
+  // If another refresh was requested while we were running, do one more
+  if (_refreshQueued) {
+    _refreshQueued = false;
+    refreshArticleList(true);
+  }
 }
 
 // Auto-refresh: poll lightweight /api/files-changed every 5s, full refresh only when files change
@@ -224,9 +240,8 @@ async function init() {
   if (savedLeading && savedLeading !== 'default') setLineHeight(savedLeading);
   if (savedSpacing && savedSpacing !== 'default') setSpacing(savedSpacing);
   if (savedWidth && savedWidth !== 'default') setWidth(savedWidth);
-  if (savedSidebar === '0' || window.innerWidth <= 768) {
-    document.getElementById('drawer').classList.add('collapsed');
-    document.getElementById('sidebar-toggle-btn').setAttribute('aria-expanded', 'false');
+  if (savedSidebar === '0') {
+    document.getElementById('sidebar').classList.add('collapsed');
   }
 
   // Restore mini mode
@@ -261,6 +276,7 @@ async function init() {
       await Promise.all([loadAnnotationsIndex(), checkLLMConfig(), loadNotebooks()]);
 
       renderFileList();
+      scheduleNavCounts();
       renderPinnedFilters();
 
       // Run one-time migration and load sync status in background

@@ -64,7 +64,8 @@ function renderFileList() {
 }
 
 function renderFileItem(f, i) {
-  const date = f.bookmarked ? f.bookmarked.slice(0, 10) : '';
+  const date = f.bookmarked ? timeAgo(f.bookmarked) : '';
+  const dateTitle = f.bookmarked ? timeAgoTitle(f.bookmarked) : '';
   const isActive = activeFile === f.filename ? ' active' : '';
   const isRead = readArticles.has(f.filename);
   const { hasHl, hasNote, isFavorite } = hasAnnotations(f.filename);
@@ -85,19 +86,17 @@ function renderFileItem(f, i) {
     ? '<img class="file-item-favicon" src="/favicons/' + encodeURIComponent(f.domain) + '.png" alt="" loading="lazy" onerror="this.style.display=\'none\'" aria-hidden="true">'
     : '';
 
+  const sourceName = (f.feed && f.domain && !feedMatchesDomain(f.feed, f.domain)) ? f.feed : (f.domain || '');
+
   const metaParts = [];
-  if (date) metaParts.push('<span>' + date + '</span>');
-  if (f.domain) metaParts.push('<span>' + escapeHtml(f.domain) + '</span>');
-  if (f.feed && f.domain && !feedMatchesDomain(f.feed, f.domain)) {
-    metaParts.push('<span class="feed-via">via ' + escapeHtml(f.feed) + '</span>');
-  }
-  const metaHtml = metaParts.join('<span class="meta-sep"></span>');
+  if (favicon) metaParts.push(favicon);
+  if (sourceName) metaParts.push('<span>' + escapeHtml(sourceName) + '</span>');
+  if (date) metaParts.push('<span' + (dateTitle ? ' title="' + escapeHtml(dateTitle) + '"' : '') + '>' + escapeHtml(date) + '</span>');
+  const metaHtml = metaParts.join('');
 
-  const srcColor = sourceColor(f.feed || f.domain);
-
-  return '<div class="file-item' + isActive + (isRead && !isActive ? ' read' : '') + '" data-index="' + i + '" data-filename="' + escapeHtml(f.filename) + '" onclick="loadFile(' + i + ')" role="option" aria-selected="' + (activeFile === f.filename) + '" tabindex="0" onkeydown="if(event.key===\'Enter\')loadFile(' + i + ')" style="border-left-color:' + srcColor + '">'
+  return '<div class="file-item' + isActive + (isRead && !isActive ? ' read' : '') + '" data-index="' + i + '" data-filename="' + escapeHtml(f.filename) + '" onclick="loadFile(' + i + ')" role="option" aria-selected="' + (activeFile === f.filename) + '" tabindex="0" onkeydown="if(event.key===\'Enter\')loadFile(' + i + ')">'
     + '<div class="file-item-title">' + escapeHtml(f.title) + '</div>'
-    + '<div class="file-item-meta">' + metaHtml + favicon + '</div>'
+    + '<div class="file-item-meta">' + metaHtml + '</div>'
     + indicators
     + '</div>';
 }
@@ -207,6 +206,15 @@ function markAsRead(filename) {
   }
   clearTimeout(_markAsReadTimer);
   _markAsReadTimer = setTimeout(_flushReadArticles, 2000);
+  scheduleNavCounts();
+}
+
+function markCurrentAsRead() {
+  if (!activeFile) return;
+  if (_markAsReadDelayTimer) { clearTimeout(_markAsReadDelayTimer); _markAsReadDelayTimer = null; }
+  markAsRead(activeFile);
+  updateSidebarActiveState(null);
+  showToast('Marked as read');
 }
 
 function markCurrentAsUnread() {
@@ -215,6 +223,7 @@ function markCurrentAsUnread() {
   clearTimeout(_markAsReadTimer);
   _markAsReadTimer = setTimeout(_flushReadArticles, 2000);
   renderFileList();
+  scheduleNavCounts();
 }
 
 window.addEventListener('beforeunload', function() {
@@ -324,6 +333,7 @@ function filterFiles() {
 }
 
 var _loadFileAbort = null;
+var _markAsReadDelayTimer = null;
 
 async function loadFile(index) {
   const file = displayFiles[index];
@@ -332,14 +342,19 @@ async function loadFile(index) {
   _sidebarView = 'home'; syncSidebarTabs();
   var prevActive = activeFile;
   activeFile = file.filename;
-  markAsRead(file.filename);
+  if (_markAsReadDelayTimer) { console.debug('[PR] loadFile clearing markAsRead timer (switching to', file.filename + ')'); clearTimeout(_markAsReadDelayTimer); }
+  var fileToMark = file.filename;
+  _markAsReadDelayTimer = setTimeout(function() {
+    console.debug('[PR] markAsRead timer fired for', fileToMark, '(active:', activeFile + ')');
+    markAsRead(fileToMark);
+    updateSidebarActiveState(null);
+  }, 3000);
   updateSidebarActiveState(prevActive);
   removeHlToolbar();
 
-  // Auto-close drawer on mobile after selecting an article
-  if (window.innerWidth <= 768) {
-    const drawer = document.getElementById('drawer');
-    if (!drawer.classList.contains('collapsed')) drawer.classList.add('collapsed');
+  // Auto-close sidebar on mobile after selecting an article
+  if (window.innerWidth <= 750) {
+    closeMobileSidebar();
   }
 
   // Dropped files store content in memory — render directly without a server fetch
@@ -356,21 +371,22 @@ async function loadFile(index) {
     var targetFile = file.filename;
 
     // Load annotations first so favorite state is available for header render
-    await preloadAnnotations(file.filename);
-    if (activeFile !== targetFile) return;
+    var annotationData = await preloadAnnotations(file.filename);
+    if (activeFile !== targetFile) { console.debug('[PR] loadFile bailed: active changed after annotations', targetFile, '->', activeFile); return; }
+    applyAnnotationData(annotationData);
 
     try {
       const res = await fetch('/api/file?name=' + encodeURIComponent(file.filename), { signal: controller.signal });
-      if (activeFile !== targetFile) return;
+      if (activeFile !== targetFile) { console.debug('[PR] loadFile bailed: active changed after fetch', targetFile, '->', activeFile); return; }
       if (res.ok) {
         const text = await res.text();
-        if (activeFile !== targetFile) return;
+        if (activeFile !== targetFile) { console.debug('[PR] loadFile bailed: active changed after text read', targetFile, '->', activeFile); return; }
         renderArticle(text, file.filename);
         applyHighlights();
         renderNotesPanel();
       }
     } catch (e) {
-      if (e.name === 'AbortError') return;
+      if (e.name === 'AbortError') { console.debug('[PR] loadFile aborted:', targetFile); return; }
       throw e;
     }
   }
@@ -379,6 +395,7 @@ async function loadFile(index) {
 // Navigate to next (+1) or previous (-1) article with wrapping
 function navigateArticle(direction) {
   if (!displayFiles.length) return;
+  console.debug('[PR] navigateArticle', direction > 0 ? 'next' : 'prev', 'from', activeFile);
   var interval = parseInt(localStorage.getItem('pr-break-interval') || '0', 10);
   if (interval > 0 && _breakSessionStart > 0) {
     var elapsed = (Date.now() - _breakSessionStart) / 60000;
@@ -519,12 +536,9 @@ function openSingleNotebook() {
 }
 
 function syncSidebarTabs() {
-  document.querySelectorAll('.nav-rail-btn[data-view]').forEach(function(t) {
-    t.classList.toggle('active', t.dataset.view === _sidebarView);
+  document.querySelectorAll('.sidebar-tab[data-tab]').forEach(function(t) {
+    t.classList.toggle('active', t.dataset.tab === _sidebarView);
   });
-  // Update drawer title to reflect current view
-  var drawerTitle = document.getElementById('drawer-title');
-  if (drawerTitle) drawerTitle.textContent = _sidebarView === 'notebooks' ? 'Notebook' : 'Articles';
 
   // Always show file list and count — articles + notebooks visible on all tabs
   var fileCount = document.getElementById('file-count');
@@ -548,6 +562,221 @@ function syncSidebarTabs() {
   // Hide read toggle only applies to articles
   var hideReadBtn = document.getElementById('hide-read-toggle');
   if (hideReadBtn) hideReadBtn.style.display = _sidebarView === 'home' ? '' : 'none';
+
+  // Nav items only visible on home tab
+  var navEl = document.getElementById('sidebar-nav');
+  if (navEl) navEl.style.display = _sidebarView === 'home' ? '' : 'none';
+}
+
+// ---- Sidebar nav filter (All Items / Sources / Tags / Unread / Starred) ----
+function sidebarNavFilter(filter) {
+  // Update active state on nav items
+  document.querySelectorAll('.sidebar-nav-item').forEach(function(item) {
+    item.classList.toggle('active', item.dataset.nav === filter);
+  });
+
+  var search = document.getElementById('search');
+  if (filter === 'all') {
+    if (search) search.value = '';
+    clearSourceFilter();
+    filterFiles();
+    closeDrawer();
+  } else if (filter === 'unread') {
+    if (search) search.value = 'is:unread';
+    closeDrawer();
+    filterFiles();
+  } else if (filter === 'starred') {
+    if (search) search.value = 'is:favorite';
+    closeDrawer();
+    filterFiles();
+  } else if (filter === 'sources') {
+    openSourcesDrawer();
+  } else if (filter === 'tags') {
+    openTagsDrawer();
+  }
+}
+
+function openSourcesDrawer() {
+  var title = document.getElementById('drawer-title');
+  var content = document.getElementById('drawer-content');
+  if (title) title.textContent = 'Sources';
+
+  // Group articles by domain
+  var domainArticles = {};
+  for (var i = 0; i < allFiles.length; i++) {
+    var f = allFiles[i];
+    var key = f.feed || f.domain || 'unknown';
+    if (!domainArticles[key]) domainArticles[key] = [];
+    domainArticles[key].push(f);
+  }
+
+  var sorted = Object.entries(domainArticles).sort(function(a, b) { return b[1].length - a[1].length; });
+
+  // Check for podcast items
+  var podcastCount = 0;
+  for (var j = 0; j < allFiles.length; j++) {
+    if (allFiles[j].enclosureUrl && allFiles[j].enclosureType && allFiles[j].enclosureType.startsWith('audio/')) podcastCount++;
+  }
+
+  var html = '';
+  if (podcastCount > 0) {
+    html += '<div class="drawer-item" onclick="filterBySource(\'__podcasts__\')">'
+      + '<svg class="drawer-item-icon" aria-hidden="true"><use href="#i-headphones"/></svg>'
+      + '<span class="drawer-item-name">Podcasts</span>'
+      + '<span class="drawer-item-count">' + podcastCount + '</span></div>';
+  }
+
+  for (var si = 0; si < sorted.length; si++) {
+    var name = sorted[si][0];
+    var articles = sorted[si][1];
+    var count = articles.length;
+    var domain = articles[0].domain || '';
+    var faviconHtml = domain && domain !== 'pullread'
+      ? '<img class="drawer-item-favicon" src="/favicons/' + encodeURIComponent(domain) + '.png" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
+      : '<svg class="drawer-item-icon" aria-hidden="true"><use href="#i-globe"/></svg>';
+    html += '<div class="drawer-item" onclick="filterBySource(\'' + escapeJsStr(name) + '\')">'
+      + faviconHtml
+      + '<span class="drawer-item-name">' + escapeHtml(name) + '</span>'
+      + '<span class="drawer-item-count">' + count + '</span></div>';
+  }
+
+  if (content) content.innerHTML = html;
+  openDrawer();
+}
+
+function openTagsDrawer() {
+  var title = document.getElementById('drawer-title');
+  var content = document.getElementById('drawer-content');
+  if (title) title.textContent = 'Tags';
+
+  // Collect tags from annotations index
+  var tagCounts = {};
+  for (var filename in allNotesIndex) {
+    var notes = allNotesIndex[filename];
+    var allTags = (notes.tags || []).concat(notes.machineTags || []);
+    for (var i = 0; i < allTags.length; i++) {
+      tagCounts[allTags[i]] = (tagCounts[allTags[i]] || 0) + 1;
+    }
+  }
+
+  var sorted = Object.entries(tagCounts).sort(function(a, b) { return b[1] - a[1]; });
+
+  var html = '';
+  for (var ti = 0; ti < sorted.length; ti++) {
+    var tag = sorted[ti][0];
+    var count = sorted[ti][1];
+    html += '<div class="drawer-item" onclick="filterByTag(\'' + escapeJsStr(tag) + '\')">'
+      + '<span class="drawer-item-dot" style="background:var(--link)"></span>'
+      + '<span class="drawer-item-name">' + escapeHtml(tag) + '</span>'
+      + '<span class="drawer-item-count">' + count + '</span></div>';
+  }
+
+  if (!sorted.length) {
+    html = '<div style="padding:16px 8px;color:var(--muted);font-size:13px;text-align:center">No tags yet. Tags appear when articles are auto-tagged or you add them manually.</div>';
+  }
+
+  if (content) content.innerHTML = html;
+  openDrawer();
+}
+
+function filterBySource(source) {
+  var search = document.getElementById('search');
+  if (source === '__podcasts__') {
+    if (search) search.value = 'is:podcast';
+    showSourceFilterBar('Podcasts');
+  } else {
+    if (search) search.value = 'feed:' + source;
+    showSourceFilterBar(source);
+  }
+  filterFiles();
+  closeDrawer();
+  // Load the most recent article from this source
+  if (displayFiles.length > 0) loadFile(0);
+}
+
+function filterByTag(tag) {
+  var search = document.getElementById('search');
+  if (search) search.value = 'tag:' + tag;
+  filterFiles();
+  closeDrawer();
+}
+
+function showSourceFilterBar(name) {
+  var bar = document.getElementById('source-filter-bar');
+  var nameEl = document.getElementById('source-filter-name');
+  if (bar) bar.style.display = '';
+  if (nameEl) nameEl.textContent = name;
+}
+
+function clearSourceFilter() {
+  var bar = document.getElementById('source-filter-bar');
+  if (bar) bar.style.display = 'none';
+  var search = document.getElementById('search');
+  if (search) search.value = '';
+  // Reset nav to All Items
+  document.querySelectorAll('.sidebar-nav-item').forEach(function(item) {
+    item.classList.toggle('active', item.dataset.nav === 'all');
+  });
+  filterFiles();
+}
+
+// Schedule nav count update (debounced via rAF)
+var _navCountsPending = false;
+function scheduleNavCounts() {
+  if (_navCountsPending) return;
+  _navCountsPending = true;
+  requestAnimationFrame(function() {
+    _navCountsPending = false;
+    updateNavCounts();
+  });
+}
+
+function updateNavCounts() {
+  var allCount = document.getElementById('nav-count-all');
+  var sourcesCount = document.getElementById('nav-count-sources');
+  var tagsCount = document.getElementById('nav-count-tags');
+  var unreadCount = document.getElementById('nav-count-unread');
+  var starredCount = document.getElementById('nav-count-starred');
+
+  if (allCount) allCount.textContent = allFiles.length || '';
+
+  // Count unique sources
+  if (sourcesCount) {
+    var domains = {};
+    for (var i = 0; i < allFiles.length; i++) {
+      var key = allFiles[i].feed || allFiles[i].domain || '';
+      if (key) domains[key] = true;
+    }
+    sourcesCount.textContent = Object.keys(domains).length || '';
+  }
+
+  // Count unique tags
+  if (tagsCount) {
+    var tags = {};
+    for (var fn in allNotesIndex) {
+      var n = allNotesIndex[fn];
+      (n.tags || []).concat(n.machineTags || []).forEach(function(t) { tags[t] = true; });
+    }
+    tagsCount.textContent = Object.keys(tags).length || '';
+  }
+
+  // Count unread
+  if (unreadCount) {
+    var ur = 0;
+    for (var j = 0; j < allFiles.length; j++) {
+      if (!readArticles.has(allFiles[j].filename)) ur++;
+    }
+    unreadCount.textContent = ur || '';
+  }
+
+  // Count starred
+  if (starredCount) {
+    var st = 0;
+    for (var fn2 in allNotesIndex) {
+      if (allNotesIndex[fn2].isFavorite) st++;
+    }
+    starredCount.textContent = st || '';
+  }
 }
 
 let _writingFocusActive = false;

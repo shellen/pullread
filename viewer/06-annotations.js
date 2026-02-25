@@ -2,23 +2,35 @@
 // ABOUTME: Manages highlight creation/deletion, footnote numbering, and the notes panel.
 
 async function preloadAnnotations(filename) {
-  if (!serverMode) return;
+  var defaults = { highlights: [], notes: { articleNote: '', annotations: [], tags: [], isFavorite: false } };
+  if (!serverMode) {
+    articleHighlights = defaults.highlights;
+    articleNotes = defaults.notes;
+    return defaults;
+  }
   try {
     const [hlRes, notesRes] = await Promise.all([
       fetch('/api/highlights?name=' + encodeURIComponent(filename)),
       fetch('/api/notes?name=' + encodeURIComponent(filename))
     ]);
-    articleHighlights = hlRes.ok ? await hlRes.json() : [];
+    var hl = hlRes.ok ? await hlRes.json() : [];
     const notesData = notesRes.ok ? await notesRes.json() : {};
-    articleNotes = { articleNote: '', annotations: [], tags: [], isFavorite: false, ...notesData };
+    var notes = { articleNote: '', annotations: [], tags: [], isFavorite: false, ...notesData };
+    return { highlights: hl, notes: notes };
   } catch {
-    articleHighlights = [];
-    articleNotes = { articleNote: '', annotations: [], tags: [], isFavorite: false };
+    return defaults;
   }
 }
 
+// Apply fetched annotation data to globals (call after verifying active file hasn't changed)
+function applyAnnotationData(data) {
+  articleHighlights = data.highlights;
+  articleNotes = data.notes;
+}
+
 async function loadAnnotations(filename) {
-  await preloadAnnotations(filename);
+  var data = await preloadAnnotations(filename);
+  applyAnnotationData(data);
   applyHighlights();
   renderNotesPanel();
 }
@@ -692,6 +704,7 @@ function toggleFavorite(btn) {
   renderNotesPanel();
   updateSidebarItem(activeFile);
   updateHeaderActions();
+  scheduleNavCounts();
 }
 
 // Alias for backward compatibility with header button onclick

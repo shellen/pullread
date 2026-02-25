@@ -3,16 +3,16 @@ document.addEventListener('keydown', e => {
   // "/" focuses search
   if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
     e.preventDefault();
-    const drawer = document.getElementById('drawer');
-    if (drawer.classList.contains('collapsed')) toggleDrawer();
+    var sidebar = document.getElementById('sidebar');
+    if (sidebar.classList.contains('collapsed')) expandSidebar();
     document.getElementById('search').focus();
     return;
   }
 
-  // "[" toggles drawer
+  // "[" toggles sidebar
   if (e.key === '[' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
     e.preventDefault();
-    toggleDrawer();
+    toggleSidebar();
     return;
   }
 

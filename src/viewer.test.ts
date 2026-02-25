@@ -270,3 +270,138 @@ describe('XSS sanitization', () => {
     expect(notebooks).toMatch(/sanitizeHtml\s*\(\s*marked\.parse\s*\(/);
   });
 });
+
+describe('timeAgo / timeAgoTitle', () => {
+  // Eval the pure functions from the client-side JS so we can unit test them
+  let timeAgo: (dateStr: string) => string;
+  let timeAgoTitle: (dateStr: string) => string;
+
+  beforeAll(() => {
+    const rootDir = join(__dirname, '..');
+    const utils = readFileSync(join(rootDir, 'viewer', '02-utils.js'), 'utf-8');
+    // Extract timeAgo and timeAgoTitle functions
+    const fn = new Function(utils + '\nreturn { timeAgo, timeAgoTitle };');
+    const fns = fn();
+    timeAgo = fns.timeAgo;
+    timeAgoTitle = fns.timeAgoTitle;
+  });
+
+  test('returns empty string for falsy input', () => {
+    expect(timeAgo('')).toBe('');
+    expect(timeAgoTitle('')).toBe('');
+  });
+
+  test('returns "just now" for dates less than a minute ago', () => {
+    const now = new Date().toISOString();
+    expect(timeAgo(now)).toBe('just now');
+  });
+
+  test('returns minutes ago for recent dates', () => {
+    const fiveMinAgo = new Date(Date.now() - 5 * 60000).toISOString();
+    expect(timeAgo(fiveMinAgo)).toBe('5m ago');
+  });
+
+  test('returns hours ago for same-day dates', () => {
+    const threeHoursAgo = new Date(Date.now() - 3 * 3600000).toISOString();
+    expect(timeAgo(threeHoursAgo)).toBe('3h ago');
+  });
+
+  test('returns "yesterday" for 1 day ago', () => {
+    const yesterday = new Date(Date.now() - 86400000).toISOString();
+    expect(timeAgo(yesterday)).toBe('yesterday');
+  });
+
+  test('returns days ago for 2-6 days', () => {
+    const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString();
+    expect(timeAgo(threeDaysAgo)).toBe('3d ago');
+  });
+
+  test('returns "Mon DD" for dates 7+ days in current year', () => {
+    const now = new Date();
+    // Pick a date 30 days ago in same year (if possible)
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000);
+    if (thirtyDaysAgo.getFullYear() === now.getFullYear()) {
+      const result = timeAgo(thirtyDaysAgo.toISOString());
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      expect(result).toBe(months[thirtyDaysAgo.getMonth()] + ' ' + thirtyDaysAgo.getDate());
+    }
+  });
+
+  test('returns "Mon DD, YYYY" for dates in a previous year', () => {
+    const result = timeAgo('2023-06-15T12:00:00Z');
+    expect(result).toBe('Jun 15, 2023');
+  });
+
+  test('returns date slice for invalid date strings', () => {
+    expect(timeAgo('not-a-date')).toBe('not-a-date');
+  });
+
+  test('timeAgoTitle returns full datetime string', () => {
+    const result = timeAgoTitle('2025-03-15T14:30:00Z');
+    // Should contain date and time parts (exact output depends on timezone)
+    expect(result).toMatch(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}/);
+  });
+
+  test('timeAgoTitle returns raw string for invalid dates', () => {
+    expect(timeAgoTitle('not-a-date')).toBe('not-a-date');
+  });
+});
+
+describe('race condition guards', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('preloadAnnotations returns data instead of setting globals', () => {
+    const annotations = readFileSync(join(rootDir, 'viewer', '06-annotations.js'), 'utf-8');
+    // Must return data object, not set globals directly
+    expect(annotations).toMatch(/return\s*\{\s*highlights/);
+    expect(annotations).toMatch(/return\s+defaults/);
+  });
+
+  test('applyAnnotationData function exists', () => {
+    const annotations = readFileSync(join(rootDir, 'viewer', '06-annotations.js'), 'utf-8');
+    expect(annotations).toMatch(/function\s+applyAnnotationData/);
+  });
+
+  test('loadFile checks activeFile after preloadAnnotations', () => {
+    const sidebar = readFileSync(join(rootDir, 'viewer', '05-sidebar.js'), 'utf-8');
+    // After annotations load, guard check must exist before applying
+    expect(sidebar).toContain('applyAnnotationData');
+    // The pattern: await preloadAnnotations -> guard check -> applyAnnotationData
+    const annotationsIdx = sidebar.indexOf('preloadAnnotations');
+    const guardIdx = sidebar.indexOf('activeFile !== targetFile', annotationsIdx);
+    const applyIdx = sidebar.indexOf('applyAnnotationData', guardIdx);
+    expect(annotationsIdx).toBeGreaterThan(-1);
+    expect(guardIdx).toBeGreaterThan(annotationsIdx);
+    expect(applyIdx).toBeGreaterThan(guardIdx);
+  });
+
+  test('loadFile checks activeFile after fetch response', () => {
+    const sidebar = readFileSync(join(rootDir, 'viewer', '05-sidebar.js'), 'utf-8');
+    // Must have guard checks after the fetch call too
+    const fetchIdx = sidebar.indexOf("fetch('/api/file");
+    const guardAfterFetch = sidebar.indexOf('activeFile !== targetFile', fetchIdx);
+    expect(fetchIdx).toBeGreaterThan(-1);
+    expect(guardAfterFetch).toBeGreaterThan(fetchIdx);
+  });
+
+  test('loadFile uses AbortController for stale fetches', () => {
+    const sidebar = readFileSync(join(rootDir, 'viewer', '05-sidebar.js'), 'utf-8');
+    expect(sidebar).toContain('AbortController');
+    expect(sidebar).toContain('_loadFileAbort');
+    expect(sidebar).toContain('AbortError');
+  });
+
+  test('markAsRead uses delayed timer, not instant', () => {
+    const sidebar = readFileSync(join(rootDir, 'viewer', '05-sidebar.js'), 'utf-8');
+    expect(sidebar).toContain('_markAsReadDelayTimer');
+    expect(sidebar).toMatch(/setTimeout\s*\(\s*function/);
+    // Timer delay should be 3000ms
+    expect(sidebar).toContain('3000');
+  });
+
+  test('goHome clears markAsRead timer', () => {
+    const article = readFileSync(join(rootDir, 'viewer', '04-article.js'), 'utf-8');
+    expect(article).toContain('_markAsReadDelayTimer');
+    expect(article).toMatch(/clearTimeout\s*\(\s*_markAsReadDelayTimer\s*\)/);
+  });
+});
