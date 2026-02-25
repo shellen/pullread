@@ -72,7 +72,7 @@ function renderDashboard() {
   if (favorites.length > 0) {
     html += '<div class="dash-section">';
     html += '<div class="dash-section-header">';
-    html += '<span class="dash-section-title"><svg viewBox="0 0 576 512"><use href="#i-heart"/></svg> Favorites <span class="dash-section-count">(' + favorites.length + ')</span></span>';
+    html += '<span class="dash-section-title"><svg viewBox="0 0 576 512"><use href="#i-heart"/></svg> Starred <span class="dash-section-count">(' + favorites.length + ')</span></span>';
     html += '</div>';
     html += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards">';
     for (const f of favorites.slice(0, 10)) {
@@ -316,11 +316,10 @@ function renderArticle(text, filename) {
   // Populate reader toolbar with action buttons (left side)
   var toolbarActions = '';
   const isFav = articleNotes.isFavorite;
-  toolbarActions += '<button onclick="toggleFavoriteFromHeader(this)" class="toolbar-action-btn' + (isFav ? ' active-fav' : '') + '" aria-label="' + (isFav ? 'Remove from favorites' : 'Add to favorites') + '" aria-pressed="' + isFav + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg><span class="toolbar-action-label"> Star</span></button>';
+  toolbarActions += '<button onclick="toggleFavoriteFromHeader(this)" class="toolbar-action-btn' + (isFav ? ' active-fav' : '') + '" aria-label="' + (isFav ? 'Remove star' : 'Star article') + '" aria-pressed="' + isFav + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg><span class="toolbar-action-label"> Star</span></button>';
   if (meta && meta.url) {
     toolbarActions += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" class="toolbar-action-btn" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-external"/></svg><span class="toolbar-action-label"> Share</span></button></div>';
   }
-  toolbarActions += '<button onclick="toggleNotesFromHeader()" class="toolbar-action-btn" aria-label="Tags"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-tags"/></svg><span class="toolbar-action-label"> Tag</span></button>';
   toolbarActions += '<button onclick="markCurrentAsRead()" class="toolbar-action-btn" aria-label="Mark read"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-eye-slash"/></svg><span class="toolbar-action-label"> Mark read</span></button>';
   var isPodcast = meta && meta.enclosure_url && meta.enclosure_type && meta.enclosure_type.startsWith('audio/');
   var listenLabel = isPodcast ? 'Play' : 'Listen';
@@ -329,7 +328,7 @@ function renderArticle(text, filename) {
   toolbarActions += '<button class="play-next-trigger" id="play-next-trigger" onclick="togglePlayNextMenu(event)" aria-label="Queue options" style="display:none"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>';
   toolbarActions += '</div>';
   if (!isReviewArticle) {
-    toolbarActions += '<button onclick="summarizeArticle()" id="summarize-btn" class="toolbar-action-btn" aria-label="Summarize article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg><span class="toolbar-action-label"> AI</span></button>';
+    toolbarActions += '<button onclick="summarizeArticle()" id="summarize-btn" class="toolbar-action-btn" aria-label="Summarize article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg><span class="toolbar-action-label"> Summarize</span></button>';
   }
   toolbarActions += '<div class="more-dropdown">';
   toolbarActions += '<button onclick="toggleMoreMenu(event)" class="toolbar-action-btn" aria-label="More actions"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-ellipsis"/></svg></button>';

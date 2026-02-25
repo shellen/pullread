@@ -906,7 +906,7 @@
     cursor: pointer;
     font-size: 12px;
     padding: 4px 10px;
-    border-radius: 16px;
+    border-radius: 6px;
     display: flex;
     align-items: center;
     gap: 3px;
@@ -940,7 +940,7 @@
   .toolbar-aa-btn {
     background: none;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 6px;
     padding: 4px 10px;
     cursor: pointer;
     font-size: 14px;

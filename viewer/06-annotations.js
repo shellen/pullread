@@ -733,8 +733,8 @@ function updateHeaderActions() {
   if (!actions) return;
   const favBtn = actions.querySelector('button');
   if (favBtn) {
-    favBtn.className = articleNotes.isFavorite ? 'active-fav' : '';
-    favBtn.innerHTML = '<svg class="icon icon-sm"><use href="#i-' + (articleNotes.isFavorite ? 'heart' : 'heart-o') + '"/></svg> Favorite';
+    favBtn.className = 'toolbar-action-btn' + (articleNotes.isFavorite ? ' active-fav' : '');
+    favBtn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (articleNotes.isFavorite ? 'heart' : 'heart-o') + '"/></svg><span class="toolbar-action-label"> Star</span>';
   }
 }
 

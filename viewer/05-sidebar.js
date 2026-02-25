@@ -74,7 +74,7 @@ function renderFileItem(f, i) {
   let indicators = '';
   if (hasHl || hasNote || hasSummary || isFavorite || isPodcast) {
     indicators = '<div class="file-item-indicators">'
-      + (isFavorite ? '<span class="dot dot-favorite" aria-label="Favorite"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-heart"/></svg></span>' : '')
+      + (isFavorite ? '<span class="dot dot-favorite" aria-label="Starred"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-heart"/></svg></span>' : '')
       + (isPodcast ? '<span class="dot dot-podcast" aria-label="Podcast"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-headphones"/></svg></span>' : '')
       + (hasHl ? '<span class="dot dot-highlight" aria-label="Has highlights"></span>' : '')
       + (hasNote ? '<span class="dot dot-note" aria-label="Has annotations"></span>' : '')
@@ -158,7 +158,7 @@ function updateSidebarItem(filename) {
   var existing = el.querySelector('.file-item-indicators');
   if (hasHl || hasNote || hasSummary || isFavorite || isPodcast) {
     var html = '<div class="file-item-indicators">'
-      + (isFavorite ? '<span class="dot dot-favorite" aria-label="Favorite"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-heart"/></svg></span>' : '')
+      + (isFavorite ? '<span class="dot dot-favorite" aria-label="Starred"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-heart"/></svg></span>' : '')
       + (isPodcast ? '<span class="dot dot-podcast" aria-label="Podcast"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-headphones"/></svg></span>' : '')
       + (hasHl ? '<span class="dot dot-highlight" aria-label="Has highlights"></span>' : '')
       + (hasNote ? '<span class="dot dot-note" aria-label="Has annotations"></span>' : '')
@@ -276,8 +276,8 @@ function filterFiles() {
         const t = term.replace(/^"(.*)"$/, '$1');
         const tl = t.toLowerCase();
 
-        // Operator: is:favorite / is:fav
-        if (tl === 'is:favorite' || tl === 'is:fav') return isFavorite;
+        // Operator: is:starred / is:favorite / is:fav
+        if (tl === 'is:starred' || tl === 'is:favorite' || tl === 'is:fav') return isFavorite;
         // Operator: is:read
         if (tl === 'is:read') return readArticles.has(f.filename);
         // Operator: is:unread
@@ -550,7 +550,7 @@ function syncSidebarTabs() {
   var search = document.getElementById('search');
   if (search) {
     if (_sidebarView === 'notebooks') search.placeholder = 'Search notebooks...';
-    else search.placeholder = 'Search... try is:favorite or tag:tech';
+    else search.placeholder = 'Search... try is:starred or tag:tech';
   }
 
   // Pinned filters only apply to articles (home view)
@@ -586,7 +586,7 @@ function sidebarNavFilter(filter) {
     closeDrawer();
     filterFiles();
   } else if (filter === 'starred') {
-    if (search) search.value = 'is:favorite';
+    if (search) search.value = 'is:starred';
     closeDrawer();
     filterFiles();
   } else if (filter === 'sources') {

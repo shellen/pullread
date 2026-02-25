@@ -75,7 +75,7 @@ function showGuideModal() {
     <table>
       <thead><tr><th>Operator</th><th>Description</th></tr></thead>
       <tbody>
-        <tr><td><code>is:favorite</code></td><td>Favorited articles (also <code>is:fav</code>)</td></tr>
+        <tr><td><code>is:starred</code></td><td>Starred articles (also <code>is:favorite</code>, <code>is:fav</code>)</td></tr>
         <tr><td><code>is:read</code> / <code>is:unread</code></td><td>Filter by read status</td></tr>
         <tr><td><code>has:summary</code></td><td>Articles with AI summaries</td></tr>
         <tr><td><code>has:highlights</code></td><td>Articles with highlights</td></tr>

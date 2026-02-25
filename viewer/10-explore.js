@@ -56,7 +56,7 @@ function showTagCloud() {
   statsHtml += '<span><strong>' + totalArticles + '</strong> articles</span>';
   statsHtml += '<span><strong>' + totalUnread + '</strong> unread</span>';
   statsHtml += '<span><strong>' + totalHighlights + '</strong> highlights</span>';
-  statsHtml += '<span><strong>' + totalFavorites + '</strong> favorites</span>';
+  statsHtml += '<span><strong>' + totalFavorites + '</strong> starred</span>';
   statsHtml += '<span><strong>' + totalSummaries + '</strong> summaries</span>';
   statsHtml += '<span><strong>' + Object.keys(domainArticles).length + '</strong> sources</span>';
   statsHtml += '</div>';
@@ -66,7 +66,7 @@ function showTagCloud() {
     return '<button class="tag-pill' + (variant ? ' tag-pill-' + variant : '') + '" onclick="document.getElementById(\'search\').value=\'' + escapeJsStr(query) + '\';filterFiles()">' + escapeHtml(label) + '</button>';
   };
   let discoverHtml = '<div class="tag-cloud">';
-  discoverHtml += makeQf('Favorites', 'is:favorite', 'pink');
+  discoverHtml += makeQf('Starred', 'is:favorite', 'pink');
   discoverHtml += makeQf('Unread', 'is:unread', 'blue');
   discoverHtml += makeQf('Has Summary', 'has:summary', 'green');
   discoverHtml += makeQf('Has Highlights', 'has:highlights', 'amber');
