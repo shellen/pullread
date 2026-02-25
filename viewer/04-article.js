@@ -300,10 +300,10 @@ function renderArticle(text, filename) {
       pubDomain = '';
     }
 
-    // Favicon: show real favicon with initials fallback
+    // Favicon: show real favicon, colored initials fallback only on error
     var initials = (pubName || meta.domain).replace(/^(the |www\.)/i, '').slice(0, 2).toUpperCase();
-    var faviconHtml = '<div class="pub-favicon" style="background:' + srcColor + '">'
-      + '<img src="/favicons/' + encodeURIComponent(meta.domain) + '.png" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
+    var faviconHtml = '<div class="pub-favicon">'
+      + '<img src="/favicons/' + encodeURIComponent(meta.domain) + '.png" alt="" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';this.parentElement.style.background=\'' + srcColor + '\'">'
       + '<span class="pub-favicon-fallback">' + escapeHtml(initials) + '</span></div>';
 
     html += '<div class="pub-bar">';

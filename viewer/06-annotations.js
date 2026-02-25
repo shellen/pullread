@@ -1,7 +1,7 @@
 // ABOUTME: Highlights, inline annotations, and footnote rendering for article content.
 // ABOUTME: Manages highlight creation/deletion, footnote numbering, and the notes panel.
 
-async function preloadAnnotations(filename) {
+async function preloadAnnotations(filename, signal) {
   var defaults = { highlights: [], notes: { articleNote: '', annotations: [], tags: [], isFavorite: false } };
   if (!serverMode) {
     articleHighlights = defaults.highlights;
@@ -9,15 +9,17 @@ async function preloadAnnotations(filename) {
     return defaults;
   }
   try {
+    var opts = signal ? { signal: signal } : {};
     const [hlRes, notesRes] = await Promise.all([
-      fetch('/api/highlights?name=' + encodeURIComponent(filename)),
-      fetch('/api/notes?name=' + encodeURIComponent(filename))
+      fetch('/api/highlights?name=' + encodeURIComponent(filename), opts),
+      fetch('/api/notes?name=' + encodeURIComponent(filename), opts)
     ]);
     var hl = hlRes.ok ? await hlRes.json() : [];
     const notesData = notesRes.ok ? await notesRes.json() : {};
     var notes = { articleNote: '', annotations: [], tags: [], isFavorite: false, ...notesData };
     return { highlights: hl, notes: notes };
-  } catch {
+  } catch (e) {
+    if (e.name === 'AbortError') throw e;
     return defaults;
   }
 }
@@ -684,6 +686,7 @@ function updateAnnotation(id, btn) {
 
 // Render tags in the article header pub-bar
 function renderNotesPanel() {
+  _tagEditMode = false;
   var container = document.getElementById('header-tags');
   if (!container) return;
 
@@ -714,33 +717,27 @@ function toggleFavorite(btn) {
 // Alias for backward compatibility with header button onclick
 var toggleFavoriteFromHeader = toggleFavorite;
 
+var _tagEditMode = false;
+
 function toggleNotesFromHeader() {
-  // Show tag editing row below pub-bar
-  var existing = document.getElementById('tag-edit-row');
-  if (existing) { existing.remove(); return; }
+  var container = document.getElementById('header-tags');
+  if (!container) return;
 
-  var pubBar = document.querySelector('.pub-bar');
-  var header = document.querySelector('.article-header');
-  if (!header) return;
-
-  var row = document.createElement('div');
-  row.id = 'tag-edit-row';
-  row.className = 'tag-edit-row';
-
-  var tags = (articleNotes.tags || []);
-  var tagsHtml = tags.map(function(t) {
-    return '<span class="tag">' + escapeHtml(t) + '<span class="tag-remove" onclick="removeTag(\'' + escapeHtml(t.replace(/'/g, "\\'")) + '\')">&times;</span></span>';
-  }).join('');
-
-  row.innerHTML = tagsHtml + '<input type="text" placeholder="Add tag\u2026" onkeydown="handleTagKey(event)" />';
-
-  if (pubBar && pubBar.nextElementSibling) {
-    header.insertBefore(row, pubBar.nextElementSibling);
-  } else {
-    header.insertBefore(row, header.firstChild);
+  if (_tagEditMode) {
+    _tagEditMode = false;
+    renderNotesPanel();
+    return;
   }
 
-  var input = row.querySelector('input');
+  _tagEditMode = true;
+  var tags = (articleNotes.tags || []);
+  var tagsHtml = tags.map(function(t) {
+    return '<span class="tag tag-editable">' + escapeHtml(t) + '<span class="tag-remove" onclick="removeTag(\'' + escapeHtml(t.replace(/'/g, "\\'")) + '\')">&times;</span></span>';
+  }).join('');
+
+  container.innerHTML = tagsHtml + '<input type="text" class="tag-input" placeholder="Add tag\u2026" onkeydown="handleTagKey(event)" />';
+
+  var input = container.querySelector('input');
   if (input) input.focus();
 }
 
@@ -767,9 +764,13 @@ function handleTagKey(e) {
   handleTagInput(e,
     function() { if (!articleNotes.tags) articleNotes.tags = []; return articleNotes.tags; },
     function() {
-      saveNotes(); renderNotesPanel(); updateSidebarItem(activeFile);
-      var editRow = document.getElementById('tag-edit-row');
-      if (editRow) { editRow.remove(); toggleNotesFromHeader(); }
+      saveNotes(); updateSidebarItem(activeFile);
+      if (_tagEditMode) {
+        _tagEditMode = false;
+        toggleNotesFromHeader();
+      } else {
+        renderNotesPanel();
+      }
     }
   );
 }
@@ -778,11 +779,13 @@ function removeTag(tag) {
   if (!articleNotes.tags) return;
   articleNotes.tags = articleNotes.tags.filter(t => t !== tag);
   saveNotes();
-  renderNotesPanel();
   updateSidebarItem(activeFile);
-  // Refresh tag edit row if open
-  var editRow = document.getElementById('tag-edit-row');
-  if (editRow) { editRow.remove(); toggleNotesFromHeader(); }
+  if (_tagEditMode) {
+    _tagEditMode = false;
+    toggleNotesFromHeader();
+  } else {
+    renderNotesPanel();
+  }
 }
 
 // ---- Voice Notes (Web Speech API) ----

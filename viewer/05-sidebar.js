@@ -96,8 +96,7 @@ function renderFileItem(f, i) {
 
   return '<div class="file-item' + isActive + (isRead && !isActive ? ' read' : '') + '" data-index="' + i + '" data-filename="' + escapeHtml(f.filename) + '" onclick="loadFile(' + i + ')" role="option" aria-selected="' + (activeFile === f.filename) + '" tabindex="0" onkeydown="if(event.key===\'Enter\')loadFile(' + i + ')">'
     + '<div class="file-item-title">' + escapeHtml(f.title) + '</div>'
-    + '<div class="file-item-meta">' + metaHtml + '</div>'
-    + indicators
+    + '<div class="file-item-meta">' + metaHtml + indicators + '</div>'
     + '</div>';
 }
 
@@ -371,7 +370,7 @@ async function loadFile(index) {
     var targetFile = file.filename;
 
     // Load annotations first so favorite state is available for header render
-    var annotationData = await preloadAnnotations(file.filename);
+    var annotationData = await preloadAnnotations(file.filename, controller.signal);
     if (activeFile !== targetFile) { console.debug('[PR] loadFile bailed: active changed after annotations', targetFile, '->', activeFile); return; }
     applyAnnotationData(annotationData);
 
@@ -393,24 +392,13 @@ async function loadFile(index) {
 }
 
 // Navigate to next (+1) or previous (-1) article with wrapping
+var _navDebounceTimer = null;
 function navigateArticle(direction) {
   if (!displayFiles.length) return;
-  console.debug('[PR] navigateArticle', direction > 0 ? 'next' : 'prev', 'from', activeFile);
-  var interval = parseInt(localStorage.getItem('pr-break-interval') || '0', 10);
-  if (interval > 0 && _breakSessionStart > 0) {
-    var elapsed = (Date.now() - _breakSessionStart) / 60000;
-    if (elapsed >= interval) {
-      var currentIdx = displayFiles.findIndex(f => f.filename === activeFile);
-      _breakPendingDirection = direction;
-      if (direction > 0) {
-        _breakPendingIndex = currentIdx < displayFiles.length - 1 ? currentIdx + 1 : 0;
-      } else {
-        _breakPendingIndex = currentIdx > 0 ? currentIdx - 1 : displayFiles.length - 1;
-      }
-      showBreakReminder();
-      return;
-    }
-  }
+  // Debounce rapid keypresses to prevent concurrent loadFile storms
+  if (_navDebounceTimer) clearTimeout(_navDebounceTimer);
+
+  // Immediately update the visual selection for responsive feel
   const cidx = displayFiles.findIndex(f => f.filename === activeFile);
   let next;
   if (direction > 0) {
@@ -418,9 +406,28 @@ function navigateArticle(direction) {
   } else {
     next = cidx > 0 ? cidx - 1 : displayFiles.length - 1;
   }
-  loadFile(next);
+  var prevActive = activeFile;
+  activeFile = displayFiles[next].filename;
+  updateSidebarActiveState(prevActive);
   const el = document.querySelector('.file-item[data-index="' + next + '"]');
   if (el) el.scrollIntoView({ block: 'nearest' });
+
+  // Debounce the heavy work (fetch + render)
+  _navDebounceTimer = setTimeout(function() {
+    _navDebounceTimer = null;
+    console.debug('[PR] navigateArticle', direction > 0 ? 'next' : 'prev', 'settled on', activeFile);
+    var interval = parseInt(localStorage.getItem('pr-break-interval') || '0', 10);
+    if (interval > 0 && _breakSessionStart > 0) {
+      var elapsed = (Date.now() - _breakSessionStart) / 60000;
+      if (elapsed >= interval) {
+        _breakPendingDirection = direction;
+        _breakPendingIndex = next;
+        showBreakReminder();
+        return;
+      }
+    }
+    loadFile(next);
+  }, 150);
 }
 
 

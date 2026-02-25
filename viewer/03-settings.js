@@ -132,6 +132,8 @@ function toggleSettingsDropdown() {
       <button data-setting="size" data-val="medium" onclick="setSize('medium');updateDropdownState()" ${currentSize==='medium'?'class="active"':''} style="font-size:14px" aria-label="Medium text">A</button>
       <button data-setting="size" data-val="large" onclick="setSize('large');updateDropdownState()" ${currentSize==='large'?'class="active"':''} style="font-size:17px" aria-label="Large text">A</button>
       <button data-setting="size" data-val="xlarge" onclick="setSize('xlarge');updateDropdownState()" ${currentSize==='xlarge'?'class="active"':''} style="font-size:20px" aria-label="Extra large text">A</button>
+      <button data-setting="size" data-val="xxlarge" onclick="setSize('xxlarge');updateDropdownState()" ${currentSize==='xxlarge'?'class="active"':''} style="font-size:23px" aria-label="2X large text">A</button>
+      <button data-setting="size" data-val="xxxlarge" onclick="setSize('xxxlarge');updateDropdownState()" ${currentSize==='xxxlarge'?'class="active"':''} style="font-size:26px" aria-label="3X large text">A</button>
     </div>
     <label>Line height</label>
     <div class="setting-row">
