@@ -1,12 +1,39 @@
 // ABOUTME: Custom element <pr-player> that renders the TTS audio player bottom bar.
-// ABOUTME: Produces identical DOM to the former static HTML so existing CSS and JS selectors work.
+// ABOUTME: Exposes public API for playback control, state getters, and custom events.
 
 class PrPlayer extends HTMLElement {
   static get observedAttributes() { return ['mode']; }
 
   constructor() {
     super();
+    this._lastQueueLen = 0;
+    this._lastIndex = -1;
   }
+
+  // ---- State getters (read from playback engine in 07-tts.js) ----
+  get queue() { return ttsQueue; }
+  get currentIndex() { return ttsCurrentIndex; }
+  get playing() { return ttsPlaying; }
+  get speed() { return ttsSpeed; }
+  get generating() { return ttsGenerating; }
+  get provider() { return ttsProvider; }
+  get currentItem() {
+    return (ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length)
+      ? ttsQueue[ttsCurrentIndex] : null;
+  }
+
+  // ---- Public API ----
+  enqueue(item) { addToTTSQueue(item.filename); }
+  playItem(index) { playTTSItem(index); }
+  stop() { stopTTS(); }
+  togglePlay() { ttsTogglePlay(); }
+  skip(seconds) { skipTime(seconds); }
+  seek(pct) { ttsSeek(pct); }
+  setSpeed(speed) { ttsSetSpeed(speed); }
+  cycleSpeed() { ttsCycleSpeed(); }
+  removeItem(index) { removeTTSQueueItem(index); }
+  clearQueue() { ttsClearQueue(); }
+  dismiss() { ttsDismissPlayer(); }
 
   connectedCallback() {
     this.className = 'bottom-bar hidden';
@@ -210,6 +237,21 @@ class PrPlayer extends HTMLElement {
     var currentIndex = state.currentIndex;
     var playing = state.playing;
     var generating = state.generating;
+
+    // Fire custom events when state changes
+    if (queue.length !== this._lastQueueLen) {
+      this._lastQueueLen = queue.length;
+      this.dispatchEvent(new CustomEvent('pr-player:queue-change', {
+        bubbles: true, detail: { length: queue.length }
+      }));
+    }
+    if (currentIndex !== this._lastIndex) {
+      this._lastIndex = currentIndex;
+      var item = (currentIndex >= 0 && currentIndex < queue.length) ? queue[currentIndex] : null;
+      this.dispatchEvent(new CustomEvent('pr-player:now-playing', {
+        bubbles: true, detail: item ? { filename: item.filename, title: item.title } : null
+      }));
+    }
 
     var app = document.querySelector('.app');
 
