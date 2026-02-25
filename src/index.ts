@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from '
 import { join, basename } from 'path';
 import { homedir } from 'os';
 import { fetchFeed, FeedEntry } from './feed';
-import { fetchAndExtract, FetchOptions, shouldSkipUrl, classifyFetchError, htmlToMarkdown } from './extractor';
+import { fetchAndExtract, FetchOptions, shouldSkipUrl, isBinaryUrl, classifyFetchError, htmlToMarkdown } from './extractor';
 import { writeArticle, listMarkdownFiles, resolveFilePath } from './writer';
 import { Storage } from './storage';
 import { startViewer } from './viewer';
@@ -190,6 +190,14 @@ async function syncFeed(
       if (skipReason) {
         console.log(`      Skipped: ${skipReason}`);
         storage.markFailed(entry.url, skipReason);
+        failed++;
+        continue;
+      }
+
+      // Skip binary file URLs (audio, video, image) that lack enclosure metadata
+      if (!entry.enclosure && isBinaryUrl(entry.url)) {
+        console.log(`      Skipped: Binary file URL (${entry.url})`);
+        storage.markFailed(entry.url, 'Binary file URL, not extractable');
         failed++;
         continue;
       }

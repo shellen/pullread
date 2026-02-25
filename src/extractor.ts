@@ -698,6 +698,32 @@ export function isPdfUrl(url: string): boolean {
   }
 }
 
+const BINARY_EXTENSIONS = new Set([
+  // Audio
+  '.mp3', '.m4a', '.wav', '.ogg', '.aac', '.flac', '.wma', '.opus',
+  // Video
+  '.mp4', '.webm', '.avi', '.mov', '.mkv', '.wmv', '.m4v',
+  // Image
+  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.ico', '.svg', '.tiff',
+  // Archive / binary
+  '.zip', '.tar', '.gz', '.rar', '.7z', '.exe', '.dmg', '.iso', '.bin', '.msi',
+]);
+
+/**
+ * Check if a URL points to a binary file (audio, video, image, archive)
+ */
+export function isBinaryUrl(url: string): boolean {
+  try {
+    const pathname = new URL(url).pathname.toLowerCase();
+    for (const ext of BINARY_EXTENSIONS) {
+      if (pathname.endsWith(ext)) return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 // ── PDF text cleanup helpers ────────────────────────────────────────
 
 /**
@@ -1315,6 +1341,11 @@ async function extractAcademicPaper(
     if (!response.ok) return null;
 
     const contentType = response.headers.get('content-type') || '';
+    // Reject binary content types
+    if (/^(audio|video|image)\//.test(contentType) ||
+        contentType.includes('application/octet-stream')) {
+      return null;
+    }
     if (contentType.includes('application/pdf') || isPdfUrl(cleanUrl)) {
       const buffer = await response.arrayBuffer();
       const article = await extractPdf(new Uint8Array(buffer), cleanUrl);
@@ -1356,6 +1387,11 @@ export async function fetchAndExtract(
   const skipReason = shouldSkipUrl(url);
   if (skipReason) {
     throw new Error(skipReason);
+  }
+
+  // Reject binary file URLs (audio, video, image, archive)
+  if (isBinaryUrl(url)) {
+    throw new Error(`Binary file URL, not extractable: ${url}`);
   }
 
   // Resolve Apple News shortlinks to original article URLs
@@ -1440,6 +1476,12 @@ export async function fetchAndExtract(
       }
 
       const contentType = response.headers.get('content-type') || '';
+
+      // Reject binary content types (audio, video, image, octet-stream)
+      if (/^(audio|video|image)\//.test(contentType) ||
+          contentType.includes('application/octet-stream')) {
+        throw new Error(`Binary content-type (${contentType}), not extractable: ${url}`);
+      }
 
       // Handle PDF responses
       if (contentType.includes('application/pdf') || isPdfUrl(cleanUrl)) {

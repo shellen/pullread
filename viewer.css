@@ -1665,6 +1665,8 @@
       top: 0;
       bottom: 0;
       z-index: 30;
+      width: 260px;
+      min-width: 0;
       transform: translateX(-260px);
       transition: transform 0.2s ease;
       margin-left: 0;
@@ -1676,6 +1678,7 @@
     .sidebar-expand-btn { display: none !important; }
     .sidebar.collapsed ~ .sidebar-expand-btn { display: none !important; }
     .drawer { display: none; }
+    .content-pane { min-width: 0; width: 100%; }
     .content-wrap {
       padding: 24px 20px 80px;
     }
@@ -1695,6 +1698,17 @@
     .reader-toolbar { padding: 4px 6px; }
     .toolbar-action-btn .toolbar-action-label { display: none; }
     .toolbar-action-btn { padding: 5px 7px; border-radius: 6px; }
+    .share-dropdown-panel {
+      position: fixed;
+      top: auto;
+      left: 8px;
+      right: 8px;
+      width: auto;
+    }
+    .more-dropdown-panel {
+      right: auto;
+      left: 0;
+    }
     .modal-card {
       padding: 20px 20px;
       width: 94%;

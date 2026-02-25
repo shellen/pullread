@@ -5,7 +5,7 @@ import {
   extractArticle, resolveRelativeUrls, simplifySubstackUrl, isYouTubeUrl, extractYouTubeId,
   matchPaperSource, fixPdfLigatures, stripRunningHeaders, buildParagraphs, extractPdfTitle,
   parseCaptionTracks, extractTweetId, isThreadsUrl, formatTweetMarkdown, fetchAndExtract,
-  stripEmbedNoise, htmlToMarkdown,
+  stripEmbedNoise, htmlToMarkdown, shouldSkipUrl, isBinaryUrl,
   type FxTweet
 } from './extractor';
 
@@ -913,5 +913,85 @@ describe('extractTweet via fetchAndExtract', () => {
     const result = await fetchAndExtract('https://x.com/user/status/999');
     expect(result).not.toBeNull();
     expect(result!.markdown).toContain('Fallback tweet text');
+  });
+});
+
+describe('isBinaryUrl', () => {
+  test('detects audio file extensions', () => {
+    expect(isBinaryUrl('https://cdn.example.com/episode.mp3')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/episode.m4a')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/episode.wav')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/episode.ogg')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/episode.aac')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/episode.flac')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/episode.wma')).toBe(true);
+  });
+
+  test('detects video file extensions', () => {
+    expect(isBinaryUrl('https://cdn.example.com/clip.mp4')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/clip.webm')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/clip.avi')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/clip.mov')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/clip.mkv')).toBe(true);
+  });
+
+  test('detects image file extensions', () => {
+    expect(isBinaryUrl('https://cdn.example.com/photo.jpg')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/photo.jpeg')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/photo.png')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/photo.gif')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/photo.webp')).toBe(true);
+  });
+
+  test('detects archive/binary file extensions', () => {
+    expect(isBinaryUrl('https://cdn.example.com/archive.zip')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/archive.tar.gz')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/app.exe')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/app.dmg')).toBe(true);
+  });
+
+  test('returns false for article URLs', () => {
+    expect(isBinaryUrl('https://example.com/article')).toBe(false);
+    expect(isBinaryUrl('https://example.com/article.html')).toBe(false);
+    expect(isBinaryUrl('https://example.com/post/123')).toBe(false);
+  });
+
+  test('handles query strings after extension', () => {
+    expect(isBinaryUrl('https://cdn.example.com/episode.mp3?token=abc')).toBe(true);
+  });
+
+  test('is case insensitive', () => {
+    expect(isBinaryUrl('https://cdn.example.com/episode.MP3')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/clip.MP4')).toBe(true);
+  });
+});
+
+describe('fetchAndExtract — binary content safeguards', () => {
+  test('rejects binary URLs before fetching', async () => {
+    await expect(
+      fetchAndExtract('https://cdn.npr.org/podcast/episode.mp3')
+    ).rejects.toThrow(/binary/i);
+  });
+
+  test('rejects audio content-type responses', async () => {
+    globalThis.fetch = async () => new Response('binary garbage', {
+      status: 200,
+      headers: { 'content-type': 'audio/mpeg' },
+    }) as any;
+
+    await expect(
+      fetchAndExtract('https://cdn.npr.org/podcast/episode')
+    ).rejects.toThrow(/binary/i);
+  });
+
+  test('rejects video content-type responses', async () => {
+    globalThis.fetch = async () => new Response('binary garbage', {
+      status: 200,
+      headers: { 'content-type': 'video/mp4' },
+    }) as any;
+
+    await expect(
+      fetchAndExtract('https://example.com/stream')
+    ).rejects.toThrow(/binary/i);
   });
 });

@@ -354,7 +354,7 @@ function renderArticle(text, filename) {
   const isFav = articleNotes.isFavorite;
   toolbarActions += '<button onclick="toggleFavoriteFromHeader(this)" class="toolbar-action-btn' + (isFav ? ' active-fav' : '') + '" aria-label="' + (isFav ? 'Remove star' : 'Star article') + '" aria-pressed="' + isFav + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg><span class="toolbar-action-label"> Star</span></button>';
   if (meta && meta.url) {
-    toolbarActions += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" class="toolbar-action-btn" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-external"/></svg><span class="toolbar-action-label"> Share</span></button></div>';
+    toolbarActions += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" class="toolbar-action-btn" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg><span class="toolbar-action-label"> Share</span></button></div>';
   }
   toolbarActions += '<button onclick="markCurrentAsRead()" class="toolbar-action-btn" aria-label="Mark read"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-eye-slash"/></svg><span class="toolbar-action-label"> Mark read</span></button>';
   var isPodcast = meta && meta.enclosure_url && meta.enclosure_type && meta.enclosure_type.startsWith('audio/');
