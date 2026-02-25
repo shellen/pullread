@@ -244,13 +244,9 @@ async function init() {
     document.getElementById('sidebar').classList.add('collapsed');
   }
 
-  // Restore mini mode
-  if (localStorage.getItem('pr-mini-mode') === '1') {
-    miniMode = true;
-    document.body.classList.add('mini-mode');
-    var miniContainer = document.getElementById('mini-mode-container');
-    if (miniContainer) miniContainer.style.display = '';
-    startMiniModeSync();
+  // Restore mini player mode
+  if (localStorage.getItem('pr-mini-mode') === '1' && ttsQueue.length > 0) {
+    setPlayerMode('mini');
   }
 
   // Restore focus mode

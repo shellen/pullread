@@ -87,12 +87,13 @@ document.addEventListener('keydown', e => {
     return;
   }
 
-  // m to toggle mini mode (when audio is playing/queued)
+  // m to toggle mini/expanded player mode (when audio is playing/queued)
   if (e.key === 'm' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-    var hasAudio = ttsQueue.length > 0 || miniMode;
-    if (hasAudio) {
+    var player = document.querySelector('pr-player');
+    if (player && ttsQueue.length > 0) {
       e.preventDefault();
-      toggleMiniMode();
+      var currentMode = player.getAttribute('mode') || 'expanded';
+      setPlayerMode(currentMode === 'mini' ? 'expanded' : 'mini');
       return;
     }
   }

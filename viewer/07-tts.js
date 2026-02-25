@@ -183,7 +183,6 @@ function renderAudioPlayer() {
   updateListenButtonState();
   updateSidebarAudioIndicators();
   updateArticleNowPlaying();
-  renderMiniMode();
   saveTTSState();
 }
 
@@ -911,8 +910,6 @@ function ttsSetSpeed(speed) {
   if (speedBtn) speedBtn.textContent = speed + 'x';
   var popupVal = document.getElementById('tts-speed-popup-val');
   if (popupVal) popupVal.textContent = speed + 'x';
-  var miniSpeedBtn = document.getElementById('mini-mode-speed-btn');
-  if (miniSpeedBtn) miniSpeedBtn.textContent = speed + 'x';
   // Update article inline speed button
   var anpSpeed = document.querySelector('.article-now-playing .anp-speed');
   if (anpSpeed) anpSpeed.textContent = speed + 'x';
@@ -1458,140 +1455,4 @@ if (typeof _ttsStateRestored === 'undefined') {
   setTimeout(restoreTTSState, 500);
 }
 
-// ---- Mini Mode ----
-
-var _miniModeSyncTimer = null;
-function startMiniModeSync() {
-  if (_miniModeSyncTimer) return;
-  _miniModeSyncTimer = setInterval(function() {
-    if (!miniMode) { stopMiniModeSync(); return; }
-    var fill = document.getElementById('mini-mode-progress-fill');
-    var cur = document.getElementById('mini-mode-time-current');
-    var tot = document.getElementById('mini-mode-time-total');
-    var mainFill = document.getElementById('tts-progress');
-    var mainCur = document.getElementById('tts-time-current');
-    var mainTot = document.getElementById('tts-time-total');
-    if (fill && mainFill) fill.style.width = mainFill.style.width;
-    if (cur && mainCur) cur.textContent = mainCur.textContent;
-    if (tot && mainTot) tot.textContent = mainTot.textContent;
-  }, 250);
-}
-function stopMiniModeSync() {
-  if (_miniModeSyncTimer) { clearInterval(_miniModeSyncTimer); _miniModeSyncTimer = null; }
-}
-
-function toggleMiniMode() {
-  miniMode = !miniMode;
-  document.body.classList.toggle('mini-mode', miniMode);
-  var container = document.getElementById('mini-mode-container');
-  if (container) container.style.display = miniMode ? '' : 'none';
-  if (miniMode) {
-    renderMiniMode();
-    initMiniModeProgressDrag();
-    startMiniModeSync();
-  } else {
-    stopMiniModeSync();
-  }
-  localStorage.setItem('pr-mini-mode', miniMode ? '1' : '0');
-}
-
-function renderMiniMode() {
-  var container = document.getElementById('mini-mode-container');
-  if (!container || !miniMode) return;
-
-  var titleEl = document.getElementById('mini-mode-title');
-  var statusEl = document.getElementById('mini-mode-status');
-  var playBtn = document.getElementById('mini-mode-play-btn');
-  var speedBtn = document.getElementById('mini-mode-speed-btn');
-  var queueEl = document.getElementById('mini-mode-queue');
-
-  if (ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length) {
-    titleEl.textContent = ttsQueue[ttsCurrentIndex].title;
-  } else {
-    titleEl.textContent = 'No article playing';
-  }
-
-  if (ttsGenerating) {
-    statusEl.textContent = 'Generating...';
-  } else if (ttsPlaying) {
-    statusEl.textContent = 'Playing';
-  } else if (ttsCurrentIndex >= 0) {
-    statusEl.textContent = 'Paused';
-  } else {
-    statusEl.textContent = '';
-  }
-
-  playBtn.innerHTML = ttsPlaying
-    ? '<svg><use href="#i-pause"/></svg>'
-    : '<svg><use href="#i-play"/></svg>';
-
-  speedBtn.textContent = ttsSpeed + 'x';
-
-  // Sync progress from main player
-  var mainProgress = document.getElementById('tts-progress');
-  var mainCurrent = document.getElementById('tts-time-current');
-  var mainTotal = document.getElementById('tts-time-total');
-  if (mainProgress) document.getElementById('mini-mode-progress-fill').style.width = mainProgress.style.width;
-  if (mainCurrent) document.getElementById('mini-mode-time-current').textContent = mainCurrent.textContent;
-  if (mainTotal) document.getElementById('mini-mode-time-total').textContent = mainTotal.textContent;
-
-  // Render queue
-  if (ttsQueue.length > 1) {
-    queueEl.innerHTML = ttsQueue.map(function(item, i) {
-      return '<div class="mini-mode-queue-item' + (i === ttsCurrentIndex ? ' playing' : '') + '" onclick="playTTSItem(' + i + ')">'
-        + '<span style="font-size:10px;color:var(--muted);width:14px;text-align:center">' + (i === ttsCurrentIndex ? '&#9654;' : (i + 1)) + '</span>'
-        + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(item.title) + '</span>'
-        + '</div>';
-    }).join('');
-  } else {
-    queueEl.innerHTML = '';
-  }
-
-  // Auto-exit mini mode when queue empties
-  if (ttsQueue.length === 0) {
-    miniMode = false;
-    document.body.classList.remove('mini-mode');
-    container.style.display = 'none';
-    localStorage.setItem('pr-mini-mode', '0');
-  }
-}
-
-var _miniModeProgressDragInit = false;
-function initMiniModeProgressDrag() {
-  if (_miniModeProgressDragInit) return;
-  _miniModeProgressDragInit = true;
-
-  var wrap = document.getElementById('mini-mode-progress-wrap');
-  if (!wrap) return;
-
-  function seekFromEvent(e) {
-    if (!ttsPlaying && ttsCurrentIndex < 0) return;
-    var rect = wrap.getBoundingClientRect();
-    var clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    var pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    ttsSeek(pct);
-  }
-
-  function onMove(e) { seekFromEvent(e); }
-  function onEnd() {
-    document.removeEventListener('mousemove', onMove);
-    document.removeEventListener('mouseup', onEnd);
-    document.removeEventListener('touchmove', onMove);
-    document.removeEventListener('touchend', onEnd);
-  }
-
-  wrap.addEventListener('mousedown', function(e) {
-    e.preventDefault();
-    seekFromEvent(e);
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onEnd);
-  });
-
-  wrap.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    seekFromEvent(e);
-    document.addEventListener('touchmove', onMove, { passive: false });
-    document.addEventListener('touchend', onEnd);
-  }, { passive: false });
-}
 

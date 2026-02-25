@@ -12,9 +12,6 @@ let readArticles = new Set(JSON.parse(localStorage.getItem('pr-read-articles') |
 const PAGE_SIZE = 200; // pagination chunk
 let displayedCount = 0;
 
-// Mini mode — collapses app to just the audio player
-let miniMode = false;
-
 // Highlights & Notes state
 let articleHighlights = []; // highlights for current article
 let articleNotes = { articleNote: '', annotations: [], tags: [], isFavorite: false }; // notes for current article

@@ -140,6 +140,9 @@ class PrPlayer extends HTMLElement {
 
     // Re-apply current state to the new DOM
     renderAudioPlayer();
+
+    // Persist mode preference
+    localStorage.setItem('pr-mini-mode', this._mode === 'mini' ? '1' : '0');
   }
 
   /** Set up mouse/touch drag on the progress bar for seeking */
