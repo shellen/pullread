@@ -682,20 +682,24 @@ function updateAnnotation(id, btn) {
   removeAnnotationPopover();
 }
 
-// Render tags in the article header
+// Render tags in the article header pub-bar
 function renderNotesPanel() {
   var container = document.getElementById('header-tags');
   if (!container) return;
 
   var tags = articleNotes.tags || [];
   var machineTags = articleNotes.machineTags || [];
-  var tagsHtml = tags.map(function(t) { return '<span class="tag">' + escapeHtml(t) + '<span class="tag-remove" onclick="removeTag(\'' + escapeHtml(t.replace(/'/g, "\\'")) + '\')">&times;</span></span>'; }).join('')
-    + machineTags.map(function(t) { return '<span class="tag tag-machine" title="Auto-generated">' + escapeHtml(t) + '</span>'; }).join('');
 
-  container.innerHTML = '<div class="tags-row">'
-    + tagsHtml
-    + '<input type="text" placeholder="Add tag\u2026" onkeydown="handleTagKey(event)" />'
-    + '</div>';
+  var html = '';
+  for (var i = 0; i < tags.length; i++) {
+    var t = tags[i];
+    html += '<a class="tag" href="#" onclick="event.preventDefault();document.getElementById(\'search\').value=\'tag:' + escapeJsStr(t) + '\';filterFiles()">' + escapeHtml(t) + '</a>';
+  }
+  for (var j = 0; j < machineTags.length; j++) {
+    var mt = machineTags[j];
+    html += '<a class="tag tag-machine" href="#" onclick="event.preventDefault();document.getElementById(\'search\').value=\'tag:' + escapeJsStr(mt) + '\';filterFiles()" title="Auto-generated">' + escapeHtml(mt) + '</a>';
+  }
+  container.innerHTML = html;
 }
 
 function toggleFavorite(btn) {
@@ -711,12 +715,33 @@ function toggleFavorite(btn) {
 var toggleFavoriteFromHeader = toggleFavorite;
 
 function toggleNotesFromHeader() {
-  var container = document.getElementById('header-tags');
-  if (container) {
-    container.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    var input = container.querySelector('input');
-    if (input) input.focus();
+  // Show tag editing row below pub-bar
+  var existing = document.getElementById('tag-edit-row');
+  if (existing) { existing.remove(); return; }
+
+  var pubBar = document.querySelector('.pub-bar');
+  var header = document.querySelector('.article-header');
+  if (!header) return;
+
+  var row = document.createElement('div');
+  row.id = 'tag-edit-row';
+  row.className = 'tag-edit-row';
+
+  var tags = (articleNotes.tags || []);
+  var tagsHtml = tags.map(function(t) {
+    return '<span class="tag">' + escapeHtml(t) + '<span class="tag-remove" onclick="removeTag(\'' + escapeHtml(t.replace(/'/g, "\\'")) + '\')">&times;</span></span>';
+  }).join('');
+
+  row.innerHTML = tagsHtml + '<input type="text" placeholder="Add tag\u2026" onkeydown="handleTagKey(event)" />';
+
+  if (pubBar && pubBar.nextElementSibling) {
+    header.insertBefore(row, pubBar.nextElementSibling);
+  } else {
+    header.insertBefore(row, header.firstChild);
   }
+
+  var input = row.querySelector('input');
+  if (input) input.focus();
 }
 
 function scrollToHighlight(id) {
@@ -741,7 +766,11 @@ function updateHeaderActions() {
 function handleTagKey(e) {
   handleTagInput(e,
     function() { if (!articleNotes.tags) articleNotes.tags = []; return articleNotes.tags; },
-    function() { saveNotes(); renderNotesPanel(); updateSidebarItem(activeFile); }
+    function() {
+      saveNotes(); renderNotesPanel(); updateSidebarItem(activeFile);
+      var editRow = document.getElementById('tag-edit-row');
+      if (editRow) { editRow.remove(); toggleNotesFromHeader(); }
+    }
   );
 }
 
@@ -751,6 +780,9 @@ function removeTag(tag) {
   saveNotes();
   renderNotesPanel();
   updateSidebarItem(activeFile);
+  // Refresh tag edit row if open
+  var editRow = document.getElementById('tag-edit-row');
+  if (editRow) { editRow.remove(); toggleNotesFromHeader(); }
 }
 
 // ---- Voice Notes (Web Speech API) ----

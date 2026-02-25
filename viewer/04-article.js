@@ -277,8 +277,51 @@ function renderArticle(text, filename) {
 
   let html = '';
 
-  // Article header: title, author, date, domain, actions
+  // Article header: pub bar, title, author, date
   html += '<div class="article-header">';
+
+  // Publication bar: source identity on left, tags on right
+  if (meta && meta.domain && meta.domain !== 'pullread') {
+    var srcColor = sourceColor(meta.feed || meta.domain);
+    var pubName = '';
+    var pubDomain = meta.domain;
+
+    // Determine publication name from feed
+    if (meta.feed && !feedMatchesDomain(meta.feed, meta.domain)) {
+      pubName = meta.feed;
+    } else if (meta.feed) {
+      // Feed matches domain — use feed as pub name, skip domain line
+      pubName = meta.feed;
+      pubDomain = '';
+    }
+
+    // If pub name IS the domain, collapse to single line
+    if (pubName && pubName.toLowerCase() === meta.domain.toLowerCase()) {
+      pubDomain = '';
+    }
+
+    // Favicon: show real favicon with initials fallback
+    var initials = (pubName || meta.domain).replace(/^(the |www\.)/i, '').slice(0, 2).toUpperCase();
+    var faviconHtml = '<div class="pub-favicon" style="background:' + srcColor + '">'
+      + '<img src="/favicons/' + encodeURIComponent(meta.domain) + '.png" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
+      + '<span class="pub-favicon-fallback">' + escapeHtml(initials) + '</span></div>';
+
+    html += '<div class="pub-bar">';
+    html += '<div class="pub-identity">';
+    html += faviconHtml;
+    html += '<div>';
+    if (pubName) html += '<span class="pub-name">' + escapeHtml(pubName) + '</span>';
+    if (pubDomain) html += '<span class="pub-domain">' + escapeHtml(pubDomain) + '</span>';
+    if (!pubName && !pubDomain) html += '<span class="pub-domain">' + escapeHtml(meta.domain) + '</span>';
+    html += '</div></div>';
+    html += '<div class="pub-tags" id="header-tags"></div>';
+    html += '</div>';
+  } else {
+    // No domain or pullread internal — just an empty tags container
+    html += '<div id="header-tags"></div>';
+  }
+
+  // Title
   if (meta && meta.title) {
     if (meta.url) {
       html += '<h1><a href="' + escapeHtml(meta.url) + '" target="_blank" rel="noopener" class="title-link">' + escapeHtml(meta.title) + '<svg class="icon icon-external" aria-hidden="true"><use href="#i-external"/></svg></a></h1>';
@@ -286,7 +329,9 @@ function renderArticle(text, filename) {
       html += '<h1>' + escapeHtml(meta.title) + '</h1>';
     }
   }
-  // Author line
+
+  // Metadata line: author, date, read time (appended later)
+  var metaLineParts = [];
   if (meta && meta.author) {
     var authorText = meta.author;
     if (authorText.length > 80) {
@@ -294,18 +339,9 @@ function renderArticle(text, filename) {
       if (cutoff > 10 && cutoff < 80) authorText = authorText.slice(0, cutoff);
       else authorText = authorText.slice(0, 80).replace(/\s+\S*$/, '') + '\u2026';
     }
-    html += '<div class="article-author">By <span class="author" onclick="searchByAuthor(\'' + escapeHtml(authorText).replace(/'/g, "\\'") + '\')" title="Search for articles by this author">' + escapeHtml(authorText) + '</span></div>';
-  }
-  // Metadata line: favicon, domain, date, feed
-  var metaLineParts = [];
-  if (meta && meta.domain) {
-    var faviconImg = meta.domain !== 'pullread' ? '<img class="article-meta-favicon" src="/favicons/' + encodeURIComponent(meta.domain) + '.png" alt="" loading="lazy" onerror="this.style.display=\'none\'">' : '';
-    metaLineParts.push(faviconImg + '<a href="' + escapeHtml(meta.url || '') + '" target="_blank">' + escapeHtml(meta.domain) + '</a>');
+    metaLineParts.push('<span class="author" onclick="searchByAuthor(\'' + escapeHtml(authorText).replace(/'/g, "\\'") + '\')" title="Search for articles by this author">' + escapeHtml(authorText) + '</span>');
   }
   if (meta && meta.bookmarked) metaLineParts.push('<span title="' + escapeHtml(timeAgoTitle(meta.bookmarked)) + '">' + escapeHtml(timeAgo(meta.bookmarked)) + '</span>');
-  if (meta && meta.feed && meta.domain && !feedMatchesDomain(meta.feed, meta.domain)) {
-    metaLineParts.push('<span class="feed-source">via ' + escapeHtml(meta.feed) + '</span>');
-  }
   if (metaLineParts.length) {
     html += '<div class="article-meta">' + metaLineParts.join('<span class="sep">&middot;</span>') + '</div>';
   }
@@ -338,8 +374,6 @@ function renderArticle(text, filename) {
   if (toolbarEl) toolbarEl.innerHTML = toolbarActions;
   var toolbar = document.getElementById('reader-toolbar');
   if (toolbar) toolbar.style.display = '';
-  // Tags row (populated by renderNotesPanel)
-  html += '<div id="header-tags"></div>';
   // Show notebook back-references
   var nbRefs = Object.values(_notebooks || {}).filter(function(nb) { return nb.sources && nb.sources.indexOf(filename) >= 0; });
   if (nbRefs.length) {
@@ -556,10 +590,10 @@ function renderArticle(text, filename) {
     });
   })(content);
 
-  // Add read time to article meta (only for 3+ min articles)
+  // Add read time to article meta (only for 5+ min articles)
   const articleBodyText = content.textContent || '';
   const { words, minutes } = calculateReadStats(articleBodyText);
-  if (minutes >= 3) {
+  if (minutes >= 5) {
     var wordStr = words >= 1000 ? (words / 1000).toFixed(1) + 'k' : words;
     var articleMetaEl = content.querySelector('.article-meta');
     if (articleMetaEl) {
