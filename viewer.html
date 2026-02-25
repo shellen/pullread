@@ -127,6 +127,7 @@
       </div>
       <div class="file-list" id="file-list" role="listbox" aria-label="Articles"></div>
       <div class="sync-status" id="sync-status" aria-live="polite"></div>
+      <div id="player-mini-mount" class="player-mini-mount"></div>
       <div class="sidebar-footer">
         <button class="sidebar-footer-btn" onclick="toggleFocusMode()" aria-label="Focus mode" title="Focus mode (f)" id="focus-btn"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-focus"/></svg> Focus</button>
         <button class="sidebar-footer-btn" onclick="showTagCloud()" aria-label="Explore" title="Explore"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-tags"/></svg> Explore</button>
@@ -143,8 +144,6 @@
       </div>
       <div class="drawer-content" id="drawer-content"></div>
     </div>
-
-    <pr-player></pr-player>
 
     <div class="mini-mode-container" id="mini-mode-container" style="display:none">
       <div class="mini-mode-header">
@@ -195,6 +194,7 @@
         <div class="margin-notes" id="margin-notes" aria-hidden="true"></div>
         <div class="toc-container" id="toc-container" aria-label="Table of contents"></div>
       </div>
+      <pr-player></pr-player>
     </main>
   </div>
 

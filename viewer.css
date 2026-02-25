@@ -1577,6 +1577,15 @@
       padding: 20px 20px;
       width: 94%;
     }
+    pr-player.bottom-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+    }
+    pr-player.bottom-bar.hidden { transform: translateY(100%); max-height: none; }
+    .app.has-bottom-bar .content-scroll { padding-bottom: 80px; }
+    .mini-toggle { display: none; }
   }
 
   /* Small mobile */
@@ -1679,19 +1688,30 @@
 
   /* ---- Bottom bar audio player ---- */
   .bottom-bar {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    flex-shrink: 0;
     z-index: 50;
     background: var(--sidebar-bg);
     border-top: 1px solid var(--border);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-size: 12px;
     box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
-    transition: transform 0.25s ease;
+    transition: transform 0.25s ease, max-height 0.25s ease;
+    overflow: hidden;
   }
-  .bottom-bar.hidden { transform: translateY(100%); pointer-events: none; }
+  .bottom-bar.hidden { max-height: 0; border-top: none; box-shadow: none; pointer-events: none; }
+  .mini-toggle {
+    border: none;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .mini-toggle:hover { background: var(--sidebar-hover); color: var(--fg); }
+  .mini-toggle svg { width: 14px; height: 14px; fill: currentColor; }
   .bottom-bar-inner {
     display: flex;
     align-items: center;
@@ -1847,9 +1867,81 @@
     max-height: 200px;
     overflow-y: auto;
   }
-  /* Add bottom padding to content pane when bottom bar is visible */
-  .app.has-bottom-bar .content-scroll { padding-bottom: 80px; }
+  /* Add bottom padding on mobile when bottom bar is fixed-positioned */
   .app.has-bottom-bar .drawer { padding-bottom: 80px; }
+
+  /* ---- Mini player (sidebar) ---- */
+  .player-mini-mount { flex-shrink: 0; }
+  .bottom-bar-mini {
+    background: var(--sidebar-bg);
+    border-top: 1px solid var(--border);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 12px;
+    overflow: hidden;
+    transition: max-height 0.25s ease;
+  }
+  .bottom-bar-mini.hidden { max-height: 0; border-top: none; }
+  .mini-player-inner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+  .mini-player-play {
+    border: none;
+    background: none;
+    color: var(--fg);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .mini-player-play:hover { background: var(--sidebar-hover); }
+  .mini-player-play svg { width: 20px; height: 20px; fill: currentColor; }
+  .mini-player-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+    cursor: pointer;
+  }
+  .mini-player-info:hover .mini-player-title { text-decoration: underline; }
+  .mini-player-title {
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--fg);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mini-player-status {
+    font-size: 10px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .mini-player-expand {
+    border: none;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .mini-player-expand:hover { background: var(--sidebar-hover); color: var(--fg); }
+  .mini-player-expand svg { width: 14px; height: 14px; fill: currentColor; }
+  .mini-player-progress-row {
+    padding: 0 10px 6px;
+  }
+  .mini-player-progress-row .audio-progress-wrap { height: 14px; padding: 0; }
+  .mini-player-progress-row .audio-progress { height: 3px; }
+
   .tts-speed-popup {
     position: fixed;
     background: var(--bg);

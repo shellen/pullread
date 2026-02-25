@@ -1,5 +1,5 @@
 // ABOUTME: Custom element <pr-player> that renders the TTS audio player bottom bar.
-// ABOUTME: Exposes public API for playback control, state getters, and custom events.
+// ABOUTME: Supports expanded (content pane) and mini (sidebar) modes with seamless switching.
 
 class PrPlayer extends HTMLElement {
   static get observedAttributes() { return ['mode']; }
@@ -8,6 +8,8 @@ class PrPlayer extends HTMLElement {
     super();
     this._lastQueueLen = 0;
     this._lastIndex = -1;
+    this._mode = 'expanded';
+    this._initialized = false;
   }
 
   // ---- State getters (read from playback engine in 07-tts.js) ----
@@ -36,8 +38,31 @@ class PrPlayer extends HTMLElement {
   dismiss() { ttsDismissPlayer(); }
 
   connectedCallback() {
-    this.className = 'bottom-bar hidden';
+    if (this._initialized) {
+      // Re-inserted after a mode switch — just re-init drag listeners
+      this._initProgressDrag();
+      return;
+    }
+    this._initialized = true;
+    this._mode = this.getAttribute('mode') || 'expanded';
     this.id = 'audio-player';
+    this._renderCurrentMode();
+  }
+
+  /** Render the template for the current mode */
+  _renderCurrentMode() {
+    this._closeSpeedSlider();
+    if (this._mode === 'mini') {
+      this._renderMini();
+    } else {
+      this._renderExpanded();
+    }
+    this._initProgressDrag();
+  }
+
+  /** Build the full expanded player template */
+  _renderExpanded() {
+    this.className = 'bottom-bar hidden';
     this.innerHTML =
       '<div class="bottom-bar-inner">' +
         '<div class="bottom-bar-now" id="bottom-bar-now" onclick="bottomBarGoToArticle()">' +
@@ -63,6 +88,7 @@ class PrPlayer extends HTMLElement {
           '<button class="audio-speed-btn" onclick="ttsToggleSpeedSlider()" title="Playback speed" id="tts-speed-btn">1x</button>' +
           '<button class="bottom-bar-queue-btn" onclick="toggleBottomBarQueue()" title="Queue" id="bottom-bar-queue-toggle"><svg><use href="#i-queue"/></svg></button>' +
           '<button class="bottom-bar-settings-btn" onclick="showSettingsPage(\'settings-voice\')" title="Voice settings"><svg><use href="#i-sliders"/></svg></button>' +
+          '<button class="mini-toggle" onclick="setPlayerMode(\'mini\')" title="Minimize to sidebar"><svg class="icon icon-sm"><use href="#i-chevron-left"/></svg></button>' +
           '<button class="bottom-bar-close-btn" onclick="ttsDismissPlayer()" title="Close player"><svg><use href="#i-xmark"/></svg></button>' +
         '</div>' +
       '</div>' +
@@ -73,8 +99,47 @@ class PrPlayer extends HTMLElement {
         '</div>' +
         '<div id="audio-queue-list"></div>' +
       '</div>';
+  }
 
-    this._initProgressDrag();
+  /** Build the compact mini player template for sidebar */
+  _renderMini() {
+    this.className = 'bottom-bar-mini hidden';
+    this.innerHTML =
+      '<div class="mini-player-inner">' +
+        '<button class="mini-player-play" onclick="ttsTogglePlay()" title="Play/Pause" id="tts-play-btn"><svg><use href="#i-play"/></svg></button>' +
+        '<div class="mini-player-info" onclick="bottomBarGoToArticle()">' +
+          '<span class="mini-player-title" id="audio-now-label">No article queued</span>' +
+          '<span class="mini-player-status" id="audio-now-status"></span>' +
+        '</div>' +
+        '<button class="mini-player-expand" onclick="setPlayerMode(\'expanded\')" title="Expand player"><svg class="icon icon-sm"><use href="#i-chevron-right"/></svg></button>' +
+      '</div>' +
+      '<div class="mini-player-progress-row">' +
+        '<div class="audio-progress-wrap" id="audio-progress-wrap">' +
+          '<div class="audio-progress"><div class="audio-progress-fill" id="tts-progress"></div></div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  /** Switch between expanded and mini modes */
+  _updateMode() {
+    var oldMode = this._mode;
+    this._mode = this.getAttribute('mode') || 'expanded';
+    if (this._mode === oldMode) return;
+
+    // Re-render with the new template
+    this._renderCurrentMode();
+
+    // Move element to the correct mount point
+    if (this._mode === 'mini') {
+      var mount = document.getElementById('player-mini-mount');
+      if (mount) mount.appendChild(this);
+    } else {
+      var pane = document.getElementById('content-pane');
+      if (pane) pane.appendChild(this);
+    }
+
+    // Re-apply current state to the new DOM
+    renderAudioPlayer();
   }
 
   /** Set up mouse/touch drag on the progress bar for seeking */
@@ -118,6 +183,7 @@ class PrPlayer extends HTMLElement {
     if (this._speedPopup) { this._closeSpeedSlider(); return; }
 
     var btn = this.querySelector('#tts-speed-btn');
+    if (!btn) return;
     var rect = btn.getBoundingClientRect();
     var count = TTS_SPEEDS.length;
 
@@ -261,7 +327,8 @@ class PrPlayer extends HTMLElement {
       return;
     }
     this.classList.remove('hidden');
-    if (app) app.classList.add('has-bottom-bar');
+    if (this._mode !== 'mini' && app) app.classList.add('has-bottom-bar');
+    if (this._mode === 'mini' && app) app.classList.remove('has-bottom-bar');
 
     var label = this.querySelector('#audio-now-label');
     var status = this.querySelector('#audio-now-status');
@@ -270,7 +337,7 @@ class PrPlayer extends HTMLElement {
     var currentItem = (currentIndex >= 0 && currentIndex < queue.length) ? queue[currentIndex] : null;
     if (label) label.textContent = currentItem ? currentItem.title : 'No article playing';
 
-    // Update artwork: article image > favicon > volume icon
+    // Update artwork (expanded mode only)
     var artworkEl = this.querySelector('#bottom-bar-artwork');
     if (artworkEl) {
       var artSrc = '';
@@ -309,30 +376,40 @@ class PrPlayer extends HTMLElement {
         : '<svg><use href="#i-play"/></svg>';
     }
 
-    // Render queue
+    // Render queue (expanded mode only)
     var queueSection = this.querySelector('#audio-queue-section');
     var queueList = this.querySelector('#audio-queue-list');
     var queueToggle = this.querySelector('#bottom-bar-queue-toggle');
-    if (queue.length > 1) {
-      if (queueToggle) queueToggle.classList.add('active');
-      if (queueList) {
-        queueList.innerHTML = queue.map(function(item, i) {
-          return '<div class="audio-queue-item' + (i === currentIndex ? ' playing' : '') + '" onclick="playTTSItem(' + i + ')">'
-            + '<span style="font-size:10px;color:var(--muted);width:14px;text-align:center">' + (i === currentIndex ? '&#9654;' : (i + 1)) + '</span>'
-            + '<span class="queue-title">' + escapeHtml(item.title) + '</span>'
-            + '<button class="queue-remove" onclick="event.stopPropagation();removeTTSQueueItem(' + i + ')" title="Remove">&times;</button>'
-            + '</div>';
-        }).join('');
+    if (queueSection) {
+      if (queue.length > 1) {
+        if (queueToggle) queueToggle.classList.add('active');
+        if (queueList) {
+          queueList.innerHTML = queue.map(function(item, i) {
+            return '<div class="audio-queue-item' + (i === currentIndex ? ' playing' : '') + '" onclick="playTTSItem(' + i + ')">'
+              + '<span style="font-size:10px;color:var(--muted);width:14px;text-align:center">' + (i === currentIndex ? '&#9654;' : (i + 1)) + '</span>'
+              + '<span class="queue-title">' + escapeHtml(item.title) + '</span>'
+              + '<button class="queue-remove" onclick="event.stopPropagation();removeTTSQueueItem(' + i + ')" title="Remove">&times;</button>'
+              + '</div>';
+          }).join('');
+        }
+      } else {
+        if (queueToggle) queueToggle.classList.remove('active');
+        queueSection.style.display = 'none';
       }
-    } else {
-      if (queueToggle) queueToggle.classList.remove('active');
-      if (queueSection) queueSection.style.display = 'none';
     }
   }
 
   attributeChangedCallback(name, oldVal, newVal) {
-    // Stub for future mode switching (expanded, mini, etc.)
+    if (name === 'mode' && oldVal !== newVal && this._initialized) {
+      this._updateMode();
+    }
   }
 }
 
 customElements.define('pr-player', PrPlayer);
+
+/** Global helper for inline onclick handlers to switch player mode */
+function setPlayerMode(mode) {
+  var player = document.querySelector('pr-player');
+  if (player) player.setAttribute('mode', mode);
+}
