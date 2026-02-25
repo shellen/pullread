@@ -104,8 +104,11 @@ function renderDashboard() {
     html += '<div class="dash-explore-pills">';
     if (hasBooks) html += '<button class="tag-pill" onclick="document.getElementById(\'search\').value=\'is:book\';filterFiles()">Books</button>';
     if (hasPodcasts) html += '<button class="tag-pill" onclick="document.getElementById(\'search\').value=\'is:podcast\';filterFiles()">Podcasts</button>';
-    for (var ti = 0; ti < Math.min(topTags.length, 12); ti++) {
+    var shownTags = 0;
+    for (var ti = 0; ti < topTags.length && shownTags < 12; ti++) {
+      if (isTagBlocked(topTags[ti][0])) continue;
       html += '<button class="tag-pill" onclick="document.getElementById(\'search\').value=\'tag:' + escapeJsStr(topTags[ti][0]) + '\';filterFiles()">' + escapeHtml(topTags[ti][0]) + '<span class="tag-count">' + topTags[ti][1] + '</span></button>';
+      shownTags++;
     }
     html += '</div></div>';
   }

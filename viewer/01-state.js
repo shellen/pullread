@@ -23,6 +23,9 @@ var _breakSessionStart = 0;
 var _breakPendingIndex = -1;
 var _breakPendingDirection = 0;
 
+// Blocked tags (hidden from Explore and Home)
+var blockedTags = new Set(JSON.parse(localStorage.getItem('pr-blocked-tags') || '[]'));
+
 // Source color palette for feed/domain indicators
 var SOURCE_COLORS = [
   '#ef4444','#f97316','#f59e0b','#84cc16','#22c55e',

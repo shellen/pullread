@@ -935,8 +935,8 @@
     color: var(--fg);
     border-color: var(--muted);
   }
-  .toolbar-action-btn.active-fav { color: #ef4444; border-color: #ef4444; }
-  .toolbar-action-btn.active-fav:hover { color: #dc2626; border-color: #dc2626; }
+  .toolbar-action-btn.active-fav { color: #d97706; border-color: #d97706; }
+  .toolbar-action-btn.active-fav:hover { color: #b45309; border-color: #b45309; }
   .reader-toolbar-right {
     display: flex;
     align-items: center;
@@ -3961,6 +3961,34 @@
   .tag-pill:hover {
     background: var(--sidebar-active);
     box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .tag-pill-wrap {
+    display: inline-flex;
+    align-items: center;
+    position: relative;
+  }
+  .tag-block-btn {
+    display: none;
+    position: absolute;
+    right: -4px;
+    top: -4px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: none;
+    background: var(--muted);
+    color: var(--bg);
+    font-size: 11px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    z-index: 1;
+  }
+  .tag-pill-wrap:hover .tag-block-btn { display: flex; align-items: center; justify-content: center; }
+  .tag-block-btn:hover { background: #ef4444; }
+  .tag-pill-blocked {
+    opacity: 0.5;
+    text-decoration: line-through;
   }
   .tag-pill .tag-count {
     font-size: 10px;

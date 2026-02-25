@@ -138,15 +138,27 @@ function showTagCloud() {
   }
 
   // --- Tab: Tags ---
+  const visibleTags = sortedTags.filter(function(entry) { return !isTagBlocked(entry[0]); });
   let tagsHtml = '';
-  if (sortedTags.length > 0) {
+  if (visibleTags.length > 0) {
     tagsHtml = '<div class="tag-cloud">';
-    for (const [tag, count] of sortedTags) {
-      tagsHtml += '<button class="tag-pill" onclick="document.getElementById(\'search\').value=\'tag:' + escapeJsStr(tag) + '\';filterFiles()">' + escapeHtml(tag) + '<span class="tag-count">' + count + '</span></button>';
+    for (const [tag, count] of visibleTags) {
+      tagsHtml += '<span class="tag-pill-wrap"><button class="tag-pill" onclick="document.getElementById(\'search\').value=\'tag:' + escapeJsStr(tag) + '\';filterFiles()">' + escapeHtml(tag) + '<span class="tag-count">' + count + '</span></button>'
+        + '<button class="tag-block-btn" onclick="blockTag(\'' + escapeJsStr(tag) + '\');showTagCloud()" title="Block this tag">&times;</button></span>';
     }
     tagsHtml += '</div>';
   } else {
     tagsHtml = '<p style="color:var(--muted);font-size:13px;padding:12px 0">No tags yet. Tag articles from the notes panel, or use auto-tagging to generate topic tags.</p>';
+  }
+
+  // Blocked tags management
+  if (blockedTags.size > 0) {
+    tagsHtml += '<h3 style="font-size:13px;font-weight:600;margin:24px 0 8px;color:var(--muted)">Blocked Tags</h3>';
+    tagsHtml += '<div class="tag-cloud">';
+    for (const tag of blockedTags) {
+      tagsHtml += '<button class="tag-pill tag-pill-blocked" onclick="unblockTag(\'' + escapeJsStr(tag) + '\');showTagCloud()">' + escapeHtml(tag) + ' <span style="opacity:0.6">unblock</span></button>';
+    }
+    tagsHtml += '</div>';
   }
 
   // --- Tab: Sources ---
@@ -198,7 +210,7 @@ function showTagCloud() {
 function buildConnectionsHtml(tagArticles, sortedTags) {
   // Pick tags with 2-8 articles (meaningful clusters, not too noisy)
   const clusters = sortedTags
-    .filter(function(entry) { return entry[1] >= 2 && entry[1] <= 8; })
+    .filter(function(entry) { return entry[1] >= 2 && entry[1] <= 8 && !isTagBlocked(entry[0]); })
     .slice(0, 12);
   if (clusters.length === 0) return '';
 

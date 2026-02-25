@@ -213,6 +213,21 @@ function handleTagInput(e, getTagsArray, onAdd) {
   }
 }
 
+// Block/unblock tags from Explore and Home
+function blockTag(tag) {
+  blockedTags.add(tag);
+  localStorage.setItem('pr-blocked-tags', JSON.stringify([...blockedTags]));
+  showToast('Blocked "' + tag + '"');
+}
+function unblockTag(tag) {
+  blockedTags.delete(tag);
+  localStorage.setItem('pr-blocked-tags', JSON.stringify([...blockedTags]));
+  showToast('Unblocked "' + tag + '"');
+}
+function isTagBlocked(tag) {
+  return blockedTags.has(tag);
+}
+
 // Print styled HTML content using the system print dialog (Save as PDF on macOS).
 // Uses @media print to hide the Pullread UI and show only the export content.
 // In Tauri, invokes native print_webview command since JS window.print() is blocked.
