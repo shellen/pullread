@@ -411,7 +411,7 @@ function navigateArticle(direction) {
   activeFile = displayFiles[next].filename;
   updateSidebarActiveState(prevActive);
   const el = document.querySelector('.file-item[data-index="' + next + '"]');
-  if (el) el.scrollIntoView({ block: 'nearest' });
+  if (el) { el.scrollIntoView({ block: 'nearest' }); el.focus({ preventScroll: true }); }
 
   // Debounce the heavy work (fetch + render)
   _navDebounceTimer = setTimeout(function() {
