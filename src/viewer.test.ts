@@ -46,6 +46,16 @@ Body`;
     const meta = parseFrontmatter(content);
     expect(meta.title).toBe('He said "hello"');
   });
+
+  test('preserves categories array as raw string', () => {
+    const content = `---
+title: "Tagged Article"
+categories: ["Technology", "Programming"]
+---
+Body`;
+    const meta = parseFrontmatter(content);
+    expect(meta.categories).toBe('["Technology", "Programming"]');
+  });
 });
 
 describe('reprocessFile', () => {

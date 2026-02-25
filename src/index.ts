@@ -257,7 +257,8 @@ async function syncFeed(
         author,
         excerpt,
         thumbnail,
-        lang
+        lang,
+        categories: entry.categories
       });
 
       storage.markProcessed({

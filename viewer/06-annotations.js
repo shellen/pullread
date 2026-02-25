@@ -692,6 +692,8 @@ function renderNotesPanel() {
 
   var tags = articleNotes.tags || [];
   var machineTags = articleNotes.machineTags || [];
+  var fileMeta = allFiles.find(function(f) { return f.filename === activeFile; });
+  var sourceTags = (fileMeta && fileMeta.categories) || [];
 
   var html = '';
   for (var i = 0; i < tags.length; i++) {
@@ -701,6 +703,10 @@ function renderNotesPanel() {
   for (var j = 0; j < machineTags.length; j++) {
     var mt = machineTags[j];
     html += '<a class="tag tag-machine" href="#" onclick="event.preventDefault();document.getElementById(\'search\').value=\'tag:' + escapeJsStr(mt) + '\';filterFiles()" title="Auto-generated">' + escapeHtml(mt) + '</a>';
+  }
+  for (var k = 0; k < sourceTags.length; k++) {
+    var st = sourceTags[k];
+    html += '<a class="tag tag-source" href="#" onclick="event.preventDefault();document.getElementById(\'search\').value=\'tag:' + escapeJsStr(st) + '\';filterFiles()" title="From feed">' + escapeHtml(st) + '</a>';
   }
   container.innerHTML = html;
 }
@@ -731,11 +737,15 @@ function toggleNotesFromHeader() {
 
   _tagEditMode = true;
   var tags = (articleNotes.tags || []);
+  var machineTags = (articleNotes.machineTags || []);
   var tagsHtml = tags.map(function(t) {
     return '<span class="tag tag-editable">' + escapeHtml(t) + '<span class="tag-remove" onclick="removeTag(\'' + escapeHtml(t.replace(/'/g, "\\'")) + '\')">&times;</span></span>';
   }).join('');
+  var machineHtml = machineTags.map(function(t) {
+    return '<span class="tag tag-editable tag-machine">' + escapeHtml(t) + '<span class="tag-remove" onclick="removeMachineTag(\'' + escapeHtml(t.replace(/'/g, "\\'")) + '\')">&times;</span></span>';
+  }).join('');
 
-  container.innerHTML = tagsHtml + '<input type="text" class="tag-input" placeholder="Add tag\u2026" onkeydown="handleTagKey(event)" />';
+  container.innerHTML = tagsHtml + machineHtml + '<input type="text" class="tag-input" placeholder="Add tag\u2026" onkeydown="handleTagKey(event)" />';
 
   var input = container.querySelector('input');
   if (input) input.focus();
@@ -778,6 +788,19 @@ function handleTagKey(e) {
 function removeTag(tag) {
   if (!articleNotes.tags) return;
   articleNotes.tags = articleNotes.tags.filter(t => t !== tag);
+  saveNotes();
+  updateSidebarItem(activeFile);
+  if (_tagEditMode) {
+    _tagEditMode = false;
+    toggleNotesFromHeader();
+  } else {
+    renderNotesPanel();
+  }
+}
+
+function removeMachineTag(tag) {
+  if (!articleNotes.machineTags) return;
+  articleNotes.machineTags = articleNotes.machineTags.filter(t => t !== tag);
   saveNotes();
   updateSidebarItem(activeFile);
   if (_tagEditMode) {

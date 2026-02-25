@@ -93,6 +93,31 @@ describe('generateMarkdown', () => {
     expect(md).toContain('title: "Article with \\"quotes\\""');
   });
 
+  test('includes categories when present', () => {
+    const md = generateMarkdown({
+      title: 'Tagged Article',
+      url: 'https://example.com/tagged',
+      bookmarkedAt: '2024-01-29T12:00:00Z',
+      domain: 'example.com',
+      content: 'Content',
+      categories: ['Technology', 'Programming']
+    });
+
+    expect(md).toContain('categories: ["Technology", "Programming"]');
+  });
+
+  test('omits categories when empty or absent', () => {
+    const md = generateMarkdown({
+      title: 'No Tags',
+      url: 'https://example.com/none',
+      bookmarkedAt: '2024-01-29T12:00:00Z',
+      domain: 'example.com',
+      content: 'Content'
+    });
+
+    expect(md).not.toContain('categories');
+  });
+
   test('includes lang when present', () => {
     const md = generateMarkdown({
       title: 'Article en français',

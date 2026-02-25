@@ -821,3 +821,115 @@ describe('parseFeed - author extraction', () => {
     expect(jsonEntries[0].author).toBeUndefined();
   });
 });
+
+describe('parseFeed - category extraction', () => {
+  test('extracts categories from RSS <category> elements', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Category Feed</title>
+    <item>
+      <title>Tagged Article</title>
+      <link>https://example.com/tagged</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <category>Technology</category>
+      <category>Programming</category>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].categories).toEqual(['Technology', 'Programming']);
+  });
+
+  test('extracts categories from Atom <category> elements', () => {
+    const feed = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Atom Categories</title>
+  <entry>
+    <title>Atom Tagged</title>
+    <link href="https://example.com/atom-tagged"/>
+    <id>urn:uuid:cat-1</id>
+    <updated>2024-01-29T12:00:00Z</updated>
+    <category term="science"/>
+    <category term="physics"/>
+  </entry>
+</feed>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].categories).toEqual(['science', 'physics']);
+  });
+
+  test('extracts tags from JSON Feed', () => {
+    const feed = JSON.stringify({
+      version: 'https://jsonfeed.org/version/1.1',
+      title: 'Tagged JSON Feed',
+      items: [{
+        id: '1',
+        title: 'JSON Tagged',
+        url: 'https://example.com/json-tagged',
+        date_published: '2024-01-29T12:00:00Z',
+        tags: ['design', 'css', 'frontend']
+      }]
+    });
+    const entries = parseFeed(feed);
+    expect(entries[0].categories).toEqual(['design', 'css', 'frontend']);
+  });
+
+  test('omits categories when none present', () => {
+    const entries = parseFeed(RSS_FEED);
+    expect(entries[0].categories).toBeUndefined();
+  });
+
+  test('extracts categories from RDF with dc:subject', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+ xmlns="http://purl.org/rss/1.0/"
+ xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel rdf:about="https://example.com/">
+    <title>RDF Categories</title>
+    <link>https://example.com/</link>
+  </channel>
+  <item rdf:about="https://example.com/rdf-tagged">
+    <title>RDF Tagged</title>
+    <link>https://example.com/rdf-tagged</link>
+    <dc:date>2025-01-15T10:30:00Z</dc:date>
+    <dc:subject>bookmarks</dc:subject>
+  </item>
+</rdf:RDF>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].categories).toEqual(['bookmarks']);
+  });
+
+  test('handles single RSS category (not array)', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Single Cat Feed</title>
+    <item>
+      <title>One Tag</title>
+      <link>https://example.com/one</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <category>Solo</category>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].categories).toEqual(['Solo']);
+  });
+
+  test('handles RSS category with CDATA', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>CDATA Cat Feed</title>
+    <item>
+      <title>CDATA Tags</title>
+      <link>https://example.com/cdata</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <category><![CDATA[Web Development]]></category>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].categories).toEqual(['Web Development']);
+  });
+});

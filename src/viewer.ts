@@ -33,6 +33,7 @@ interface FileMeta {
   enclosureUrl: string;
   enclosureType: string;
   enclosureDuration: string;
+  categories: string[];
 }
 
 export function parseFrontmatter(content: string): Record<string, string> {
@@ -460,6 +461,17 @@ function listFiles(outputPath: string): FileMeta[] {
         if (imgMatch) image = imgMatch[1];
       }
 
+      // Parse categories from frontmatter YAML array: ["a", "b"] or [a, b]
+      let categories: string[] = [];
+      if (meta.categories) {
+        try {
+          const parsed = JSON.parse(meta.categories.replace(/'/g, '"'));
+          if (Array.isArray(parsed)) categories = parsed;
+        } catch {
+          categories = meta.categories.replace(/^\[|\]$/g, '').split(',').map(s => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+        }
+      }
+
       files.push({
         filename: name,
         title: meta.title || name.replace(/\.md$/, ''),
@@ -477,6 +489,7 @@ function listFiles(outputPath: string): FileMeta[] {
         enclosureUrl: meta.enclosure_url || '',
         enclosureType: meta.enclosure_type || '',
         enclosureDuration: meta.enclosure_duration || '',
+        categories,
       });
     } catch {
       // Skip unreadable files
@@ -513,6 +526,7 @@ function listFiles(outputPath: string): FileMeta[] {
         enclosureUrl: '',
         enclosureType: '',
         enclosureDuration: '',
+        categories: [],
       });
     } catch (err) {
       console.error(`[EPUB] Failed to index ${name}:`, err);

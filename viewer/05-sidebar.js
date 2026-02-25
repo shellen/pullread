@@ -293,12 +293,12 @@ function filterFiles() {
         // Operator: has:notes
         if (tl === 'has:notes' || tl === 'has:note') return hasNote;
         // Operator: has:tags
-        if (tl === 'has:tags' || tl === 'has:tag') return hasTags;
-        // Operator: tag:value
+        if (tl === 'has:tags' || tl === 'has:tag') return hasTags || (f.categories && f.categories.length > 0);
+        // Operator: tag:value — searches user tags, machine tags, and source categories
         if (tl.startsWith('tag:')) {
           const tagQ = tl.slice(4);
-          if (!tagQ) return hasTags;
-          const allTags = [...(notes?.tags || []), ...(notes?.machineTags || [])];
+          if (!tagQ) return hasTags || (f.categories && f.categories.length > 0);
+          const allTags = [...(notes?.tags || []), ...(notes?.machineTags || []), ...(f.categories || [])];
           return allTags.some(t => t.toLowerCase().includes(tagQ));
         }
         // Operator: feed:value

@@ -21,6 +21,7 @@ export interface FeedEntry {
   contentHtml?: string;
   enclosure?: Enclosure;
   author?: string;
+  categories?: string[];
 }
 
 type FeedType = 'atom' | 'rss' | 'rdf' | 'json';
@@ -49,6 +50,19 @@ function formatDuration(seconds: number): string {
   const s = seconds % 60;
   if (h > 0) return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
   return m + ':' + String(s).padStart(2, '0');
+}
+
+function extractCategories(raw: any): string[] | undefined {
+  if (!raw) return undefined;
+  const items = Array.isArray(raw) ? raw : [raw];
+  const cats = items.map((c: any) => {
+    if (typeof c === 'string') return c.trim();
+    if (c?.['@_term']) return String(c['@_term']).trim();
+    if (c?.['#text']) return String(c['#text']).trim();
+    if (c?.__cdata) return String(c.__cdata).trim();
+    return String(c).trim();
+  }).filter(Boolean);
+  return cats.length > 0 ? cats : undefined;
 }
 
 function parseJsonFeed(text: string): FeedEntry[] {
@@ -86,6 +100,10 @@ function parseJsonFeed(text: string): FeedEntry[] {
     const jsonAuthor = item.authors?.[0]?.name || item.author?.name || '';
     const jsonAuthorStr = typeof jsonAuthor === 'string' ? jsonAuthor.trim() : '';
 
+    const categories = Array.isArray(item.tags) && item.tags.length > 0
+      ? item.tags.filter((t: any) => typeof t === 'string' && t.trim()).map((t: string) => t.trim())
+      : undefined;
+
     return {
       title: item.title || 'Untitled',
       url,
@@ -94,7 +112,8 @@ function parseJsonFeed(text: string): FeedEntry[] {
       annotation: annotation || undefined,
       contentHtml: contentHtml || undefined,
       enclosure,
-      author: jsonAuthorStr || undefined
+      author: jsonAuthorStr || undefined,
+      categories: categories?.length ? categories : undefined
     };
   });
 }
@@ -154,6 +173,7 @@ function parseAtomFeed(feed: any): FeedEntry[] {
     }
 
     const author = extractAtomAuthorName(entry.author) || feedAuthor;
+    const categories = extractCategories(entry.category);
 
     return {
       title: extractTitle(entry.title),
@@ -162,7 +182,8 @@ function parseAtomFeed(feed: any): FeedEntry[] {
       domain,
       annotation: annotation || undefined,
       contentHtml: contentHtml || undefined,
-      author: author || undefined
+      author: author || undefined,
+      categories
     };
   });
 }
@@ -220,6 +241,8 @@ function parseRssFeed(rss: any): FeedEntry[] {
       ? (authorStr.match(/\(([^)]+)\)/)?.[1] || '').trim()
       : authorStr;
 
+    const categories = extractCategories(item.category);
+
     return [{
       title: extractTitle(item.title),
       url,
@@ -228,7 +251,8 @@ function parseRssFeed(rss: any): FeedEntry[] {
       annotation: description || undefined,
       contentHtml: contentHtml || undefined,
       enclosure,
-      author: authorName || undefined
+      author: authorName || undefined,
+      categories
     }];
   });
 }
@@ -260,6 +284,7 @@ function parseRdfFeed(rdf: any): FeedEntry[] {
 
     const rdfAuthor = item['dc:creator'] || '';
     const rdfAuthorStr = typeof rdfAuthor === 'string' ? rdfAuthor.trim() : '';
+    const categories = extractCategories(item['dc:subject'] || item.category);
 
     return {
       title: extractTitle(item.title),
@@ -268,7 +293,8 @@ function parseRdfFeed(rdf: any): FeedEntry[] {
       domain,
       annotation: description || undefined,
       contentHtml: contentHtml || undefined,
-      author: rdfAuthorStr || undefined
+      author: rdfAuthorStr || undefined,
+      categories
     };
   });
 }

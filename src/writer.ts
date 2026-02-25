@@ -18,6 +18,7 @@ export interface ArticleData {
   excerpt?: string;
   thumbnail?: string;
   lang?: string;
+  categories?: string[];
 }
 
 export function generateFilename(title: string, bookmarkedAt: string): string {
@@ -56,6 +57,10 @@ domain: ${data.domain}`;
 
   if (data.lang) {
     frontmatter += `\nlang: ${data.lang}`;
+  }
+
+  if (data.categories && data.categories.length > 0) {
+    frontmatter += `\ncategories: [${data.categories.map(c => `"${escapeQuotes(c)}"`).join(', ')}]`;
   }
 
   if (data.author) {
