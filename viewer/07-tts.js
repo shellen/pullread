@@ -170,81 +170,16 @@ async function addToTTSQueue(filename) {
 }
 
 function renderAudioPlayer() {
-  const panel = document.getElementById('audio-player');
-  if (!panel) return;
-
-  var app = document.querySelector('.app');
-
-  if (ttsQueue.length === 0) {
-    panel.classList.add('hidden');
-    if (app) app.classList.remove('has-bottom-bar');
-    updateSidebarAudioIndicators();
-    updateArticleNowPlaying();
-    return;
+  var player = document.querySelector('pr-player');
+  if (player) {
+    player.update({
+      queue: ttsQueue,
+      currentIndex: ttsCurrentIndex,
+      playing: ttsPlaying,
+      generating: ttsGenerating,
+      speed: ttsSpeed,
+    });
   }
-  panel.classList.remove('hidden');
-  if (app) app.classList.add('has-bottom-bar');
-
-  const label = document.getElementById('audio-now-label');
-  const status = document.getElementById('audio-now-status');
-  const playBtn = document.getElementById('tts-play-btn');
-
-  var currentItem = (ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length) ? ttsQueue[ttsCurrentIndex] : null;
-  label.textContent = currentItem ? currentItem.title : 'No article playing';
-
-  // Update artwork: article image > favicon > volume icon
-  var artworkEl = document.getElementById('bottom-bar-artwork');
-  if (artworkEl) {
-    var artSrc = '';
-    if (currentItem) {
-      if (currentItem.image) artSrc = currentItem.image;
-      else if (currentItem.domain) artSrc = '/favicons/' + encodeURIComponent(currentItem.domain) + '.png';
-    }
-    var fallbackIcon = '<svg class="bottom-bar-icon" aria-hidden="true"><use href="#i-volume"/></svg>';
-    if (artSrc) {
-      var img = new Image();
-      img.src = artSrc;
-      img.alt = '';
-      img.onerror = function() { artworkEl.innerHTML = fallbackIcon; };
-      artworkEl.innerHTML = '';
-      artworkEl.appendChild(img);
-    } else {
-      artworkEl.innerHTML = fallbackIcon;
-    }
-  }
-
-  if (ttsGenerating) {
-    status.textContent = 'Generating\u2026';
-  } else if (ttsPlaying) {
-    status.textContent = 'Playing';
-  } else if (ttsCurrentIndex >= 0) {
-    status.textContent = 'Paused';
-  } else {
-    status.textContent = '';
-  }
-
-  playBtn.innerHTML = ttsPlaying
-    ? '<svg><use href="#i-pause"/></svg>'
-    : '<svg><use href="#i-play"/></svg>';
-
-  // Render queue
-  const queueSection = document.getElementById('audio-queue-section');
-  const queueList = document.getElementById('audio-queue-list');
-  var queueToggle = document.getElementById('bottom-bar-queue-toggle');
-  if (ttsQueue.length > 1) {
-    if (queueToggle) queueToggle.classList.add('active');
-    queueList.innerHTML = ttsQueue.map((item, i) =>
-      '<div class="audio-queue-item' + (i === ttsCurrentIndex ? ' playing' : '') + '" onclick="playTTSItem(' + i + ')">'
-      + '<span style="font-size:10px;color:var(--muted);width:14px;text-align:center">' + (i === ttsCurrentIndex ? '&#9654;' : (i + 1)) + '</span>'
-      + '<span class="queue-title">' + escapeHtml(item.title) + '</span>'
-      + '<button class="queue-remove" onclick="event.stopPropagation();removeTTSQueueItem(' + i + ')" title="Remove">&times;</button>'
-      + '</div>'
-    ).join('');
-  } else {
-    if (queueToggle) queueToggle.classList.remove('active');
-    queueSection.style.display = 'none';
-  }
-
   updateListenButtonState();
   updateSidebarAudioIndicators();
   updateArticleNowPlaying();

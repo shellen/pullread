@@ -48,6 +48,90 @@ class PrPlayer extends HTMLElement {
       '</div>';
   }
 
+  /** Update all player DOM elements from TTS state */
+  update(state) {
+    var queue = state.queue || [];
+    var currentIndex = state.currentIndex;
+    var playing = state.playing;
+    var generating = state.generating;
+
+    var app = document.querySelector('.app');
+
+    if (queue.length === 0) {
+      this.classList.add('hidden');
+      if (app) app.classList.remove('has-bottom-bar');
+      return;
+    }
+    this.classList.remove('hidden');
+    if (app) app.classList.add('has-bottom-bar');
+
+    var label = this.querySelector('#audio-now-label');
+    var status = this.querySelector('#audio-now-status');
+    var playBtn = this.querySelector('#tts-play-btn');
+
+    var currentItem = (currentIndex >= 0 && currentIndex < queue.length) ? queue[currentIndex] : null;
+    if (label) label.textContent = currentItem ? currentItem.title : 'No article playing';
+
+    // Update artwork: article image > favicon > volume icon
+    var artworkEl = this.querySelector('#bottom-bar-artwork');
+    if (artworkEl) {
+      var artSrc = '';
+      if (currentItem) {
+        if (currentItem.image) artSrc = currentItem.image;
+        else if (currentItem.domain) artSrc = '/favicons/' + encodeURIComponent(currentItem.domain) + '.png';
+      }
+      var fallbackIcon = '<svg class="bottom-bar-icon" aria-hidden="true"><use href="#i-volume"/></svg>';
+      if (artSrc) {
+        var img = new Image();
+        img.src = artSrc;
+        img.alt = '';
+        img.onerror = function() { artworkEl.innerHTML = fallbackIcon; };
+        artworkEl.innerHTML = '';
+        artworkEl.appendChild(img);
+      } else {
+        artworkEl.innerHTML = fallbackIcon;
+      }
+    }
+
+    if (status) {
+      if (generating) {
+        status.textContent = 'Generating\u2026';
+      } else if (playing) {
+        status.textContent = 'Playing';
+      } else if (currentIndex >= 0) {
+        status.textContent = 'Paused';
+      } else {
+        status.textContent = '';
+      }
+    }
+
+    if (playBtn) {
+      playBtn.innerHTML = playing
+        ? '<svg><use href="#i-pause"/></svg>'
+        : '<svg><use href="#i-play"/></svg>';
+    }
+
+    // Render queue
+    var queueSection = this.querySelector('#audio-queue-section');
+    var queueList = this.querySelector('#audio-queue-list');
+    var queueToggle = this.querySelector('#bottom-bar-queue-toggle');
+    if (queue.length > 1) {
+      if (queueToggle) queueToggle.classList.add('active');
+      if (queueList) {
+        queueList.innerHTML = queue.map(function(item, i) {
+          return '<div class="audio-queue-item' + (i === currentIndex ? ' playing' : '') + '" onclick="playTTSItem(' + i + ')">'
+            + '<span style="font-size:10px;color:var(--muted);width:14px;text-align:center">' + (i === currentIndex ? '&#9654;' : (i + 1)) + '</span>'
+            + '<span class="queue-title">' + escapeHtml(item.title) + '</span>'
+            + '<button class="queue-remove" onclick="event.stopPropagation();removeTTSQueueItem(' + i + ')" title="Remove">&times;</button>'
+            + '</div>';
+        }).join('');
+      }
+    } else {
+      if (queueToggle) queueToggle.classList.remove('active');
+      if (queueSection) queueSection.style.display = 'none';
+    }
+  }
+
   attributeChangedCallback(name, oldVal, newVal) {
     // Stub for future mode switching (expanded, mini, etc.)
   }
