@@ -270,12 +270,12 @@ function renderArticle(text, filename) {
   // Guard against corrupt/binary files that would freeze the UI
   var MAX_ARTICLE_SIZE = 2 * 1024 * 1024; // 2 MB
   if (text.length > MAX_ARTICLE_SIZE) {
-    var content = document.getElementById('content');
-    var empty = document.getElementById('empty-state');
-    if (empty) empty.style.display = 'none';
-    if (content) {
-      content.style.display = '';
-      content.innerHTML = '<div class="content-wrap"><h1>File too large</h1>'
+    var el = document.getElementById('content');
+    var emptyEl = document.getElementById('empty-state');
+    if (emptyEl) emptyEl.style.display = 'none';
+    if (el) {
+      el.style.display = '';
+      el.innerHTML = '<div class="content-wrap"><h1>File too large</h1>'
         + '<p>This file is ' + (text.length / 1024 / 1024).toFixed(1) + ' MB, which likely indicates corrupt content. '
         + 'Expected article files are under 2 MB.</p></div>';
     }
@@ -368,9 +368,6 @@ function renderArticle(text, filename) {
   var toolbarActions = '';
   const isFav = articleNotes.isFavorite;
   toolbarActions += '<button onclick="toggleFavoriteFromHeader(this)" class="toolbar-action-btn' + (isFav ? ' active-fav' : '') + '" aria-label="' + (isFav ? 'Remove star' : 'Star article') + '" aria-pressed="' + isFav + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg><span class="toolbar-action-label"> Star</span></button>';
-  if (meta && meta.url) {
-    toolbarActions += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" class="toolbar-action-btn" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg><span class="toolbar-action-label"> Share</span></button></div>';
-  }
   toolbarActions += '<button onclick="markCurrentAsRead()" class="toolbar-action-btn" aria-label="Mark read"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-eye-slash"/></svg><span class="toolbar-action-label"> Mark read</span></button>';
   var isPodcast = meta && meta.enclosure_url && meta.enclosure_type && meta.enclosure_type.startsWith('audio/');
   var listenLabel = isPodcast ? 'Play' : 'Listen';
@@ -380,6 +377,9 @@ function renderArticle(text, filename) {
   toolbarActions += '</div>';
   if (!isReviewArticle) {
     toolbarActions += '<button onclick="summarizeArticle()" id="summarize-btn" class="toolbar-action-btn" aria-label="Summarize article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg><span class="toolbar-action-label"> Summarize</span></button>';
+  }
+  if (meta && meta.url) {
+    toolbarActions += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" class="toolbar-action-btn" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg><span class="toolbar-action-label"> Share</span></button></div>';
   }
   toolbarActions += '<div class="more-dropdown">';
   toolbarActions += '<button onclick="toggleMoreMenu(event)" class="toolbar-action-btn" aria-label="More actions"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-ellipsis"/></svg></button>';

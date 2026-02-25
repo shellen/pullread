@@ -65,6 +65,7 @@ PullRead connects to bookmark services like Instapaper, Pinboard, Raindrop, and 
 - **Retry mechanism** - Failed extractions are tracked and can be retried later
 - **Podcast support** - Saves episode metadata with audio links (perfect for show notes)
 - **Built-in article reader** - Two-pane local web UI with full keyboard navigation, highlights, notes, and tags
+- **Sources & tags browsers** - Browse articles by feed or topic with sortable sources (Recent, A–Z, Count)
 - **Homepage dashboard** - Card-based landing page with continue reading, reviews, favorites, and recent articles
 - **Search operators** - Filter articles with `is:favorite`, `tag:tech`, `has:summary`, AND/OR logic, and more
 - **Weekly reviews** - AI-generated summaries of your recent reading (daily/weekly schedule or on-demand)
@@ -489,7 +490,7 @@ On other platforms, these features degrade gracefully (API keys in config file, 
 
 ### Article Reader
 
-The built-in article reader (**View Articles** in the menu bar) is a two-pane web UI served on a dynamic localhost port. It supports themes (Light, Dark, Sepia), multiple font families, adjustable text sizes, highlights, notes, and full keyboard navigation.
+The built-in article reader (**View Articles** in the menu bar) is a two-pane web UI served on a dynamic localhost port. It supports themes (Light, Dark, Sepia, High Contrast), multiple reading fonts (Inter, Lora, Source Serif, Work Sans, Literata, OpenDyslexic), adjustable text sizes, highlights, notes, and full keyboard navigation. App chrome (toolbars, menus, sidebar) uses Work Sans regardless of your reading font choice.
 
 #### Highlights & Notes
 
@@ -504,6 +505,16 @@ Select any text in an article to see a floating toolbar with highlight color opt
 - **Favorites** mark articles with a heart icon in the sidebar
 - Sidebar items show indicator dots for favorites (heart), highlights (yellow), notes (blue), and summaries
 - Feed source and clickable author names shown in article metadata
+
+#### Sources & Tags
+
+Click **Sources** or **Tags** in the sidebar to browse articles grouped by feed or topic. The Sources drawer includes sort buttons:
+
+- **Recent** — feeds with the most recently bookmarked articles first (default)
+- **A–Z** — alphabetical by feed name
+- **Count** — feeds with the most articles first
+
+Your sort preference is remembered between sessions. Each source shows its favicon; sources without an icon display a neutral placeholder.
 
 #### Summaries
 
@@ -591,21 +602,30 @@ Share articles as markdown files with optional content:
 
 #### Keyboard Shortcuts
 
+Shortcuts follow Google Reader conventions where possible.
+
 | Key | Action |
 |-----|--------|
-| `j` / `Right Arrow` | Next article |
-| `k` / `Left Arrow` | Previous article |
-| `Up Arrow` / `Down Arrow` | Scroll content (navigates to prev/next article at top/bottom) |
+| `j` / `n` | Next article |
+| `k` / `p` | Previous article |
+| `Space` | Page down (next article at bottom) |
+| `Shift+Space` | Page up |
+| `Up` / `Down` | Scroll content (navigates at boundaries) |
+| `s` | Star / unstar article |
+| `m` | Toggle read / unread |
+| `v` | Open original in new tab |
+| `r` | Refresh article list |
+| `Shift+A` | Mark all visible as read |
 | `/` | Focus search (opens sidebar if collapsed) |
 | `[` | Toggle sidebar |
 | `h` | Highlight selected text (yellow) |
-| `n` | Toggle article notes panel |
+| `Shift+N` | Toggle article notes panel |
+| `a` | Add article by URL |
 | `f` | Toggle focus mode |
-| `p` | Print article |
+| `?` | Show keyboard shortcuts |
 | `Escape` | Clear search / dismiss popover |
-| `Enter` | Reload current article |
 
-Arrow key scrolling is boundary-aware: when you reach the bottom of an article and press Down, or the top and press Up, it automatically advances to the next or previous article.
+**Audio playback** (when player is active): `>` / `<` skip tracks, `Shift+S` cycles speed, `Shift+M` toggles mini player.
 
 ### URL Scheme
 

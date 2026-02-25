@@ -475,7 +475,7 @@
   .sidebar-expand-btn {
     display: none;
     position: absolute;
-    top: 10px;
+    top: 48px;
     left: 10px;
     z-index: 15;
     background: var(--sidebar-bg);
@@ -566,6 +566,23 @@
     font-size: 11px;
     color: var(--muted);
     flex-shrink: 0;
+  }
+  .drawer-sort-bar { display: flex; gap: 2px; padding: 6px 8px 2px; }
+  .drawer-sort-btn {
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: 11px;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .drawer-sort-btn:hover { color: var(--fg); }
+  .drawer-sort-btn.active {
+    background: color-mix(in srgb, var(--link) 12%, transparent);
+    color: var(--link);
+    border-color: color-mix(in srgb, var(--link) 25%, transparent);
   }
 
   .sidebar-search {
@@ -1107,6 +1124,12 @@
     font-size: 11px;
     color: var(--muted);
     margin-bottom: 6px;
+    overflow: hidden;
+  }
+  .dash-card-meta span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .dash-card-meta img {
     width: 14px;
@@ -1115,6 +1138,7 @@
     filter: grayscale(100%);
     transition: filter 0.2s;
     background: #808080;
+    flex-shrink: 0;
   }
   .dash-card-badge {
     font-size: 10px;
@@ -1122,6 +1146,11 @@
     border-radius: 3px;
     padding: 1px 5px;
     color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
+    flex-shrink: 1;
   }
   .dash-card-title {
     font-size: 14px;
@@ -1392,6 +1421,11 @@
     font-size: 11px;
     color: var(--muted);
     line-height: 1.3;
+  }
+  .pub-bar, .pub-name, .pub-domain, .article-meta,
+  .share-dropdown-panel, .settings-dropdown-panel,
+  .more-dropdown-panel, .annotation-popover {
+    font-family: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
   .pub-tags {
     display: flex;
