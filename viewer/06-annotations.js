@@ -728,15 +728,15 @@ function renderNotesPanel() {
   var html = '';
   for (var i = 0; i < tags.length; i++) {
     var t = tags[i];
-    html += '<a class="tag" href="#" onclick="event.preventDefault();document.getElementById(\'search\').value=\'tag:' + escapeJsStr(t) + '\';filterFiles()">' + escapeHtml(t) + '</a>';
+    html += '<a class="tag" href="#" onclick="event.preventDefault();document.getElementById(\'search\').value=\'tag:\\x22' + escapeJsStr(t) + '\\x22\';filterFiles()">' + escapeHtml(t) + '</a>';
   }
   for (var j = 0; j < machineTags.length; j++) {
     var mt = machineTags[j];
-    html += '<a class="tag tag-machine" href="#" onclick="event.preventDefault();document.getElementById(\'search\').value=\'tag:' + escapeJsStr(mt) + '\';filterFiles()" title="Auto-generated">' + escapeHtml(mt) + '</a>';
+    html += '<a class="tag tag-machine" href="#" onclick="event.preventDefault();document.getElementById(\'search\').value=\'tag:\\x22' + escapeJsStr(mt) + '\\x22\';filterFiles()" title="Auto-generated">' + escapeHtml(mt) + '</a>';
   }
   for (var k = 0; k < sourceTags.length; k++) {
     var st = sourceTags[k];
-    html += '<a class="tag tag-source" href="#" onclick="event.preventDefault();document.getElementById(\'search\').value=\'tag:' + escapeJsStr(st) + '\';filterFiles()" title="From feed">' + escapeHtml(st) + '</a>';
+    html += '<a class="tag tag-source" href="#" onclick="event.preventDefault();document.getElementById(\'search\').value=\'tag:\\x22' + escapeJsStr(st) + '\\x22\';filterFiles()" title="From feed">' + escapeHtml(st) + '</a>';
   }
   container.innerHTML = html;
 }

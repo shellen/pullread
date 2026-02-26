@@ -88,7 +88,7 @@ function buildTagsHtml(data) {
     for (var i = 0; i < visibleTags.length; i++) {
       var tag = visibleTags[i][0];
       var count = visibleTags[i][1];
-      html += '<span class="tag-pill-wrap"><button class="tag-pill" onclick="document.getElementById(\'search\').value=\'tag:' + escapeJsStr(tag) + '\';filterFiles()">' + escapeHtml(tag) + '<span class="tag-count">' + count + '</span></button>'
+      html += '<span class="tag-pill-wrap"><button class="tag-pill" onclick="document.getElementById(\'search\').value=\'tag:\\x22' + escapeJsStr(tag) + '\\x22\';filterFiles()">' + escapeHtml(tag) + '<span class="tag-count">' + count + '</span></button>'
         + '<button class="tag-block-btn" onclick="blockTag(\'' + escapeJsStr(tag) + '\');goHome()" title="Block this tag">&times;</button></span>';
     }
     html += '</div>';
@@ -115,15 +115,15 @@ function buildSourcesHtml(data) {
     var domain = domains[i][0];
     var articles = domains[i][1];
     html += '<div class="domain-group">';
-    html += '<div class="domain-group-header" onclick="document.getElementById(\'search\').value=\'domain:' + escapeJsStr(domain) + '\';filterFiles();this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">';
-    html += '<img class="file-item-favicon" src="/favicons/' + encodeURIComponent(domain) + '.png" alt="" loading="lazy" onerror="this.style.display=\'none\'">';
+    html += '<div class="domain-group-header" onclick="document.getElementById(\'search\').value=\'domain:\\x22' + escapeJsStr(domain) + '\\x22\';filterFiles();this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">';
+    html += '<img class="file-item-favicon" src="/favicons/' + encodeURIComponent(domain) + '.png" alt="" loading="lazy" onerror="drawerFaviconFallback(this,\'' + escapeJsStr(domain) + '\')">';
     html += '<span>' + escapeHtml(domain) + '</span><span class="domain-group-count">' + articles.length + ' article' + (articles.length !== 1 ? 's' : '') + '</span></div>';
     html += '<div class="domain-group-articles" style="display:none">';
     for (var j = 0; j < Math.min(articles.length, 10); j++) {
       html += '<a href="#" onclick="event.preventDefault();jumpToArticle(\'' + escapeJsStr(articles[j].filename) + '\')">' + escapeHtml(articles[j].title) + '</a>';
     }
     if (articles.length > 10) {
-      html += '<a href="#" onclick="event.preventDefault();document.getElementById(\'search\').value=\'domain:' + escapeJsStr(domain) + '\';filterFiles()" style="color:var(--link)">+ ' + (articles.length - 10) + ' more</a>';
+      html += '<a href="#" onclick="event.preventDefault();document.getElementById(\'search\').value=\'domain:\\x22' + escapeJsStr(domain) + '\\x22\';filterFiles()" style="color:var(--link)">+ ' + (articles.length - 10) + ' more</a>';
     }
     html += '</div></div>';
   }
@@ -133,13 +133,11 @@ function buildSourcesHtml(data) {
 function buildTagsTabHtml(data) {
   var html = '';
 
-  html += buildTagsHtml(data);
-
   // Auto-tagging actions
   var taggedCount = allFiles.filter(function(f) { var n = allNotesIndex[f.filename]; return n && ((n.tags && n.tags.length) || (n.machineTags && n.machineTags.length)); }).length;
   var totalArticles = allFiles.length;
   var untaggedCount = totalArticles - taggedCount;
-  html += '<div style="margin-top:20px">';
+  html += '<div style="margin-bottom:20px">';
   html += '<h3 style="font-size:14px;font-weight:600;margin:0 0 8px">Auto-Tagging</h3>';
   html += '<p style="font-size:13px;color:var(--muted);margin:0 0 10px">' + taggedCount + ' of ' + totalArticles + ' articles tagged. ';
   if (untaggedCount > 0) html += untaggedCount + ' remaining.';
@@ -149,6 +147,8 @@ function buildTagsTabHtml(data) {
   html += '<button class="tag-pill" id="batch-tag-btn" onclick="batchAutotagAll(false)" title="Tag untagged articles using AI"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-wand"/></svg> Tag Untagged</button>';
   html += '<button class="tag-pill" onclick="batchAutotagAll(true)" title="Re-tag all articles, replacing existing AI tags"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-refresh"/></svg> Retag All</button>';
   html += '</div></div>';
+
+  html += buildTagsHtml(data);
 
   return html;
 }
@@ -280,13 +280,13 @@ function showTagCloud() {
   content.innerHTML =
     '<div class="article-header"><h1>Explore</h1></div>' +
     '<div class="explore-tabs">' +
-      '<button class="explore-tab active" data-tab="tags">Tags</button>' +
-      '<button class="explore-tab" data-tab="sources">Sources</button>' +
+      '<button class="explore-tab active" data-tab="sources">Sources</button>' +
       '<button class="explore-tab" data-tab="stats">Stats</button>' +
+      '<button class="explore-tab" data-tab="tags">Tags</button>' +
     '</div>' +
-    '<div id="explore-tags" class="explore-tab-panel active">' + buildTagsTabHtml(data) + '</div>' +
-    '<div id="explore-sources" class="explore-tab-panel">' + buildSourcesHtml(data) + '</div>' +
-    '<div id="explore-stats" class="explore-tab-panel">' + buildStatsTabHtml(data) + '</div>';
+    '<div id="explore-sources" class="explore-tab-panel active">' + buildSourcesHtml(data) + '</div>' +
+    '<div id="explore-stats" class="explore-tab-panel">' + buildStatsTabHtml(data) + '</div>' +
+    '<div id="explore-tags" class="explore-tab-panel">' + buildTagsTabHtml(data) + '</div>';
 
   content.querySelectorAll('.explore-tab').forEach(function(btn) {
     btn.addEventListener('click', function() {
@@ -327,7 +327,7 @@ function buildConnectionsHtml(tagArticles, sortedTags) {
       html += '</div>';
     }
     if (tagArticles[tag].length > 5) {
-      html += '<div style="padding:4px 8px;font-size:11px"><a href="#" style="color:var(--link);text-decoration:none" onclick="event.preventDefault();document.getElementById(\'search\').value=\'tag:' + escapeJsStr(tag) + '\';filterFiles()">View all ' + count + ' &rsaquo;</a></div>';
+      html += '<div style="padding:4px 8px;font-size:11px"><a href="#" style="color:var(--link);text-decoration:none" onclick="event.preventDefault();document.getElementById(\'search\').value=\'tag:\\x22' + escapeJsStr(tag) + '\\x22\';filterFiles()">View all ' + count + ' &rsaquo;</a></div>';
     }
     html += '</div></div>';
   }

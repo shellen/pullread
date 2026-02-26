@@ -396,20 +396,20 @@ function filterFiles() {
         if (tl === 'has:tags' || tl === 'has:tag') return hasTags || (f.categories && f.categories.length > 0);
         // Operator: tag:value — searches user tags, machine tags, and source categories
         if (tl.startsWith('tag:')) {
-          const tagQ = tl.slice(4);
+          const tagQ = tl.slice(4).replace(/^"(.*)"$/, '$1');
           if (!tagQ) return hasTags || (f.categories && f.categories.length > 0);
           const allTags = [...(notes?.tags || []), ...(notes?.machineTags || []), ...(f.categories || [])];
           return allTags.some(t => t.toLowerCase().includes(tagQ));
         }
         // Operator: feed:value (exact match against feed name or domain fallback)
         if (tl.startsWith('feed:')) {
-          const feedQ = tl.slice(5);
+          const feedQ = tl.slice(5).replace(/^"(.*)"$/, '$1');
           const key = (f.feed || f.domain || 'unknown').toLowerCase();
           return key === feedQ;
         }
         // Operator: domain:value
         if (tl.startsWith('domain:')) {
-          const domQ = tl.slice(7);
+          const domQ = tl.slice(7).replace(/^"(.*)"$/, '$1');
           return f.domain.toLowerCase().includes(domQ);
         }
         // Operator: author:value (supports author:"First Last")
@@ -959,7 +959,7 @@ function filterBySource(source) {
     showSourceFilterBar('Podcasts');
     _activeDrawerSource = '__podcasts__';
   } else {
-    if (search) search.value = 'feed:' + source;
+    if (search) search.value = 'feed:"' + source + '"';
     showSourceFilterBar(source);
     _activeDrawerSource = source;
   }
@@ -971,7 +971,7 @@ function filterBySource(source) {
 
 function filterByTag(tag) {
   var search = document.getElementById('search');
-  if (search) search.value = 'tag:' + tag;
+  if (search) search.value = 'tag:"' + tag + '"';
   showSourceFilterBar(tag);
   _activeDrawerSource = null;
   filterFiles();

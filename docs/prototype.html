@@ -1,0 +1,2319 @@
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Work+Sans:wght@300;400;500;600;700&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  /* ========================================
+       DESIGN TOKENS
+       ======================================== */
+  :root {
+    --paper: #faf8f4;
+    --paper-warm: #f3efe8;
+    --paper-deep: #ece6db;
+    --card: #ffffff;
+    --ink: #1c1917;
+    --ink-secondary: #57534e;
+    --ink-muted: #a8a29e;
+    --ink-faint: #d6d3d1;
+    --accent: #b45535;
+    --accent-hover: #9c4529;
+    --accent-bg: #fef2ee;
+    --border: #e7e1d8;
+    --border-light: #f0ece5;
+    --shadow-sm: 0 1px 2px rgba(28, 25, 23, 0.04);
+    --shadow-md: 0 2px 8px rgba(28, 25, 23, 0.08);
+    --radius: 10px;
+    --radius-sm: 6px;
+    --font-display: "Instrument Serif", Georgia, "Times New Roman", serif;
+    --font-body: "Work Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    --sidebar-w: 300px;
+    --sources-w: 220px;
+    --toolbar-h: 44px;
+  }
+
+  /* ========================================
+       RESET & BASE
+       ======================================== */
+  *,
+  *::before,
+  *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--paper);
+    color: var(--ink);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button {
+    cursor: pointer;
+    border: none;
+    background: none;
+    font: inherit;
+    color: inherit;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  img {
+    display: block;
+    max-width: 100%;
+  }
+
+  input {
+    font: inherit;
+  }
+
+  /* ========================================
+       SCROLLBARS
+       ======================================== */
+  .scroll-thin {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--ink-faint) transparent;
+  }
+
+  .scroll-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scroll-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scroll-thin::-webkit-scrollbar-thumb {
+    background: var(--ink-faint);
+    border-radius: 3px;
+  }
+
+  .scroll-thin::-webkit-scrollbar-thumb:hover {
+    background: var(--ink-muted);
+  }
+
+  .scroll-hide {
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+
+  .scroll-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* ========================================
+       APP SHELL
+       ======================================== */
+  .app {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* ========================================
+       LEFT SIDEBAR
+       ======================================== */
+  .sidebar {
+    width: var(--sidebar-w);
+    min-width: var(--sidebar-w);
+    background: var(--paper-warm);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    position: relative;
+    z-index: 20;
+    transition:
+      width 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+      min-width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Logo bar */
+  .sidebar-header {
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    min-height: 49px;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .logo-icon {
+    width: 24px;
+    height: 24px;
+    background: var(--accent);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .logo-icon svg {
+    width: 14px;
+    height: 14px;
+    color: white;
+  }
+
+  .logo-text {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 20px;
+    letter-spacing: -0.3px;
+  }
+
+  .sidebar-actions {
+    display: flex;
+    gap: 1px;
+  }
+
+  .sidebar-actions button {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    color: var(--ink-muted);
+    transition: all 0.15s;
+  }
+
+  .sidebar-actions button svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .sidebar-actions button:hover {
+    background: var(--border);
+    color: var(--ink-secondary);
+  }
+
+  /* Tabs */
+  .sidebar-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar-tab {
+    flex: 1;
+    padding: 10px 0;
+    font-size: 13px;
+    font-weight: 500;
+    text-align: center;
+    color: var(--ink-muted);
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+  }
+
+  .sidebar-tab:hover {
+    color: var(--ink-secondary);
+  }
+
+  .sidebar-tab.active {
+    color: var(--ink);
+    border-bottom-color: var(--accent);
+  }
+
+  .sidebar-tab svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* Sidebar search */
+  .sidebar-search {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .sidebar-search-inner {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--card);
+    transition: border-color 0.15s;
+  }
+
+  .sidebar-search-inner:focus-within {
+    border-color: var(--accent);
+  }
+
+  .sidebar-search-inner svg {
+    width: 14px;
+    height: 14px;
+    color: var(--ink-muted);
+    flex-shrink: 0;
+  }
+
+  .sidebar-search-inner input {
+    border: none;
+    background: none;
+    outline: none;
+    font-size: 12px;
+    color: var(--ink);
+    width: 100%;
+  }
+
+  .sidebar-search-inner input::placeholder {
+    color: var(--ink-muted);
+  }
+
+  /* Feed filter bar */
+  .feed-filter {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .feed-filter-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--paper-deep);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 10px 4px 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-secondary);
+  }
+
+  .feed-filter-pill .pin {
+    color: var(--ink-muted);
+  }
+
+  .feed-filter-pill .close {
+    width: 14px;
+    height: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    color: var(--ink-muted);
+    transition: all 0.15s;
+  }
+
+  .feed-filter-pill .close:hover {
+    background: var(--border);
+    color: var(--ink);
+  }
+
+  /* Nav items */
+  .sidebar-nav {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    color: var(--ink-secondary);
+    transition: all 0.15s;
+  }
+
+  .nav-item:hover {
+    background: var(--paper-deep);
+    color: var(--ink);
+  }
+
+  .nav-item.active {
+    background: var(--accent-bg);
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .nav-item svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+
+  .nav-item .count {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--ink-muted);
+    font-weight: 500;
+  }
+
+  .nav-item .arrow {
+    color: var(--ink-faint);
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .nav-item .arrow svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* When both count and arrow present, count shouldn't push to the right */
+  .nav-item .count + .arrow {
+    margin-left: 0;
+  }
+
+  /* Article list header */
+  .article-list-header {
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border-light);
+    font-size: 12px;
+    color: var(--ink-muted);
+  }
+
+  .article-list-header button {
+    font-size: 12px;
+    color: var(--ink-muted);
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    transition: all 0.15s;
+  }
+
+  .article-list-header button:hover {
+    background: var(--paper-deep);
+    color: var(--ink-secondary);
+  }
+
+  /* Article list */
+  .article-list {
+    flex: 1;
+    min-height: 0;
+    padding: 4px 8px;
+  }
+
+  .article-item {
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.12s;
+    position: relative;
+    margin-bottom: 2px;
+  }
+
+  .article-item:hover {
+    background: var(--paper-deep);
+  }
+
+  .article-item.active {
+    background: var(--accent-bg);
+  }
+
+  .article-item.active .article-item-title {
+    color: var(--accent);
+  }
+
+  .article-item-title {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--ink);
+    margin-bottom: 4px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .article-item-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--ink-muted);
+  }
+
+  .article-item-meta .favicon {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    background: var(--paper-deep);
+  }
+
+  .article-item .unread-dot {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  /* Now playing / bottom bar */
+  .sidebar-bottom {
+    border-top: 1px solid var(--border);
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--paper-warm);
+    min-height: 48px;
+  }
+
+  .now-playing-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    flex-shrink: 0;
+  }
+
+  .now-playing-btn svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .now-playing-text {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    color: var(--ink-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .now-playing-text strong {
+    font-weight: 600;
+  }
+
+  .now-playing-text span {
+    display: block;
+    font-size: 11px;
+    color: var(--ink-muted);
+  }
+
+  .sidebar-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    border-top: 1px solid var(--border-light);
+    background: var(--paper-warm);
+  }
+
+  .sidebar-footer-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink-muted);
+    transition: all 0.12s;
+  }
+
+  .sidebar-footer-btn:hover {
+    background: var(--paper-deep);
+    color: var(--ink-secondary);
+  }
+
+  .sidebar-footer-btn svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .sidebar-footer-btn.focus-active {
+    color: var(--accent);
+    background: var(--accent-bg);
+  }
+
+  /* ========================================
+       SOURCES DRAWER
+       ======================================== */
+  .sources-drawer {
+    width: 0;
+    min-width: 0;
+    overflow: hidden;
+    background: var(--paper);
+    border-right: 1px solid var(--border);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    z-index: 15;
+  }
+
+  .sources-drawer.open {
+    width: var(--sources-w);
+    min-width: var(--sources-w);
+  }
+
+  .sources-header {
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    min-height: 49px;
+  }
+
+  .sources-header h3 {
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .sources-header button {
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    color: var(--ink-muted);
+    transition: all 0.15s;
+  }
+
+  .sources-header button:hover {
+    background: var(--border);
+    color: var(--ink);
+  }
+
+  .sources-search {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .sources-search input {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--card);
+    font-size: 12px;
+    color: var(--ink);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .sources-search input::placeholder {
+    color: var(--ink-muted);
+  }
+
+  .sources-search input:focus {
+    border-color: var(--accent);
+  }
+
+  .sources-sort {
+    display: flex;
+    gap: 2px;
+    padding: 4px 14px 10px;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .sources-sort button {
+    padding: 3px 9px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink-muted);
+    transition: all 0.12s;
+    border: 1px solid transparent;
+  }
+
+  .sources-sort button:hover {
+    color: var(--ink-secondary);
+    background: var(--paper-warm);
+  }
+
+  .sources-sort button.active {
+    color: var(--ink-secondary);
+    background: var(--paper-warm);
+    border-color: var(--border);
+  }
+
+  .sources-list {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .sources-group-label {
+    padding: 10px 14px 4px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--ink-muted);
+  }
+
+  .media-type-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 14px;
+    font-size: 13px;
+    color: var(--ink-secondary);
+    transition: all 0.12s;
+    cursor: pointer;
+  }
+
+  .media-type-item:hover {
+    background: var(--paper-warm);
+    color: var(--ink);
+  }
+
+  .media-type-item.active {
+    background: var(--accent-bg);
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .media-type-item svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+
+  .media-type-item .source-count {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--ink-muted);
+    font-weight: 500;
+  }
+
+  .source-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 14px;
+    font-size: 13px;
+    color: var(--ink-secondary);
+    transition: all 0.12s;
+    cursor: pointer;
+  }
+
+  .source-item:hover {
+    background: var(--paper-warm);
+    color: var(--ink);
+  }
+
+  .source-item.active {
+    background: var(--accent-bg);
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .source-item img {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    background: var(--paper-deep);
+    flex-shrink: 0;
+  }
+
+  .source-item .source-count {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--ink-muted);
+    font-weight: 500;
+  }
+
+  .sources-footer {
+    padding: 10px 14px;
+    border-top: 1px solid var(--border);
+  }
+
+  .sources-footer button {
+    width: 100%;
+    padding: 7px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--accent);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+  }
+
+  .sources-footer button:hover {
+    background: var(--accent-bg);
+    border-color: var(--accent);
+  }
+
+  .sources-footer button svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* ========================================
+       READING PANE
+       ======================================== */
+  .reading-pane {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: var(--card);
+  }
+
+  /* Toolbar */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    height: var(--toolbar-h);
+    min-height: var(--toolbar-h);
+    border-bottom: 1px solid var(--border);
+    background: var(--card);
+  }
+
+  .toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .toolbar-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-secondary);
+    transition: all 0.12s;
+    white-space: nowrap;
+  }
+
+  .toolbar-btn:hover {
+    background: var(--paper-warm);
+    color: var(--ink);
+  }
+
+  .toolbar-btn svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .toolbar-divider {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+    margin: 0 4px;
+  }
+
+  .toolbar-btn-icon {
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    color: var(--ink-secondary);
+    transition: all 0.12s;
+  }
+
+  .toolbar-btn-icon:hover {
+    background: var(--paper-warm);
+    color: var(--ink);
+  }
+
+  .toolbar-btn-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* Article view */
+  .article-view {
+    flex: 1;
+    min-height: 0;
+    padding: 0;
+  }
+
+  .article-content {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 32px 40px 80px;
+  }
+
+  .article-source-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 24px;
+    padding: 14px 0;
+    border-top: 2px solid var(--ink);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .article-source-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--paper-warm);
+    flex-shrink: 0;
+  }
+
+  .article-source-info {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: calc(50% - 42px);
+  }
+
+  .article-source-name {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .article-source-domain {
+    font-size: 12px;
+    color: var(--ink-muted);
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .article-tags-wrapper {
+    flex: 1;
+    min-width: 0;
+    max-width: 50%;
+    position: relative;
+    overflow: hidden;
+    margin-left: auto;
+  }
+
+  .article-tags-wrapper::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 40px;
+    background: linear-gradient(to left, transparent, var(--card));
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .article-tags {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-left: 40px;
+    direction: rtl;
+  }
+
+  .article-tags::-webkit-scrollbar {
+    display: none;
+  }
+
+  .article-tag {
+    direction: ltr;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    background: var(--paper);
+    color: var(--ink-muted);
+    border: 1px solid var(--border-light);
+    transition: all 0.12s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .article-tag:hover {
+    background: var(--paper-warm);
+    color: var(--ink-secondary);
+  }
+
+  .article-title {
+    font-family: var(--font-display);
+    font-size: 34px;
+    font-weight: 400;
+    line-height: 1.15;
+    color: var(--ink);
+    margin-bottom: 12px;
+    letter-spacing: -0.2px;
+  }
+
+  .article-byline {
+    font-size: 13px;
+    color: var(--ink-muted);
+    margin-bottom: 28px;
+  }
+
+  .article-byline strong {
+    color: var(--ink-secondary);
+    font-weight: 500;
+  }
+
+  .article-hero {
+    width: 100%;
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+
+  .article-hero img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .article-caption {
+    font-size: 12px;
+    color: var(--ink-muted);
+    line-height: 1.5;
+    margin-bottom: 28px;
+    font-family: var(--font-body);
+  }
+
+  .article-body {
+    font-family: var(--font-body);
+    font-size: 16.5px;
+    line-height: 1.75;
+    color: var(--ink-secondary);
+    font-weight: 400;
+  }
+
+  .article-body p {
+    margin-bottom: 20px;
+  }
+
+  .article-body p:last-child {
+    margin-bottom: 0;
+  }
+
+  /* ========================================
+       MOBILE: slide-over sidebar + icon-only toolbar
+       ======================================== */
+  .mobile-menu-btn {
+    display: none;
+    width: 30px;
+    height: 30px;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    color: var(--ink-secondary);
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+
+  .mobile-menu-btn:hover {
+    background: var(--paper-warm);
+    color: var(--ink);
+  }
+
+  .mobile-menu-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* Show when sidebar is collapsed on desktop */
+  .sidebar.collapsed ~ .reading-pane .mobile-menu-btn {
+    display: flex;
+  }
+
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(28, 25, 23, 0.35);
+    backdrop-filter: blur(2px);
+    z-index: 45;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+
+  .sidebar-overlay.visible {
+    display: block;
+    opacity: 1;
+  }
+
+  /* Toolbar button labels */
+  .toolbar-btn .btn-label {
+    display: inline;
+  }
+
+  @media (max-width: 768px) {
+    /* Sidebar becomes a slide-over */
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      z-index: 50;
+      transform: translateX(-100%);
+      transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: none;
+    }
+
+    .sidebar.open {
+      transform: translateX(0);
+      box-shadow: 4px 0 24px rgba(28, 25, 23, 0.15);
+    }
+
+    .sources-drawer {
+      display: none;
+    }
+
+    /* Show mobile menu chevron */
+    .mobile-menu-btn {
+      display: flex;
+    }
+
+    .mobile-menu-btn svg {
+      width: 22px;
+      height: 22px;
+    }
+
+    /* Toolbar: icon-only with bigger touch targets */
+    .toolbar-btn .btn-label {
+      display: none;
+    }
+
+    .toolbar-btn {
+      padding: 8px;
+      min-width: 40px;
+      min-height: 40px;
+      justify-content: center;
+    }
+
+    .toolbar-btn svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .toolbar-divider {
+      margin: 0 2px;
+    }
+
+    .toolbar-btn-icon {
+      width: 40px;
+      height: 40px;
+    }
+
+    .toolbar-btn-icon svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .toolbar {
+      min-height: 48px;
+    }
+
+    /* Article content tighter */
+    .article-content {
+      padding: 24px 20px 60px;
+    }
+
+    .article-title {
+      font-size: 26px;
+    }
+
+    .toolbar {
+      padding: 0 4px;
+    }
+
+    .toolbar-group {
+      gap: 0;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .toolbar-btn {
+      padding: 6px;
+      min-width: 36px;
+      min-height: 36px;
+    }
+
+    .toolbar-btn svg {
+      width: 19px;
+      height: 19px;
+    }
+
+    .toolbar-btn-icon {
+      width: 36px;
+      height: 36px;
+    }
+
+    .toolbar-btn-icon svg {
+      width: 19px;
+      height: 19px;
+    }
+
+    .article-content {
+      padding: 20px 16px 60px;
+    }
+
+    .article-title {
+      font-size: 24px;
+    }
+  }
+
+  /* ========================================
+       ANIMATIONS
+       ======================================== */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+  }
+
+  /* Active article highlight transition */
+  .article-item {
+    transition:
+      background 0.12s,
+      box-shadow 0.12s;
+  }
+
+  /* Subtle hover lift on source items */
+  .source-item {
+    transition: all 0.12s;
+  }
+
+  /* Desktop sidebar collapse (focused mode) */
+  .sidebar.collapsed {
+    width: 0;
+    min-width: 0;
+    overflow: hidden;
+    border-right: none;
+  }
+
+  .sidebar.collapsed ~ .sources-drawer {
+    display: none;
+  }
+</style>
+<div>
+  <div class="app">
+    <!-- Mobile sidebar overlay -->
+    <div
+      class="sidebar-overlay"
+      id="sidebar-overlay"
+      onclick="closeMobileSidebar()"
+    ></div>
+
+    <!-- ============ LEFT SIDEBAR ============ -->
+    <div class="sidebar">
+      <!-- Logo bar -->
+      <div class="sidebar-header">
+        <div class="logo">
+          <div class="logo-icon">
+            <svg
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"
+              />
+            </svg>
+          </div>
+          <span class="logo-text">Pull Read</span>
+        </div>
+        <div class="sidebar-actions">
+          <button title="Add feed" onclick="alert('Add feed')">
+            <svg
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M12 4.5v15m7.5-7.5h-15"
+              />
+            </svg>
+          </button>
+          <button title="Refresh" onclick="alert('Refresh')">
+            <svg
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182"
+              />
+            </svg>
+          </button>
+          <button title="Collapse sidebar" onclick="toggleSidebar()">
+            <svg
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M15.75 19.5L8.25 12l7.5-7.5"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="sidebar-tabs">
+        <button class="sidebar-tab active" onclick="switchTab(this, 'home')">
+          <svg
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M2.25 12l8.954-8.955a1.126 1.126 0 011.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"
+            />
+          </svg>
+          Home
+        </button>
+        <button class="sidebar-tab" onclick="switchTab(this, 'notebook')">
+          <svg
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
+            />
+          </svg>
+          Notebook
+        </button>
+      </div>
+
+      <!-- Sidebar search -->
+      <div class="sidebar-search">
+        <div class="sidebar-search-inner">
+          <svg
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+            />
+          </svg>
+          <input type="text" placeholder="Search articles..." />
+        </div>
+      </div>
+
+      <!-- Active feed filter -->
+      <div class="feed-filter">
+        <div class="feed-filter-pill">
+          <span class="pin">
+            <svg
+              width="12"
+              height="12"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M3 3l1.664 1.664M21 21l-1.5-1.5m-5.533-1.467a2.25 2.25 0 01-3.182 0L7.5 14.748a2.25 2.25 0 010-3.182l8.197-8.197a2.25 2.25 0 013.182 0l1.414 1.414a2.25 2.25 0 010 3.182L12.096 16.2z"
+              />
+            </svg>
+          </span>
+          feed:Berkeleyside
+          <button
+            class="close"
+            onclick="this.closest('.feed-filter').style.display = 'none'"
+          >
+            <svg
+              width="10"
+              height="10"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Nav -->
+      <div class="sidebar-nav">
+        <a class="nav-item" href="#">
+          <svg
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+            />
+          </svg>
+          All Items
+          <span class="count">13K+</span>
+        </a>
+        <a class="nav-item active" href="#" onclick="toggleSources()">
+          <svg
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25a2.25 2.25 0 01-2.25-2.25v-2.25z"
+            />
+          </svg>
+          Sources
+          <span class="count">100+</span>
+          <span class="arrow"
+            ><svg
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M8.25 4.5l7.5 7.5-7.5 7.5"
+              /></svg
+          ></span>
+        </a>
+        <a class="nav-item" href="#">
+          <svg
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"
+            />
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M6 6h.008v.008H6V6z"
+            />
+          </svg>
+          Tags
+          <span class="count">10K+</span>
+          <span class="arrow"
+            ><svg
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M8.25 4.5l7.5 7.5-7.5 7.5"
+              /></svg
+          ></span>
+        </a>
+        <a class="nav-item" href="#">
+          <svg
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          Unread
+          <span class="count">13K+</span>
+        </a>
+        <a class="nav-item" href="#">
+          <svg
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.562.562 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"
+            />
+          </svg>
+          Starred
+          <span class="count">16</span>
+        </a>
+      </div>
+
+      <!-- Article list header -->
+      <div class="article-list-header">
+        <span>28 articles</span>
+        <button>Hide read</button>
+      </div>
+
+      <!-- Article list -->
+      <div class="article-list scroll-thin" id="article-list">
+        <!-- Articles injected by JS -->
+      </div>
+
+      <!-- Now playing -->
+      <div class="sidebar-bottom">
+        <button class="now-playing-btn" title="Pause">
+          <svg fill="currentColor" viewBox="0 0 24 24">
+            <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+          </svg>
+        </button>
+        <div class="now-playing-text">
+          <strong>NPR News: 02-25-2026 7P...</strong>
+          <span>Playing</span>
+        </div>
+        <button style="color: var(--ink-muted); padding: 4px" title="Expand">
+          <svg
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M8.25 4.5l7.5 7.5-7.5 7.5"
+            />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Footer: Focus + Settings -->
+      <div class="sidebar-footer">
+        <button
+          class="sidebar-footer-btn"
+          id="focus-btn"
+          onclick="toggleFocusMode()"
+          title="Focus mode"
+        >
+          <svg
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"
+            />
+          </svg>
+          Focus
+        </button>
+        <button
+          class="sidebar-footer-btn"
+          onclick="alert('Settings')"
+          title="Settings"
+        >
+          <svg
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"
+            />
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+            />
+          </svg>
+          Settings
+        </button>
+      </div>
+    </div>
+
+    <!-- ============ SOURCES DRAWER ============ -->
+    <div class="sources-drawer" id="sources-drawer">
+      <div class="sources-header">
+        <h3>Sources</h3>
+        <button onclick="toggleSources()" title="Close sources">
+          <svg
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M15.75 19.5L8.25 12l7.5-7.5"
+            />
+          </svg>
+        </button>
+      </div>
+      <div class="sources-search">
+        <input type="text" placeholder="Filter sources..." />
+      </div>
+      <div class="sources-sort" id="sources-sort">
+        <button class="active" onclick="sortSources('recent')">Recent</button>
+        <button onclick="sortSources('az')">A–Z</button>
+        <button onclick="sortSources('count')">Count</button>
+      </div>
+      <div class="sources-list scroll-thin" id="sources-list">
+        <!-- Sources injected by JS -->
+      </div>
+      <div class="sources-footer">
+        <button onclick="alert('Add source')">
+          <svg
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M12 4.5v15m7.5-7.5h-15"
+            />
+          </svg>
+          Add source
+        </button>
+      </div>
+    </div>
+
+    <!-- ============ READING PANE ============ -->
+    <div class="reading-pane">
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <div class="toolbar-group">
+          <button
+            class="mobile-menu-btn"
+            onclick="toggleSidebar()"
+            title="Open sidebar"
+          >
+            <svg
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M8.25 4.5l7.5 7.5-7.5 7.5"
+              />
+            </svg>
+          </button>
+          <button class="toolbar-btn" title="Star">
+            <svg
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.562.562 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"
+              />
+            </svg>
+            <span class="btn-label">Star</span>
+          </button>
+          <button class="toolbar-btn" title="Mark read">
+            <svg
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <span class="btn-label">Mark read</span>
+          </button>
+          <button class="toolbar-btn" title="Listen">
+            <svg
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z"
+              />
+            </svg>
+            <span class="btn-label">Listen</span>
+          </button>
+          <button class="toolbar-btn" title="Summarize">
+            <svg
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z"
+              />
+            </svg>
+            <span class="btn-label">Summarize</span>
+          </button>
+          <button class="toolbar-btn" title="Share">
+            <svg
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M9 8.25H7.5a2.25 2.25 0 00-2.25 2.25v9a2.25 2.25 0 002.25 2.25h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25H15m0-3l-3-3m0 0l-3 3m3-3v11.25"
+              />
+            </svg>
+            <span class="btn-label">Share</span>
+          </button>
+        </div>
+        <div class="toolbar-group">
+          <button class="toolbar-btn-icon" title="More options">
+            <svg
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z"
+              />
+            </svg>
+          </button>
+          <button
+            class="toolbar-btn-icon"
+            title="Previous"
+            onclick="navigateArticle(-1)"
+          >
+            <svg
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M4.5 15.75l7.5-7.5 7.5 7.5"
+              />
+            </svg>
+          </button>
+          <button
+            class="toolbar-btn-icon"
+            title="Next"
+            onclick="navigateArticle(1)"
+          >
+            <svg
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+              />
+            </svg>
+          </button>
+          <div class="toolbar-divider"></div>
+          <button
+            class="toolbar-btn-icon"
+            title="Text size"
+            style="
+              font-size: 16px;
+              font-weight: 600;
+              font-family: var(--font-display);
+            "
+          >
+            Aa
+          </button>
+        </div>
+      </div>
+
+      <!-- Article content area -->
+      <div class="article-view scroll-thin" id="article-view">
+        <div class="article-content fade-in" id="article-content">
+          <!-- Article injected by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ========================================
+    // FAVICON HELPERS
+    // ========================================
+    function faviconUrl(domain, size) {
+      size = size || 32;
+      return `https://www.google.com/s2/favicons?domain=${domain}&sz=${size}`;
+    }
+
+    function faviconFallback(el, name) {
+      // Generate an SVG initial as last-resort fallback
+      const letter = (name || el.alt || "?").charAt(0).toUpperCase();
+      const colors = [
+        "#b45535",
+        "#5b7a5e",
+        "#4a6fa5",
+        "#8b6b4a",
+        "#6b5b8a",
+        "#5a8a7a",
+        "#8a5a5a",
+        "#5a6b8a",
+      ];
+      const color = colors[letter.charCodeAt(0) % colors.length];
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="${color}"/><text x="32" y="32" dominant-baseline="central" text-anchor="middle" fill="white" font-family="system-ui,sans-serif" font-size="28" font-weight="600">${letter}</text></svg>`;
+      el.src = "data:image/svg+xml," + encodeURIComponent(svg);
+      el.onerror = null;
+    }
+    // ========================================
+    // DATA
+    // ========================================
+    const sources = [
+      {
+        name: "Berkeleyside",
+        domain: "berkeleyside.org",
+        count: 28,
+        group: "pinned",
+        active: true,
+      },
+      {
+        name: "Stratechery",
+        domain: "stratechery.com",
+        count: 5,
+        group: "pinned",
+      },
+      {
+        name: "Daring Fireball",
+        domain: "daringfireball.net",
+        count: 12,
+        group: "pinned",
+      },
+      {
+        name: "The Verge",
+        domain: "theverge.com",
+        count: 34,
+        group: "news",
+      },
+      {
+        name: "Ars Technica",
+        domain: "arstechnica.com",
+        count: 19,
+        group: "news",
+      },
+      {
+        name: "TechCrunch",
+        domain: "techcrunch.com",
+        count: 22,
+        group: "news",
+      },
+      {
+        name: "NPR",
+        domain: "npr.org",
+        count: 8,
+        group: "news",
+      },
+      {
+        name: "Kottke.org",
+        domain: "kottke.org",
+        count: 7,
+        group: "blogs",
+      },
+      {
+        name: "Craig Mod",
+        domain: "craigmod.com",
+        count: 2,
+        group: "blogs",
+      },
+      {
+        name: "Robin Sloan",
+        domain: "robinsloan.com",
+        count: 1,
+        group: "blogs",
+      },
+      {
+        name: "Molly White",
+        domain: "mollywhite.net",
+        count: 3,
+        group: "blogs",
+      },
+      {
+        name: "Platformer",
+        domain: "platformer.news",
+        count: 6,
+        group: "newsletters",
+      },
+      {
+        name: "Garbage Day",
+        domain: "garbageday.email",
+        count: 4,
+        group: "newsletters",
+      },
+    ];
+    const articles = [
+      {
+        title: "Berkeley woman killed in Poet's Corner fire identified",
+        source: "berkeleyside.org",
+        time: "3h ago",
+        unread: false,
+        author: "Alex N. Gecan",
+        tags: [
+          "City",
+          "Fire",
+          "Public Safety",
+          "Berkeley Fire Department",
+          "Fatalities",
+          "Fires",
+        ],
+        image: "https://picsum.photos/id/1067/900/500",
+        caption:
+          "Police and firefighters work outside the Poe Street duplex where 74-year-old Mary Ellen Bruns died Feb. 4, 2026. Credit: Zac Farber/Berkeleyside",
+        body: `<p>County investigators have identified the 74-year-old Berkeley woman who died when her home caught fire Feb. 4.</p>
+<p>Mary Ellen Bruns had lived at 1301 Poe St. for a little over a decade, and had struggled in recent years, according to her landlord. Her cause of death remains under investigation, according to the Alameda County Sheriff's Office's Coroner's Bureau.</p>
+<p>Authorities have not said what started the fire, which is also still under investigation.</p>
+<p>The coroner's office was unable to formally identify Bruns at first due in part to extensive burns to her body.</p>
+<p>Steve Moros, who owns the duplex where Bruns lived, said she frequently kept her unit filthy, with old food and dirt strewn throughout. He said he had tried to help her clean multiple times over the years.</p>`,
+      },
+      {
+        title:
+          "Update: Berkeley teachers union, school district reach tentative...",
+        source: "berkeleyside.org",
+        time: "6h ago",
+        unread: true,
+        author: "Natalie Orenstein",
+        tags: ["Education", "Labor"],
+        image: "https://picsum.photos/id/180/900/500",
+        caption:
+          "Berkeley teachers rally outside the district office. Credit: Berkeleyside",
+        body: "<p>After months of tense negotiations, the Berkeley Federation of Teachers and the Berkeley Unified School District announced a tentative agreement late Tuesday evening that would avert a threatened strike.</p><p>The deal includes a 4% salary increase for the current year and commitments to reduce class sizes at several Title I schools. Union leadership said members would vote on the agreement within two weeks.</p>",
+      },
+      {
+        title: "What future does police accountability have in Berkeley?",
+        source: "berkeleyside.org",
+        time: "10h ago",
+        unread: true,
+        author: "Emilie Raguso",
+        tags: ["Public Safety", "Police"],
+        image: "https://picsum.photos/id/1016/900/500",
+        caption:
+          "Berkeley Police Department headquarters. Credit: Berkeleyside",
+        body: "<p>A comprehensive review of Berkeley's police oversight mechanisms reveals a system struggling to keep pace with community expectations and national reform movements.</p><p>The Police Accountability Board, established in 2020, has faced challenges including limited subpoena power and difficulty recruiting and retaining commissioners willing to serve multi-year terms.</p>",
+      },
+      {
+        title: "Berkeley City Council approves housing developments that...",
+        source: "berkeleyside.org",
+        time: "yesterday",
+        unread: true,
+        author: "Darwin BondGraham",
+        tags: ["Housing", "Development"],
+        image: "https://picsum.photos/id/164/900/500",
+        caption: "Rendering of proposed development at Ashby BART station.",
+        body: "<p>In a marathon session that stretched past midnight, the Berkeley City Council approved three major housing developments that will add over 800 new units to the city's housing stock.</p><p>The largest project, a mixed-use development at the Ashby BART station, will include 380 units, with 30% designated as affordable housing.</p>",
+      },
+      {
+        title:
+          "A State of the Union seat will be left empty to honor Berkeley...",
+        source: "berkeleyside.org",
+        time: "yesterday",
+        unread: true,
+        author: "Kate Lardner",
+        tags: ["Politics", "Community"],
+        image: null,
+        caption: "",
+        body: "<p>Representative Barbara Lee announced that she will leave one seat empty at the upcoming State of the Union address to honor a Berkeley community leader who passed away last month.</p>",
+      },
+      {
+        title: "BAMPFA announces expansive spring film season",
+        source: "berkeleyside.org",
+        time: "yesterday",
+        unread: true,
+        author: "Berkeleyside Staff",
+        tags: ["Arts", "Film"],
+        image: "https://picsum.photos/id/335/900/500",
+        caption: "BAMPFA theater. Credit: Berkeleyside",
+        body: "<p>The Berkeley Art Museum and Pacific Film Archive has unveiled its spring 2026 film program, featuring retrospectives of several international directors alongside new experimental works.</p>",
+      },
+      {
+        title: "Newsom signs $590M mass transit bridge loan",
+        source: "berkeleyside.org",
+        time: "yesterday",
+        unread: true,
+        author: "Ricardo Cano",
+        tags: ["Transit", "State Politics"],
+        image: null,
+        caption: "",
+        body: "<p>Governor Gavin Newsom signed emergency legislation providing a $590 million bridge loan to Bay Area mass transit agencies, preventing service cuts that had been scheduled to take effect in March.</p>",
+      },
+      {
+        title: "Alameda County health care layoff plan to face public scrutiny",
+        source: "berkeleyside.org",
+        time: "yesterday",
+        unread: true,
+        author: "Sarah Ravani",
+        tags: ["Health", "County"],
+        image: null,
+        caption: "",
+        body: "<p>Alameda County's controversial plan to lay off hundreds of health care workers at Highland Hospital will face a public hearing next week after advocacy groups collected enough signatures to force a review.</p>",
+      },
+      {
+        title: "2 new cafes arrive to help fuel East Bay mornings",
+        source: "berkeleyside.org",
+        time: "yesterday",
+        unread: true,
+        author: "Sarah Han",
+        tags: ["Food", "Business"],
+        image: "https://picsum.photos/id/431/900/500",
+        caption: "Inside one of the new East Bay cafes. Credit: Berkeleyside",
+        body: "<p>Two new independent coffee shops have opened their doors in the East Bay this month, offering distinct takes on the morning ritual.</p>",
+      },
+      {
+        title:
+          "Berkeley teachers union, school district reach tentative agreement",
+        source: "berkeleyside.org",
+        time: "2d ago",
+        unread: true,
+        author: "Natalie Orenstein",
+        tags: ["Education", "Labor"],
+        image: null,
+        caption: "",
+        body: "<p>After several weeks of intensive mediation, the Berkeley Federation of Teachers and BUSD reached a tentative contract agreement that includes wage increases and workload protections.</p>",
+      },
+      {
+        title: "Kaiser strike to end after 4 weeks without a deal",
+        source: "berkeleyside.org",
+        time: "2d ago",
+        unread: true,
+        author: "Victoria Fierce",
+        tags: ["Health", "Labor"],
+        image: null,
+        caption: "",
+        body: "<p>The four-week Kaiser Permanente strike affecting facilities across the East Bay is set to end this weekend even as workers and management remain without a contract agreement.</p>",
+      },
+    ];
+    // ========================================
+    // STATE
+    // ========================================
+    let currentArticle = 0;
+    let sourcesOpen = false;
+    // ========================================
+    // RENDER FUNCTIONS
+    // ========================================
+    function renderSources() {
+      const container = document.getElementById("sources-list");
+      const groups = {
+        pinned: "Pinned",
+        news: "News & Media",
+        blogs: "Blogs",
+        newsletters: "Newsletters",
+      };
+      let html = "";
+      // Media type filters
+      html += `<div class="sources-group-label">Media Type</div>`;
+      html += `
+    <div class="media-type-item" onclick="filterMediaType('podcasts')">
+      <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"/></svg>
+      <span style="flex:1">Podcasts</span>
+      <span class="source-count">14</span>
+    </div>
+    <div class="media-type-item" onclick="filterMediaType('video')">
+      <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"/></svg>
+      <span style="flex:1">Video</span>
+      <span class="source-count">8</span>
+    </div>`;
+      for (const [groupKey, groupLabel] of Object.entries(groups)) {
+        const items = sources.filter((s) => s.group === groupKey);
+        if (items.length === 0) continue;
+        html += `<div class="sources-group-label">${groupLabel}</div>`;
+        items.forEach((s) => {
+          html += `
+        <div class="source-item${s.active ? " active" : ""}" onclick="selectSource('${s.domain}')">
+          <img src="${faviconUrl(s.domain)}" alt="${s.name}" onerror="faviconFallback(this,'${s.name}')" />
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.name}</span>
+          <span class="source-count">${s.count}</span>
+        </div>`;
+        });
+      }
+      container.innerHTML = html;
+    }
+
+    function renderArticleList() {
+      const container = document.getElementById("article-list");
+      let html = "";
+      articles.forEach((a, i) => {
+        html += `
+      <div class="article-item${i === currentArticle ? " active" : ""}" onclick="selectArticle(${i})">
+        <div class="article-item-title">${a.title}</div>
+        <div class="article-item-meta">
+          <img class="favicon" src="${faviconUrl(a.source, 16)}" alt="${a.source}" onerror="faviconFallback(this,'${a.source}')" />
+          <span>${a.source}</span>
+          <span>${a.time}</span>
+        </div>
+        ${a.unread ? '<div class="unread-dot"></div>' : ""}
+      </div>`;
+      });
+      container.innerHTML = html;
+    }
+
+    function renderArticle(index) {
+      const a = articles[index];
+      const container = document.getElementById("article-content");
+      const sourceName =
+        sources.find((s) => s.domain === a.source)?.name || a.source;
+      const tagsHtml = a.tags
+        .map((t) => `<span class="article-tag">${t}</span>`)
+        .join("");
+      const imageHtml = a.image
+        ? `
+    <div class="article-hero"><img src="${a.image}" alt="" /></div>
+    <div class="article-caption">${a.caption}</div>`
+        : "";
+      container.innerHTML = `
+    <div class="article-source-bar">
+      <img class="article-source-icon" src="${faviconUrl(a.source, 64)}" alt="${sourceName}" onerror="faviconFallback(this,'${sourceName}')" />
+      <div class="article-source-info">
+        <div class="article-source-name">${sourceName}</div>
+        <div class="article-source-domain">${a.source}</div>
+      </div>
+      <div class="article-tags-wrapper">
+        <div class="article-tags">${tagsHtml}</div>
+      </div>
+    </div>
+    <h1 class="article-title">${a.title}</h1>
+    <div class="article-byline"><strong>${a.author}</strong> · ${a.time}</div>
+    ${imageHtml}
+    <div class="article-body">${a.body}</div>`;
+      // Reset scroll
+      document.getElementById("article-view").scrollTop = 0;
+      // Re-trigger fade
+      container.classList.remove("fade-in");
+      void container.offsetWidth;
+      container.classList.add("fade-in");
+    }
+    // ========================================
+    // INTERACTIONS
+    // ========================================
+    function selectArticle(index) {
+      currentArticle = index;
+      renderArticleList();
+      renderArticle(index);
+      // Close mobile sidebar if open
+      closeMobileSidebar();
+    }
+
+    function navigateArticle(dir) {
+      const next = currentArticle + dir;
+      if (next >= 0 && next < articles.length) {
+        selectArticle(next);
+      }
+    }
+
+    function toggleSources() {
+      const drawer = document.getElementById("sources-drawer");
+      sourcesOpen = !sourcesOpen;
+      drawer.classList.toggle("open", sourcesOpen);
+    }
+
+    function selectSource(domain) {
+      sources.forEach((s) => (s.active = s.domain === domain));
+      document
+        .querySelectorAll(".media-type-item")
+        .forEach((el) => el.classList.remove("active"));
+      renderSources();
+    }
+
+    function filterMediaType(type) {
+      sources.forEach((s) => (s.active = false));
+      document
+        .querySelectorAll(".media-type-item")
+        .forEach((el) => el.classList.remove("active"));
+      event.currentTarget.classList.add("active");
+      renderSources();
+    }
+
+    function sortSources(mode) {
+      // Update active button
+      document
+        .querySelectorAll("#sources-sort button")
+        .forEach((b) => b.classList.remove("active"));
+      event.target.classList.add("active");
+      // Sort within each group
+      const sortFn = {
+        recent: () => {}, // keep original order
+        az: () => sources.sort((a, b) => a.name.localeCompare(b.name)),
+        count: () => sources.sort((a, b) => b.count - a.count),
+      };
+      if (sortFn[mode]) sortFn[mode]();
+      renderSources();
+    }
+
+    function switchTab(el, tab) {
+      document
+        .querySelectorAll(".sidebar-tab")
+        .forEach((t) => t.classList.remove("active"));
+      el.classList.add("active");
+    }
+
+    function openMobileSidebar() {
+      const sidebar = document.querySelector(".sidebar");
+      sidebar.classList.remove("collapsed");
+      sidebar.classList.add("open");
+      document.getElementById("sidebar-overlay").classList.add("visible");
+    }
+
+    function closeMobileSidebar() {
+      const sidebar = document.querySelector(".sidebar");
+      sidebar.classList.remove("open");
+      document.getElementById("sidebar-overlay").classList.remove("visible");
+    }
+
+    function toggleSidebar() {
+      const sidebar = document.querySelector(".sidebar");
+      const isMobile = window.innerWidth <= 768;
+      const focusBtn = document.getElementById("focus-btn");
+      if (isMobile) {
+        if (sidebar.classList.contains("open")) {
+          closeMobileSidebar();
+        } else {
+          openMobileSidebar();
+        }
+      } else {
+        sidebar.classList.toggle("collapsed");
+        if (focusBtn)
+          focusBtn.classList.toggle(
+            "focus-active",
+            sidebar.classList.contains("collapsed"),
+          );
+        if (sidebar.classList.contains("collapsed") && sourcesOpen) {
+          sourcesOpen = false;
+          document.getElementById("sources-drawer").classList.remove("open");
+        }
+      }
+    }
+
+    function toggleFocusMode() {
+      toggleSidebar();
+    }
+    // ========================================
+    // KEYBOARD NAVIGATION
+    // ========================================
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "j" || e.key === "ArrowDown") {
+        e.preventDefault();
+        navigateArticle(1);
+      }
+      if (e.key === "k" || e.key === "ArrowUp") {
+        e.preventDefault();
+        navigateArticle(-1);
+      }
+      if (e.key === "s") {
+        const items = document.querySelectorAll(".article-item");
+        if (items[currentArticle])
+          items[currentArticle].querySelector(
+            ".article-item-title",
+          ).style.fontStyle = "italic";
+      }
+    });
+    // ========================================
+    // INIT
+    // ========================================
+    renderSources();
+    renderArticleList();
+    renderArticle(0);
+  </script>
+</div>

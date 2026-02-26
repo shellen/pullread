@@ -79,6 +79,86 @@ function generateFontCSS(): string {
 }
 
 // ---------------------------------------------------------------------------
+// Icon sprite: generate <symbol> elements from the heroicons npm package
+// ---------------------------------------------------------------------------
+const OUTLINE_ATTRS = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
+const SOLID_ATTRS = 'viewBox="0 0 24 24" fill="currentColor" stroke="none"';
+const CHEVRON_ATTRS = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+
+const ICON_MAP: Array<{ id: string; file: string; variant?: 'solid' | 'chevron' }> = [
+  { id: 'i-backward', file: 'backward.svg' },
+  { id: 'i-bars', file: 'bars-3.svg' },
+  { id: 'i-book', file: 'book-open.svg' },
+  { id: 'i-calendar', file: 'calendar.svg' },
+  { id: 'i-chevron-down', file: 'chevron-down.svg', variant: 'chevron' },
+  { id: 'i-chevron-left', file: 'chevron-left.svg', variant: 'chevron' },
+  { id: 'i-chevron-right', file: 'chevron-right.svg', variant: 'chevron' },
+  { id: 'i-chevron-up', file: 'chevron-up.svg', variant: 'chevron' },
+  { id: 'i-cloud-download', file: 'cloud-arrow-down.svg' },
+  { id: 'i-comment', file: 'chat-bubble-oval-left-ellipsis.svg' },
+  { id: 'i-ellipsis', file: 'ellipsis-horizontal.svg' },
+  { id: 'i-envelope', file: 'envelope.svg' },
+  { id: 'i-external', file: 'arrow-top-right-on-square.svg' },
+  { id: 'i-eye-slash', file: 'eye-slash.svg' },
+  { id: 'i-focus', file: 'bars-2.svg' },
+  { id: 'i-forward', file: 'forward.svg' },
+  { id: 'i-gear', file: 'cog-6-tooth.svg' },
+  { id: 'i-globe', file: 'globe-alt.svg' },
+  { id: 'i-heart', file: 'heart.svg', variant: 'solid' },
+  { id: 'i-heart-o', file: 'heart.svg' },
+  { id: 'i-home', file: 'home.svg' },
+  { id: 'i-inbox', file: 'inbox.svg' },
+  { id: 'i-link', file: 'link.svg' },
+  { id: 'i-mic', file: 'microphone.svg' },
+  { id: 'i-pause', file: 'pause.svg' },
+  { id: 'i-pen', file: 'pencil.svg' },
+  { id: 'i-pin', file: 'map-pin.svg' },
+  { id: 'i-play', file: 'play.svg' },
+  { id: 'i-plus', file: 'plus.svg', variant: 'chevron' },
+  { id: 'i-queue', file: 'queue-list.svg' },
+  { id: 'i-refresh', file: 'arrow-path.svg' },
+  { id: 'i-search', file: 'magnifying-glass.svg' },
+  { id: 'i-share', file: 'arrow-up-tray.svg' },
+  { id: 'i-sliders', file: 'adjustments-horizontal.svg' },
+  { id: 'i-squares', file: 'squares-2x2.svg' },
+  { id: 'i-stop', file: 'stop.svg' },
+  { id: 'i-tags', file: 'tag.svg' },
+  { id: 'i-volume', file: 'speaker-wave.svg' },
+  { id: 'i-wand', file: 'sparkles.svg' },
+  { id: 'i-xmark', file: 'x-mark.svg' },
+];
+
+function extractSvgInner(svgContent: string): string {
+  return svgContent
+    .replace(/<svg[^>]*>/, '')
+    .replace(/<\/svg>\s*$/, '')
+    .trim();
+}
+
+function generateIconSymbols(): string {
+  const heroiconsDir = join(rootDir, 'node_modules', 'heroicons', '24');
+  const symbols: string[] = [];
+
+  for (const icon of ICON_MAP) {
+    const dir = icon.variant === 'solid' ? 'solid' : 'outline';
+    const filepath = join(heroiconsDir, dir, icon.file);
+    if (!existsSync(filepath)) {
+      console.warn(`  Warning: heroicon not found: ${dir}/${icon.file}`);
+      continue;
+    }
+    const inner = extractSvgInner(readFileSync(filepath, 'utf-8'));
+    let attrs: string;
+    if (icon.variant === 'solid') attrs = SOLID_ATTRS;
+    else if (icon.variant === 'chevron') attrs = CHEVRON_ATTRS;
+    else attrs = OUTLINE_ATTRS;
+    symbols.push(`  <symbol id="${icon.id}" ${attrs}>${inner}</symbol>`);
+  }
+
+  console.log(`  Icons: ${symbols.length} symbols generated from heroicons package`);
+  return symbols.join('\n');
+}
+
+// ---------------------------------------------------------------------------
 // Build the embedded HTML
 // ---------------------------------------------------------------------------
 let html = readFileSync(htmlPath, 'utf-8');
@@ -92,7 +172,11 @@ const js = jsModules.join('\n');
 // Generate font @font-face CSS and prepend to the main CSS
 const fontCss = generateFontCSS();
 
-// Inline CSS (with fonts prepended) and JS into the HTML template
+// Generate icon sprite symbols from heroicons package
+const iconSymbols = generateIconSymbols();
+
+// Inline icons, CSS (with fonts prepended), and JS into the HTML template
+html = html.replace('<!-- INJECT:ICONS -->', () => iconSymbols);
 html = html.replace('/* INJECT:CSS */', () => fontCss + '\n' + css);
 html = html.replace('/* INJECT:JS */', () => js);
 
