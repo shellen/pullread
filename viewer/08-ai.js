@@ -216,8 +216,7 @@ function toggleShareDropdown(e) {
     <div class="share-group-label">Share to</div>
     <button onclick="prOpenExternal('https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}')"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-linkedin"/></svg> LinkedIn</button>
     <button onclick="prOpenExternal('https://bsky.app/intent/compose?text=${encodedText}')"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-bluesky"/></svg> Bluesky</button>
-    <button onclick="prOpenExternal('https://mastodon.social/share?text=${encodedText}')"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-mastodon"/></svg> Mastodon</button>
-    <button onclick="prOpenExternal('https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}')"><svg class="share-icon" viewBox="0 0 320 512"><use href="#i-facebook"/></svg> Facebook</button>
+    <button onclick="shareMastodon('${encodedText}')"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-mastodon"/></svg> Mastodon</button>
     <button onclick="prOpenExternal('https://www.threads.net/intent/post?text=${encodedText}')"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-threads"/></svg> Threads</button>
     <hr>
     <div class="share-group-label">Send</div>
@@ -573,6 +572,117 @@ async function doExportArticlePdf() {
     + highlightsHtml + notesHtml + sourceHtml;
 
   prPrintHtml(content);
+}
+
+function shareMastodon(encodedText) {
+  var server = localStorage.getItem('pr-mastodon-instance');
+  if (server) {
+    prOpenExternal('https://' + server + '/share?text=' + encodedText);
+  } else {
+    promptMastodonSetup(encodedText);
+  }
+}
+
+function promptMastodonSetup(encodedText) {
+  // Close any share dropdown
+  var panel = document.querySelector('.share-dropdown-panel');
+  if (panel) panel.remove();
+
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Mastodon Setup');
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+  overlay.innerHTML = '\
+    <div class="modal-card" onclick="event.stopPropagation()" style="max-width:400px">\
+      <h2>Mastodon Instance</h2>\
+      <p style="color:var(--muted);font-size:13px;margin-bottom:12px">Enter your Mastodon server to share articles there.</p>\
+      <input type="text" id="mastodon-setup-input" placeholder="e.g., xoxo.zone, mastodon.social" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:14px;font-family:inherit;box-sizing:border-box" autofocus>\
+      <div class="modal-actions">\
+        <button class="btn-secondary" onclick="this.closest(\'.modal-overlay\').remove()">Cancel</button>\
+        <button class="btn-primary" onclick="saveMastodonAndShare(\'' + encodedText + '\')">Save &amp; Share</button>\
+      </div>\
+    </div>\
+  ';
+  document.body.appendChild(overlay);
+  var input = overlay.querySelector('#mastodon-setup-input');
+  if (input) {
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') saveMastodonAndShare(encodedText);
+    });
+    input.focus();
+  }
+}
+
+function saveMastodonAndShare(encodedText) {
+  var input = document.getElementById('mastodon-setup-input');
+  var val = (input ? input.value : '').trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  if (!val) return;
+  localStorage.setItem('pr-mastodon-instance', val);
+  var overlay = input.closest('.modal-overlay');
+  if (overlay) overlay.remove();
+  prOpenExternal('https://' + val + '/share?text=' + encodedText);
+}
+
+function showQuoteSharePanel(quote, title, url) {
+  // Close any existing share panel
+  var existing = document.querySelector('.share-dropdown-panel');
+  if (existing) existing.remove();
+
+  var attribution = title ? ('\n\n\u2014 ' + title + (url ? ' ' + url : '')) : (url ? '\n\n' + url : '');
+  var shareText = '\u201c' + quote + '\u201d' + attribution;
+  var encodedText = encodeURIComponent(shareText);
+  var clipboardText = '\u201c' + quote + '\u201d' + (title ? ' \u2014 ' + title : '') + (url ? ' ' + url : '');
+
+  var panel = document.createElement('div');
+  panel.className = 'share-dropdown-panel quote-share-panel';
+  panel.onclick = function(ev) { ev.stopPropagation(); };
+
+  var html = '';
+  html += '<div class="share-group-label">Quote</div>';
+  html += '<div class="quote-share-preview">\u201c' + escapeHtml(quote.length > 140 ? quote.slice(0, 140) + '\u2026' : quote) + '\u201d</div>';
+  html += '<button onclick="copyQuoteToClipboard(this)"><svg class="share-icon" viewBox="0 0 640 512"><use href="#i-link"/></svg> Copy Quote</button>';
+  html += '<hr>';
+  html += '<div class="share-group-label">Share to</div>';
+  html += '<button onclick="prOpenExternal(\'https://www.linkedin.com/sharing/share-offsite/?url=' + encodeURIComponent(url) + '\')"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-linkedin"/></svg> LinkedIn</button>';
+  html += '<button onclick="prOpenExternal(\'https://bsky.app/intent/compose?text=' + encodedText + '\')"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-bluesky"/></svg> Bluesky</button>';
+  html += '<button onclick="shareMastodon(\'' + encodedText + '\')"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-mastodon"/></svg> Mastodon</button>';
+  html += '<button onclick="prOpenExternal(\'https://www.threads.net/intent/post?text=' + encodedText + '\')"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-threads"/></svg> Threads</button>';
+  html += '<hr>';
+  html += '<div class="share-group-label">Send</div>';
+  html += '<button onclick="prOpenExternal(\'mailto:?subject=' + encodeURIComponent(title) + '&body=' + encodedText + '\')"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-envelope"/></svg> Email</button>';
+  html += '<button onclick="prOpenExternal(\'sms:&body=' + encodedText + '\')"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-comment"/></svg> Messages</button>';
+
+  panel.innerHTML = html;
+  panel.setAttribute('data-clipboard-text', clipboardText);
+
+  // Position near the selection
+  var sel = window.getSelection();
+  var pane = document.getElementById('content-scroll');
+  if (sel && sel.rangeCount > 0 && pane) {
+    var range = sel.getRangeAt(0);
+    var rect = range.getBoundingClientRect();
+    var paneRect = pane.getBoundingClientRect();
+    panel.style.position = 'absolute';
+    panel.style.left = Math.max(10, rect.left - paneRect.left) + 'px';
+    panel.style.top = (rect.bottom - paneRect.top + pane.scrollTop + 8) + 'px';
+    pane.appendChild(panel);
+  } else {
+    document.body.appendChild(panel);
+  }
+}
+
+function copyQuoteToClipboard(btn) {
+  var panel = btn.closest('.quote-share-panel');
+  var text = panel ? panel.getAttribute('data-clipboard-text') : '';
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(function() {
+    var orig = btn.innerHTML;
+    btn.innerHTML = '<span class="share-icon">&#10003;</span> Copied!';
+    setTimeout(function() { btn.innerHTML = orig; }, 1200);
+  });
 }
 
 // Close share dropdown when clicking outside

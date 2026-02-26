@@ -380,6 +380,15 @@ function showSettingsPage(scrollToSection) {
   html += '<p style="color:var(--muted);font-size:13px">Loading AI settings...</p>';
   html += '</div>';
 
+  // ---- Sharing section ----
+  var mastodonInstance = localStorage.getItem('pr-mastodon-instance') || '';
+  html += '<div class="settings-section" id="settings-sharing">';
+  html += '<h2>Sharing</h2>';
+  html += '<div class="settings-row"><div><label>Mastodon instance</label><div class="settings-desc">Your Mastodon server (e.g., xoxo.zone, mastodon.social)</div></div>';
+  html += '<input type="text" id="sp-mastodon-instance" value="' + escapeHtml(mastodonInstance) + '" placeholder="mastodon.social" style="min-width:200px">';
+  html += '</div>';
+  html += '</div>';
+
   // ---- Save Settings bar ----
   html += '<div class="settings-save-bar">';
   html += '<button class="btn-primary" onclick="settingsPageSaveAll()" style="font-size:13px;padding:8px 24px">Save Settings</button>';
@@ -1016,7 +1025,14 @@ function settingsPageSaveAll() {
   if (document.getElementById('sp-output-path')) saves.push(settingsPageSaveConfig(true));
   if (document.getElementById('sp-tts-provider')) saves.push(settingsPageSaveTTS(true));
   if (document.getElementById('sp-llm-default')) saves.push(settingsPageSaveLLM(true));
-  if (saves.length === 0) return;
+  // Save Mastodon instance (localStorage only, no server round-trip)
+  var mastodonInput = document.getElementById('sp-mastodon-instance');
+  if (mastodonInput) {
+    var val = mastodonInput.value.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    if (val) localStorage.setItem('pr-mastodon-instance', val);
+    else localStorage.removeItem('pr-mastodon-instance');
+  }
+  if (saves.length === 0) { showSettingsPage(); return; }
   Promise.all(saves).then(function() {
     showSettingsPage();
   });
