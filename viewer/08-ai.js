@@ -729,7 +729,7 @@ async function batchAutotagAll(force) {
       await loadAnnotationsIndex();
       renderFileList();
       // Refresh the explore page if open
-      setTimeout(function() { var ep = document.querySelector('.explore-tabs'); if (ep) showTagCloud(); }, 2000);
+      setTimeout(function() { var ep = document.querySelector('.explore-tabs'); if (ep) goHome(); }, 2000);
     }
   } catch (err) {
     alert('Auto-tag request failed.');
