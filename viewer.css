@@ -2445,7 +2445,7 @@
     margin-left: 4px;
     flex-shrink: 0;
   }
-  .file-item-audio svg { width: 10px; height: 10px; fill: var(--link); }
+  .file-item-audio svg { width: 10px; height: 10px; fill: var(--link); stroke: var(--link); color: var(--link); }
   .file-item-audio .eq-bars {
     display: inline-flex;
     align-items: flex-end;
