@@ -27,28 +27,6 @@ function renderHub() {
   html += '<h1>' + greeting + '</h1>';
   html += '</div>';
 
-  // --- Persistent top: Continue Reading (compact, max 3) ---
-  var positions = JSON.parse(localStorage.getItem('pr-scroll-positions') || '{}');
-  var continueReading = allFiles.filter(function(f) {
-    var pos = positions[f.filename];
-    return pos && pos.pct > 0.05 && pos.pct < 0.9;
-  }).sort(function(a, b) { return (positions[b.filename].ts || 0) - (positions[a.filename].ts || 0); }).slice(0, 3);
-
-  if (continueReading.length > 0) {
-    html += '<div class="dash-section">';
-    html += '<div class="dash-section-header">';
-    html += '<span class="dash-section-title"><svg viewBox="0 0 384 512"><use href="#i-book"/></svg> Continue Reading</span>';
-    html += '</div>';
-    html += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards">';
-    for (var ci = 0; ci < continueReading.length; ci++) {
-      html += dashCardHtml(continueReading[ci], positions[continueReading[ci].filename] ? positions[continueReading[ci].filename].pct : undefined);
-    }
-    html += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
-  }
-
-  // --- Persistent top: Suggested Feeds placeholder ---
-  html += '<div id="hub-suggested-feeds"></div>';
-
   // --- Tab bar ---
   html += '<div class="explore-tabs">';
   html += '<button class="explore-tab active" data-tab="for-you">For You</button>';
@@ -60,8 +38,30 @@ function renderHub() {
   // --- Tab content ---
   var data = collectExploreData();
 
-  // For You tab: Reviews + Quick Filters + Top Tags + Connections + Recent
+  // For You tab
   var forYouHtml = '';
+
+  // Continue Reading
+  var positions = JSON.parse(localStorage.getItem('pr-scroll-positions') || '{}');
+  var continueReading = allFiles.filter(function(f) {
+    var pos = positions[f.filename];
+    return pos && pos.pct > 0.05 && pos.pct < 0.9;
+  }).sort(function(a, b) { return (positions[b.filename].ts || 0) - (positions[a.filename].ts || 0); }).slice(0, 3);
+
+  if (continueReading.length > 0) {
+    forYouHtml += '<div class="dash-section">';
+    forYouHtml += '<div class="dash-section-header">';
+    forYouHtml += '<span class="dash-section-title"><svg viewBox="0 0 384 512"><use href="#i-book"/></svg> Continue Reading</span>';
+    forYouHtml += '</div>';
+    forYouHtml += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards">';
+    for (var ci = 0; ci < continueReading.length; ci++) {
+      forYouHtml += dashCardHtml(continueReading[ci], positions[continueReading[ci].filename] ? positions[continueReading[ci].filename].pct : undefined);
+    }
+    forYouHtml += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
+  }
+
+  // Suggested Feeds
+  forYouHtml += '<div id="hub-suggested-feeds"></div>';
 
   // Reviews
   var reviews = allFiles.filter(function(f) { return f.feed === 'weekly-review' || f.feed === 'daily-review' || f.domain === 'pullread'; }).slice(0, 3);
@@ -109,18 +109,18 @@ function renderHub() {
     forYouHtml += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
   }
 
+  // Quick actions at bottom of For You
+  forYouHtml += '<div class="dash-actions">';
+  forYouHtml += '<button onclick="dashGenerateReview(1)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Daily Review</button>';
+  forYouHtml += '<button onclick="dashGenerateReview(7)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Weekly Review</button>';
+  forYouHtml += '<button onclick="showGuideModal()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-book"/></svg> Guide</button>';
+  forYouHtml += '<button onclick="showTour()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-comment"/></svg> Tour</button>';
+  forYouHtml += '</div>';
+
   html += '<div id="explore-for-you" class="explore-tab-panel active">' + forYouHtml + '</div>';
   html += '<div id="explore-tags" class="explore-tab-panel">' + buildTagsTabHtml(data) + '</div>';
   html += '<div id="explore-sources" class="explore-tab-panel">' + buildSourcesHtml(data) + '</div>';
   html += '<div id="explore-stats" class="explore-tab-panel">' + buildStatsTabHtml(data) + '</div>';
-
-  // Quick actions
-  html += '<div class="dash-actions">';
-  html += '<button onclick="dashGenerateReview(1)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Daily Review</button>';
-  html += '<button onclick="dashGenerateReview(7)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Weekly Review</button>';
-  html += '<button onclick="showGuideModal()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-book"/></svg> Guide</button>';
-  html += '<button onclick="showTour()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-comment"/></svg> Tour</button>';
-  html += '</div>';
 
   dash.innerHTML = html;
 
