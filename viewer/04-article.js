@@ -60,9 +60,7 @@ function renderHub() {
   // --- Tab bar ---
   html += '<div class="explore-tabs">';
   html += '<button class="explore-tab active" data-tab="for-you">For You</button>';
-  html += '<button class="explore-tab" data-tab="tags">Tags</button>';
-  html += '<button class="explore-tab" data-tab="sources">Sources</button>';
-  html += '<button class="explore-tab" data-tab="top">Top</button>';
+  html += '<button class="explore-tab" data-tab="explore">Explore</button>';
   html += '<button class="explore-tab" data-tab="stats">Stats</button>';
   html += '</div>';
 
@@ -92,8 +90,14 @@ function renderHub() {
     forYouHtml += '</div></div>';
   }
 
-  // Quick Filters + Auto-Tagging + Connections
-  forYouHtml += buildDiscoverHtml(data);
+  // Connections between articles via shared tags
+  var connectionsHtml = buildConnectionsHtml(data.tagArticles, data.sortedTags);
+  if (connectionsHtml) {
+    forYouHtml += '<div class="dash-section">';
+    forYouHtml += '<div class="dash-section-header"><span class="dash-section-title">Connections</span></div>';
+    forYouHtml += connectionsHtml;
+    forYouHtml += '</div>';
+  }
 
   // Recent Unread
   var recent = allFiles.filter(function(f) { return !readArticles.has(f.filename) && f.feed !== 'weekly-review' && f.feed !== 'daily-review' && f.domain !== 'pullread'; }).slice(0, 20);
@@ -113,9 +117,7 @@ function renderHub() {
   }
 
   html += '<div id="explore-for-you" class="explore-tab-panel active">' + forYouHtml + '</div>';
-  html += '<div id="explore-tags" class="explore-tab-panel">' + buildTagsHtml(data) + '</div>';
-  html += '<div id="explore-sources" class="explore-tab-panel">' + buildSourcesHtml(data) + '</div>';
-  html += '<div id="explore-top" class="explore-tab-panel">' + buildMostViewedHtml() + '</div>';
+  html += '<div id="explore-explore" class="explore-tab-panel">' + buildExploreTabHtml(data) + '</div>';
   html += '<div id="explore-stats" class="explore-tab-panel">' + buildStatsTabHtml(data) + '</div>';
 
   // Quick actions

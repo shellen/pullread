@@ -1,5 +1,5 @@
-// ABOUTME: Explore page with tabs for Discover, Most Viewed, Tags, Sources.
-// ABOUTME: Builder functions are reusable by the Hub renderer in 04-article.js.
+// ABOUTME: Explore and Stats tab builders for the dashboard hub.
+// ABOUTME: Provides Tags, Sources, Auto-Tagging, Stats, and Most Viewed content.
 
 function collectExploreData() {
   var tagCounts = {};
@@ -192,6 +192,39 @@ function buildSourcesHtml(data) {
   return html;
 }
 
+function buildExploreTabHtml(data) {
+  var html = '';
+
+  // Tags cloud
+  html += '<div class="stats-section">';
+  html += '<h3 class="stats-heading">Tags</h3>';
+  html += buildTagsHtml(data);
+  html += '</div>';
+
+  // Auto-tagging actions
+  var taggedCount = allFiles.filter(function(f) { var n = allNotesIndex[f.filename]; return n && ((n.tags && n.tags.length) || (n.machineTags && n.machineTags.length)); }).length;
+  var totalArticles = allFiles.length;
+  var untaggedCount = totalArticles - taggedCount;
+  html += '<div class="stats-section">';
+  html += '<h3 class="stats-heading">Auto-Tagging</h3>';
+  html += '<p style="font-size:13px;color:var(--muted);margin:0 0 10px">' + taggedCount + ' of ' + totalArticles + ' articles tagged. ';
+  if (untaggedCount > 0) html += untaggedCount + ' remaining.';
+  else html += 'All articles tagged!';
+  html += '</p>';
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+  html += '<button class="tag-pill" id="batch-tag-btn" onclick="batchAutotagAll(false)" title="Tag untagged articles using AI"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-wand"/></svg> Tag Untagged</button>';
+  html += '<button class="tag-pill" onclick="batchAutotagAll(true)" title="Re-tag all articles, replacing existing AI tags"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-refresh"/></svg> Retag All</button>';
+  html += '</div></div>';
+
+  // Sources
+  html += '<div class="stats-section">';
+  html += '<h3 class="stats-heading">Sources</h3>';
+  html += buildSourcesHtml(data);
+  html += '</div>';
+
+  return html;
+}
+
 function buildStatsTabHtml(data) {
   var html = '';
 
@@ -286,6 +319,15 @@ function buildStatsTabHtml(data) {
   html += '<div class="stats-card"><div class="stats-card-num">' + Object.keys(sourceStats).length + '</div><div class="stats-card-label">sources</div></div>';
   html += '</div></div>';
 
+  // --- Most Viewed ---
+  var mostViewedHtml = buildMostViewedHtml();
+  if (mostViewedHtml) {
+    html += '<div class="stats-section">';
+    html += '<h3 class="stats-heading">Most Viewed</h3>';
+    html += mostViewedHtml;
+    html += '</div>';
+  }
+
   return html;
 }
 
@@ -306,25 +348,15 @@ function showTagCloud() {
   renderFileList();
 
   var data = collectExploreData();
-  var statsHtml = buildStatsHtml(data);
-  var discoverHtml = buildDiscoverHtml(data);
-  var viewedHtml = buildMostViewedHtml();
-  var tagsHtml = buildTagsHtml(data);
-  var domainsHtml = buildSourcesHtml(data);
 
   content.innerHTML =
     '<div class="article-header"><h1>Explore</h1></div>' +
-    statsHtml +
     '<div class="explore-tabs">' +
-      '<button class="explore-tab active" data-tab="discover">Discover</button>' +
-      '<button class="explore-tab" data-tab="most-viewed">Most Viewed</button>' +
-      '<button class="explore-tab" data-tab="tags">Tags</button>' +
-      '<button class="explore-tab" data-tab="sources">Sources</button>' +
+      '<button class="explore-tab active" data-tab="explore">Explore</button>' +
+      '<button class="explore-tab" data-tab="stats">Stats</button>' +
     '</div>' +
-    '<div id="explore-discover" class="explore-tab-panel active">' + discoverHtml + '</div>' +
-    '<div id="explore-most-viewed" class="explore-tab-panel">' + viewedHtml + '</div>' +
-    '<div id="explore-tags" class="explore-tab-panel">' + tagsHtml + '</div>' +
-    '<div id="explore-sources" class="explore-tab-panel">' + domainsHtml + '</div>';
+    '<div id="explore-explore" class="explore-tab-panel active">' + buildExploreTabHtml(data) + '</div>' +
+    '<div id="explore-stats" class="explore-tab-panel">' + buildStatsTabHtml(data) + '</div>';
 
   content.querySelectorAll('.explore-tab').forEach(function(btn) {
     btn.addEventListener('click', function() {
