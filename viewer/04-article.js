@@ -28,7 +28,11 @@ function renderHub() {
 
   html += '<div class="dash-greeting">';
   html += '<h1>' + greeting + '</h1>';
-  html += '<p>' + totalArticles + ' articles &middot; ' + unreadCount + ' unread &middot; ' + totalHighlights + ' highlights &middot; ' + totalFavorites + ' starred</p>';
+  var greetParts = [];
+  if (unreadCount > 0) greetParts.push(approxCount(unreadCount) + ' unread');
+  if (totalHighlights > 0) greetParts.push(totalHighlights + ' highlights');
+  if (totalFavorites > 0) greetParts.push(totalFavorites + ' starred');
+  html += '<p>' + (greetParts.length ? greetParts.join(' &middot; ') : 'You\u2019re all caught up') + '</p>';
   html += '</div>';
 
   // --- Persistent top: Continue Reading (compact, max 3) ---

@@ -1031,7 +1031,7 @@ function updateNavCounts() {
   var starredCount = document.getElementById('nav-count-starred');
 
   if (allCount) {
-    allCount.textContent = allFiles.length ? approxCount(allFiles.length) : '';
+    allCount.textContent = '';
     allCount.title = allFiles.length ? allFiles.length.toLocaleString() + ' articles' : '';
   }
 
