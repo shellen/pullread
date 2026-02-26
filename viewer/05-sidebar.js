@@ -320,10 +320,10 @@ function filterFiles() {
           const allTags = [...(notes?.tags || []), ...(notes?.machineTags || []), ...(f.categories || [])];
           return allTags.some(t => t.toLowerCase().includes(tagQ));
         }
-        // Operator: feed:value
+        // Operator: feed:value (exact match)
         if (tl.startsWith('feed:')) {
           const feedQ = tl.slice(5);
-          return f.feed.toLowerCase().includes(feedQ);
+          return f.feed.toLowerCase() === feedQ;
         }
         // Operator: domain:value
         if (tl.startsWith('domain:')) {
