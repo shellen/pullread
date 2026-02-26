@@ -23,6 +23,8 @@ const turndown = new TurndownService({
   codeBlockStyle: 'fenced'
 });
 
+turndown.remove(['script', 'style', 'noscript']);
+
 // When <a> wraps an <img> — directly or inside a wrapper <div>/<figure>/<picture>
 // (Substack uses <a> > <div class="captioned-image-container"> > <img>).
 // Without this rule, Turndown produces [![alt](long-url)](long-url) which
@@ -159,6 +161,10 @@ export function stripEmbedNoise(markdown: string): string {
   // Remove standalone "Download" and "Transcript" list items from player UI
   // (only when they appear as bare bullets with no meaningful content after)
   markdown = markdown.replace(/^\*\s+\*?\*?Download\*?\*?\s*$/gm, '');
+
+  // Remove ad network script remnants (Google AdSense, etc.)
+  markdown = markdown.replace(/^\s*\(?\s*adsbygoogle\b[^]*?$/gm, '');
+  markdown = markdown.replace(/^\s*window\.adsbygoogle\b[^]*?$/gm, '');
 
   // Collapse runs of 3+ blank lines into 2
   markdown = markdown.replace(/\n{4,}/g, '\n\n\n');

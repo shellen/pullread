@@ -280,6 +280,22 @@ describe('stripEmbedNoise', () => {
     const result = stripEmbedNoise(md);
     expect(result).toBe(md);
   });
+
+  test('strips Google AdSense script remnants', () => {
+    const md = 'Article content.\n\n(adsbygoogle = window.adsbygoogle || []).push({});\n\nMore content.';
+    const result = stripEmbedNoise(md);
+    expect(result).not.toContain('adsbygoogle');
+    expect(result).toContain('Article content.');
+    expect(result).toContain('More content.');
+  });
+
+  test('strips window.adsbygoogle variant', () => {
+    const md = 'Intro.\n\nwindow.adsbygoogle = window.adsbygoogle || [];\n\nBody text.';
+    const result = stripEmbedNoise(md);
+    expect(result).not.toContain('adsbygoogle');
+    expect(result).toContain('Intro.');
+    expect(result).toContain('Body text.');
+  });
 });
 
 describe('htmlToMarkdown', () => {
@@ -298,6 +314,21 @@ describe('htmlToMarkdown', () => {
     expect(result).toContain('first paragraph');
     expect(result).toContain('_formatting_');
     expect(result).toContain('[links](https://example.com)');
+  });
+
+  test('strips script tags from HTML content', () => {
+    const html = '<p>Article text.</p><script>(adsbygoogle = window.adsbygoogle || []).push({});</script><p>More text.</p>';
+    const result = htmlToMarkdown(html, 'https://example.com');
+    expect(result).not.toContain('adsbygoogle');
+    expect(result).toContain('Article text.');
+    expect(result).toContain('More text.');
+  });
+
+  test('strips style tags from HTML content', () => {
+    const html = '<style>.ad { display: block; }</style><p>Content here.</p>';
+    const result = htmlToMarkdown(html, 'https://example.com');
+    expect(result).not.toContain('.ad');
+    expect(result).toContain('Content here.');
   });
 });
 
