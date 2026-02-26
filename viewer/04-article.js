@@ -18,21 +18,13 @@ function renderHub() {
 
   var html = '';
 
-  // --- Persistent top: Greeting + Stats ---
+  // --- Greeting ---
   var hour = new Date().getHours();
   var greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-  var totalArticles = allFiles.length;
   var unreadCount = allFiles.filter(function(f) { return !readArticles.has(f.filename); }).length;
-  var totalHighlights = Object.values(allHighlightsIndex).reduce(function(s, h) { return s + (h ? h.length : 0); }, 0);
-  var totalFavorites = Object.values(allNotesIndex).filter(function(n) { return n && n.isFavorite; }).length;
 
   html += '<div class="dash-greeting">';
   html += '<h1>' + greeting + '</h1>';
-  var greetParts = [];
-  if (unreadCount > 0) greetParts.push(approxCount(unreadCount) + ' unread');
-  if (totalHighlights > 0) greetParts.push(totalHighlights + ' highlights');
-  if (totalFavorites > 0) greetParts.push(totalFavorites + ' starred');
-  html += '<p>' + (greetParts.length ? greetParts.join(' &middot; ') : 'You\u2019re all caught up') + '</p>';
   html += '</div>';
 
   // --- Persistent top: Continue Reading (compact, max 3) ---
