@@ -17,6 +17,16 @@ function renderFileList() {
     displayFiles.sort(function(a, b) {
       return magicScore(b, engagement) - magicScore(a, engagement);
     });
+    // Source diversity: max 3 articles per source in top positions, extras pushed down
+    var sourceCounts = {};
+    var top = [], overflow = [];
+    for (var di = 0; di < displayFiles.length; di++) {
+      var key = displayFiles[di].feed || displayFiles[di].domain || 'unknown';
+      sourceCounts[key] = (sourceCounts[key] || 0) + 1;
+      if (sourceCounts[key] <= 3) top.push(displayFiles[di]);
+      else overflow.push(displayFiles[di]);
+    }
+    displayFiles = top.concat(overflow);
   }
 
   const searchTerm = (document.getElementById('search').value || '').trim().toLowerCase();
@@ -252,9 +262,12 @@ function computeSourceEngagement() {
 }
 
 function magicScore(f, engagement) {
-  // Recency: exponential decay, 3-day half-life (weight 40)
+  // Recency: exponential decay (weight 40)
+  // Podcasts use 12-hour half-life (decay 1.386), articles use 3-day (decay 0.231)
   var age = f.bookmarked ? (Date.now() - new Date(f.bookmarked).getTime()) / 86400000 : 30;
-  var recency = Math.exp(-0.231 * age);
+  var isPodcast = f.enclosureUrl && f.enclosureType && f.enclosureType.startsWith('audio/');
+  var decay = isPodcast ? 1.386 : 0.231;
+  var recency = Math.exp(-decay * age);
 
   // Source engagement (weight 35)
   var key = f.feed || f.domain || 'unknown';
