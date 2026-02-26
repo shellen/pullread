@@ -192,6 +192,103 @@ function buildSourcesHtml(data) {
   return html;
 }
 
+function buildStatsTabHtml(data) {
+  var html = '';
+
+  // --- Reading activity sparkline (last 14 days) ---
+  var dayBuckets = {};
+  var now = Date.now();
+  var positions = JSON.parse(localStorage.getItem('pr-scroll-positions') || '{}');
+  for (var fn in positions) {
+    var ts = positions[fn].ts;
+    if (!ts) continue;
+    var dayKey = new Date(ts).toISOString().slice(0, 10);
+    dayBuckets[dayKey] = (dayBuckets[dayKey] || 0) + 1;
+  }
+  // Also count articles marked read without scroll position
+  readArticles.forEach(function(fn) {
+    if (positions[fn]) return; // already counted
+    // Find the article's bookmarked date as a proxy
+    var f = allFiles.find(function(a) { return a.filename === fn; });
+    if (f && f.bookmarked) {
+      var dayKey = new Date(f.bookmarked).toISOString().slice(0, 10);
+      dayBuckets[dayKey] = (dayBuckets[dayKey] || 0) + 1;
+    }
+  });
+
+  var days = [];
+  for (var d = 13; d >= 0; d--) {
+    var date = new Date(now - d * 86400000);
+    var key = date.toISOString().slice(0, 10);
+    days.push({ key: key, count: dayBuckets[key] || 0, label: date.toLocaleDateString(undefined, { weekday: 'short' }) });
+  }
+  var maxDay = Math.max.apply(null, days.map(function(d) { return d.count; })) || 1;
+
+  html += '<div class="stats-section">';
+  html += '<h3 class="stats-heading">Reading Activity</h3>';
+  html += '<div class="stats-bar-chart">';
+  for (var di = 0; di < days.length; di++) {
+    var pct = Math.round((days[di].count / maxDay) * 100);
+    var isToday = di === days.length - 1;
+    html += '<div class="stats-bar-col' + (isToday ? ' today' : '') + '" title="' + days[di].key + ': ' + days[di].count + ' articles">';
+    html += '<div class="stats-bar" style="height:' + Math.max(pct, 2) + '%"></div>';
+    html += '<div class="stats-bar-label">' + days[di].label.slice(0, 2) + '</div>';
+    html += '</div>';
+  }
+  html += '</div></div>';
+
+  // --- Top Sources by engagement ---
+  var sourceStats = {};
+  for (var i = 0; i < allFiles.length; i++) {
+    var f = allFiles[i];
+    var src = f.feed || f.domain || '';
+    if (!src || src === 'pullread') continue;
+    if (!sourceStats[src]) sourceStats[src] = { total: 0, read: 0, starred: 0 };
+    sourceStats[src].total++;
+    if (readArticles.has(f.filename)) sourceStats[src].read++;
+    var notes = allNotesIndex[f.filename];
+    if (notes && notes.isFavorite) sourceStats[src].starred++;
+  }
+  var topSources = Object.entries(sourceStats).sort(function(a, b) { return b[1].read - a[1].read; }).slice(0, 10);
+  var maxRead = topSources.length ? topSources[0][1].read : 1;
+
+  html += '<div class="stats-section">';
+  html += '<h3 class="stats-heading">Top Sources</h3>';
+  for (var si = 0; si < topSources.length; si++) {
+    var name = topSources[si][0];
+    var s = topSources[si][1];
+    var barW = Math.round((s.read / maxRead) * 100);
+    html += '<div class="stats-source-row">';
+    html += '<span class="stats-source-name">' + escapeHtml(name) + '</span>';
+    html += '<div class="stats-source-bar-bg"><div class="stats-source-bar" style="width:' + barW + '%"></div></div>';
+    html += '<span class="stats-source-count">' + s.read + ' / ' + s.total + '</span>';
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // --- Overview numbers ---
+  var totalArticles = allFiles.length;
+  var totalUnread = allFiles.filter(function(f) { return !readArticles.has(f.filename); }).length;
+  var totalRead = totalArticles - totalUnread;
+  var totalHighlights = Object.values(allHighlightsIndex).reduce(function(s, h) { return s + (h ? h.length : 0); }, 0);
+  var totalFavorites = Object.values(allNotesIndex).filter(function(n) { return n && n.isFavorite; }).length;
+  var totalNotes = Object.values(allNotesIndex).filter(function(n) { return n && (n.articleNote || (n.annotations && n.annotations.length)); }).length;
+  var readPct = totalArticles > 0 ? Math.round((totalRead / totalArticles) * 100) : 0;
+
+  html += '<div class="stats-section">';
+  html += '<h3 class="stats-heading">Overview</h3>';
+  html += '<div class="stats-grid">';
+  html += '<div class="stats-card"><div class="stats-card-num">' + approxCount(totalArticles) + '</div><div class="stats-card-label">articles</div></div>';
+  html += '<div class="stats-card"><div class="stats-card-num">' + readPct + '%</div><div class="stats-card-label">read</div></div>';
+  html += '<div class="stats-card"><div class="stats-card-num">' + totalHighlights + '</div><div class="stats-card-label">highlights</div></div>';
+  html += '<div class="stats-card"><div class="stats-card-num">' + totalFavorites + '</div><div class="stats-card-label">starred</div></div>';
+  html += '<div class="stats-card"><div class="stats-card-num">' + totalNotes + '</div><div class="stats-card-label">annotated</div></div>';
+  html += '<div class="stats-card"><div class="stats-card-num">' + Object.keys(sourceStats).length + '</div><div class="stats-card-label">sources</div></div>';
+  html += '</div></div>';
+
+  return html;
+}
+
 // ---- Standalone Explore page (renders as inline page like Guide) ----
 function showTagCloud() {
   _sidebarView = 'home'; syncSidebarTabs();

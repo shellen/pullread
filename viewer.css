@@ -4295,6 +4295,97 @@
   }
   .explore-stats strong { color: var(--fg); }
 
+  /* Stats tab */
+  .stats-section { margin: 0 0 28px; }
+  .stats-heading { font-size: 14px; font-weight: 600; margin: 0 0 12px; }
+  .stats-bar-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 80px;
+    padding: 0 0 18px;
+  }
+  .stats-bar-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+    justify-content: flex-end;
+  }
+  .stats-bar {
+    width: 100%;
+    background: var(--link);
+    border-radius: 3px 3px 0 0;
+    opacity: 0.6;
+    transition: opacity 0.15s;
+  }
+  .stats-bar-col:hover .stats-bar { opacity: 1; }
+  .stats-bar-col.today .stats-bar { opacity: 1; background: var(--accent); }
+  .stats-bar-label {
+    font-size: 9px;
+    color: var(--muted);
+    margin-top: 4px;
+    position: absolute;
+    bottom: 0;
+  }
+  .stats-bar-col { position: relative; }
+  .stats-source-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 6px;
+    font-size: 12px;
+  }
+  .stats-source-name {
+    width: 120px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--fg);
+  }
+  .stats-source-bar-bg {
+    flex: 1;
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .stats-source-bar {
+    height: 100%;
+    background: var(--link);
+    border-radius: 4px;
+  }
+  .stats-source-count {
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+    min-width: 50px;
+    text-align: right;
+  }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .stats-card {
+    background: var(--sidebar-bg);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+  }
+  .stats-card-num {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--fg);
+  }
+  .stats-card-label {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
   /* Source / domain list */
   .domain-group {
     margin: 0 0 2px;

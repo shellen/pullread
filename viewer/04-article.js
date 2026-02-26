@@ -63,6 +63,7 @@ function renderHub() {
   html += '<button class="explore-tab" data-tab="tags">Tags</button>';
   html += '<button class="explore-tab" data-tab="sources">Sources</button>';
   html += '<button class="explore-tab" data-tab="top">Top</button>';
+  html += '<button class="explore-tab" data-tab="stats">Stats</button>';
   html += '</div>';
 
   // --- Tab content ---
@@ -115,6 +116,7 @@ function renderHub() {
   html += '<div id="explore-tags" class="explore-tab-panel">' + buildTagsHtml(data) + '</div>';
   html += '<div id="explore-sources" class="explore-tab-panel">' + buildSourcesHtml(data) + '</div>';
   html += '<div id="explore-top" class="explore-tab-panel">' + buildMostViewedHtml() + '</div>';
+  html += '<div id="explore-stats" class="explore-tab-panel">' + buildStatsTabHtml(data) + '</div>';
 
   // Quick actions
   html += '<div class="dash-actions">';
