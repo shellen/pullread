@@ -18,7 +18,7 @@ function fetchSuggestedFeeds(callback) {
     try { callback(JSON.parse(cached)); return; } catch (e) {}
   }
 
-  fetch('https://pullread.com/api/suggested-feeds')
+  fetch('https://pullread.com/api/suggested-feeds.json')
     .then(function(r) { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(function(feeds) {
       if (Array.isArray(feeds) && feeds.length > 0) {

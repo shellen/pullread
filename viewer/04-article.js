@@ -43,11 +43,11 @@ function renderHub() {
     html += '<div class="dash-section-header">';
     html += '<span class="dash-section-title"><svg viewBox="0 0 384 512"><use href="#i-book"/></svg> Continue Reading</span>';
     html += '</div>';
-    html += '<div class="dash-cards" style="overflow:visible;flex-wrap:wrap">';
+    html += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards">';
     for (var ci = 0; ci < continueReading.length; ci++) {
       html += dashCardHtml(continueReading[ci], positions[continueReading[ci].filename] ? positions[continueReading[ci].filename].pct : undefined);
     }
-    html += '</div></div>';
+    html += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
   }
 
   // --- Persistent top: Suggested Feeds placeholder ---
