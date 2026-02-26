@@ -174,7 +174,12 @@ document.addEventListener('keydown', e => {
     var pane = document.getElementById('content-scroll');
     var pageAmount = pane.clientHeight - 40;
     if (e.shiftKey) {
-      pane.scrollTop -= pageAmount;
+      var atTop = pane.scrollTop <= 0;
+      if (atTop) {
+        navigateArticle(-1);
+      } else {
+        pane.scrollTop -= pageAmount;
+      }
     } else {
       var atBottom = pane.scrollTop + pane.clientHeight >= pane.scrollHeight - 2;
       if (atBottom) {
