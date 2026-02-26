@@ -88,6 +88,7 @@ function renderFileList() {
   }
 }
 
+var _advanceOrigin = null;
 function advanceToNextSource() {
   var items = document.querySelectorAll('#drawer-content .drawer-item[data-source]');
   if (!items.length) return;
@@ -97,7 +98,10 @@ function advanceToNextSource() {
   }
   var nextIdx = (currentIdx + 1) % items.length;
   var nextSource = items[nextIdx].dataset.source;
+  if (_advanceOrigin === null) _advanceOrigin = _activeDrawerSource;
+  else if (nextSource === _advanceOrigin) { _advanceOrigin = null; return; }
   filterBySource(nextSource);
+  _advanceOrigin = null;
 }
 
 function renderFileItem(f, i) {
@@ -397,10 +401,11 @@ function filterFiles() {
           const allTags = [...(notes?.tags || []), ...(notes?.machineTags || []), ...(f.categories || [])];
           return allTags.some(t => t.toLowerCase().includes(tagQ));
         }
-        // Operator: feed:value (exact match)
+        // Operator: feed:value (exact match against feed name or domain fallback)
         if (tl.startsWith('feed:')) {
           const feedQ = tl.slice(5);
-          return f.feed.toLowerCase() === feedQ;
+          const key = (f.feed || f.domain || 'unknown').toLowerCase();
+          return key === feedQ;
         }
         // Operator: domain:value
         if (tl.startsWith('domain:')) {
@@ -649,10 +654,10 @@ function syncSidebarTabs() {
     t.classList.toggle('active', t.dataset.tab === _sidebarView);
   });
 
-  // Always show file list and count — articles + notebooks visible on all tabs
+  // File list always visible; sort bar only on articles tab
   var fileCount = document.getElementById('file-count');
   var fileList = document.getElementById('file-list');
-  if (fileCount) fileCount.style.display = '';
+  if (fileCount) fileCount.style.display = _sidebarView === 'home' ? '' : 'none';
   if (fileList) fileList.style.display = '';
 
   // Update search placeholder contextually
@@ -668,11 +673,7 @@ function syncSidebarTabs() {
   var pinBtn = document.getElementById('search-pin');
   if (pinBtn && _sidebarView !== 'home') pinBtn.style.display = 'none';
 
-  // Hide read and magic sort toggles only apply to articles
-  var hideReadBtn = document.getElementById('hide-read-toggle');
-  if (hideReadBtn) hideReadBtn.style.display = _sidebarView === 'home' ? '' : 'none';
-  var magicSortBtn = document.getElementById('magic-sort-toggle');
-  if (magicSortBtn) magicSortBtn.style.display = _sidebarView === 'home' ? '' : 'none';
+  // Sort toggles visibility handled by file-count container above
 
   // Nav items only visible on home tab
   var navEl = document.getElementById('sidebar-nav');
@@ -982,7 +983,33 @@ function refreshDrawerCounts() {
   var drawer = document.getElementById('drawer');
   if (!drawer || !drawer.classList.contains('open')) return;
   var title = document.getElementById('drawer-title');
-  if (title && title.textContent === 'Sources') openSourcesDrawer();
+  if (!title) return;
+
+  if (title.textContent === 'Sources') {
+    // Update counts in-place to preserve scroll position
+    var items = drawer.querySelectorAll('.drawer-item[data-source]');
+    for (var i = 0; i < items.length; i++) {
+      var src = items[i].dataset.source;
+      var countEl = items[i].querySelector('.drawer-item-count');
+      if (!countEl) continue;
+      var unread = 0;
+      if (src === '__podcasts__') {
+        for (var j = 0; j < allFiles.length; j++) {
+          if (allFiles[j].enclosureUrl && allFiles[j].enclosureType && allFiles[j].enclosureType.startsWith('audio/') && !readArticles.has(allFiles[j].filename)) unread++;
+        }
+      } else {
+        for (var j = 0; j < allFiles.length; j++) {
+          var key = allFiles[j].feed || allFiles[j].domain || 'unknown';
+          if (key === src && !readArticles.has(allFiles[j].filename)) unread++;
+        }
+      }
+      countEl.textContent = unread;
+      items[i].classList.toggle('dimmed', unread === 0);
+    }
+  } else if (title.textContent === 'Tags') {
+    // Tags drawer — just re-render since tag counts change less often
+    openTagsDrawer();
+  }
 }
 
 function updateDrawerActiveState() {
