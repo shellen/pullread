@@ -1,4 +1,5 @@
-// Rendering
+// ABOUTME: Hub landing page (merged Home + Explore) and article rendering.
+// ABOUTME: renderHub() builds the tabbed hub; loadFile() renders individual articles.
 function renderHub() {
   var dash = document.getElementById('dashboard');
   if (!dash) return;
