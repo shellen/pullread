@@ -10,6 +10,15 @@ function renderFileList() {
     displayFiles = filteredFiles;
   }
 
+  // Apply magic sort
+  if (magicSort) {
+    if (displayFiles === filteredFiles) displayFiles = filteredFiles.slice();
+    var engagement = computeSourceEngagement();
+    displayFiles.sort(function(a, b) {
+      return magicScore(b, engagement) - magicScore(a, engagement);
+    });
+  }
+
   const searchTerm = (document.getElementById('search').value || '').trim().toLowerCase();
 
   const total = filteredFiles.length;
@@ -207,6 +216,61 @@ function toggleHideRead() {
   localStorage.setItem('pr-hide-read', hideRead ? '1' : '0');
   document.getElementById('hide-read-toggle').classList.toggle('active', hideRead);
   renderFileList();
+}
+
+function toggleMagicSort() {
+  magicSort = !magicSort;
+  localStorage.setItem('pr-magic-sort', magicSort ? '1' : '0');
+  document.getElementById('magic-sort-toggle').classList.toggle('active', magicSort);
+  renderFileList();
+}
+
+function computeSourceEngagement() {
+  var stats = {};
+  for (var i = 0; i < allFiles.length; i++) {
+    var f = allFiles[i];
+    var key = f.feed || f.domain || 'unknown';
+    if (!stats[key]) stats[key] = { total: 0, read: 0, interact: 0 };
+    stats[key].total++;
+    if (readArticles.has(f.filename)) stats[key].read++;
+    var notes = allNotesIndex[f.filename];
+    if (notes && (notes.isFavorite || (notes.annotations && notes.annotations.length) || notes.articleNote)) {
+      stats[key].interact++;
+    }
+    if (allHighlightsIndex[f.filename] && allHighlightsIndex[f.filename].length) {
+      stats[key].interact++;
+    }
+  }
+  var engagement = {};
+  for (var key in stats) {
+    var s = stats[key];
+    var readRate = s.total > 0 ? s.read / s.total : 0;
+    var interactRate = s.total > 0 ? s.interact / s.total : 0;
+    engagement[key] = 0.5 * readRate + 0.5 * Math.min(interactRate * 3, 1);
+  }
+  return engagement;
+}
+
+function magicScore(f, engagement) {
+  // Recency: exponential decay, 3-day half-life (weight 40)
+  var age = f.bookmarked ? (Date.now() - new Date(f.bookmarked).getTime()) / 86400000 : 30;
+  var recency = Math.exp(-0.231 * age);
+
+  // Source engagement (weight 35)
+  var key = f.feed || f.domain || 'unknown';
+  var source = engagement[key] || 0;
+
+  // Unread boost (weight 15)
+  var unread = readArticles.has(f.filename) ? 0 : 1;
+
+  // Article signals (weight 10)
+  var signals = 0;
+  var notes = allNotesIndex[f.filename];
+  if (notes && notes.isFavorite) signals += 0.3;
+  if (allHighlightsIndex[f.filename] && allHighlightsIndex[f.filename].length) signals += 0.2;
+  if (notes && (notes.articleNote || (notes.annotations && notes.annotations.length))) signals += 0.15;
+
+  return 40 * recency + 35 * source + 15 * unread + 10 * Math.min(signals, 1);
 }
 
 // Debounced localStorage write for read articles
@@ -591,9 +655,11 @@ function syncSidebarTabs() {
   var pinBtn = document.getElementById('search-pin');
   if (pinBtn && _sidebarView !== 'home') pinBtn.style.display = 'none';
 
-  // Hide read toggle only applies to articles
+  // Hide read and magic sort toggles only apply to articles
   var hideReadBtn = document.getElementById('hide-read-toggle');
   if (hideReadBtn) hideReadBtn.style.display = _sidebarView === 'home' ? '' : 'none';
+  var magicSortBtn = document.getElementById('magic-sort-toggle');
+  if (magicSortBtn) magicSortBtn.style.display = _sidebarView === 'home' ? '' : 'none';
 
   // Nav items only visible on home tab
   var navEl = document.getElementById('sidebar-nav');

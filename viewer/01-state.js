@@ -8,6 +8,7 @@ let displayFiles = []; // after hide-read filter
 let activeFile = null;
 let serverMode = false;
 let hideRead = false;
+let magicSort = false;
 let readArticles = new Set(JSON.parse(localStorage.getItem('pr-read-articles') || '[]'));
 const PAGE_SIZE = 200; // pagination chunk
 let displayedCount = 0;

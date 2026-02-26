@@ -72,6 +72,7 @@
   <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5v15m7.5-7.5h-15"/></symbol>
   <symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/><path d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0z"/></symbol>
   <symbol id="i-ellipsis" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0zm6 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0zm6 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0z"/></symbol>
+  <symbol id="i-magic-hat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16"/><path d="M6.5 19l1.5-8 4 3 4-9 2 14"/><path d="M9.5 4.5l1 .8M14.5 3.5l-.8 1M12 2.5v1.5"/></symbol>
 
 </svg>
 <div class="app" role="application" aria-label="Pull Read article reader">
@@ -119,6 +120,7 @@
       </div>
       <div class="file-count" id="file-count" aria-live="polite" aria-atomic="true">
         <span id="file-count-text"></span>
+        <span class="magic-sort-toggle" id="magic-sort-toggle" onclick="toggleMagicSort()" title="Surfaces articles you're most likely to want to read. Prioritizes sources you read, star, and highlight often, then recency, then unread status."><svg class="icon icon-sm" aria-hidden="true"><use href="#i-magic-hat"/></svg></span>
         <span class="hide-read-toggle" id="hide-read-toggle" onclick="toggleHideRead()" title="Hide viewed articles">Hide read</span>
       </div>
       <div class="source-filter-bar" id="source-filter-bar" style="display:none">

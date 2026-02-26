@@ -260,6 +260,10 @@ async function init() {
   hideRead = localStorage.getItem('pr-hide-read') === '1';
   document.getElementById('hide-read-toggle').classList.toggle('active', hideRead);
 
+  // Restore magic sort
+  magicSort = localStorage.getItem('pr-magic-sort') === '1';
+  document.getElementById('magic-sort-toggle').classList.toggle('active', magicSort);
+
   try {
     const res = await fetch('/api/files');
     if (res.ok) {
