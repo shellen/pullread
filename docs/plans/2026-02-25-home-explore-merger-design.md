@@ -115,24 +115,29 @@ Pinned at bottom of the page:
 - `viewer.html` — Remove Explore button from sidebar footer markup
 - `viewer.css` — Styles for suggested feeds hero/banner, tab bar in hub context
 
-## New: Suggested Feeds Data
+## Suggested Feeds Data
 
-A curated list stored in `viewer/13-suggested-feeds.js` (or inline in the hub renderer):
+Fetched from `https://pullread.com/api/suggested-feeds` (or a static JSON file on the site). This lets the feed list be updated without app releases.
 
-```js
-var suggestedFeeds = [
-  { name: 'Daring Fireball', url: 'https://daringfireball.net/feeds/main', category: 'Tech' },
-  { name: 'Stratechery', url: 'https://stratechery.com/feed/', category: 'Business' },
-  { name: 'Platformer', url: 'https://www.platformer.news/rss/', category: 'Tech' },
-  { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index', category: 'Tech' },
-  // ... more curated feeds
-];
+**Endpoint contract** (JSON):
+```json
+[
+  { "name": "Daring Fireball", "url": "https://daringfireball.net/feeds/main", "category": "Tech" },
+  { "name": "Stratechery", "url": "https://stratechery.com/feed/", "category": "Business" }
+]
 ```
 
-Feeds the user already subscribes to are excluded from suggestions.
+**Client behavior**:
+- Fetch on hub render, cache in sessionStorage (avoids re-fetching per tab switch)
+- Fallback: if fetch fails, show a hardcoded minimal list baked into the app
+- Feeds the user already subscribes to are excluded from suggestions
 
-## Open Questions
+## Suggested Feeds Dismiss Behavior
 
-1. Should the Suggested Feeds list be hardcoded or fetched from pullread.com so it can be updated without app releases?
-2. Should "Top" tab include a "time range" filter (last week/month/all time)?
-3. Should dismissing the suggested feeds banner be permanent or reset periodically?
+Periodic dismiss — when established users dismiss the feed suggestions banner, store the dismiss timestamp in localStorage (`pr-feeds-dismissed`). Re-show after 30 days.
+
+## Decisions
+
+1. **Suggested feeds**: Fetched from pullread.com (updatable without app release), with hardcoded fallback
+2. **Top tab time range**: No filter — keep it simple
+3. **Banner dismiss**: Periodic (30-day re-show cycle)
