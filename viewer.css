@@ -1402,9 +1402,11 @@
     gap: 8px;
     flex-shrink: 0;
     max-width: 50%;
+    min-width: 0;
     text-decoration: none;
     color: inherit;
   }
+  .pub-identity > div { min-width: 0; overflow: hidden; }
   .pub-identity:hover .pub-name,
   .pub-identity:hover .pub-domain {
     color: var(--link);
@@ -1465,6 +1467,7 @@
   .pub-tags {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: 4px;
     flex: 1;
     min-width: 0;
@@ -1795,13 +1798,9 @@
       width: 94%;
     }
     pr-player.bottom-bar {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
+      width: 100%;
     }
-    pr-player.bottom-bar.hidden { transform: translateY(100%); max-height: none; }
-    .app.has-bottom-bar .content-scroll { padding-bottom: 80px; }
+    pr-player.bottom-bar.hidden { max-height: 0; }
     .mini-toggle { display: none; }
   }
 

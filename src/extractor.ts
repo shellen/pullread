@@ -174,15 +174,26 @@ export function resolveRelativeUrls(markdown: string, baseUrl: string): string {
     return markdown;
   }
 
-  // Resolve root-relative URLs in markdown images: ![alt](/path) -> ![alt](https://domain.com/path)
+  // Resolve protocol-relative URLs: ![alt](//cdn.example.com/img.png) -> ![alt](https://cdn.example.com/img.png)
   markdown = markdown.replace(
-    /!\[([^\]]*)\]\((\/[^)]+)\)/g,
+    /!\[([^\]]*)\]\((\/\/[^)]+)\)/g,
+    (_, alt, path) => `![${alt}](https:${path})`
+  );
+  markdown = markdown.replace(
+    /(?<!!)\[([^\]]*)\]\((\/\/[^)]+)\)/g,
+    (_, text, path) => `[${text}](https:${path})`
+  );
+
+  // Resolve root-relative URLs in markdown images: ![alt](/path) -> ![alt](https://domain.com/path)
+  // Skips protocol-relative URLs (already handled above)
+  markdown = markdown.replace(
+    /!\[([^\]]*)\]\((\/(?!\/)[^)]+)\)/g,
     (_, alt, path) => `![${alt}](${origin}${path})`
   );
 
   // Resolve root-relative URLs in markdown links: [text](/path) -> [text](https://domain.com/path)
   markdown = markdown.replace(
-    /(?<!!)\[([^\]]*)\]\((\/[^)]+)\)/g,
+    /(?<!!)\[([^\]]*)\]\((\/(?!\/)[^)]+)\)/g,
     (_, text, path) => `[${text}](${origin}${path})`
   );
 

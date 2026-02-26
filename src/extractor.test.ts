@@ -219,6 +219,24 @@ describe('resolveRelativeUrls', () => {
     expect(result).toContain('https://example.com/img/2.png');
     expect(result).toContain('https://example.com/page2');
   });
+
+  test('resolves protocol-relative image URLs to https', () => {
+    const md = '![chart](//static.lukew.com/bench_toolcalls.png)';
+    const result = resolveRelativeUrls(md, 'https://www.lukew.com/ff/entry.asp?123');
+    expect(result).toBe('![chart](https://static.lukew.com/bench_toolcalls.png)');
+  });
+
+  test('resolves protocol-relative link URLs to https', () => {
+    const md = '[read more](//cdn.example.com/page)';
+    const result = resolveRelativeUrls(md, baseUrl);
+    expect(result).toBe('[read more](https://cdn.example.com/page)');
+  });
+
+  test('does not double-prefix protocol-relative URLs with origin', () => {
+    const md = '![img](//static.lukew.com/image.png) and [link](//cdn.example.com/doc)';
+    const result = resolveRelativeUrls(md, 'https://www.lukew.com/ff/rss');
+    expect(result).toBe('![img](https://static.lukew.com/image.png) and [link](https://cdn.example.com/doc)');
+  });
 });
 
 describe('stripEmbedNoise', () => {

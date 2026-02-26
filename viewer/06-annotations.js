@@ -435,7 +435,7 @@ function showHlToolbar(x, y) {
     <button class="hl-green-btn" aria-label="Highlight green" onclick="createHighlight('green')"></button>
     <button class="hl-blue-btn" aria-label="Highlight blue" onclick="createHighlight('blue')"></button>
     <button class="hl-pink-btn" aria-label="Highlight pink" onclick="createHighlight('pink')"></button>
-    <button class="hl-share-btn" aria-label="Share quote" onclick="shareHighlightQuote()"><svg class="icon icon-xs" aria-hidden="true"><use href="#i-share"/></svg></button>
+    <button class="hl-share-btn" aria-label="Share quote" onclick="shareHighlightQuote(event)"><svg class="icon icon-xs" aria-hidden="true"><use href="#i-share"/></svg></button>
     <button class="hl-note-btn" aria-label="Add note" onclick="addInlineNote()">+ Note</button>
   `;
   bar.style.left = x + 'px';
@@ -444,7 +444,8 @@ function showHlToolbar(x, y) {
   hlToolbarEl = bar;
 }
 
-function shareHighlightQuote() {
+function shareHighlightQuote(e) {
+  if (e) e.stopPropagation();
   var sel = window.getSelection();
   if (!sel || sel.isCollapsed) return;
   var quoteText = sel.toString().trim();
@@ -458,7 +459,8 @@ function shareHighlightQuote() {
   removeHlToolbar();
 }
 
-function shareExistingHighlight(id) {
+function shareExistingHighlight(id, e) {
+  if (e) e.stopPropagation();
   var hl = articleHighlights.find(function(h) { return h.id === id; });
   if (!hl || !hl.text) return;
 
@@ -481,7 +483,7 @@ function showHighlightContextMenu(e, hl) {
     <button class="hl-green-btn" aria-label="Green" onclick="changeHighlightColor('${hl.id}','green')"></button>
     <button class="hl-blue-btn" aria-label="Blue" onclick="changeHighlightColor('${hl.id}','blue')"></button>
     <button class="hl-pink-btn" aria-label="Pink" onclick="changeHighlightColor('${hl.id}','pink')"></button>
-    <button class="hl-share-btn" aria-label="Share quote" onclick="shareExistingHighlight('${hl.id}')"><svg class="icon icon-xs" aria-hidden="true"><use href="#i-share"/></svg></button>
+    <button class="hl-share-btn" aria-label="Share quote" onclick="shareExistingHighlight('${hl.id}', event)"><svg class="icon icon-xs" aria-hidden="true"><use href="#i-share"/></svg></button>
     <button class="hl-note-btn" aria-label="${noteLabel}" onclick="editHighlightNote('${hl.id}', event)">${noteLabel}</button>
     <button class="hl-note-btn" style="color:red;border-color:red" aria-label="Delete highlight" onclick="deleteHighlight('${hl.id}')">Del</button>
   `;
