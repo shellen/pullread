@@ -41,68 +41,6 @@ function collectExploreData() {
   };
 }
 
-function buildStatsHtml(data) {
-  var totalArticles = allFiles.length;
-  var totalHighlights = Object.values(allHighlightsIndex).reduce(function(s, h) { return s + (h ? h.length : 0); }, 0);
-  var totalFavorites = Object.values(allNotesIndex).filter(function(n) { return n && n.isFavorite; }).length;
-  var totalSummaries = allFiles.filter(function(f) { return f.hasSummary; }).length;
-  var totalUnread = allFiles.filter(function(f) { return !readArticles.has(f.filename); }).length;
-
-  var html = '<div class="explore-stats">';
-  html += '<span><strong>' + totalArticles + '</strong> articles</span>';
-  html += '<span><strong>' + totalUnread + '</strong> unread</span>';
-  html += '<span><strong>' + totalHighlights + '</strong> highlights</span>';
-  html += '<span><strong>' + totalFavorites + '</strong> starred</span>';
-  html += '<span><strong>' + totalSummaries + '</strong> summaries</span>';
-  html += '<span><strong>' + Object.keys(data.domainArticles).length + '</strong> sources</span>';
-  html += '</div>';
-  return html;
-}
-
-function buildDiscoverHtml(data) {
-  var makeQf = function(label, query, variant) {
-    return '<button class="tag-pill' + (variant ? ' tag-pill-' + variant : '') + '" onclick="document.getElementById(\'search\').value=\'' + escapeJsStr(query) + '\';filterFiles()">' + escapeHtml(label) + '</button>';
-  };
-  var html = '<div class="tag-cloud">';
-  html += makeQf('Starred', 'is:favorite', 'pink');
-  html += makeQf('Unread', 'is:unread', 'blue');
-  html += makeQf('Has Summary', 'has:summary', 'green');
-  html += makeQf('Has Highlights', 'has:highlights', 'amber');
-  html += makeQf('Has Notes', 'has:notes', '');
-  html += makeQf('Has Tags', 'has:tags', '');
-  html += makeQf('Podcasts', 'is:podcast', '');
-  var bookCount = allFiles.filter(function(f) { return f.domain === 'epub'; }).length;
-  if (bookCount > 0) html += makeQf('Books', 'is:book', '');
-  var sortedFeeds = Object.entries(data.feedCounts).sort(function(a, b) { return b[1] - a[1]; }).slice(0, 8);
-  for (var i = 0; i < sortedFeeds.length; i++) {
-    html += makeQf(escapeHtml(sortedFeeds[i][0]), 'feed:' + sortedFeeds[i][0], '');
-  }
-  html += '</div>';
-
-  // Auto-tag actions
-  var taggedCount = allFiles.filter(function(f) { var n = allNotesIndex[f.filename]; return n && ((n.tags && n.tags.length) || (n.machineTags && n.machineTags.length)); }).length;
-  var totalArticles = allFiles.length;
-  var untaggedCount = totalArticles - taggedCount;
-  html += '<h3 style="font-size:14px;font-weight:600;margin:24px 0 12px">Auto-Tagging</h3>';
-  html += '<p style="font-size:13px;color:var(--muted);margin:0 0 10px">' + taggedCount + ' of ' + totalArticles + ' articles tagged. ';
-  if (untaggedCount > 0) html += untaggedCount + ' remaining.';
-  else html += 'All articles tagged!';
-  html += '</p>';
-  html += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
-  html += '<button class="tag-pill" id="batch-tag-btn" onclick="batchAutotagAll(false)" title="Tag untagged articles using AI"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-wand"/></svg> Tag Untagged</button>';
-  html += '<button class="tag-pill" onclick="batchAutotagAll(true)" title="Re-tag all articles, replacing existing AI tags"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-refresh"/></svg> Retag All</button>';
-  html += '</div>';
-
-  // Ontological connections
-  var connectionsHtml = buildConnectionsHtml(data.tagArticles, data.sortedTags);
-  if (connectionsHtml) {
-    html += '<h3 style="font-size:14px;font-weight:600;margin:24px 0 12px">Connections</h3>';
-    html += connectionsHtml;
-  }
-
-  return html;
-}
-
 function buildMostViewedHtml() {
   var positions = JSON.parse(localStorage.getItem('pr-scroll-positions') || '{}');
   var viewedArticles = allFiles
@@ -192,21 +130,17 @@ function buildSourcesHtml(data) {
   return html;
 }
 
-function buildExploreTabHtml(data) {
+function buildTagsTabHtml(data) {
   var html = '';
 
-  // Tags cloud
-  html += '<div class="stats-section">';
-  html += '<h3 class="stats-heading">Tags</h3>';
   html += buildTagsHtml(data);
-  html += '</div>';
 
   // Auto-tagging actions
   var taggedCount = allFiles.filter(function(f) { var n = allNotesIndex[f.filename]; return n && ((n.tags && n.tags.length) || (n.machineTags && n.machineTags.length)); }).length;
   var totalArticles = allFiles.length;
   var untaggedCount = totalArticles - taggedCount;
-  html += '<div class="stats-section">';
-  html += '<h3 class="stats-heading">Auto-Tagging</h3>';
+  html += '<div style="margin-top:20px">';
+  html += '<h3 style="font-size:14px;font-weight:600;margin:0 0 8px">Auto-Tagging</h3>';
   html += '<p style="font-size:13px;color:var(--muted);margin:0 0 10px">' + taggedCount + ' of ' + totalArticles + ' articles tagged. ';
   if (untaggedCount > 0) html += untaggedCount + ' remaining.';
   else html += 'All articles tagged!';
@@ -215,12 +149,6 @@ function buildExploreTabHtml(data) {
   html += '<button class="tag-pill" id="batch-tag-btn" onclick="batchAutotagAll(false)" title="Tag untagged articles using AI"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-wand"/></svg> Tag Untagged</button>';
   html += '<button class="tag-pill" onclick="batchAutotagAll(true)" title="Re-tag all articles, replacing existing AI tags"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-refresh"/></svg> Retag All</button>';
   html += '</div></div>';
-
-  // Sources
-  html += '<div class="stats-section">';
-  html += '<h3 class="stats-heading">Sources</h3>';
-  html += buildSourcesHtml(data);
-  html += '</div>';
 
   return html;
 }
@@ -352,10 +280,12 @@ function showTagCloud() {
   content.innerHTML =
     '<div class="article-header"><h1>Explore</h1></div>' +
     '<div class="explore-tabs">' +
-      '<button class="explore-tab active" data-tab="explore">Explore</button>' +
+      '<button class="explore-tab active" data-tab="tags">Tags</button>' +
+      '<button class="explore-tab" data-tab="sources">Sources</button>' +
       '<button class="explore-tab" data-tab="stats">Stats</button>' +
     '</div>' +
-    '<div id="explore-explore" class="explore-tab-panel active">' + buildExploreTabHtml(data) + '</div>' +
+    '<div id="explore-tags" class="explore-tab-panel active">' + buildTagsTabHtml(data) + '</div>' +
+    '<div id="explore-sources" class="explore-tab-panel">' + buildSourcesHtml(data) + '</div>' +
     '<div id="explore-stats" class="explore-tab-panel">' + buildStatsTabHtml(data) + '</div>';
 
   content.querySelectorAll('.explore-tab').forEach(function(btn) {

@@ -60,7 +60,8 @@ function renderHub() {
   // --- Tab bar ---
   html += '<div class="explore-tabs">';
   html += '<button class="explore-tab active" data-tab="for-you">For You</button>';
-  html += '<button class="explore-tab" data-tab="explore">Explore</button>';
+  html += '<button class="explore-tab" data-tab="tags">Tags</button>';
+  html += '<button class="explore-tab" data-tab="sources">Sources</button>';
   html += '<button class="explore-tab" data-tab="stats">Stats</button>';
   html += '</div>';
 
@@ -117,7 +118,8 @@ function renderHub() {
   }
 
   html += '<div id="explore-for-you" class="explore-tab-panel active">' + forYouHtml + '</div>';
-  html += '<div id="explore-explore" class="explore-tab-panel">' + buildExploreTabHtml(data) + '</div>';
+  html += '<div id="explore-tags" class="explore-tab-panel">' + buildTagsTabHtml(data) + '</div>';
+  html += '<div id="explore-sources" class="explore-tab-panel">' + buildSourcesHtml(data) + '</div>';
   html += '<div id="explore-stats" class="explore-tab-panel">' + buildStatsTabHtml(data) + '</div>';
 
   // Quick actions
