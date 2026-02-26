@@ -885,8 +885,11 @@
     font-size: 11px;
     color: var(--muted);
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 6px;
+  }
+  .file-count-label {
+    margin-left: auto;
   }
   .sync-status {
     padding: 0 12px 4px;
