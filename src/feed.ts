@@ -22,6 +22,7 @@ export interface FeedEntry {
   enclosure?: Enclosure;
   author?: string;
   categories?: string[];
+  thumbnail?: string;
 }
 
 type FeedType = 'atom' | 'rss' | 'rdf' | 'json';
@@ -50,6 +51,18 @@ function formatDuration(seconds: number): string {
   const s = seconds % 60;
   if (h > 0) return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
   return m + ':' + String(s).padStart(2, '0');
+}
+
+function extractMediaUrl(media: any): string | undefined {
+  if (!media) return undefined;
+  // Single element: { '@_url': '...' }
+  if (media['@_url']) return media['@_url'];
+  // Array of media:content elements — pick the first image
+  if (Array.isArray(media)) {
+    const img = media.find((m: any) => !m['@_medium'] || m['@_medium'] === 'image');
+    return img?.['@_url'] || media[0]?.['@_url'] || undefined;
+  }
+  return undefined;
 }
 
 function extractCategories(raw: any): string[] | undefined {
@@ -104,6 +117,8 @@ function parseJsonFeed(text: string): FeedEntry[] {
       ? item.tags.filter((t: any) => typeof t === 'string' && t.trim()).map((t: string) => t.trim())
       : undefined;
 
+    const thumbnail = item.image || item.banner_image || undefined;
+
     return {
       title: item.title || 'Untitled',
       url,
@@ -113,7 +128,8 @@ function parseJsonFeed(text: string): FeedEntry[] {
       contentHtml: contentHtml || undefined,
       enclosure,
       author: jsonAuthorStr || undefined,
-      categories: categories?.length ? categories : undefined
+      categories: categories?.length ? categories : undefined,
+      thumbnail
     };
   });
 }
@@ -175,6 +191,10 @@ function parseAtomFeed(feed: any): FeedEntry[] {
     const author = extractAtomAuthorName(entry.author) || feedAuthor;
     const categories = extractCategories(entry.category);
 
+    const thumbnail = extractMediaUrl(entry['media:content'])
+      || extractMediaUrl(entry['media:thumbnail'])
+      || undefined;
+
     return {
       title: extractTitle(entry.title),
       url,
@@ -183,7 +203,8 @@ function parseAtomFeed(feed: any): FeedEntry[] {
       annotation: annotation || undefined,
       contentHtml: contentHtml || undefined,
       author: author || undefined,
-      categories
+      categories,
+      thumbnail
     };
   });
 }
@@ -243,6 +264,11 @@ function parseRssFeed(rss: any): FeedEntry[] {
 
     const categories = extractCategories(item.category);
 
+    const thumbnail = extractMediaUrl(item['media:content'])
+      || extractMediaUrl(item['media:thumbnail'])
+      || item['itunes:image']?.['@_href']
+      || undefined;
+
     return [{
       title: extractTitle(item.title),
       url,
@@ -252,7 +278,8 @@ function parseRssFeed(rss: any): FeedEntry[] {
       contentHtml: contentHtml || undefined,
       enclosure,
       author: authorName || undefined,
-      categories
+      categories,
+      thumbnail
     }];
   });
 }

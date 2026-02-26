@@ -421,6 +421,11 @@ function renderArticle(text, filename) {
     html += '<div class="article-meta">' + metaLineParts.join('<span class="sep">&middot;</span>') + '</div>';
   }
 
+  // Hero image from frontmatter thumbnail (feed media:content or og:image)
+  if (meta && meta.thumbnail) {
+    html += '<div class="article-hero"><img src="' + escapeHtml(meta.thumbnail) + '" alt="" loading="lazy"></div>';
+  }
+
   // Detect review/summary articles where Summarize doesn't make sense
   const isReviewArticle = meta && (meta.feed === 'weekly-review' || meta.feed === 'daily-review' || meta.domain === 'pullread');
 
@@ -550,6 +555,10 @@ function renderArticle(text, filename) {
     div.innerHTML = h;
     const imgs = Array.from(div.querySelectorAll('img'));
     const seen = new Set();
+    // Pre-seed with hero image thumbnail to prevent duplication in body
+    if (meta && meta.thumbnail) {
+      try { seen.add(new URL(meta.thumbnail).origin + new URL(meta.thumbnail).pathname); } catch { seen.add(meta.thumbnail); }
+    }
     for (const img of imgs) {
       const src = img.getAttribute('src');
       if (!src) continue;

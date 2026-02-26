@@ -933,3 +933,112 @@ describe('parseFeed - category extraction', () => {
     expect(entries[0].categories).toEqual(['Web Development']);
   });
 });
+
+describe('parseFeed - thumbnail extraction', () => {
+  test('extracts media:content url from RSS item', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <title>Media Feed</title>
+    <item>
+      <title>Article With Image</title>
+      <link>https://example.com/article</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <media:content url="https://example.com/hero.jpg" medium="image"/>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].thumbnail).toBe('https://example.com/hero.jpg');
+  });
+
+  test('extracts media:thumbnail url from RSS item', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <title>Thumbnail Feed</title>
+    <item>
+      <title>Article With Thumbnail</title>
+      <link>https://example.com/article</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <media:thumbnail url="https://example.com/thumb.jpg"/>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].thumbnail).toBe('https://example.com/thumb.jpg');
+  });
+
+  test('extracts itunes:image from RSS item', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>Podcast Feed</title>
+    <item>
+      <title>Episode With Art</title>
+      <link>https://podcast.com/ep1</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <itunes:image href="https://podcast.com/art.jpg"/>
+      <enclosure url="https://cdn.example.com/ep1.mp3" type="audio/mpeg"/>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].thumbnail).toBe('https://podcast.com/art.jpg');
+  });
+
+  test('extracts media:content from Atom entry', () => {
+    const feed = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">
+  <title>Atom Media Feed</title>
+  <entry>
+    <title>Atom With Image</title>
+    <link href="https://example.com/atom-article"/>
+    <id>urn:uuid:media-1</id>
+    <updated>2024-01-29T12:00:00Z</updated>
+    <media:content url="https://example.com/atom-hero.jpg" medium="image"/>
+  </entry>
+</feed>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].thumbnail).toBe('https://example.com/atom-hero.jpg');
+  });
+
+  test('extracts image from JSON Feed item', () => {
+    const feed = JSON.stringify({
+      version: 'https://jsonfeed.org/version/1.1',
+      title: 'Image JSON Feed',
+      items: [{
+        id: '1',
+        title: 'JSON With Image',
+        url: 'https://example.com/json-article',
+        date_published: '2024-01-29T12:00:00Z',
+        image: 'https://example.com/json-hero.jpg'
+      }]
+    });
+    const entries = parseFeed(feed);
+    expect(entries[0].thumbnail).toBe('https://example.com/json-hero.jpg');
+  });
+
+  test('omits thumbnail when no media tags present', () => {
+    const entries = parseFeed(RSS_FEED);
+    expect(entries[0].thumbnail).toBeUndefined();
+  });
+
+  test('prefers media:content over media:thumbnail in RSS', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <title>Both Media Feed</title>
+    <item>
+      <title>Article With Both</title>
+      <link>https://example.com/both</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <media:content url="https://example.com/full.jpg" medium="image"/>
+      <media:thumbnail url="https://example.com/small.jpg"/>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].thumbnail).toBe('https://example.com/full.jpg');
+  });
+});

@@ -1711,6 +1711,15 @@
   }
   .article-meta .author:hover { text-decoration: underline; }
   .article-meta .sep { color: var(--border); font-size: 10px; }
+  .article-hero {
+    margin: 16px 0 20px;
+  }
+  .article-hero img {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    display: block;
+  }
   .article-actions {
     display: flex;
     gap: 6px;

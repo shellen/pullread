@@ -241,7 +241,7 @@ async function syncFeed(
         title = article?.title || entry.title;
         author = article?.byline || entry.author;
         excerpt = article?.excerpt;
-        thumbnail = article?.thumbnail;
+        thumbnail = article?.thumbnail || entry.thumbnail;
         lang = article?.lang;
       }
 

@@ -452,13 +452,15 @@ function listFiles(outputPath: string): FileMeta[] {
       const head = buf.slice(0, bytesRead).toString('utf-8');
       const meta = parseFrontmatter(head);
 
-      // Extract first image URL from body
-      let image = '';
-      const fmEnd = head.indexOf('\n---\n');
-      if (fmEnd > 0) {
-        const bodyStart = head.slice(fmEnd + 5);
-        const imgMatch = bodyStart.match(/!\[.*?\]\((https?:\/\/[^)]+)\)/);
-        if (imgMatch) image = imgMatch[1];
+      // Use frontmatter thumbnail if available, otherwise extract first image from body
+      let image = meta.thumbnail || '';
+      if (!image) {
+        const fmEnd = head.indexOf('\n---\n');
+        if (fmEnd > 0) {
+          const bodyStart = head.slice(fmEnd + 5);
+          const imgMatch = bodyStart.match(/!\[.*?\]\((https?:\/\/[^)]+)\)/);
+          if (imgMatch) image = imgMatch[1];
+        }
       }
 
       // Parse categories from frontmatter YAML array: ["a", "b"] or [a, b]
