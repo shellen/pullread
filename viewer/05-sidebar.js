@@ -755,9 +755,10 @@ function openSourcesDrawer() {
       if (filterInput) {
         filterInput.addEventListener('input', function() {
           _drawerFilter = this.value;
+          var pos = this.selectionStart;
           renderSources();
           var fi = document.getElementById('drawer-filter-input');
-          if (fi) fi.focus();
+          if (fi) { fi.focus(); fi.setSelectionRange(pos, pos); }
         });
       }
     }
@@ -858,9 +859,10 @@ function openTagsDrawer() {
       if (filterInput) {
         filterInput.addEventListener('input', function() {
           _tagFilter = this.value;
+          var pos = this.selectionStart;
           renderTags();
           var fi = document.getElementById('drawer-tag-filter');
-          if (fi) fi.focus();
+          if (fi) { fi.focus(); fi.setSelectionRange(pos, pos); }
         });
       }
     }
@@ -890,9 +892,11 @@ function filterBySource(source) {
 function filterByTag(tag) {
   var search = document.getElementById('search');
   if (search) search.value = 'tag:' + tag;
+  showSourceFilterBar(tag);
   _activeDrawerSource = null;
   filterFiles();
   updateDrawerActiveState();
+  if (displayFiles.length > 0) loadFile(0);
 }
 
 function refreshDrawerCounts() {
