@@ -329,7 +329,7 @@ function buildConnectionsHtml(tagArticles, sortedTags) {
     if (tagArticles[tag].length > 5) {
       html += '<div style="padding:4px 8px;font-size:11px"><a href="#" style="color:var(--link);text-decoration:none" onclick="event.preventDefault();document.getElementById(\'search\').value=\'tag:' + escapeJsStr(tag) + '\';filterFiles()">View all ' + count + ' &rsaquo;</a></div>';
     }
-    html += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
+    html += '</div></div>';
   }
   return html;
 }
