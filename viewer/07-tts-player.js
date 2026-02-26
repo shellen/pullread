@@ -45,6 +45,7 @@ class PrPlayer extends HTMLElement {
     }
     this._initialized = true;
     this._mode = this.getAttribute('mode') || 'expanded';
+    if (this._mode === 'mini' && window.innerWidth <= 750) this._mode = 'expanded';
     this.id = 'audio-player';
     this._renderCurrentMode();
   }
@@ -124,6 +125,8 @@ class PrPlayer extends HTMLElement {
   _updateMode() {
     var oldMode = this._mode;
     this._mode = this.getAttribute('mode') || 'expanded';
+    // On mobile, always use expanded mode (mini lives in sidebar which is off-screen)
+    if (this._mode === 'mini' && window.innerWidth <= 750) this._mode = 'expanded';
     if (this._mode === oldMode) return;
 
     // Re-render with the new template

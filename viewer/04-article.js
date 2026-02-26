@@ -292,6 +292,7 @@ function renderArticle(text, filename) {
 
   empty.style.display = 'none';
   content.style.display = 'block';
+  content.classList.remove('settings-view');
 
   let html = '';
 
@@ -305,18 +306,15 @@ function renderArticle(text, filename) {
     var pubDomain = meta.domain;
 
     // Determine publication name from feed
-    if (meta.feed && !feedMatchesDomain(meta.feed, meta.domain)) {
+    if (meta.feed) {
       pubName = meta.feed;
-    } else if (meta.feed) {
-      // Feed matches domain — use feed as pub name, skip domain line
-      pubName = meta.feed;
-      pubDomain = '';
+      // If pub name IS the domain exactly, show only once as the name
+      if (pubName.toLowerCase() === meta.domain.toLowerCase()) {
+        pubDomain = '';
+      }
     }
 
-    // If pub name IS the domain, collapse to single line
-    if (pubName && pubName.toLowerCase() === meta.domain.toLowerCase()) {
-      pubDomain = '';
-    }
+    var sourceHref = 'https://' + encodeURI(meta.domain);
 
     // Favicon: show real favicon, colored initials fallback only on error
     var initials = (pubName || meta.domain).replace(/^(the |www\.)/i, '').slice(0, 2).toUpperCase();
@@ -325,13 +323,13 @@ function renderArticle(text, filename) {
       + '<span class="pub-favicon-fallback">' + escapeHtml(initials) + '</span></div>';
 
     html += '<div class="pub-bar">';
-    html += '<div class="pub-identity">';
+    html += '<a class="pub-identity" href="' + escapeHtml(sourceHref) + '" target="_blank" rel="noopener" title="Visit ' + escapeHtml(meta.domain) + '">';
     html += faviconHtml;
     html += '<div>';
     if (pubName) html += '<span class="pub-name">' + escapeHtml(pubName) + '</span>';
     if (pubDomain) html += '<span class="pub-domain">' + escapeHtml(pubDomain) + '</span>';
     if (!pubName && !pubDomain) html += '<span class="pub-domain">' + escapeHtml(meta.domain) + '</span>';
-    html += '</div></div>';
+    html += '</div></a>';
     html += '<div class="pub-tags" id="header-tags"></div>';
     html += '</div>';
   } else {

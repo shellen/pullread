@@ -62,6 +62,23 @@ function renderFileList() {
   }
 
   list.innerHTML = html;
+
+  // Auto-advance to next source when current feed is empty
+  if (_activeDrawerSource && displayFiles.length === 0) {
+    setTimeout(advanceToNextSource, 0);
+  }
+}
+
+function advanceToNextSource() {
+  var items = document.querySelectorAll('#drawer-content .drawer-item[data-source]');
+  if (!items.length) return;
+  var currentIdx = -1;
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].dataset.source === _activeDrawerSource) { currentIdx = i; break; }
+  }
+  var nextIdx = (currentIdx + 1) % items.length;
+  var nextSource = items[nextIdx].dataset.source;
+  filterBySource(nextSource);
 }
 
 function renderFileItem(f, i) {
@@ -207,6 +224,7 @@ function markAsRead(filename) {
   clearTimeout(_markAsReadTimer);
   _markAsReadTimer = setTimeout(_flushReadArticles, 2000);
   scheduleNavCounts();
+  refreshDrawerCounts();
 }
 
 function markCurrentAsRead() {
@@ -224,6 +242,7 @@ function markCurrentAsUnread() {
   _markAsReadTimer = setTimeout(_flushReadArticles, 2000);
   renderFileList();
   scheduleNavCounts();
+  refreshDrawerCounts();
 }
 
 window.addEventListener('beforeunload', function() {
@@ -239,7 +258,7 @@ function clearSearch() {
 function searchByAuthor(authorName) {
   var input = document.getElementById('search');
   if (!input) return;
-  input.value = 'author:' + authorName;
+  input.value = 'author:"' + authorName + '"';
   filterFiles();
   // Switch to articles tab if not already there
   var articlesTab = document.querySelector('.sidebar-tab[data-tab="articles"]');
@@ -270,7 +289,7 @@ function filterFiles() {
 
     return orGroups.some(group => {
       // Split group into individual terms (AND logic)
-      const terms = group.match(/"[^"]*"|\S+/g) || [];
+      const terms = group.match(/\S+:"[^"]*"|"[^"]*"|\S+/g) || [];
       return terms.every(term => {
         // Remove surrounding quotes if present
         const t = term.replace(/^"(.*)"$/, '$1');
@@ -311,9 +330,9 @@ function filterFiles() {
           const domQ = tl.slice(7);
           return f.domain.toLowerCase().includes(domQ);
         }
-        // Operator: author:value
+        // Operator: author:value (supports author:"First Last")
         if (tl.startsWith('author:')) {
-          const authQ = tl.slice(7);
+          const authQ = tl.slice(7).replace(/^"(.*)"$/, '$1');
           return (f.author || '').toLowerCase().includes(authQ);
         }
 
@@ -528,12 +547,17 @@ function quickAddUrl() {
 
 // ---- Sidebar nav view switching ----
 let _sidebarView = 'home';
+var _activeDrawerSource = null;
 
 function switchSidebarView(view) {
   _sidebarView = view;
   syncSidebarTabs();
 
-  if (view === 'notebooks') { openSingleNotebook(); }
+  if (view === 'notebooks') {
+    clearSourceFilter();
+    closeDrawer();
+    openSingleNotebook();
+  }
   else if (view === 'home') goHome();
 }
 
@@ -589,6 +613,7 @@ function sidebarNavFilter(filter) {
     clearSourceFilter();
     filterFiles();
     closeDrawer();
+    if (displayFiles.length > 0) loadFile(0);
   } else if (filter === 'unread') {
     if (search) search.value = 'is:unread';
     closeDrawer();
@@ -659,10 +684,16 @@ function openSourcesDrawer() {
 
     // Podcast row
     if (podcastCount > 0) {
-      html += '<div class="drawer-item" onclick="filterBySource(\'__podcasts__\')">'
+      var podUnread = 0;
+      for (var pj = 0; pj < allFiles.length; pj++) {
+        if (allFiles[pj].enclosureUrl && allFiles[pj].enclosureType && allFiles[pj].enclosureType.startsWith('audio/') && !readArticles.has(allFiles[pj].filename)) podUnread++;
+      }
+      var podActive = _activeDrawerSource === '__podcasts__' ? ' active' : '';
+      var podDim = podUnread === 0 ? ' dimmed' : '';
+      html += '<div class="drawer-item' + podActive + podDim + '" data-source="__podcasts__" onclick="filterBySource(\'__podcasts__\')">'
         + '<svg class="drawer-item-icon" aria-hidden="true"><use href="#i-headphones"/></svg>'
         + '<span class="drawer-item-name">Podcasts</span>'
-        + '<span class="drawer-item-count">' + podcastCount + '</span></div>';
+        + '<span class="drawer-item-count">' + podUnread + '</span></div>';
     }
 
     // Source rows
@@ -670,15 +701,20 @@ function openSourcesDrawer() {
     for (var si = 0; si < entries.length; si++) {
       var name = entries[si][0];
       var articles = entries[si][1];
-      var count = articles.length;
+      var unread = 0;
+      for (var ui = 0; ui < articles.length; ui++) {
+        if (!readArticles.has(articles[ui].filename)) unread++;
+      }
       var domain = articles[0].domain || '';
+      var isActive = _activeDrawerSource === name ? ' active' : '';
+      var isDimmed = unread === 0 ? ' dimmed' : '';
       var faviconHtml = domain && domain !== 'pullread'
         ? '<img class="drawer-item-favicon" src="/favicons/' + encodeURIComponent(domain) + '.png" alt="" loading="lazy" onerror="this.src=\'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7\'">'
         : '<svg class="drawer-item-icon" aria-hidden="true"><use href="#i-globe"/></svg>';
-      html += '<div class="drawer-item" onclick="filterBySource(\'' + escapeJsStr(name) + '\')">'
+      html += '<div class="drawer-item' + isActive + isDimmed + '" data-source="' + escapeHtml(name) + '" onclick="filterBySource(\'' + escapeJsStr(name) + '\')">'
         + faviconHtml
         + '<span class="drawer-item-name">' + escapeHtml(name) + '</span>'
-        + '<span class="drawer-item-count">' + count + '</span></div>';
+        + '<span class="drawer-item-count">' + unread + '</span></div>';
     }
 
     if (contentEl) {
@@ -738,12 +774,14 @@ function filterBySource(source) {
   if (source === '__podcasts__') {
     if (search) search.value = 'is:podcast';
     showSourceFilterBar('Podcasts');
+    _activeDrawerSource = '__podcasts__';
   } else {
     if (search) search.value = 'feed:' + source;
     showSourceFilterBar(source);
+    _activeDrawerSource = source;
   }
   filterFiles();
-  closeDrawer();
+  updateDrawerActiveState();
   // Load the most recent article from this source
   if (displayFiles.length > 0) loadFile(0);
 }
@@ -751,8 +789,23 @@ function filterBySource(source) {
 function filterByTag(tag) {
   var search = document.getElementById('search');
   if (search) search.value = 'tag:' + tag;
+  _activeDrawerSource = null;
   filterFiles();
-  closeDrawer();
+  updateDrawerActiveState();
+}
+
+function refreshDrawerCounts() {
+  var drawer = document.getElementById('drawer');
+  if (!drawer || !drawer.classList.contains('open')) return;
+  var title = document.getElementById('drawer-title');
+  if (title && title.textContent === 'Sources') openSourcesDrawer();
+}
+
+function updateDrawerActiveState() {
+  var items = document.querySelectorAll('#drawer-content .drawer-item[data-source]');
+  for (var i = 0; i < items.length; i++) {
+    items[i].classList.toggle('active', items[i].dataset.source === _activeDrawerSource);
+  }
 }
 
 function showSourceFilterBar(name) {
@@ -767,6 +820,7 @@ function clearSourceFilter() {
   if (bar) bar.style.display = 'none';
   var search = document.getElementById('search');
   if (search) search.value = '';
+  _activeDrawerSource = null;
   // Reset nav to All Items
   document.querySelectorAll('.sidebar-nav-item').forEach(function(item) {
     item.classList.toggle('active', item.dataset.nav === 'all');

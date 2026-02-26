@@ -131,7 +131,7 @@
   .share-dropdown-panel {
     position: absolute;
     top: calc(100% + 4px);
-    right: 0;
+    left: 0;
     width: 220px;
     background: var(--bg);
     border: 1px solid var(--border);
@@ -552,6 +552,8 @@
     transition: background 0.12s;
   }
   .drawer-item:hover { background: var(--sidebar-hover); }
+  .drawer-item.active { background: var(--sidebar-active); font-weight: 600; }
+  .drawer-item.dimmed { opacity: 0.45; }
   .drawer-item-favicon {
     width: 16px;
     height: 16px;
@@ -1390,6 +1392,13 @@
     align-items: center;
     gap: 8px;
     flex-shrink: 0;
+    max-width: 50%;
+    text-decoration: none;
+    color: inherit;
+  }
+  .pub-identity:hover .pub-name,
+  .pub-identity:hover .pub-domain {
+    color: var(--link);
   }
   .pub-favicon {
     width: 24px;
@@ -1429,6 +1438,9 @@
     color: var(--fg);
     letter-spacing: -0.01em;
     line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .pub-domain {
     display: block;
@@ -1447,14 +1459,13 @@
     gap: 4px;
     flex: 1;
     min-width: 0;
-    justify-content: flex-end;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
     margin-left: 20px;
-    mask-image: linear-gradient(to right, transparent, black 20px);
-    -webkit-mask-image: linear-gradient(to right, transparent, black 20px);
+    mask-image: linear-gradient(to right, transparent, black 20px, black calc(100% - 20px), transparent);
+    -webkit-mask-image: linear-gradient(to right, transparent, black 20px, black calc(100% - 20px), transparent);
   }
   .pub-tags::-webkit-scrollbar { display: none; }
   .pub-tags .tag {
@@ -1757,9 +1768,14 @@
     .share-dropdown-panel {
       position: fixed;
       top: auto;
-      left: 8px;
-      right: 8px;
+      bottom: 0;
+      left: 0;
+      right: 0;
       width: auto;
+      max-height: 70vh;
+      overflow-y: auto;
+      border-radius: 12px 12px 0 0;
+      padding-bottom: max(8px, env(safe-area-inset-bottom));
     }
     .more-dropdown-panel {
       right: auto;
@@ -4037,6 +4053,9 @@
 
   /* Explore stats bar */
   /* Settings page */
+  .content-wrap.settings-view {
+    font-family: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
   .settings-section {
     margin-bottom: 20px;
     padding: 20px 24px;
@@ -4046,6 +4065,7 @@
   .settings-save-bar {
     margin-bottom: 20px;
     text-align: right;
+    font-family: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
   .settings-section h2 {
     font-size: 16px; font-weight: 600; margin: 0 0 16px;

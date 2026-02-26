@@ -165,7 +165,21 @@ function toggleSettingsDropdown() {
 }
 
 var _fontLabels = {serif:'Serif',sans:'Sans-serif',system:'Charter',mono:'Monospace',inter:'Inter',lora:'Lora',literata:'Literata','source-serif':'Source Serif','work-sans':'Work Sans','instrument-serif':'Instrument Serif',opendyslexic:'OpenDyslexic'};
-var _fontOptions = [['serif','Serif'],['sans','Sans-serif'],['system','Charter'],['mono','Monospace'],['inter','Inter'],['lora','Lora'],['literata','Literata'],['source-serif','Source Serif'],['work-sans','Work Sans'],['instrument-serif','Instrument Serif'],['opendyslexic','OpenDyslexic']];
+var _fontOptions = [['work-sans','Work Sans'],['instrument-serif','Instrument Serif'],['serif','Serif'],['sans','Sans-serif'],['system','Charter'],['mono','Monospace'],['inter','Inter'],['lora','Lora'],['literata','Literata'],['source-serif','Source Serif'],['opendyslexic','OpenDyslexic']];
+
+var _fontFamilies = {
+  'serif': 'Georgia, "Times New Roman", serif',
+  'sans': '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  'system': 'Charter, "Bitstream Charter", serif',
+  'mono': '"SF Mono", "Fira Code", monospace',
+  'inter': 'Inter, -apple-system, sans-serif',
+  'lora': 'Lora, Georgia, serif',
+  'literata': 'Literata, Georgia, serif',
+  'source-serif': '"Source Serif 4", Georgia, serif',
+  'work-sans': '"Work Sans", -apple-system, sans-serif',
+  'instrument-serif': '"Instrument Serif", Georgia, serif',
+  'opendyslexic': 'OpenDyslexic, sans-serif'
+};
 
 function toggleFontPicker() {
   var current = localStorage.getItem('pr-font') || 'serif';
@@ -236,6 +250,9 @@ function settingsCustomSelect(btnId, options, currentVal, onSelect) {
     opt.textContent = options[i][1];
     opt.setAttribute('data-val', options[i][0]);
     if (options[i][0] === currentVal) opt.className = 'active';
+    if (btnId === 'aa-font-picker' && _fontFamilies[options[i][0]]) {
+      opt.style.fontFamily = _fontFamilies[options[i][0]];
+    }
     opt.onclick = (function(val) {
       return function() {
         onSelect(val);
@@ -290,6 +307,7 @@ function showSettingsPage(scrollToSection) {
   const empty = document.getElementById('empty-state');
   empty.style.display = 'none';
   content.style.display = 'block';
+  content.classList.add('settings-view');
   document.title = 'Settings — PullRead';
   document.getElementById('margin-notes').innerHTML = '';
   var toc = document.getElementById('toc-container');
