@@ -844,7 +844,7 @@ function settingsPageSaveTimeFormat() {
 
 function settingsOpenAa() {
   // Navigate to dashboard/last article so the Aa button is in context, then open the dropdown
-  renderDashboard();
+  renderHub();
   setTimeout(function() { toggleSettingsDropdown(); }, 100);
 }
 

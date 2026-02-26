@@ -145,7 +145,7 @@ async function refreshArticleList(silent) {
         const idx = displayFiles.findIndex(f => f.filename === activeFile);
         if (idx >= 0 && !silent) loadFile(idx);
       } else if (!silent) {
-        renderDashboard();
+        renderHub();
       }
     }
   } catch {}
@@ -289,7 +289,7 @@ async function init() {
       }).catch(function() {});
 
       // Show dashboard instead of auto-loading first article
-      renderDashboard();
+      renderHub();
       showOnboardingIfNeeded();
       // Seed the change tracker so first poll doesn't false-trigger
       fetch('/api/files-changed').then(function(r) { return r.ok ? r.json() : null; }).then(function(d) { if (d) _lastKnownChangeAt = d.changedAt; }).catch(function() {});

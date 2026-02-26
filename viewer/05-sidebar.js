@@ -1228,7 +1228,7 @@ function openBreakBook(filename) {
       displayFiles.push(filteredFiles[allIdx]);
       loadFile(displayFiles.length - 1);
     } else {
-      renderDashboard();
+      renderHub();
     }
   }
 }
@@ -1291,9 +1291,9 @@ function dismissBreakReminder() {
   } else if (activeFile) {
     var idx = displayFiles.findIndex(function(f) { return f.filename === activeFile; });
     if (idx >= 0) loadFile(idx);
-    else renderDashboard();
+    else renderHub();
   } else {
-    renderDashboard();
+    renderHub();
   }
 }
 
