@@ -1,14 +1,16 @@
   :root {
-    --bg: #ffffff;
-    --fg: #1a1a1a;
-    --muted: #666666;
-    --border: #e0e0e0;
-    --code-bg: #f5f5f5;
+    --bg: #faf8f5;
+    --fg: #1c1917;
+    --muted: #78716c;
+    --border: #e7e5e4;
+    --code-bg: #f5f2ed;
     --link: #1a6daa;
-    --toolbar-bg: #fafafa;
-    --sidebar-bg: #f7f7f7;
-    --sidebar-hover: #eeeeee;
-    --sidebar-active: #e4e4e4;
+    --accent: #b45535;
+    --accent-hover: #9c4529;
+    --toolbar-bg: #f5f2ed;
+    --sidebar-bg: #f3f0ea;
+    --sidebar-hover: #ece8e1;
+    --sidebar-active: #e5e0d8;
   }
   [data-theme="dark"] {
     --bg: #1a1a1a;
@@ -17,6 +19,8 @@
     --border: #333333;
     --code-bg: #2a2a2a;
     --link: #6db3e8;
+    --accent: #d97756;
+    --accent-hover: #c4633f;
     --toolbar-bg: #222222;
     --sidebar-bg: #1e1e1e;
     --sidebar-hover: #2a2a2a;
@@ -29,6 +33,8 @@
     --border: #d4c9b0;
     --code-bg: #ebe3cf;
     --link: #6b4226;
+    --accent: #b45535;
+    --accent-hover: #9c4529;
     --toolbar-bg: #efe6d0;
     --sidebar-bg: #ede4cd;
     --sidebar-hover: #e5dbc2;
@@ -41,6 +47,8 @@
     --border: #666666;
     --code-bg: #1a1a1a;
     --link: #6ec6ff;
+    --accent: #ff8a65;
+    --accent-hover: #ff7043;
     --toolbar-bg: #111111;
     --sidebar-bg: #0a0a0a;
     --sidebar-hover: #1a1a1a;
@@ -99,7 +107,7 @@
     font-family: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-weight: 600;
     font-size: 14px;
-    color: var(--fg);
+    color: var(--accent);
     cursor: pointer;
     letter-spacing: -0.01em;
     display: inline-flex;
@@ -385,7 +393,7 @@
   .sidebar-tab:hover { color: var(--fg); }
   .sidebar-tab.active {
     color: var(--fg);
-    border-bottom-color: var(--link);
+    border-bottom-color: var(--accent);
   }
   .sidebar-tab .icon { width: 14px; height: 14px; }
 
@@ -651,7 +659,7 @@
     font-size: 12px;
     font-weight: 500;
     font-family: inherit;
-    color: var(--link);
+    color: var(--accent);
     border: 1px dashed color-mix(in srgb, var(--border) 60%, transparent);
     border-radius: 6px;
     background: none;
@@ -663,8 +671,8 @@
     gap: 5px;
   }
   .drawer-footer button:hover {
-    background: color-mix(in srgb, var(--link) 8%, transparent);
-    border-color: var(--link);
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    border-color: var(--accent);
   }
   .drawer-footer button svg { width: 14px; height: 14px; fill: currentColor; }
 
@@ -3752,7 +3760,7 @@
   .reading-progress-bar {
     height: 100%;
     width: 0%;
-    background: var(--link);
+    background: var(--accent);
     transition: width 0.1s linear;
     border-radius: 0 2px 2px 0;
     opacity: 0.8;
