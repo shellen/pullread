@@ -64,6 +64,8 @@ function openDrawer() {
 
 function closeDrawer() {
   document.getElementById('drawer').classList.remove('open');
+  var footerEl = document.getElementById('drawer-footer');
+  if (footerEl) footerEl.style.display = 'none';
 }
 
 // Legacy alias

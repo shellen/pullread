@@ -564,12 +564,12 @@
   .drawer-item.active { background: var(--sidebar-active); font-weight: 600; }
   .drawer-item.dimmed { opacity: 0.45; }
   .drawer-item-favicon {
-    width: 16px;
-    height: 16px;
-    border-radius: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
     flex-shrink: 0;
-    background: #fff;
-    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06);
+    background: var(--sidebar-hover);
+    object-fit: cover;
   }
   .drawer-item-icon {
     width: 16px;
@@ -582,29 +582,91 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    min-width: 0;
   }
   .drawer-item-count {
     font-size: 11px;
     color: var(--muted);
     flex-shrink: 0;
+    font-weight: 500;
   }
-  .drawer-sort-bar { display: flex; gap: 2px; padding: 6px 8px 2px; }
+  .drawer-search {
+    padding: 8px 10px;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+  }
+  .drawer-search input {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+    border-radius: 6px;
+    background: var(--bg);
+    font-size: 12px;
+    font-family: inherit;
+    color: var(--fg);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .drawer-search input::placeholder { color: var(--muted); }
+  .drawer-search input:focus { border-color: var(--link); }
+  .drawer-sort-bar {
+    display: flex;
+    gap: 2px;
+    padding: 4px 10px 8px;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 30%, transparent);
+  }
   .drawer-sort-btn {
     background: none;
     border: 1px solid transparent;
     border-radius: 4px;
-    padding: 3px 8px;
+    padding: 3px 9px;
     font-size: 11px;
+    font-weight: 500;
     color: var(--muted);
     cursor: pointer;
     font-family: inherit;
+    transition: all 0.12s;
   }
-  .drawer-sort-btn:hover { color: var(--fg); }
+  .drawer-sort-btn:hover { color: var(--fg); background: var(--sidebar-hover); }
   .drawer-sort-btn.active {
-    background: color-mix(in srgb, var(--link) 12%, transparent);
     color: var(--link);
-    border-color: color-mix(in srgb, var(--link) 25%, transparent);
+    background: color-mix(in srgb, var(--link) 10%, transparent);
+    border-color: color-mix(in srgb, var(--link) 20%, transparent);
   }
+  .drawer-group-label {
+    padding: 10px 10px 4px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+  }
+  .drawer-footer {
+    padding: 10px;
+    border-top: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+    flex-shrink: 0;
+  }
+  .drawer-footer button {
+    width: 100%;
+    padding: 7px;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: inherit;
+    color: var(--link);
+    border: 1px dashed color-mix(in srgb, var(--border) 60%, transparent);
+    border-radius: 6px;
+    background: none;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+  }
+  .drawer-footer button:hover {
+    background: color-mix(in srgb, var(--link) 8%, transparent);
+    border-color: var(--link);
+  }
+  .drawer-footer button svg { width: 14px; height: 14px; fill: currentColor; }
 
   .sidebar-search {
     padding: 12px 12px 8px;
