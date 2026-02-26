@@ -793,23 +793,80 @@ function openTagsDrawer() {
     }
   }
 
-  var sorted = Object.entries(tagCounts).sort(function(a, b) { return b[1] - a[1]; });
+  var entries = Object.entries(tagCounts);
+  var sortMode = localStorage.getItem('pr-tags-sort') || 'count';
+  var _tagFilter = '';
 
-  var html = '';
-  for (var ti = 0; ti < sorted.length; ti++) {
-    var tag = sorted[ti][0];
-    var count = sorted[ti][1];
-    html += '<div class="drawer-item" onclick="filterByTag(\'' + escapeJsStr(tag) + '\')">'
-      + '<span class="drawer-item-dot" style="background:var(--link)"></span>'
-      + '<span class="drawer-item-name">' + escapeHtml(tag) + '</span>'
-      + '<span class="drawer-item-count">' + count + '</span></div>';
+  function sortEntries(mode) {
+    if (mode === 'az') {
+      entries.sort(function(a, b) { return a[0].localeCompare(b[0]); });
+    } else {
+      entries.sort(function(a, b) { return b[1] - a[1]; });
+    }
   }
 
-  if (!sorted.length) {
-    html = '<div style="padding:16px 8px;color:var(--muted);font-size:13px;text-align:center">No tags yet. Tags appear when articles are auto-tagged or you add them manually.</div>';
+  function renderTags() {
+    var html = '';
+
+    // Search/filter input
+    html += '<div class="drawer-search">';
+    html += '<input type="text" id="drawer-tag-filter" placeholder="Filter tags\u2026" value="' + escapeHtml(_tagFilter) + '">';
+    html += '</div>';
+
+    // Sort bar
+    html += '<div class="drawer-sort-bar">';
+    html += '<button class="drawer-sort-btn' + (sortMode === 'count' ? ' active' : '') + '" data-sort="count" title="Sort by frequency">Count</button>';
+    html += '<button class="drawer-sort-btn' + (sortMode === 'az' ? ' active' : '') + '" data-sort="az" title="Sort alphabetically">A\u2013Z</button>';
+    html += '</div>';
+
+    var filterLower = _tagFilter.toLowerCase();
+    sortEntries(sortMode);
+
+    var shown = 0;
+    for (var ti = 0; ti < entries.length; ti++) {
+      var tag = entries[ti][0];
+      var count = entries[ti][1];
+      if (filterLower && tag.toLowerCase().indexOf(filterLower) === -1) continue;
+      html += '<div class="drawer-item" onclick="filterByTag(\'' + escapeJsStr(tag) + '\')">'
+        + '<span class="drawer-item-dot" style="background:var(--link)"></span>'
+        + '<span class="drawer-item-name">' + escapeHtml(tag) + '</span>'
+        + '<span class="drawer-item-count">' + count + '</span></div>';
+      shown++;
+    }
+
+    if (!entries.length) {
+      html += '<div style="padding:16px 8px;color:var(--muted);font-size:13px;text-align:center">No tags yet. Tags appear when articles are auto-tagged or you add them manually.</div>';
+    } else if (!shown) {
+      html += '<div style="padding:16px 8px;color:var(--muted);font-size:13px;text-align:center">No tags matching \u201c' + escapeHtml(_tagFilter) + '\u201d</div>';
+    }
+
+    if (content) {
+      content.innerHTML = html;
+
+      // Wire sort buttons
+      var btns = content.querySelectorAll('.drawer-sort-btn');
+      for (var b = 0; b < btns.length; b++) {
+        btns[b].addEventListener('click', function() {
+          sortMode = this.dataset.sort;
+          localStorage.setItem('pr-tags-sort', sortMode);
+          renderTags();
+        });
+      }
+
+      // Wire search filter
+      var filterInput = document.getElementById('drawer-tag-filter');
+      if (filterInput) {
+        filterInput.addEventListener('input', function() {
+          _tagFilter = this.value;
+          renderTags();
+          var fi = document.getElementById('drawer-tag-filter');
+          if (fi) fi.focus();
+        });
+      }
+    }
   }
 
-  if (content) content.innerHTML = html;
+  renderTags();
   openDrawer();
 }
 
