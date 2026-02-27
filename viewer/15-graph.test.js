@@ -7,18 +7,20 @@ const path = require('path');
 // Load the graph module into global scope
 function loadGraphModule() {
   const code = fs.readFileSync(path.join(__dirname, '15-graph.js'), 'utf8');
-  const fn = new Function(code + '\nreturn { buildTagIndex, findRelatedArticles, buildTopicClusters };');
+  const fn = new Function(code + '\nreturn { buildTagIndex, findRelatedArticles, buildTopicClusters, buildDailyRundown };');
   const exports = fn();
   globalThis.buildTagIndex = exports.buildTagIndex;
   globalThis.findRelatedArticles = exports.findRelatedArticles;
   globalThis.buildTopicClusters = exports.buildTopicClusters;
+  globalThis.buildDailyRundown = exports.buildDailyRundown;
 }
 
 // Helper: set up mock global state
-function setupMockData(files, notesIndex) {
+function setupMockData(files, notesIndex, readSet) {
   globalThis.allFiles = files;
   globalThis.allNotesIndex = notesIndex || {};
   globalThis.blockedTags = new Set();
+  globalThis.readArticles = readSet || new Set();
 }
 
 beforeEach(() => {
@@ -29,6 +31,7 @@ afterEach(() => {
   globalThis.allFiles = [];
   globalThis.allNotesIndex = {};
   globalThis.blockedTags = new Set();
+  globalThis.readArticles = new Set();
 });
 
 describe('buildTagIndex', () => {
@@ -211,5 +214,127 @@ describe('buildTopicClusters', () => {
     const clusters = buildTopicClusters(2, 3);
     // Can't form a cluster with 2 shared tags since blocked-tag is excluded
     expect(clusters).toEqual([]);
+  });
+});
+
+describe('buildDailyRundown', () => {
+  // Helper: 3 articles sharing 2 tags = 1 cluster at threshold (2, 2)
+  function setupRundownData(readSet) {
+    setupMockData(
+      [
+        { filename: 'a.md', title: 'AI Regulation Update', domain: 'tech.com', image: 'https://tech.com/og.jpg' },
+        { filename: 'b.md', title: 'OpenAI Policy Shift', domain: 'ai.org', image: '' },
+        { filename: 'c.md', title: 'AI Safety Standards', domain: 'safety.io', image: 'https://safety.io/og.png' },
+        { filename: 'd.md', title: 'Crypto Market Rally', domain: 'crypto.com', image: '' },
+        { filename: 'e.md', title: 'Bitcoin Regulation', domain: 'coin.net', image: '' },
+      ],
+      {
+        'a.md': { machineTags: ['ai', 'regulation'] },
+        'b.md': { machineTags: ['ai', 'regulation'] },
+        'c.md': { machineTags: ['ai', 'regulation'] },
+        'd.md': { machineTags: ['crypto', 'markets'] },
+        'e.md': { machineTags: ['crypto', 'markets'] },
+      },
+      readSet || new Set()
+    );
+  }
+
+  test('returns clusters with only unread articles', () => {
+    setupRundownData(new Set(['a.md']));
+
+    const rundown = buildDailyRundown(5);
+
+    // ai+regulation cluster should exist but only have 2 unread articles
+    const aiCluster = rundown.find(c => c.tags.includes('ai'));
+    expect(aiCluster).toBeDefined();
+    expect(aiCluster.articles.length).toBe(2);
+    expect(aiCluster.articles.every(a => a.filename !== 'a.md')).toBe(true);
+  });
+
+  test('drops clusters with no unread articles', () => {
+    setupRundownData(new Set(['a.md', 'b.md', 'c.md']));
+
+    const rundown = buildDailyRundown(5);
+
+    // ai+regulation cluster should be gone (all read)
+    const aiCluster = rundown.find(c => c.tags.includes('ai'));
+    expect(aiCluster).toBeUndefined();
+  });
+
+  test('sorts by unread article count descending', () => {
+    setupMockData(
+      [
+        { filename: 'a.md', title: 'A', domain: 'a.com' },
+        { filename: 'b.md', title: 'B', domain: 'b.com' },
+        { filename: 'c.md', title: 'C', domain: 'c.com' },
+        { filename: 'd.md', title: 'D', domain: 'd.com' },
+        { filename: 'e.md', title: 'E', domain: 'e.com' },
+      ],
+      {
+        'a.md': { machineTags: ['small', 'topic'] },
+        'b.md': { machineTags: ['small', 'topic'] },
+        'c.md': { machineTags: ['big', 'cluster'] },
+        'd.md': { machineTags: ['big', 'cluster'] },
+        'e.md': { machineTags: ['big', 'cluster'] },
+      }
+    );
+
+    const rundown = buildDailyRundown(5);
+
+    expect(rundown.length).toBe(2);
+    expect(rundown[0].articles.length).toBeGreaterThanOrEqual(rundown[1].articles.length);
+  });
+
+  test('respects maxTopics limit', () => {
+    setupRundownData();
+
+    const rundown = buildDailyRundown(1);
+
+    expect(rundown.length).toBe(1);
+  });
+
+  test('builds label from shortest tags in cluster', () => {
+    setupRundownData();
+
+    const rundown = buildDailyRundown(5);
+    const aiCluster = rundown.find(c => c.tags.includes('regulation'));
+    expect(aiCluster).toBeDefined();
+    // 'ai' (2 chars) is shortest, 'regulation' (10 chars) is next
+    expect(aiCluster.label).toBe('ai & regulation');
+  });
+
+  test('includes domain and image in article entries', () => {
+    setupRundownData();
+
+    const rundown = buildDailyRundown(5);
+    const aiCluster = rundown.find(c => c.tags.includes('ai'));
+    expect(aiCluster).toBeDefined();
+    expect(aiCluster.articles[0]).toHaveProperty('domain');
+    expect(aiCluster.articles[0]).toHaveProperty('image');
+  });
+
+  test('returns empty array when no clusters exist', () => {
+    setupMockData(
+      [{ filename: 'a.md', title: 'A', domain: 'a.com' }],
+      { 'a.md': { machineTags: ['solo'] } }
+    );
+
+    const rundown = buildDailyRundown(5);
+    expect(rundown).toEqual([]);
+  });
+
+  test('defaults maxTopics to 5', () => {
+    // Create enough clusters to test the default
+    setupMockData(
+      Array.from({ length: 14 }, (_, i) => ({ filename: i + '.md', title: 'Art ' + i, domain: i + '.com' })),
+      Object.fromEntries(Array.from({ length: 14 }, (_, i) => {
+        // 7 pairs, each sharing 2 tags
+        var pairIdx = Math.floor(i / 2);
+        return [i + '.md', { machineTags: ['tag' + pairIdx + 'a', 'tag' + pairIdx + 'b'] }];
+      }))
+    );
+
+    const rundown = buildDailyRundown();
+    expect(rundown.length).toBeLessThanOrEqual(5);
   });
 });

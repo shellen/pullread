@@ -41,6 +41,9 @@ function renderHub() {
   // For You tab
   var forYouHtml = '';
 
+  // Daily Rundown — topic briefing cards
+  forYouHtml += buildDailyRundownHtml();
+
   // Continue Reading
   var positions = JSON.parse(localStorage.getItem('pr-scroll-positions') || '{}');
   var continueReading = allFiles.filter(function(f) {
@@ -151,6 +154,12 @@ function renderHub() {
   });
 
   requestAnimationFrame(initDashChevrons);
+  requestAnimationFrame(initRundown);
+
+  // If audio is queued, switch to mini player so controls stay visible in sidebar
+  if (typeof ttsQueue !== 'undefined' && ttsQueue.length > 0) {
+    setPlayerMode('mini');
+  }
 
   // Async: load suggested feeds
   loadSuggestedFeedsSection();
@@ -217,6 +226,66 @@ function addSuggestedFeed(btn, name, url) {
     btn.textContent = name;
     btn.disabled = false;
   });
+}
+
+function buildDailyRundownHtml() {
+  var clusters = buildDailyRundown(7);
+  if (clusters.length === 0) return '';
+
+  var html = '<div class="rundown">';
+
+  // Progress dots (clickable for desktop nav)
+  html += '<div class="rundown-dots">';
+  for (var di = 0; di < clusters.length; di++) {
+    html += '<span class="rundown-dot' + (di === 0 ? ' active' : '') + '" onclick="rundownGoTo(' + di + ')"></span>';
+  }
+  html += '</div>';
+
+  // Scrollable card track
+  html += '<div class="rundown-track">';
+  for (var ci = 0; ci < clusters.length; ci++) {
+    var c = clusters[ci];
+    // Pick the first article with an OG image for the card background
+    var heroImage = '';
+    for (var ii = 0; ii < c.articles.length; ii++) {
+      if (c.articles[ii].image) { heroImage = c.articles[ii].image; break; }
+    }
+
+    html += '<div class="rundown-card">';
+
+    if (heroImage) {
+      html += '<img class="rundown-card-img" src="' + escapeHtml(heroImage) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<div class=rundown-card-noimg></div>\'">';
+    } else {
+      html += '<div class="rundown-card-noimg"></div>';
+    }
+
+    html += '<div class="rundown-card-body">';
+    html += '<div class="rundown-card-label">' + escapeHtml(c.label) + '</div>';
+    html += '<div class="rundown-card-count">' + c.articles.length + ' article' + (c.articles.length !== 1 ? 's' : '') + '</div>';
+
+    // Up to 3 headlines
+    html += '<div class="rundown-card-headlines">';
+    var headlineCount = Math.min(c.articles.length, 3);
+    for (var hi = 0; hi < headlineCount; hi++) {
+      var a = c.articles[hi];
+      html += '<a onclick="dashLoadArticle(\'' + escapeJsStr(a.filename) + '\')">' + escapeHtml(a.title) + '</a>';
+    }
+    html += '</div>';
+
+    // Tag pills (limit to 5)
+    var maxTags = Math.min(c.tags.length, 5);
+    html += '<div class="rundown-card-tags">';
+    for (var ti = 0; ti < maxTags; ti++) {
+      html += '<span class="tag-pill tag-pill-sm">' + escapeHtml(c.tags[ti]) + '</span>';
+    }
+    html += '</div>';
+    html += '</div>'; // .rundown-card-body
+    html += '</div>'; // .rundown-card
+  }
+  html += '</div>';
+  html += '</div>';
+
+  return html;
 }
 
 function dashCardHtml(f, progressPct) {
