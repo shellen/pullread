@@ -9,6 +9,7 @@ let ttsProvider = 'browser';
 let ttsGenerating = false;
 let ttsProgressTimer = null;
 let _ttsChunkSession = null; // { id, totalChunks, currentChunk, elapsedTime }
+var _ttsPlayGeneration = 0;  // incremented on stop — stale async ops check this to bail out
 var _ttsNextPrefetch = null;  // { filename, sessionId, totalChunks, currentChunk, done }
 var _browserTTSState = null;  // { text, estimatedSeconds, startTime, seekOffset, voice, lang }
 // Migrate old boolean to tri-state; 'off' | 'podcasts' | 'everything'
@@ -260,6 +261,7 @@ function updateArticleNowPlaying() {
 
 async function playTTSItem(index) {
   stopTTS();
+  var gen = _ttsPlayGeneration;
   ttsCurrentIndex = index;
   if (index < 0 || index >= ttsQueue.length) return;
 
@@ -276,6 +278,7 @@ async function playTTSItem(index) {
 
   // Check TTS provider
   await loadTTSSettings();
+  if (gen !== _ttsPlayGeneration) return;
 
   if (ttsProvider === 'browser') {
     await playBrowserTTS(item.filename, item.domain);
@@ -296,6 +299,7 @@ async function loadTTSSettings() {
 }
 
 async function playBrowserTTS(filename, domain) {
+  var gen = _ttsPlayGeneration;
   const synth = window.speechSynthesis;
   if (!synth) {
     showToast('Speech synthesis not available in this browser.');
@@ -308,7 +312,9 @@ async function playBrowserTTS(filename, domain) {
   let text = '';
   try {
     const res = await fetch('/api/file?name=' + encodeURIComponent(filename));
+    if (gen !== _ttsPlayGeneration) return;
     if (res.ok) text = await res.text();
+    if (gen !== _ttsPlayGeneration) return;
   } catch {}
   if (!text) { ttsPlaying = false; renderAudioPlayer(); return; }
 
@@ -497,6 +503,7 @@ function _startBrowserUtterance(text, seekOffset) {
 }
 
 async function playCloudTTS(filename) {
+  var gen = _ttsPlayGeneration;
   ttsGenerating = true;
   renderAudioPlayer();
 
@@ -508,10 +515,12 @@ async function playCloudTTS(filename) {
       body: JSON.stringify({ name: filename }),
     });
 
+    if (gen !== _ttsPlayGeneration) return;
     ttsGenerating = false;
 
     if (!startRes.ok) {
       const err = await startRes.json().catch(function() { return { error: 'TTS failed' }; });
+      if (gen !== _ttsPlayGeneration) return;
       if (err.fallback === 'browser') {
         console.warn('Server TTS unavailable, falling back to browser TTS:', err.error);
         var fallbackItem = ttsQueue[ttsCurrentIndex];
@@ -526,9 +535,9 @@ async function playCloudTTS(filename) {
     }
 
     const session = await startRes.json();
+    if (gen !== _ttsPlayGeneration) return;
 
     if (session.cached) {
-      // Already cached on disk — use the full-file endpoint for instant playback
       await playCloudTTSCached(filename);
       return;
     }
@@ -925,6 +934,7 @@ async function ttsPlayNextChunk(index, seekPct) {
 }
 
 function stopTTS() {
+  _ttsPlayGeneration++;
   clearInterval(ttsProgressTimer);
   _ttsChunkSession = null;
   _ttsChunkBuffer.clear();
@@ -954,7 +964,19 @@ function stopTTS() {
 function ttsTogglePlay() {
   if (ttsQueue.length === 0) return;
 
-  if (ttsProvider === 'browser') {
+  // HTMLAudioElement takes priority — handles cloud TTS, cached, AND podcast audio
+  // (podcasts skip loadTTSSettings so ttsProvider may be stale)
+  if (ttsAudio) {
+    if (ttsPlaying) {
+      ttsAudio.pause();
+      ttsPlaying = false;
+      ttsPrefetchAhead();
+    } else {
+      ttsAudio.play();
+      ttsPlaying = true;
+    }
+  } else if (_browserTTSState || ttsProvider === 'browser') {
+    // Browser speech synthesis — no HTMLAudioElement involved
     const synth = window.speechSynthesis;
     if (ttsPlaying) {
       synth.pause();
@@ -974,25 +996,13 @@ function ttsTogglePlay() {
     } else {
       playTTSItem(0);
     }
+  } else if (ttsPlaying || ttsGenerating) {
+    // Audio still loading/generating — cancel rather than restarting
+    stopTTS();
+  } else if (ttsCurrentIndex >= 0) {
+    playTTSItem(ttsCurrentIndex);
   } else {
-    if (ttsAudio) {
-      if (ttsPlaying) {
-        ttsAudio.pause();
-        ttsPlaying = false;
-        // Pre-buffer upcoming chunks while paused so resume is instant
-        ttsPrefetchAhead();
-      } else {
-        ttsAudio.play();
-        ttsPlaying = true;
-      }
-    } else if (ttsPlaying || ttsGenerating) {
-      // Audio still loading/generating — cancel rather than restarting
-      stopTTS();
-    } else if (ttsCurrentIndex >= 0) {
-      playTTSItem(ttsCurrentIndex);
-    } else {
-      playTTSItem(0);
-    }
+    playTTSItem(0);
   }
   renderAudioPlayer();
 }
