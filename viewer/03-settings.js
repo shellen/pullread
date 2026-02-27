@@ -344,6 +344,33 @@ function settingsSaveBreakActivity(input) {
   if (indicator) indicator.classList.add('visible');
 }
 
+function settingsAutoSaveSync(input) {
+  settingsPageSaveConfig(true).then(function() {
+    if (input && input.parentNode) {
+      var indicator = input.parentNode.querySelector('.save-indicator');
+      if (indicator) indicator.classList.add('visible');
+    }
+  });
+}
+
+function settingsAutoSaveTTS(input) {
+  settingsPageSaveTTS(true).then(function() {
+    if (input && input.parentNode) {
+      var indicator = input.parentNode.querySelector('.save-indicator');
+      if (indicator) indicator.classList.add('visible');
+    }
+  });
+}
+
+function settingsAutoSaveLLM(input) {
+  settingsPageSaveLLM(true).then(function() {
+    if (input && input.parentNode) {
+      var indicator = input.parentNode.querySelector('.save-indicator');
+      if (indicator) indicator.classList.add('visible');
+    }
+  });
+}
+
 function showSettingsPage(scrollToSection) {
   var prevActive = activeFile;
   activeFile = null;
@@ -582,7 +609,7 @@ function showSettingsPage(scrollToSection) {
       h += '<div class="setting-row">';
       h += '<div class="setting-label"><label>Output Folder</label><div class="setting-desc">Where articles are saved as markdown</div></div>';
       h += '<div class="setting-control" style="display:flex;gap:8px;align-items:center">';
-      h += '<input type="text" id="sp-output-path" value="' + escapeHtml(cfg.outputPath || '') + '" placeholder="~/Documents/PullRead" class="input-field">';
+      h += '<div class="input-wrap"><input type="text" id="sp-output-path" value="' + escapeHtml(cfg.outputPath || '') + '" placeholder="~/Documents/PullRead" class="input-field" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveSync(this)"><span class="save-indicator">\u2713</span></div>';
       h += '<button onclick="pickOutputFolder(\'sp-output-path\')" style="white-space:nowrap;padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;cursor:pointer;font-family:inherit">Choose\u2026</button>';
       h += '<button onclick="revealOutputFolder()" style="white-space:nowrap;padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;cursor:pointer;font-family:inherit" title="Open in Finder">Reveal</button>';
       h += '</div></div>';
@@ -596,17 +623,17 @@ function showSettingsPage(scrollToSection) {
       h += '<div class="setting-control" style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">';
       h += '<div class="pill-group" id="sp-sync-presets">';
       for (var ii = 0; ii < intervals.length; ii++) {
-        h += '<button class="pill' + (cfg.syncInterval === intervals[ii][0] ? ' active' : '') + '" data-val="' + intervals[ii][0] + '" onclick="settingsSyncPreset(this,\'' + intervals[ii][0] + '\')">' + intervals[ii][1] + '</button>';
+        h += '<button class="pill' + (cfg.syncInterval === intervals[ii][0] ? ' active' : '') + '" data-val="' + intervals[ii][0] + '" onclick="settingsSyncPreset(this,\'' + intervals[ii][0] + '\');settingsPageSaveConfig(true)">' + intervals[ii][1] + '</button>';
       }
       h += '</div>';
-      h += '<input type="text" id="sp-sync-custom" value="' + escapeHtml(syncCustom) + '" placeholder="e.g. 2h" style="width:52px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:12px;font-family:inherit;text-align:center" oninput="settingsSyncCustom(this.value)">';
+      h += '<input type="text" id="sp-sync-custom" value="' + escapeHtml(syncCustom) + '" placeholder="e.g. 2h" style="width:52px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:12px;font-family:inherit;text-align:center" oninput="settingsSyncCustom(this.value)" onblur="settingsPageSaveConfig(true)">';
       h += '</div><input type="hidden" id="sp-sync-interval" value="' + escapeHtml(cfg.syncInterval || '1h') + '">';
       h += '</div>';
 
       // Chrome cookies
       h += '<div class="setting-row">';
       h += '<div class="setting-label"><label>Chrome Cookies</label><div class="setting-desc">Use Chrome login cookies for paywalled sites (local only)</div></div>';
-      h += '<div class="setting-control"><input type="checkbox" id="sp-cookies"' + (cfg.useBrowserCookies ? ' checked' : '') + ' style="width:18px;height:18px;accent-color:var(--link)"></div>';
+      h += '<div class="setting-control"><input type="checkbox" id="sp-cookies"' + (cfg.useBrowserCookies ? ' checked' : '') + ' onchange="settingsPageSaveConfig(true)" style="width:18px;height:18px;accent-color:var(--link)"></div>';
       h += '</div>';
 
       // Max age
@@ -615,14 +642,9 @@ function showSettingsPage(scrollToSection) {
       var ages = [[0,'None'],[30,'30d'],[90,'3mo'],[180,'6mo'],[365,'1yr']];
       h += '<div class="setting-control"><div class="pill-group">';
       for (var ai = 0; ai < ages.length; ai++) {
-        h += '<button class="pill' + (cfg.maxAgeDays === ages[ai][0] ? ' active' : '') + '" data-val="' + ages[ai][0] + '" onclick="settingsBtnSelect(this,\'sp-max-age\',\'' + ages[ai][0] + '\')">' + ages[ai][1] + '</button>';
+        h += '<button class="pill' + (cfg.maxAgeDays === ages[ai][0] ? ' active' : '') + '" data-val="' + ages[ai][0] + '" onclick="settingsBtnSelect(this,\'sp-max-age\',\'' + ages[ai][0] + '\');settingsPageSaveConfig(true)">' + ages[ai][1] + '</button>';
       }
       h += '</div><input type="hidden" id="sp-max-age" value="' + (cfg.maxAgeDays || 0) + '"></div>';
-      h += '</div>';
-
-      // Save button
-      h += '<div style="padding:8px 0 0;text-align:right">';
-      h += '<button class="btn-primary" onclick="settingsPageSaveConfig()" style="font-size:13px;padding:6px 18px">Save</button>';
       h += '</div>';
 
       sec.innerHTML = h;
@@ -680,7 +702,7 @@ function showSettingsPage(scrollToSection) {
         var note = '';
         if (pid === 'google' && !hasGoogle) note = ' <span style="font-size:10px;opacity:0.7">(Chrome)</span>';
         if (pid === 'apple' && !hasApple) note = ' <span style="font-size:10px;opacity:0.7">(Safari/macOS)</span>';
-        h += '<button class="' + cls + '" data-val="' + pid + '" onclick="settingsBtnSelect(this,\'sp-tts-provider\',\'' + pid + '\');settingsPageTTSChanged()">' + (ttsShortLabels[pid] || pid) + note + '</button>';
+        h += '<button class="' + cls + '" data-val="' + pid + '" onclick="settingsBtnSelect(this,\'sp-tts-provider\',\'' + pid + '\');settingsPageTTSChanged();settingsPageSaveTTS(true)">' + (ttsShortLabels[pid] || pid) + note + '</button>';
       }
       h += '</div><input type="hidden" id="sp-tts-provider" value="' + escapeHtml(activeProv) + '"></div>';
       h += '</div>';
@@ -722,7 +744,7 @@ function showSettingsPage(scrollToSection) {
         var models = data.models[data.provider] || [];
         h += '<div class="setting-control"><div class="pill-group">';
         for (var mi = 0; mi < models.length; mi++) {
-          h += '<button class="pill' + (data.model === models[mi].id ? ' active' : '') + '" data-val="' + models[mi].id + '" onclick="settingsBtnSelect(this,\'sp-tts-model\',\'' + models[mi].id + '\')">' + escapeHtml(models[mi].label) + '</button>';
+          h += '<button class="pill' + (data.model === models[mi].id ? ' active' : '') + '" data-val="' + models[mi].id + '" onclick="settingsBtnSelect(this,\'sp-tts-model\',\'' + models[mi].id + '\');settingsPageSaveTTS(true)">' + escapeHtml(models[mi].label) + '</button>';
         }
         h += '</div><input type="hidden" id="sp-tts-model" value="' + escapeHtml(data.model || '') + '"></div>';
         h += '</div>';
@@ -733,7 +755,7 @@ function showSettingsPage(scrollToSection) {
       h += '<div class="setting-row" id="sp-tts-key-row" style="display:' + (isCloud ? 'flex' : 'none') + '">';
       h += '<div class="setting-label"><label>API Key</label>';
       h += '<div class="setting-desc">' + (data.hasKey && isCloud ? '<span class="settings-status ok">Key saved</span>' : 'Required for cloud TTS') + '</div></div>';
-      h += '<div class="setting-control"><input type="password" id="sp-tts-key" placeholder="' + (data.hasKey && isCloud ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : 'Paste API key') + '" style="min-width:200px"></div>';
+      h += '<div class="setting-control"><div class="input-wrap"><input type="password" id="sp-tts-key" placeholder="' + (data.hasKey && isCloud ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : 'Paste API key') + '" class="input-field" style="min-width:200px" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveTTS(this)"><span class="save-indicator">\u2713</span></div></div>';
       h += '</div>';
 
       // Auto-play next
@@ -751,11 +773,6 @@ function showSettingsPage(scrollToSection) {
       var showVoiceHint = isBrowserProv && prov === 'apple' && !hasQualityVoices;
       h += '<div id="sp-voice-hint" style="display:' + (showVoiceHint ? 'block' : 'none') + ';padding:8px 0">';
       h += '<div class="callout">Tip: Install better voices in System Settings &rarr; Accessibility &rarr; Spoken Content &rarr; Manage Voices</div>';
-      h += '</div>';
-
-      // Save button
-      h += '<div style="padding:8px 0 0;text-align:right">';
-      h += '<button class="btn-primary" onclick="settingsPageSaveTTS()" style="font-size:13px;padding:6px 18px">Save</button>';
       h += '</div>';
 
       sec.innerHTML = h;
@@ -819,7 +836,7 @@ function showSettingsPage(scrollToSection) {
       h += '<div class="setting-control"><div class="pill-group">';
       for (var i = 0; i < providerOrder.length; i++) {
         var p = providerOrder[i];
-        h += '<button class="pill' + (defaultProv === p ? ' active' : '') + '" data-val="' + p + '" onclick="settingsBtnSelect(this,\'sp-llm-default\',\'' + p + '\');settingsPageLLMProviderChanged()">' + (llmShortLabels[p] || p) + '</button>';
+        h += '<button class="pill' + (defaultProv === p ? ' active' : '') + '" data-val="' + p + '" onclick="settingsBtnSelect(this,\'sp-llm-default\',\'' + p + '\');settingsPageLLMProviderChanged();settingsPageSaveLLM(true)">' + (llmShortLabels[p] || p) + '</button>';
       }
       h += '</div><input type="hidden" id="sp-llm-default" value="' + escapeHtml(defaultProv) + '"></div>';
       h += '</div>';
@@ -851,12 +868,12 @@ function showSettingsPage(scrollToSection) {
 
         h += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">';
         h += '<label style="font-size:12px;min-width:55px;color:var(--muted)">API Key</label>';
-        h += '<input type="password" id="sp-llm-key-' + cp.id + '" placeholder="' + (hasKey ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : cp.placeholder) + '" style="flex:1;min-width:0">';
+        h += '<div class="input-wrap" style="flex:1;min-width:0"><input type="password" id="sp-llm-key-' + cp.id + '" placeholder="' + (hasKey ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : cp.placeholder) + '" class="input-field" style="width:100%" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveLLM(this)"><span class="save-indicator">\u2713</span></div>';
         h += '</div>';
 
         h += '<div style="display:flex;gap:8px;align-items:center">';
         h += '<label style="font-size:12px;min-width:55px;color:var(--muted)">Model</label>';
-        h += '<select id="sp-llm-model-' + cp.id + '" onchange="settingsPageModelChanged(\'' + cp.id + '\')" style="flex:1;min-width:0;font-size:12px;padding:6px 8px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px">';
+        h += '<select id="sp-llm-model-' + cp.id + '" onchange="settingsPageModelChanged(\'' + cp.id + '\');settingsPageSaveLLM(true)" style="flex:1;min-width:0;font-size:12px;padding:6px 8px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px">';
         h += '<option value=""' + (!savedModel ? ' selected' : '') + '>' + escapeHtml(cp.defaultModel || 'default') + ' (default)</option>';
         for (var mi = 0; mi < cp.models.length; mi++) {
           var m = cp.models[mi];
@@ -869,16 +886,11 @@ function showSettingsPage(scrollToSection) {
 
         h += '<div id="sp-llm-custom-' + cp.id + '" style="display:' + (isCustom ? 'flex' : 'none') + ';gap:8px;align-items:center;margin-top:6px">';
         h += '<label style="font-size:12px;min-width:55px;color:var(--muted)"></label>';
-        h += '<input type="text" id="sp-llm-custom-input-' + cp.id + '" value="' + escapeHtml(isCustom ? savedModel : '') + '" placeholder="model-id" style="flex:1;min-width:0;font-size:12px">';
+        h += '<input type="text" id="sp-llm-custom-input-' + cp.id + '" value="' + escapeHtml(isCustom ? savedModel : '') + '" placeholder="model-id" style="flex:1;min-width:0;font-size:12px" onblur="settingsPageSaveLLM(true)">';
         h += '</div>';
 
         h += '</div>';
       }
-
-      // Save button
-      h += '<div style="padding:8px 0 0;text-align:right">';
-      h += '<button class="btn-primary" onclick="settingsPageSaveLLM()" style="font-size:13px;padding:6px 18px">Save</button>';
-      h += '</div>';
 
       sec.innerHTML = h;
     }).catch(function() {
@@ -984,6 +996,7 @@ function toggleTTSVoicePicker() {
       var vList = data.voices[provider] || [];
       for (var i = 0; i < vList.length; i++) { if (vList[i].id === val) { label = vList[i].label; break; } }
       if (btn2) btn2.firstChild.textContent = label;
+      settingsPageSaveTTS(true);
     }
   });
 }
@@ -1039,7 +1052,7 @@ function settingsPageTTSChanged() {
     var grp = '<div class="setting-label"><label>Model</label></div>';
     grp += '<div class="setting-control"><div class="pill-group">';
     for (var mi = 0; mi < models.length; mi++) {
-      grp += '<button class="pill' + (mi === 0 ? ' active' : '') + '" data-val="' + models[mi].id + '" onclick="settingsBtnSelect(this,\'sp-tts-model\',\'' + models[mi].id + '\')">' + escapeHtml(models[mi].label) + '</button>';
+      grp += '<button class="pill' + (mi === 0 ? ' active' : '') + '" data-val="' + models[mi].id + '" onclick="settingsBtnSelect(this,\'sp-tts-model\',\'' + models[mi].id + '\');settingsPageSaveTTS(true)">' + escapeHtml(models[mi].label) + '</button>';
     }
     grp += '</div><input type="hidden" id="sp-tts-model" value="' + (models.length > 0 ? models[0].id : '') + '"></div>';
     modelRow.innerHTML = grp;
