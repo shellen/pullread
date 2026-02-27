@@ -1,142 +1,206 @@
-// Rendering
-function renderDashboard() {
-  const dash = document.getElementById('dashboard');
+// ABOUTME: Hub landing page (merged Home + Explore) and article rendering.
+// ABOUTME: renderHub() builds the tabbed hub; loadFile() renders individual articles.
+function renderHub() {
+  var dash = document.getElementById('dashboard');
   if (!dash) return;
 
-  const empty = document.getElementById('empty-state');
-  const content = document.getElementById('content');
+  var empty = document.getElementById('empty-state');
+  var content = document.getElementById('content');
   empty.style.display = '';
   if (content) content.style.display = 'none';
+  var toolbar = document.getElementById('reader-toolbar');
+  if (toolbar) toolbar.style.display = 'none';
 
   if (allFiles.length === 0) {
     dash.innerHTML = '<div class="dash-empty-hint"><p class="hint">No articles yet</p><p class="subhint">Add RSS feeds in the tray app, or drop a .md file here</p></div>';
     return;
   }
 
-  let html = '';
+  var html = '';
 
-  // Greeting
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-  const totalArticles = allFiles.length;
-  const unreadCount = allFiles.filter(f => !readArticles.has(f.filename)).length;
+  // --- Greeting ---
+  var hour = new Date().getHours();
+  var greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  var unreadCount = allFiles.filter(function(f) { return !readArticles.has(f.filename); }).length;
+
   html += '<div class="dash-greeting">';
   html += '<h1>' + greeting + '</h1>';
-  html += '<p>' + totalArticles + ' articles' + (unreadCount > 0 ? ' &middot; ' + unreadCount + ' unread' : '') + '</p>';
   html += '</div>';
 
-  // Continue Reading — articles with saved scroll position (partially read)
-  const positions = JSON.parse(localStorage.getItem('pr-scroll-positions') || '{}');
-  const continueReading = allFiles.filter(f => {
-    const pos = positions[f.filename];
-    return pos && pos.pct > 0.05 && pos.pct < 0.9; // partially read
-  }).sort((a, b) => (positions[b.filename].ts || 0) - (positions[a.filename].ts || 0)).slice(0, 10);
+  // --- Tab bar ---
+  html += '<div class="explore-tabs">';
+  html += '<button class="explore-tab active" data-tab="for-you">For You</button>';
+  html += '<button class="explore-tab" data-tab="sources">Sources</button>';
+  html += '<button class="explore-tab" data-tab="stats">Stats</button>';
+  html += '<button class="explore-tab" data-tab="tags">Tags</button>';
+  html += '</div>';
+
+  // --- Tab content ---
+  var data = collectExploreData();
+
+  // For You tab
+  var forYouHtml = '';
+
+  // Continue Reading
+  var positions = JSON.parse(localStorage.getItem('pr-scroll-positions') || '{}');
+  var continueReading = allFiles.filter(function(f) {
+    var pos = positions[f.filename];
+    return pos && pos.pct > 0.05 && pos.pct < 0.9;
+  }).sort(function(a, b) { return (positions[b.filename].ts || 0) - (positions[a.filename].ts || 0); }).slice(0, 3);
 
   if (continueReading.length > 0) {
-    html += '<div class="dash-section">';
-    html += '<div class="dash-section-header">';
-    html += '<span class="dash-section-title"><svg viewBox="0 0 384 512"><use href="#i-book"/></svg> Continue Reading <span class="dash-section-count">(' + continueReading.length + ')</span></span>';
-    html += '</div>';
-    html += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards">';
-    for (const f of continueReading) {
-      html += dashCardHtml(f, positions[f.filename]?.pct);
+    forYouHtml += '<div class="dash-section">';
+    forYouHtml += '<div class="dash-section-header">';
+    forYouHtml += '<span class="dash-section-title"><svg viewBox="0 0 384 512"><use href="#i-book"/></svg> Continue Reading</span>';
+    forYouHtml += '</div>';
+    forYouHtml += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards">';
+    for (var ci = 0; ci < continueReading.length; ci++) {
+      forYouHtml += dashCardHtml(continueReading[ci], positions[continueReading[ci].filename] ? positions[continueReading[ci].filename].pct : undefined);
     }
-    html += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
+    forYouHtml += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
   }
 
-  // Latest Reviews
-  const reviews = allFiles.filter(f => f.feed === 'weekly-review' || f.feed === 'daily-review' || f.domain === 'pullread').slice(0, 5);
+  // Suggested Feeds
+  forYouHtml += '<div id="hub-suggested-feeds"></div>';
+
+  // Reviews
+  var reviews = allFiles.filter(function(f) { return f.feed === 'weekly-review' || f.feed === 'daily-review' || f.domain === 'pullread'; }).slice(0, 3);
   if (reviews.length > 0) {
-    html += '<div class="dash-section">';
-    html += '<div class="dash-section-header">';
-    html += '<span class="dash-section-title"><svg viewBox="0 0 512 512"><use href="#i-wand"/></svg> Reviews</span>';
-    html += '</div>';
-    html += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards">';
-    for (const f of reviews) {
-      const isWeekly = f.feed === 'weekly-review';
-      const typeLabel = isWeekly ? 'Weekly' : 'Daily';
-      const date = f.bookmarked ? f.bookmarked.slice(0, 10) : '';
-      html += '<div class="dash-review-card" onclick="dashLoadArticle(\'' + escapeHtml(f.filename) + '\')">';
-      html += '<div class="dash-review-title">' + escapeHtml(f.title) + '</div>';
-      html += '<div class="dash-review-meta">' + typeLabel + ' Review' + (date ? ' &middot; ' + date : '') + '</div>';
-      if (f.excerpt) html += '<div class="dash-review-excerpt">' + escapeHtml(f.excerpt) + '</div>';
-      html += '</div>';
+    forYouHtml += '<div class="dash-section">';
+    forYouHtml += '<div class="dash-section-header"><span class="dash-section-title"><svg viewBox="0 0 512 512"><use href="#i-wand"/></svg> Reviews</span></div>';
+    forYouHtml += '<div class="dash-cards" style="overflow:visible;flex-wrap:wrap">';
+    for (var ri = 0; ri < reviews.length; ri++) {
+      var rf = reviews[ri];
+      var isWeekly = rf.feed === 'weekly-review';
+      var typeLabel = isWeekly ? 'Weekly' : 'Daily';
+      var rdate = rf.bookmarked ? rf.bookmarked.slice(0, 10) : '';
+      forYouHtml += '<div class="dash-review-card" onclick="dashLoadArticle(\'' + escapeHtml(rf.filename) + '\')">';
+      forYouHtml += '<div class="dash-review-title">' + escapeHtml(rf.title) + '</div>';
+      forYouHtml += '<div class="dash-review-meta">' + typeLabel + ' Review' + (rdate ? ' &middot; ' + rdate : '') + '</div>';
+      if (rf.excerpt) forYouHtml += '<div class="dash-review-excerpt">' + escapeHtml(rf.excerpt) + '</div>';
+      forYouHtml += '</div>';
     }
-    html += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
+    forYouHtml += '</div></div>';
   }
 
-  // Favorites
-  const favorites = allFiles.filter(f => allNotesIndex[f.filename]?.isFavorite);
-  if (favorites.length > 0) {
-    html += '<div class="dash-section">';
-    html += '<div class="dash-section-header">';
-    html += '<span class="dash-section-title"><svg viewBox="0 0 576 512"><use href="#i-heart"/></svg> Favorites <span class="dash-section-count">(' + favorites.length + ')</span></span>';
-    html += '</div>';
-    html += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards">';
-    for (const f of favorites.slice(0, 10)) {
-      html += dashCardHtml(f);
-    }
-    html += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
+  // Connections between articles via shared tags
+  var connectionsHtml = buildConnectionsHtml(data.tagArticles, data.sortedTags);
+  if (connectionsHtml) {
+    forYouHtml += '<div class="dash-section">';
+    forYouHtml += '<div class="dash-section-header"><span class="dash-section-title">Connections</span></div>';
+    forYouHtml += connectionsHtml;
+    forYouHtml += '</div>';
   }
 
-  // Explore — top tags and quick filters
-  var tagMap = {};
-  for (var ef of allFiles) {
-    var en = allNotesIndex[ef.filename];
-    var et = [];
-    if (en && en.tags) et.push.apply(et, en.tags);
-    if (en && en.machineTags) et.push.apply(et, en.machineTags);
-    for (var etag of et) {
-      tagMap[etag] = (tagMap[etag] || 0) + 1;
-    }
-  }
-  var topTags = Object.entries(tagMap).sort(function(a, b) { return b[1] - a[1]; });
-  var hasBooks = allFiles.some(function(f) { return f.domain === 'epub'; });
-  var hasPodcasts = allFiles.some(function(f) { return f.enclosureUrl && f.enclosureType && f.enclosureType.startsWith('audio/'); });
-  if (topTags.length > 0 || hasBooks || hasPodcasts) {
-    html += '<div class="dash-section">';
-    html += '<div class="dash-section-header">';
-    html += '<span class="dash-section-title"><svg viewBox="0 0 512 512"><use href="#i-tags"/></svg> Explore</span>';
-    html += '<button class="dash-view-all" onclick="showTagCloud()">View all &rsaquo;</button>';
-    html += '</div>';
-    html += '<div class="dash-explore-pills">';
-    if (hasBooks) html += '<button class="tag-pill" onclick="document.getElementById(\'search\').value=\'is:book\';filterFiles()">Books</button>';
-    if (hasPodcasts) html += '<button class="tag-pill" onclick="document.getElementById(\'search\').value=\'is:podcast\';filterFiles()">Podcasts</button>';
-    for (var ti = 0; ti < Math.min(topTags.length, 12); ti++) {
-      html += '<button class="tag-pill" onclick="document.getElementById(\'search\').value=\'tag:' + escapeJsStr(topTags[ti][0]) + '\';filterFiles()">' + escapeHtml(topTags[ti][0]) + '<span class="tag-count">' + topTags[ti][1] + '</span></button>';
-    }
-    html += '</div></div>';
-  }
-
-  // Recent — latest unread articles
-  const recent = allFiles.filter(f => !readArticles.has(f.filename) && f.feed !== 'weekly-review' && f.feed !== 'daily-review' && f.domain !== 'pullread').slice(0, 20);
+  // Recent Unread
+  var recent = allFiles.filter(function(f) { return !readArticles.has(f.filename) && f.feed !== 'weekly-review' && f.feed !== 'daily-review' && f.domain !== 'pullread'; }).slice(0, 20);
   if (recent.length > 0) {
-    html += '<div class="dash-section">';
-    html += '<div class="dash-section-header">';
-    html += '<span class="dash-section-title"><svg viewBox="0 0 448 512"><use href="#i-calendar"/></svg> Recent <span class="dash-section-count">(' + recent.length + ')</span></span>';
+    forYouHtml += '<div class="dash-section">';
+    forYouHtml += '<div class="dash-section-header">';
+    forYouHtml += '<span class="dash-section-title"><svg viewBox="0 0 448 512"><use href="#i-calendar"/></svg> Recent <span class="dash-section-count">(' + recent.length + ')</span></span>';
     if (unreadCount > recent.length) {
-      html += '<button class="dash-view-all" onclick="document.getElementById(\'search\').focus()">View all ' + unreadCount + ' &rsaquo;</button>';
+      forYouHtml += '<button class="dash-view-all" onclick="document.getElementById(\'search\').focus()">View all ' + unreadCount + ' &rsaquo;</button>';
     }
-    html += '</div>';
-    html += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards">';
-    for (const f of recent) {
-      html += dashCardHtml(f);
+    forYouHtml += '</div>';
+    forYouHtml += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards">';
+    for (var rci = 0; rci < recent.length; rci++) {
+      forYouHtml += dashCardHtml(recent[rci]);
     }
-    html += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
+    forYouHtml += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
   }
 
-  // Quick actions
-  html += '<div class="dash-actions">';
-  html += '<button onclick="dashGenerateReview(1)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Daily Review</button>';
-  html += '<button onclick="dashGenerateReview(7)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Weekly Review</button>';
-  html += '<button onclick="showTagCloud()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-search"/></svg> Explore</button>';
-  html += '<button onclick="showGuideModal()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-book"/></svg> Guide</button>';
-  html += '<button onclick="showTour()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-comment"/></svg> Tour</button>';
-  html += '</div>';
+  // Quick actions at bottom of For You
+  forYouHtml += '<div class="dash-actions">';
+  forYouHtml += '<button onclick="dashGenerateReview(1)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Daily Review</button>';
+  forYouHtml += '<button onclick="dashGenerateReview(7)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Weekly Review</button>';
+  forYouHtml += '<button onclick="showGuideModal()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-book"/></svg> Guide</button>';
+  forYouHtml += '<button onclick="showTour()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-comment"/></svg> Tour</button>';
+  forYouHtml += '</div>';
+
+  html += '<div id="explore-for-you" class="explore-tab-panel active">' + forYouHtml + '</div>';
+  html += '<div id="explore-sources" class="explore-tab-panel">' + buildSourcesHtml(data) + '</div>';
+  html += '<div id="explore-stats" class="explore-tab-panel">' + buildStatsTabHtml(data) + '</div>';
+  html += '<div id="explore-tags" class="explore-tab-panel">' + buildTagsTabHtml(data) + '</div>';
 
   dash.innerHTML = html;
-  // Initialize chevron visibility after DOM is populated
+
+  // Wire up tab switching
+  dash.querySelectorAll('.explore-tab').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      dash.querySelectorAll('.explore-tab').forEach(function(b) { b.classList.remove('active'); });
+      dash.querySelectorAll('.explore-tab-panel').forEach(function(p) { p.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById('explore-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
   requestAnimationFrame(initDashChevrons);
+
+  // Async: load suggested feeds
+  loadSuggestedFeedsSection();
+}
+
+function loadSuggestedFeedsSection() {
+  var container = document.getElementById('hub-suggested-feeds');
+  if (!container) return;
+
+  fetchSuggestedFeeds(function(allFeeds) {
+    var feeds = filterSuggestedFeeds(allFeeds);
+    if (feeds.length === 0) return;
+
+    var userFeedCount = new Set(allFiles.map(function(f) { return f.feed; }).filter(Boolean)).size;
+    var isNewUser = userFeedCount < 5;
+    var dismissed = isFeedsDismissed();
+
+    if (!isNewUser && dismissed) return;
+
+    var html = '<div class="hub-feeds-section' + (isNewUser ? ' hub-feeds-hero' : '') + '">';
+
+    if (isNewUser) {
+      html += '<div class="hub-feeds-heading">Build your reading list</div>';
+      html += '<p class="hub-feeds-desc">Subscribe to feeds to get articles delivered to Pull Read.</p>';
+    } else {
+      html += '<div class="hub-feeds-heading" style="display:flex;align-items:center;justify-content:space-between">Discover new feeds';
+      html += '<button class="hub-feeds-dismiss" onclick="dismissSuggestedFeeds()" title="Dismiss">&times;</button>';
+      html += '</div>';
+    }
+
+    html += '<div class="hub-feeds-pills">';
+    for (var i = 0; i < feeds.length; i++) {
+      var f = feeds[i];
+      html += '<button class="tag-pill" onclick="addSuggestedFeed(this,\'' + escapeHtml(f.name.replace(/'/g, "\\'")) + '\',\'' + escapeHtml(f.url.replace(/'/g, "\\'")) + '\')">' + escapeHtml(f.name) + '</button>';
+    }
+    html += '<button class="tag-pill" onclick="toggleQuickAdd()" style="opacity:0.7">+ Add custom</button>';
+    html += '</div></div>';
+
+    container.innerHTML = html;
+  });
+}
+
+function addSuggestedFeed(btn, name, url) {
+  btn.disabled = true;
+  btn.textContent = 'Adding\u2026';
+  fetch('/api/config').then(function(r) { return r.json(); }).then(function(cfg) {
+    var feeds = cfg.feeds || {};
+    feeds[name] = url;
+    return fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ outputPath: cfg.outputPath, feeds: feeds, syncInterval: cfg.syncInterval, useBrowserCookies: cfg.useBrowserCookies, maxAgeDays: cfg.maxAgeDays })
+    });
+  }).then(function(r) {
+    if (r.ok) {
+      btn.textContent = '\u2713 Added';
+      btn.style.opacity = '0.5';
+      showToast('Added ' + name);
+    } else {
+      btn.textContent = name;
+      btn.disabled = false;
+    }
+  }).catch(function() {
+    btn.textContent = name;
+    btn.disabled = false;
+  });
 }
 
 function dashCardHtml(f, progressPct) {
@@ -207,14 +271,17 @@ function dashGenerateReview(days) {
 }
 
 function goHome() {
+  if (_markAsReadDelayTimer) { console.debug('[PR] goHome clearing markAsRead timer'); clearTimeout(_markAsReadDelayTimer); _markAsReadDelayTimer = null; }
   _sidebarView = 'home'; syncSidebarTabs();
   activeFile = null;
   document.title = 'PullRead';
   renderFileList();
   var toc = document.getElementById('toc-container');
   if (toc) toc.innerHTML = '';
-  // Defer dashboard render so sidebar becomes interactive first
-  requestAnimationFrame(renderDashboard);
+  var toolbar = document.getElementById('reader-toolbar');
+  if (toolbar) toolbar.style.display = 'none';
+  // Defer hub render so sidebar becomes interactive first
+  requestAnimationFrame(renderHub);
 }
 
 function dashScrollLeft(btn) {
@@ -262,6 +329,21 @@ function dashLoadArticle(filename) {
 }
 
 function renderArticle(text, filename) {
+  // Guard against corrupt/binary files that would freeze the UI
+  var MAX_ARTICLE_SIZE = 2 * 1024 * 1024; // 2 MB
+  if (text.length > MAX_ARTICLE_SIZE) {
+    var el = document.getElementById('content');
+    var emptyEl = document.getElementById('empty-state');
+    if (emptyEl) emptyEl.style.display = 'none';
+    if (el) {
+      el.style.display = '';
+      el.innerHTML = '<div class="content-wrap"><h1>File too large</h1>'
+        + '<p>This file is ' + (text.length / 1024 / 1024).toFixed(1) + ' MB, which likely indicates corrupt content. '
+        + 'Expected article files are under 2 MB.</p></div>';
+    }
+    return;
+  }
+
   const { meta, body: rawBodyText } = parseFrontmatter(text);
   let body = rawBodyText;
   const content = document.getElementById('content');
@@ -269,11 +351,65 @@ function renderArticle(text, filename) {
 
   empty.style.display = 'none';
   content.style.display = 'block';
+  content.classList.remove('settings-view');
 
   let html = '';
 
-  // Article header: title, author, date, domain, actions
+  // Article header: pub bar, title, author, date
   html += '<div class="article-header">';
+
+  // Publication bar: source identity on left, tags on right
+  if (meta && meta.domain && meta.domain !== 'pullread') {
+    var srcColor = sourceColor(meta.feed || meta.domain);
+    var pubName = '';
+    var pubDomain = meta.domain;
+
+    // Determine publication name from feed
+    if (meta.feed) {
+      pubName = meta.feed;
+      // If pub name IS the domain exactly, show only once as the name
+      if (pubName.toLowerCase() === meta.domain.toLowerCase()) {
+        pubDomain = '';
+      }
+    }
+
+    var sourceHref = 'https://' + encodeURI(meta.domain);
+
+    // Favicon: for podcasts with artwork, show artwork; otherwise show domain favicon
+    var initials = (pubName || meta.domain).replace(/^(the |www\.)/i, '').slice(0, 2).toUpperCase();
+    var hasPodcastArt = meta.thumbnail && meta.enclosure_type && meta.enclosure_type.startsWith('audio/');
+    var faviconHtml;
+    if (hasPodcastArt) {
+      faviconHtml = '<div class="pub-favicon pub-favicon-art">'
+        + '<img src="' + escapeHtml(meta.thumbnail) + '" alt="" loading="lazy" onerror="this.src=\'/favicons/' + encodeURIComponent(meta.domain) + '.png\';this.parentElement.classList.remove(\'pub-favicon-art\')">'
+        + '<span class="pub-favicon-fallback">' + escapeHtml(initials) + '</span></div>';
+    } else {
+      faviconHtml = '<div class="pub-favicon">'
+        + '<img src="/favicons/' + encodeURIComponent(meta.domain) + '.png" alt="" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';this.parentElement.style.background=\'' + srcColor + '\'">'
+        + '<span class="pub-favicon-fallback">' + escapeHtml(initials) + '</span></div>';
+    }
+
+    html += '<div class="pub-bar">';
+    html += '<a class="pub-identity" href="' + escapeHtml(sourceHref) + '" target="_blank" rel="noopener" title="Visit ' + escapeHtml(meta.domain) + '">';
+    html += faviconHtml;
+    html += '<div>';
+    if (pubName && pubDomain) {
+      html += '<span class="pub-name">' + escapeHtml(pubDomain) + '</span>';
+      html += '<span class="pub-domain">via ' + escapeHtml(pubName) + '</span>';
+    } else if (pubName) {
+      html += '<span class="pub-name">' + escapeHtml(pubName) + '</span>';
+    } else {
+      html += '<span class="pub-domain">' + escapeHtml(pubDomain || meta.domain) + '</span>';
+    }
+    html += '</div></a>';
+    html += '<div class="pub-tags" id="header-tags"></div>';
+    html += '</div>';
+  } else {
+    // No domain or pullread internal — just an empty tags container
+    html += '<div id="header-tags"></div>';
+  }
+
+  // Title
   if (meta && meta.title) {
     if (meta.url) {
       html += '<h1><a href="' + escapeHtml(meta.url) + '" target="_blank" rel="noopener" class="title-link">' + escapeHtml(meta.title) + '<svg class="icon icon-external" aria-hidden="true"><use href="#i-external"/></svg></a></h1>';
@@ -281,55 +417,53 @@ function renderArticle(text, filename) {
       html += '<h1>' + escapeHtml(meta.title) + '</h1>';
     }
   }
-  html += '<div class="article-byline">';
-  const bylineParts = [];
+
+  // Metadata line: author, date, read time (appended later)
+  var metaLineParts = [];
   if (meta && meta.author) {
-    // Truncate overly long bylines (e.g. full author bios from PDFs/arxiv)
     var authorText = meta.author;
     if (authorText.length > 80) {
-      // Try to cut at first sentence boundary or period
       var cutoff = authorText.indexOf('. ');
       if (cutoff > 10 && cutoff < 80) authorText = authorText.slice(0, cutoff);
       else authorText = authorText.slice(0, 80).replace(/\s+\S*$/, '') + '\u2026';
     }
-    bylineParts.push('<span class="author" onclick="searchByAuthor(\'' + escapeHtml(authorText).replace(/'/g, "\\'") + '\')" title="Search for articles by this author">' + escapeHtml(authorText) + '</span>');
+    metaLineParts.push('<span class="author" onclick="searchByAuthor(\'' + escapeHtml(authorText).replace(/'/g, "\\'") + '\')" title="Search for articles by this author">' + escapeHtml(authorText) + '</span>');
   }
-  if (meta && meta.domain) bylineParts.push('<a href="' + escapeHtml(meta.url || '') + '" target="_blank">' + escapeHtml(meta.domain) + '</a>');
-  if (meta && meta.bookmarked) bylineParts.push(escapeHtml(meta.bookmarked.slice(0, 10)));
-  // Show feed source when it doesn't match the article domain
-  if (meta && meta.feed && meta.domain && !feedMatchesDomain(meta.feed, meta.domain)) {
-    bylineParts.push('<span class="feed-source">via ' + escapeHtml(meta.feed) + '</span>');
+  if (meta && meta.bookmarked) metaLineParts.push('<span title="' + escapeHtml(timeAgoTitle(meta.bookmarked)) + '">' + escapeHtml(timeAgo(meta.bookmarked)) + '</span>');
+  if (metaLineParts.length) {
+    html += '<div class="article-meta">' + metaLineParts.join('<span class="sep">&middot;</span>') + '</div>';
   }
-  html += bylineParts.join('<span class="sep">&middot;</span>');
-  // Read time will be inserted after rendering
-  html += '</div>';
+
+  // Hero image from frontmatter thumbnail (feed media:content or og:image)
+  if (meta && meta.thumbnail) {
+    html += '<div class="article-hero"><img src="' + escapeHtml(meta.thumbnail) + '" alt="" loading="lazy" onerror="this.parentElement.style.display=\'none\'"></div>';
+  }
 
   // Detect review/summary articles where Summarize doesn't make sense
   const isReviewArticle = meta && (meta.feed === 'weekly-review' || meta.feed === 'daily-review' || meta.domain === 'pullread');
 
-  // Action buttons row — primary actions visible, secondary behind overflow menu
-  html += '<div class="article-actions">';
+  // Populate reader toolbar with action buttons (left side)
+  var toolbarActions = '';
   const isFav = articleNotes.isFavorite;
-  html += '<button onclick="toggleFavoriteFromHeader(this)" class="' + (isFav ? 'active-fav' : '') + '" aria-label="' + (isFav ? 'Remove from favorites' : 'Add to favorites') + '" aria-pressed="' + isFav + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg> Favorite</button>';
-  if (!isReviewArticle) {
-    html += '<button onclick="summarizeArticle()" id="summarize-btn" aria-label="Summarize article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Summarize</button>';
-  }
+  toolbarActions += '<button onclick="toggleFavoriteFromHeader(this)" class="toolbar-action-btn' + (isFav ? ' active-fav' : '') + '" aria-label="' + (isFav ? 'Remove star' : 'Star article') + '" aria-pressed="' + isFav + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg><span class="toolbar-action-label"> Star</span></button>';
+  toolbarActions += '<button onclick="markCurrentAsRead()" class="toolbar-action-btn" aria-label="Mark read"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-eye-slash"/></svg><span class="toolbar-action-label"> Mark read</span></button>';
   var isPodcast = meta && meta.enclosure_url && meta.enclosure_type && meta.enclosure_type.startsWith('audio/');
   var listenLabel = isPodcast ? 'Play' : 'Listen';
-  html += '<div class="play-next-menu" id="play-next-menu">';
-  html += '<button id="listen-btn" onclick="addCurrentToTTSQueue()" aria-label="' + listenLabel + ' article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> ' + listenLabel + '</button>';
-  html += '<button class="play-next-trigger" id="play-next-trigger" onclick="togglePlayNextMenu(event)" aria-label="Queue options" style="display:none"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>';
-  html += '</div>';
-  if (meta && meta.url) {
-    html += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg> Share</button></div>';
+  toolbarActions += '<div class="play-next-menu" id="play-next-menu">';
+  toolbarActions += '<button id="listen-btn" onclick="addCurrentToTTSQueue()" class="toolbar-action-btn" aria-label="' + listenLabel + ' article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg><span class="toolbar-action-label"> ' + listenLabel + '</span></button>';
+  toolbarActions += '<button class="play-next-trigger" id="play-next-trigger" onclick="togglePlayNextMenu(event)" aria-label="Queue options" style="display:none"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>';
+  toolbarActions += '</div>';
+  if (!isReviewArticle) {
+    toolbarActions += '<button onclick="summarizeArticle()" id="summarize-btn" class="toolbar-action-btn" aria-label="Summarize article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg><span class="toolbar-action-label"> Summarize</span></button>';
   }
-  // Overflow menu for secondary actions (Notes, Mark Unread)
-  html += '<div class="more-dropdown">';
-  html += '<button onclick="toggleMoreMenu(event)" aria-label="More actions"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-ellipsis"/></svg></button>';
-  html += '</div>';
-  html += '</div>';
-  // Tags row (populated by renderNotesPanel)
-  html += '<div id="header-tags"></div>';
+  if (meta && meta.url) {
+    toolbarActions += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" class="toolbar-action-btn" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg><span class="toolbar-action-label"> Share</span></button></div>';
+  }
+
+  var toolbarEl = document.getElementById('reader-toolbar-actions');
+  if (toolbarEl) toolbarEl.innerHTML = toolbarActions;
+  var toolbar = document.getElementById('reader-toolbar');
+  if (toolbar) toolbar.style.display = '';
   // Show notebook back-references
   var nbRefs = Object.values(_notebooks || {}).filter(function(nb) { return nb.sources && nb.sources.indexOf(filename) >= 0; });
   if (nbRefs.length) {
@@ -345,10 +479,8 @@ function renderArticle(text, filename) {
   if (meta && meta.summary) {
     const sp = meta.summaryProvider || '';
     const sm = meta.summaryModel || '';
-    html += '<div class="article-summary"><div class="summary-header"><div class="summary-header-left">'
-      + summaryBadgesHtml(sp, sm)
-      + '</div><span class="summary-actions"><button onclick="hideSummary()" title="Hide summary"><svg class="icon icon-sm"><use href="#i-xmark"/></svg></button></span></div>'
-      + escapeHtml(meta.summary) + '</div>';
+    html += '<div class="article-summary">' + summaryBlockHtml(sp, sm, meta.summary) + '</div>';
+    html += '<div class="summary-dismissed"><span>Summary removed</span><button onclick="undismissSummary()">Undo</button></div>';
   }
 
   // YouTube embed: detect from frontmatter and inject responsive iframe
@@ -431,6 +563,10 @@ function renderArticle(text, filename) {
     div.innerHTML = h;
     const imgs = Array.from(div.querySelectorAll('img'));
     const seen = new Set();
+    // Pre-seed with hero image thumbnail to prevent duplication in body
+    if (meta && meta.thumbnail) {
+      try { seen.add(new URL(meta.thumbnail).origin + new URL(meta.thumbnail).pathname); } catch { seen.add(meta.thumbnail); }
+    }
     for (const img of imgs) {
       const src = img.getAttribute('src');
       if (!src) continue;
@@ -470,8 +606,29 @@ function renderArticle(text, filename) {
     }
   );
 
+  // Link to source for feed-sourced articles, plus optional re-extraction
+  if (meta && meta.source === 'feed' && meta.url) {
+    html += '<div class="feed-extract-prompt">';
+    html += '<a href="' + escapeHtml(meta.url) + '" target="_blank" rel="noopener" class="feed-extract-btn">'
+      + '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-external"/></svg> '
+      + 'Read full article at ' + escapeHtml(meta.domain || 'source') + '</a>';
+    if (serverMode) {
+      html += '<button onclick="reprocessFromMenu()" class="feed-extract-btn feed-extract-fetch">'
+        + '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-cloud-download"/></svg> '
+        + 'Fetch full content</button>';
+    }
+    html += '</div>';
+  }
+
   content.innerHTML = html;
   document.title = (meta && meta.title) || filename || 'PullRead';
+
+  // Hide broken images instead of showing broken-image icons
+  content.querySelectorAll('.content-wrap img, .article-hero img').forEach(function(img) {
+    if (!img.getAttribute('onerror')) {
+      img.onerror = function() { this.style.display = 'none'; };
+    }
+  });
 
   // Set article language for TTS and CSS :lang() selectors
   if (meta && meta.lang) {
@@ -546,22 +703,15 @@ function renderArticle(text, filename) {
     });
   })(content);
 
-  // Add read time & word count to byline
+  // Add read time to article meta (only for 5+ min articles)
   const articleBodyText = content.textContent || '';
   const { words, minutes } = calculateReadStats(articleBodyText);
-  const bylineEl = content.querySelector('.article-byline');
-  if (bylineEl && words > 50) {
-    const statsSpan = document.createElement('span');
-    statsSpan.className = 'read-stats';
-    if (bylineEl.children.length > 0) {
-      const sep = document.createElement('span');
-      sep.className = 'sep';
-      sep.innerHTML = '&middot;';
-      bylineEl.appendChild(sep);
+  if (minutes >= 5) {
+    var wordStr = words >= 1000 ? (words / 1000).toFixed(1) + 'k' : words;
+    var articleMetaEl = content.querySelector('.article-meta');
+    if (articleMetaEl) {
+      articleMetaEl.innerHTML += '<span class="sep">&middot;</span><span class="read-stats" title="' + wordStr + ' words">' + minutes + ' min read</span>';
     }
-    var wordStr = (words >= 1000 ? (words / 1000).toFixed(1) + 'k' : words) + ' words';
-    statsSpan.innerHTML = minutes + ' min read<span class="word-count"><span class="stat-divider">&middot;</span>' + wordStr + '</span>';
-    bylineEl.appendChild(statsSpan);
   }
 
   // Render diagrams (mermaid, d2) before highlighting
@@ -579,7 +729,7 @@ function renderArticle(text, filename) {
   }
 
   // Scroll to top
-  document.getElementById('content-pane').scrollTop = 0;
+  document.getElementById('content-scroll').scrollTop = 0;
 
   // Reset reading progress
   updateReadingProgress();
@@ -672,7 +822,7 @@ function localizeReviewLinks(container) {
 
 // ---- Reading Progress Bar ----
 function updateReadingProgress() {
-  const pane = document.getElementById('content-pane');
+  const pane = document.getElementById('content-scroll');
   const bar = document.getElementById('reading-progress-bar');
   if (!pane || !bar) return;
   const scrollTop = pane.scrollTop;
@@ -681,7 +831,7 @@ function updateReadingProgress() {
   bar.style.width = Math.min(100, Math.max(0, progress)) + '%';
 }
 
-document.getElementById('content-pane').addEventListener('scroll', function() {
+document.getElementById('content-scroll').addEventListener('scroll', function() {
   updateReadingProgress();
   updateFocusMode();
   updateTocActive();
@@ -728,7 +878,7 @@ function updateFocusMode() {
   const content = document.getElementById('content');
   if (!content || content.style.display === 'none') return;
 
-  const pane = document.getElementById('content-pane');
+  const pane = document.getElementById('content-scroll');
   const paneRect = pane.getBoundingClientRect();
   // Shift the focus point near the top/bottom of the scroll so edge
   // paragraphs still get highlighted instead of being permanently dimmed.
@@ -868,7 +1018,7 @@ function saveScrollPosition() {
   if (!activeFile) return;
   clearTimeout(scrollSaveTimeout);
   scrollSaveTimeout = setTimeout(() => {
-    const pane = document.getElementById('content-pane');
+    const pane = document.getElementById('content-scroll');
     if (!pane) return;
     const scrollHeight = pane.scrollHeight - pane.clientHeight;
     if (scrollHeight <= 0) return;
@@ -890,7 +1040,7 @@ function restoreScrollPosition(filename) {
   const saved = positions[filename];
   if (!saved || saved.pct < 0.02) return; // Don't restore if near the top
 
-  const pane = document.getElementById('content-pane');
+  const pane = document.getElementById('content-scroll');
   if (!pane) return;
 
   // Show a "resume" indicator
@@ -963,7 +1113,7 @@ function updateTocActive() {
   const tocLinks = document.querySelectorAll('.toc-list a');
   if (!tocLinks.length) return;
 
-  const pane = document.getElementById('content-pane');
+  const pane = document.getElementById('content-scroll');
   const paneRect = pane.getBoundingClientRect();
   const threshold = paneRect.top + 80;
 
@@ -1111,11 +1261,11 @@ function setupEpubFootnotes() {
 
       // Position the popup near the reference
       var rect = ref.getBoundingClientRect();
-      var pane = document.getElementById('content-pane');
+      var pane = document.getElementById('content-scroll');
       var paneRect = pane.getBoundingClientRect();
       popup.style.position = 'absolute';
 
-      // Insert into content-pane for proper scrolling
+      // Insert into scroll container for proper scrolling
       pane.appendChild(popup);
 
       // Position below the reference, centered

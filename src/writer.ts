@@ -18,6 +18,8 @@ export interface ArticleData {
   excerpt?: string;
   thumbnail?: string;
   lang?: string;
+  categories?: string[];
+  source?: string;
 }
 
 export function generateFilename(title: string, bookmarkedAt: string): string {
@@ -58,6 +60,10 @@ domain: ${data.domain}`;
     frontmatter += `\nlang: ${data.lang}`;
   }
 
+  if (data.categories && data.categories.length > 0) {
+    frontmatter += `\ncategories: [${data.categories.map(c => `"${escapeQuotes(c)}"`).join(', ')}]`;
+  }
+
   if (data.author) {
     frontmatter += `\nauthor: "${escapeQuotes(data.author)}"`;
   }
@@ -80,6 +86,10 @@ domain: ${data.domain}`;
     if (data.enclosure.duration) {
       frontmatter += `\nenclosure_duration: "${data.enclosure.duration}"`;
     }
+  }
+
+  if (data.source) {
+    frontmatter += `\nsource: ${data.source}`;
   }
 
   frontmatter += '\n---';
@@ -303,11 +313,21 @@ export async function downloadFavicon(domain: string, outputPath: string): Promi
     mkdirSync(faviconDir, { recursive: true });
   }
 
-  // Try the site's own /favicon.ico first, then fall back to Google's service
+  // Try the site's own /favicon.ico first, then fall back to Google's service.
+  // If the domain has a subdomain (e.g. feeds.npr.org), also try the root domain.
   const sources = [
     `https://${domain}/favicon.ico`,
     `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32`,
   ];
+
+  const parts = domain.split('.');
+  const rootDomain = parts.length > 2 ? parts.slice(-2).join('.') : null;
+  if (rootDomain) {
+    sources.push(
+      `https://${rootDomain}/favicon.ico`,
+      `https://www.google.com/s2/favicons?domain=${encodeURIComponent(rootDomain)}&sz=32`,
+    );
+  }
 
   for (const url of sources) {
     try {

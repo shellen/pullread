@@ -12,24 +12,31 @@ function showShortcutsModal() {
     <div class="modal-card" onclick="event.stopPropagation()">
       <h2>Keyboard Shortcuts</h2>
       <div class="shortcuts-grid">
-        <kbd>j</kbd> / <kbd>&rarr;</kbd> <span>Next article</span>
-        <kbd>k</kbd> / <kbd>&larr;</kbd> <span>Previous article</span>
+        <kbd>j</kbd> / <kbd>n</kbd> <span>Next article</span>
+        <kbd>k</kbd> / <kbd>p</kbd> <span>Previous article</span>
+        <kbd>Space</kbd> <span>Page down (next article at bottom)</span>
+        <kbd>Shift</kbd>+<kbd>Space</kbd> <span>Page up</span>
         <kbd>&uarr;</kbd> <kbd>&darr;</kbd> <span>Scroll (jumps articles at edges)</span>
+        <kbd>s</kbd> <span>Star / unstar article</span>
+        <kbd>m</kbd> <span>Toggle read / unread</span>
+        <kbd>v</kbd> <span>Open original in new tab</span>
+        <kbd>r</kbd> <span>Refresh article list</span>
+        <kbd>Shift</kbd>+<kbd>A</kbd> <span>Mark all as read</span>
         <kbd>/</kbd> <span>Search articles</span>
         <kbd>[</kbd> <span>Toggle sidebar</span>
         <kbd>h</kbd> <span>Highlight selected text</span>
-        <kbd>n</kbd> <span>Toggle article notes</span>
+        <kbd>Shift</kbd>+<kbd>N</kbd> <span>Toggle article notes</span>
         <kbd>a</kbd> <span>Add article by URL</span>
         <kbd>f</kbd> <span>Toggle focus mode</span>
-        <kbd>p</kbd> <span>Print article</span>
+        <kbd>?</kbd> <span>Show keyboard shortcuts</span>
         <kbd>Esc</kbd> <span>Clear search / close popover</span>
       </div>
       <h3 style="font-size:13px;margin:14px 0 6px;color:var(--muted)">Audio Playback</h3>
       <div class="shortcuts-grid">
-        <kbd>Space</kbd> <span>Play / pause audio</span>
         <kbd>&gt;</kbd> <span>Skip to next track</span>
         <kbd>&lt;</kbd> <span>Skip to previous track</span>
-        <kbd>s</kbd> <span>Cycle playback speed</span>
+        <kbd>Shift</kbd>+<kbd>S</kbd> <span>Cycle playback speed</span>
+        <kbd>Shift</kbd>+<kbd>M</kbd> <span>Toggle mini player</span>
       </div>
       <button class="modal-close" onclick="closeModal()">Done</button>
     </div>
@@ -75,7 +82,7 @@ function showGuideModal() {
     <table>
       <thead><tr><th>Operator</th><th>Description</th></tr></thead>
       <tbody>
-        <tr><td><code>is:favorite</code></td><td>Favorited articles (also <code>is:fav</code>)</td></tr>
+        <tr><td><code>is:starred</code></td><td>Starred articles (also <code>is:favorite</code>, <code>is:fav</code>)</td></tr>
         <tr><td><code>is:read</code> / <code>is:unread</code></td><td>Filter by read status</td></tr>
         <tr><td><code>has:summary</code></td><td>Articles with AI summaries</td></tr>
         <tr><td><code>has:highlights</code></td><td>Articles with highlights</td></tr>
@@ -96,7 +103,7 @@ function showGuideModal() {
     <p>Click the microphone icon next to the notes textarea to dictate notes hands-free. Speech is transcribed in real-time using the Web Speech API and automatically saved to your article notes when you stop recording.</p>
 
     <h2>Summaries</h2>
-    <p>Click the Summarize button on any article to generate an AI summary. Summaries display with badges showing which provider and model generated them (e.g., <span class="badge badge-amber">Anthropic</span> <span class="badge badge-gray">claude-haiku-4.5</span>). Summaries are saved in the article frontmatter so they persist across sessions. Supports Anthropic, OpenAI, Gemini, OpenRouter, and Apple Intelligence.</p>
+    <p>Click the Summarize button on any article to generate an AI summary. The summary appears as italic text with a provider attribution below. You can regenerate or dismiss it. Summaries are saved in the article frontmatter so they persist across sessions. Supports Anthropic, OpenAI, Gemini, OpenRouter, and Apple Intelligence.</p>
 
     <h2>Text-to-Speech</h2>
     <p>Click the <strong>Listen</strong> button on any article to hear it read aloud. Queue multiple articles for continuous playback with speed control (0.5x&ndash;2x).</p>
@@ -104,7 +111,6 @@ function showGuideModal() {
       <thead><tr><th>Provider</th><th>Cost</th><th>Notes</th></tr></thead>
       <tbody>
         <tr><td>Browser</td><td>Free</td><td>Built-in speech synthesis, works offline</td></tr>
-        <tr><td>Kokoro</td><td>Free</td><td>Local AI voice (~86MB model, auto-downloads)</td></tr>
         <tr><td>OpenAI</td><td>~$0.15/article</td><td>Cloud API, bring your own key</td></tr>
         <tr><td>ElevenLabs</td><td>~$1.20/article</td><td>Cloud API, bring your own key</td></tr>
       </tbody>
@@ -127,7 +133,10 @@ function showGuideModal() {
     <p>On wide screens, articles with 3 or more headings show an auto-generated table of contents on the left. Click any heading to jump to that section. The active section is highlighted as you scroll.</p>
 
     <h2>Themes &amp; Fonts</h2>
-    <p>Click the gear icon to switch between Light, Dark, Sepia, and High Contrast themes. Choose from fonts including Inter, Lora, Source Serif, Work Sans, and OpenDyslexic. Adjust text size, line height, letter spacing, and content width. Preferences are saved automatically.</p>
+    <p>Click the gear icon to switch between Light, Dark, Sepia, and High Contrast themes. Choose from fonts including Inter, Lora, Source Serif, Work Sans, and OpenDyslexic. Adjust text size, line height, letter spacing, and content width. Preferences are saved automatically. App chrome (toolbars, menus, sidebar) always uses Work Sans regardless of your reading font choice.</p>
+
+    <h2>Sources &amp; Tags</h2>
+    <p>Click <strong>Sources</strong> or <strong>Tags</strong> in the sidebar to browse articles grouped by feed or topic. The Sources drawer includes sort buttons to arrange feeds by <strong>Recent</strong> (most recently bookmarked), <strong>A&ndash;Z</strong> (alphabetical), or <strong>Count</strong> (most articles). Your sort preference is remembered between sessions. Each source shows its favicon; sources without an icon display a neutral placeholder.</p>
 
     <h2>Machine Tags &amp; Explore</h2>
     <p>PullRead can auto-generate topic, entity, and theme tags using your configured AI provider. Tags power relational mapping — discover connections between articles through the <strong>Explore</strong> page. Use the auto-tagging buttons on the Explore page's Discover tab, or enable auto-tagging after sync in the macOS app settings.</p>
@@ -152,18 +161,27 @@ function showGuideModal() {
     <p>Import bookmarks.html files exported from Chrome, Safari, Firefox, or Pocket directly from Settings or via the CLI with <code>pullread import &lt;file&gt;</code>.</p>
 
     <h2>Keyboard Shortcuts</h2>
+    <p>Shortcuts follow Google Reader conventions where possible.</p>
     <table>
       <thead><tr><th>Key</th><th>Action</th></tr></thead>
       <tbody>
-        <tr><td><kbd>j</kbd> / <kbd>&rarr;</kbd></td><td>Next article</td></tr>
-        <tr><td><kbd>k</kbd> / <kbd>&larr;</kbd></td><td>Previous article</td></tr>
+        <tr><td><kbd>j</kbd> / <kbd>n</kbd></td><td>Next article</td></tr>
+        <tr><td><kbd>k</kbd> / <kbd>p</kbd></td><td>Previous article</td></tr>
+        <tr><td><kbd>Space</kbd></td><td>Page down (next article at bottom)</td></tr>
+        <tr><td><kbd>Shift</kbd>+<kbd>Space</kbd></td><td>Page up</td></tr>
         <tr><td><kbd>&uarr;</kbd> <kbd>&darr;</kbd></td><td>Scroll (jumps articles at edges)</td></tr>
+        <tr><td><kbd>s</kbd></td><td>Star / unstar article</td></tr>
+        <tr><td><kbd>m</kbd></td><td>Toggle read / unread</td></tr>
+        <tr><td><kbd>v</kbd></td><td>Open original in new tab</td></tr>
+        <tr><td><kbd>r</kbd></td><td>Refresh article list</td></tr>
+        <tr><td><kbd>Shift</kbd>+<kbd>A</kbd></td><td>Mark all as read</td></tr>
         <tr><td><kbd>/</kbd></td><td>Search articles</td></tr>
         <tr><td><kbd>[</kbd></td><td>Toggle sidebar</td></tr>
         <tr><td><kbd>h</kbd></td><td>Highlight selected text</td></tr>
-        <tr><td><kbd>n</kbd></td><td>Toggle article notes</td></tr>
+        <tr><td><kbd>Shift</kbd>+<kbd>N</kbd></td><td>Toggle article notes</td></tr>
+        <tr><td><kbd>a</kbd></td><td>Add article by URL</td></tr>
         <tr><td><kbd>f</kbd></td><td>Toggle focus mode</td></tr>
-        <tr><td><kbd>p</kbd></td><td>Print article</td></tr>
+        <tr><td><kbd>?</kbd></td><td>Show keyboard shortcuts</td></tr>
         <tr><td><kbd>Esc</kbd></td><td>Clear search / close popover</td></tr>
       </tbody>
     </table>
@@ -172,10 +190,10 @@ function showGuideModal() {
     <table>
       <thead><tr><th>Key</th><th>Action</th></tr></thead>
       <tbody>
-        <tr><td><kbd>Space</kbd></td><td>Play / pause audio</td></tr>
         <tr><td><kbd>&gt;</kbd></td><td>Skip to next track</td></tr>
         <tr><td><kbd>&lt;</kbd></td><td>Skip to previous track</td></tr>
-        <tr><td><kbd>s</kbd></td><td>Cycle playback speed</td></tr>
+        <tr><td><kbd>Shift</kbd>+<kbd>S</kbd></td><td>Cycle playback speed</td></tr>
+        <tr><td><kbd>Shift</kbd>+<kbd>M</kbd></td><td>Toggle mini player</td></tr>
       </tbody>
     </table>
 
@@ -188,7 +206,7 @@ function showGuideModal() {
     <p>Only for AI features (summaries, auto-tagging, reviews, and paid TTS). Reading, highlighting, searching, and browser TTS are all free with no API key. Apple Intelligence (macOS 26+) works without a key too.</p>
 
     <h3>Is my data sent anywhere?</h3>
-    <p>Articles stay on your Mac. Data is only sent to an API when you explicitly use summaries, auto-tagging, or cloud TTS providers (OpenAI/ElevenLabs). Kokoro TTS and browser TTS are fully local. API keys are stored locally and never shared between features (your Summaries key is separate from your TTS key).</p>
+    <p>Articles stay on your Mac. Data is only sent to an API when you explicitly use summaries, auto-tagging, or cloud TTS providers (OpenAI/ElevenLabs). Browser TTS is fully local. API keys are stored locally and never shared between features (your Summaries key is separate from your TTS key).</p>
 
     <h3>Why can't PullRead extract some articles?</h3>
     <p>Some sites use paywalls, bot detection, or JavaScript-only rendering that blocks extraction. Try enabling browser cookies in Settings to use your existing login sessions. You can also retry failed articles with <code>pullread sync --retry-failed</code>.</p>
@@ -211,7 +229,7 @@ function showGuideModal() {
     <h2>Acknowledgements</h2>
 
     <h3>Open Source Software</h3>
-    <p>PullRead uses open-source software including <strong>Kokoro TTS</strong> (Apache 2.0, by hexgrad), <strong>ONNX Runtime</strong> (MIT, by Microsoft), <strong>Mozilla Readability</strong> (Apache 2.0), <strong>Turndown</strong> (MIT), <strong>marked</strong> (MIT), <strong>highlight.js</strong> (BSD 3-Clause), <strong>Mermaid</strong> (MIT), and <strong>DOMPurify</strong> (Apache 2.0 / MPL 2.0). Kokoro was trained on audio data including Koniwa (CC BY 3.0) and SIWIS (CC BY 4.0).</p>
+    <p>PullRead uses open-source software including <strong>Mozilla Readability</strong> (Apache 2.0), <strong>Turndown</strong> (MIT), <strong>marked</strong> (MIT), <strong>highlight.js</strong> (BSD 3-Clause), <strong>Mermaid</strong> (MIT), and <strong>DOMPurify</strong> (Apache 2.0 / MPL 2.0).</p>
 
     <h3>Fonts</h3>
     <p>PullRead bundles the following typefaces for offline reading, all under the <strong>SIL Open Font License 1.1</strong>:</p>
@@ -231,7 +249,7 @@ function showGuideModal() {
     <p style="margin-top:16px">Full license texts are included in the app bundle at <code>Contents/Resources/Licenses/</code>.</p>
   `;
   document.title = 'PullRead Guide';
-  document.getElementById('content-pane').scrollTop = 0;
+  document.getElementById('content-scroll').scrollTop = 0;
   generateToc();
 }
 
@@ -448,14 +466,14 @@ function renderStepReady() {
     + '<p class="ob-subtitle">' + (_tourMode ? 'Here are some keyboard shortcuts to remember:' : 'PullRead will fetch your bookmarked articles and save them as Markdown. Here are some keyboard shortcuts to get started:') + '</p>'
     + '</div>'
     + '<div class="ob-shortcuts">'
-    + '<kbd>j</kbd> / <kbd>&rarr;</kbd> <span>Next article</span>'
-    + '<kbd>k</kbd> / <kbd>&larr;</kbd> <span>Previous article</span>'
+    + '<kbd>j</kbd> / <kbd>n</kbd> <span>Next article</span>'
+    + '<kbd>k</kbd> / <kbd>p</kbd> <span>Previous article</span>'
+    + '<kbd>Space</kbd> <span>Page down</span>'
+    + '<kbd>s</kbd> <span>Star article</span>'
+    + '<kbd>m</kbd> <span>Toggle read / unread</span>'
+    + '<kbd>v</kbd> <span>Open original in new tab</span>'
     + '<kbd>/</kbd> <span>Search articles</span>'
-    + '<kbd>[</kbd> <span>Toggle sidebar</span>'
-    + '<kbd>h</kbd> <span>Highlight selected text</span>'
-    + '<kbd>n</kbd> <span>Toggle article notes</span>'
-    + '<kbd>f</kbd> <span>Toggle focus mode</span>'
-    + '<kbd>Space</kbd> <span>Play / pause audio</span>'
+    + '<kbd>?</kbd> <span>All shortcuts</span>'
     + '</div>'
     + '<div style="text-align:center;margin-top:16px">'
     + '<button onclick="showGuideModal()" style="background:none;border:none;color:var(--link);cursor:pointer;font-size:13px;font-family:inherit;text-decoration:underline">Open full Guide for more</button>'

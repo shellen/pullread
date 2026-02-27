@@ -10,6 +10,25 @@ function renderFileList() {
     displayFiles = filteredFiles;
   }
 
+  // Apply magic sort
+  if (magicSort) {
+    if (displayFiles === filteredFiles) displayFiles = filteredFiles.slice();
+    var engagement = computeSourceEngagement();
+    displayFiles.sort(function(a, b) {
+      return magicScore(b, engagement) - magicScore(a, engagement);
+    });
+    // Source diversity: max 3 articles per source in top positions, extras pushed down
+    var sourceCounts = {};
+    var top = [], overflow = [];
+    for (var di = 0; di < displayFiles.length; di++) {
+      var key = displayFiles[di].feed || displayFiles[di].domain || 'unknown';
+      sourceCounts[key] = (sourceCounts[key] || 0) + 1;
+      if (sourceCounts[key] <= 3) top.push(displayFiles[di]);
+      else overflow.push(displayFiles[di]);
+    }
+    displayFiles = top.concat(overflow);
+  }
+
   const searchTerm = (document.getElementById('search').value || '').trim().toLowerCase();
 
   const total = filteredFiles.length;
@@ -20,10 +39,11 @@ function renderFileList() {
   if (isNotebooksTab) {
     countStr = 'Notebook';
   } else {
-    countStr = shown + ' article' + (shown !== 1 ? 's' : '');
-    if (hideRead && shown < total) countStr += ' (' + (total - shown) + ' hidden)';
+    countStr = approxCount(shown) + ' article' + (shown !== 1 ? 's' : '');
+    if (hideRead && shown < total) countStr += ' (' + approxCount(total - shown) + ' hidden)';
   }
   countText.textContent = countStr;
+  countText.title = !isNotebooksTab && shown >= 100 ? shown.toLocaleString() + ' articles' : '';
 
   let html = '';
   if (isNotebooksTab) {
@@ -61,10 +81,32 @@ function renderFileList() {
   }
 
   list.innerHTML = html;
+
+  // Auto-advance to next source when current feed is empty
+  if (_activeDrawerSource && displayFiles.length === 0) {
+    setTimeout(advanceToNextSource, 0);
+  }
+}
+
+var _advanceOrigin = null;
+function advanceToNextSource() {
+  var items = document.querySelectorAll('#drawer-content .drawer-item[data-source]');
+  if (!items.length) return;
+  var currentIdx = -1;
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].dataset.source === _activeDrawerSource) { currentIdx = i; break; }
+  }
+  var nextIdx = (currentIdx + 1) % items.length;
+  var nextSource = items[nextIdx].dataset.source;
+  if (_advanceOrigin === null) _advanceOrigin = _activeDrawerSource;
+  else if (nextSource === _advanceOrigin) { _advanceOrigin = null; return; }
+  filterBySource(nextSource);
+  _advanceOrigin = null;
 }
 
 function renderFileItem(f, i) {
-  const date = f.bookmarked ? f.bookmarked.slice(0, 10) : '';
+  const date = f.bookmarked ? timeAgo(f.bookmarked) : '';
+  const dateTitle = f.bookmarked ? timeAgoTitle(f.bookmarked) : '';
   const isActive = activeFile === f.filename ? ' active' : '';
   const isRead = readArticles.has(f.filename);
   const { hasHl, hasNote, isFavorite } = hasAnnotations(f.filename);
@@ -73,7 +115,7 @@ function renderFileItem(f, i) {
   let indicators = '';
   if (hasHl || hasNote || hasSummary || isFavorite || isPodcast) {
     indicators = '<div class="file-item-indicators">'
-      + (isFavorite ? '<span class="dot dot-favorite" aria-label="Favorite"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-heart"/></svg></span>' : '')
+      + (isFavorite ? '<span class="dot dot-favorite" aria-label="Starred"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-heart"/></svg></span>' : '')
       + (isPodcast ? '<span class="dot dot-podcast" aria-label="Podcast"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-headphones"/></svg></span>' : '')
       + (hasHl ? '<span class="dot dot-highlight" aria-label="Has highlights"></span>' : '')
       + (hasNote ? '<span class="dot dot-note" aria-label="Has annotations"></span>' : '')
@@ -81,22 +123,25 @@ function renderFileItem(f, i) {
       + '</div>';
   }
 
-  const favicon = f.domain && f.domain !== 'pullread'
-    ? '<img class="file-item-favicon" src="/favicons/' + encodeURIComponent(f.domain) + '.png" alt="" loading="lazy" onerror="this.style.display=\'none\'" aria-hidden="true">'
-    : '';
+  // Podcasts with artwork use it instead of the domain favicon
+  const podcastArt = isPodcast && f.image;
+  const favicon = podcastArt
+    ? '<img class="file-item-favicon file-item-artwork" src="' + escapeHtml(f.image) + '" alt="" loading="lazy" onerror="this.src=\'/favicons/' + encodeURIComponent(f.domain || '') + '.png\';this.classList.remove(\'file-item-artwork\');this.onerror=function(){this.src=\'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7\'}" aria-hidden="true">'
+    : (f.domain && f.domain !== 'pullread'
+      ? '<img class="file-item-favicon" src="/favicons/' + encodeURIComponent(f.domain) + '.png" alt="" loading="lazy" onerror="this.src=\'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7\'" aria-hidden="true">'
+      : '');
+
+  const sourceName = (f.feed && f.domain && !feedMatchesDomain(f.feed, f.domain)) ? f.feed : (f.domain || '');
 
   const metaParts = [];
-  if (date) metaParts.push('<span>' + date + '</span>');
-  if (f.domain) metaParts.push('<span>' + escapeHtml(f.domain) + '</span>');
-  if (f.feed && f.domain && !feedMatchesDomain(f.feed, f.domain)) {
-    metaParts.push('<span class="feed-via">via ' + escapeHtml(f.feed) + '</span>');
-  }
-  const metaHtml = metaParts.join('<span class="meta-sep"></span>');
+  if (favicon) metaParts.push(favicon);
+  if (sourceName) metaParts.push('<span>' + escapeHtml(sourceName) + '</span>');
+  if (date) metaParts.push('<span' + (dateTitle ? ' title="' + escapeHtml(dateTitle) + '"' : '') + '>' + escapeHtml(date) + '</span>');
+  const metaHtml = metaParts.join('');
 
   return '<div class="file-item' + isActive + (isRead && !isActive ? ' read' : '') + '" data-index="' + i + '" data-filename="' + escapeHtml(f.filename) + '" onclick="loadFile(' + i + ')" role="option" aria-selected="' + (activeFile === f.filename) + '" tabindex="0" onkeydown="if(event.key===\'Enter\')loadFile(' + i + ')">'
     + '<div class="file-item-title">' + escapeHtml(f.title) + '</div>'
-    + '<div class="file-item-meta">' + metaHtml + favicon + '</div>'
-    + indicators
+    + '<div class="file-item-meta">' + metaHtml + indicators + '</div>'
     + '</div>';
 }
 
@@ -157,7 +202,7 @@ function updateSidebarItem(filename) {
   var existing = el.querySelector('.file-item-indicators');
   if (hasHl || hasNote || hasSummary || isFavorite || isPodcast) {
     var html = '<div class="file-item-indicators">'
-      + (isFavorite ? '<span class="dot dot-favorite" aria-label="Favorite"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-heart"/></svg></span>' : '')
+      + (isFavorite ? '<span class="dot dot-favorite" aria-label="Starred"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-heart"/></svg></span>' : '')
       + (isPodcast ? '<span class="dot dot-podcast" aria-label="Podcast"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-headphones"/></svg></span>' : '')
       + (hasHl ? '<span class="dot dot-highlight" aria-label="Has highlights"></span>' : '')
       + (hasNote ? '<span class="dot dot-note" aria-label="Has annotations"></span>' : '')
@@ -191,6 +236,64 @@ function toggleHideRead() {
   renderFileList();
 }
 
+function toggleMagicSort() {
+  magicSort = !magicSort;
+  localStorage.setItem('pr-magic-sort', magicSort ? '1' : '0');
+  document.getElementById('magic-sort-toggle').classList.toggle('active', magicSort);
+  renderFileList();
+}
+
+function computeSourceEngagement() {
+  var stats = {};
+  for (var i = 0; i < allFiles.length; i++) {
+    var f = allFiles[i];
+    var key = f.feed || f.domain || 'unknown';
+    if (!stats[key]) stats[key] = { total: 0, read: 0, interact: 0 };
+    stats[key].total++;
+    if (readArticles.has(f.filename)) stats[key].read++;
+    var notes = allNotesIndex[f.filename];
+    if (notes && (notes.isFavorite || (notes.annotations && notes.annotations.length) || notes.articleNote)) {
+      stats[key].interact++;
+    }
+    if (allHighlightsIndex[f.filename] && allHighlightsIndex[f.filename].length) {
+      stats[key].interact++;
+    }
+  }
+  var engagement = {};
+  for (var key in stats) {
+    var s = stats[key];
+    var readRate = s.total > 0 ? s.read / s.total : 0;
+    var interactRate = s.total > 0 ? s.interact / s.total : 0;
+    engagement[key] = 0.5 * readRate + 0.5 * Math.min(interactRate * 3, 1);
+  }
+  return engagement;
+}
+
+function magicScore(f, engagement) {
+  // Recency: exponential decay (weight 40)
+  // Podcasts use 12-hour half-life (decay 1.386), articles use 3-day (decay 0.231)
+  var age = f.bookmarked ? (Date.now() - new Date(f.bookmarked).getTime()) / 86400000 : 30;
+  var isPodcast = f.enclosureUrl && f.enclosureType && f.enclosureType.startsWith('audio/');
+  var decay = isPodcast ? 1.386 : 0.231;
+  var recency = Math.exp(-decay * age);
+
+  // Source engagement (weight 35)
+  var key = f.feed || f.domain || 'unknown';
+  var source = engagement[key] || 0;
+
+  // Unread boost (weight 15)
+  var unread = readArticles.has(f.filename) ? 0 : 1;
+
+  // Article signals (weight 10)
+  var signals = 0;
+  var notes = allNotesIndex[f.filename];
+  if (notes && notes.isFavorite) signals += 0.3;
+  if (allHighlightsIndex[f.filename] && allHighlightsIndex[f.filename].length) signals += 0.2;
+  if (notes && (notes.articleNote || (notes.annotations && notes.annotations.length))) signals += 0.15;
+
+  return 40 * recency + 35 * source + 15 * unread + 10 * Math.min(signals, 1);
+}
+
 // Debounced localStorage write for read articles
 var _markAsReadTimer = null;
 function _flushReadArticles() {
@@ -205,6 +308,16 @@ function markAsRead(filename) {
   }
   clearTimeout(_markAsReadTimer);
   _markAsReadTimer = setTimeout(_flushReadArticles, 2000);
+  scheduleNavCounts();
+  refreshDrawerCounts();
+}
+
+function markCurrentAsRead() {
+  if (!activeFile) return;
+  if (_markAsReadDelayTimer) { clearTimeout(_markAsReadDelayTimer); _markAsReadDelayTimer = null; }
+  markAsRead(activeFile);
+  updateSidebarActiveState(null);
+  showToast('Marked as read');
 }
 
 function markCurrentAsUnread() {
@@ -213,6 +326,8 @@ function markCurrentAsUnread() {
   clearTimeout(_markAsReadTimer);
   _markAsReadTimer = setTimeout(_flushReadArticles, 2000);
   renderFileList();
+  scheduleNavCounts();
+  refreshDrawerCounts();
 }
 
 window.addEventListener('beforeunload', function() {
@@ -228,7 +343,7 @@ function clearSearch() {
 function searchByAuthor(authorName) {
   var input = document.getElementById('search');
   if (!input) return;
-  input.value = 'author:' + authorName;
+  input.value = 'author:"' + authorName + '"';
   filterFiles();
   // Switch to articles tab if not already there
   var articlesTab = document.querySelector('.sidebar-tab[data-tab="articles"]');
@@ -259,14 +374,14 @@ function filterFiles() {
 
     return orGroups.some(group => {
       // Split group into individual terms (AND logic)
-      const terms = group.match(/"[^"]*"|\S+/g) || [];
+      const terms = group.match(/\S+:"[^"]*"|"[^"]*"|\S+/g) || [];
       return terms.every(term => {
         // Remove surrounding quotes if present
         const t = term.replace(/^"(.*)"$/, '$1');
         const tl = t.toLowerCase();
 
-        // Operator: is:favorite / is:fav
-        if (tl === 'is:favorite' || tl === 'is:fav') return isFavorite;
+        // Operator: is:starred / is:favorite / is:fav
+        if (tl === 'is:starred' || tl === 'is:favorite' || tl === 'is:fav') return isFavorite;
         // Operator: is:read
         if (tl === 'is:read') return readArticles.has(f.filename);
         // Operator: is:unread
@@ -282,27 +397,28 @@ function filterFiles() {
         // Operator: has:notes
         if (tl === 'has:notes' || tl === 'has:note') return hasNote;
         // Operator: has:tags
-        if (tl === 'has:tags' || tl === 'has:tag') return hasTags;
-        // Operator: tag:value
+        if (tl === 'has:tags' || tl === 'has:tag') return hasTags || (f.categories && f.categories.length > 0);
+        // Operator: tag:value — searches user tags, machine tags, and source categories
         if (tl.startsWith('tag:')) {
-          const tagQ = tl.slice(4);
-          if (!tagQ) return hasTags;
-          const allTags = [...(notes?.tags || []), ...(notes?.machineTags || [])];
+          const tagQ = tl.slice(4).replace(/^"(.*)"$/, '$1');
+          if (!tagQ) return hasTags || (f.categories && f.categories.length > 0);
+          const allTags = [...(notes?.tags || []), ...(notes?.machineTags || []), ...(f.categories || [])];
           return allTags.some(t => t.toLowerCase().includes(tagQ));
         }
-        // Operator: feed:value
+        // Operator: feed:value (exact match against feed name or domain fallback)
         if (tl.startsWith('feed:')) {
-          const feedQ = tl.slice(5);
-          return f.feed.toLowerCase().includes(feedQ);
+          const feedQ = tl.slice(5).replace(/^"(.*)"$/, '$1');
+          const key = (f.feed || f.domain || 'unknown').toLowerCase();
+          return key === feedQ;
         }
         // Operator: domain:value
         if (tl.startsWith('domain:')) {
-          const domQ = tl.slice(7);
+          const domQ = tl.slice(7).replace(/^"(.*)"$/, '$1');
           return f.domain.toLowerCase().includes(domQ);
         }
-        // Operator: author:value
+        // Operator: author:value (supports author:"First Last")
         if (tl.startsWith('author:')) {
-          const authQ = tl.slice(7);
+          const authQ = tl.slice(7).replace(/^"(.*)"$/, '$1');
           return (f.author || '').toLowerCase().includes(authQ);
         }
 
@@ -322,6 +438,7 @@ function filterFiles() {
 }
 
 var _loadFileAbort = null;
+var _markAsReadDelayTimer = null;
 
 async function loadFile(index) {
   const file = displayFiles[index];
@@ -330,14 +447,19 @@ async function loadFile(index) {
   _sidebarView = 'home'; syncSidebarTabs();
   var prevActive = activeFile;
   activeFile = file.filename;
-  markAsRead(file.filename);
+  if (_markAsReadDelayTimer) { console.debug('[PR] loadFile clearing markAsRead timer (switching to', file.filename + ')'); clearTimeout(_markAsReadDelayTimer); }
+  var fileToMark = file.filename;
+  _markAsReadDelayTimer = setTimeout(function() {
+    console.debug('[PR] markAsRead timer fired for', fileToMark, '(active:', activeFile + ')');
+    markAsRead(fileToMark);
+    updateSidebarActiveState(null);
+  }, 3000);
   updateSidebarActiveState(prevActive);
   removeHlToolbar();
 
   // Auto-close sidebar on mobile after selecting an article
-  if (window.innerWidth <= 768) {
-    const sidebar = document.getElementById('sidebar');
-    if (!sidebar.classList.contains('collapsed')) sidebar.classList.add('collapsed');
+  if (window.innerWidth <= 750) {
+    closeMobileSidebar();
   }
 
   // Dropped files store content in memory — render directly without a server fetch
@@ -354,54 +476,102 @@ async function loadFile(index) {
     var targetFile = file.filename;
 
     // Load annotations first so favorite state is available for header render
-    await preloadAnnotations(file.filename);
-    if (activeFile !== targetFile) return;
+    var annotationData = await preloadAnnotations(file.filename, controller.signal);
+    if (activeFile !== targetFile) { console.debug('[PR] loadFile bailed: active changed after annotations', targetFile, '->', activeFile); return; }
+    applyAnnotationData(annotationData);
 
     try {
       const res = await fetch('/api/file?name=' + encodeURIComponent(file.filename), { signal: controller.signal });
-      if (activeFile !== targetFile) return;
+      if (activeFile !== targetFile) { console.debug('[PR] loadFile bailed: active changed after fetch', targetFile, '->', activeFile); return; }
       if (res.ok) {
         const text = await res.text();
-        if (activeFile !== targetFile) return;
+        if (activeFile !== targetFile) { console.debug('[PR] loadFile bailed: active changed after text read', targetFile, '->', activeFile); return; }
         renderArticle(text, file.filename);
         applyHighlights();
         renderNotesPanel();
+
+        // Auto-reprocess articles with suspiciously short bodies
+        var parsed = parseFrontmatter(text);
+        if (parsed.meta && parsed.meta.url && parsed.meta.source !== 'feed' && parsed.body.trim().length < 200) {
+          showToast('Fetching full article\u2026');
+          fetch('/api/reprocess', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: file.filename })
+          }).then(function(rr) { return rr.json(); }).then(function(data) {
+            if (!data.ok || activeFile !== targetFile) return;
+            return fetch('/api/file?name=' + encodeURIComponent(targetFile));
+          }).then(function(rr) {
+            if (!rr || !rr.ok || activeFile !== targetFile) return;
+            return rr.text();
+          }).then(function(updated) {
+            if (!updated || activeFile !== targetFile) return;
+            renderArticle(updated, targetFile);
+            showToast('Article updated');
+          }).catch(function() {});
+        }
       }
     } catch (e) {
-      if (e.name === 'AbortError') return;
+      if (e.name === 'AbortError') { console.debug('[PR] loadFile aborted:', targetFile); return; }
       throw e;
     }
   }
 }
 
 // Navigate to next (+1) or previous (-1) article with wrapping
+var _navDebounceTimer = null;
 function navigateArticle(direction) {
   if (!displayFiles.length) return;
-  var interval = parseInt(localStorage.getItem('pr-break-interval') || '0', 10);
-  if (interval > 0 && _breakSessionStart > 0) {
-    var elapsed = (Date.now() - _breakSessionStart) / 60000;
-    if (elapsed >= interval) {
-      var currentIdx = displayFiles.findIndex(f => f.filename === activeFile);
-      _breakPendingDirection = direction;
-      if (direction > 0) {
-        _breakPendingIndex = currentIdx < displayFiles.length - 1 ? currentIdx + 1 : 0;
-      } else {
-        _breakPendingIndex = currentIdx > 0 ? currentIdx - 1 : displayFiles.length - 1;
-      }
-      showBreakReminder();
-      return;
-    }
-  }
+  // Debounce rapid keypresses to prevent concurrent loadFile storms
+  if (_navDebounceTimer) clearTimeout(_navDebounceTimer);
+
+  // Immediately update the visual selection for responsive feel
   const cidx = displayFiles.findIndex(f => f.filename === activeFile);
   let next;
   if (direction > 0) {
     next = cidx < displayFiles.length - 1 ? cidx + 1 : 0;
+
+    // When all items from the current source are read, advance to next source's first unread
+    var currentSource = displayFiles[cidx] && (displayFiles[cidx].domain || displayFiles[cidx].feed);
+    if (currentSource) {
+      var hasUnreadInSource = displayFiles.some(function(f) {
+        return (f.domain || f.feed) === currentSource && !readArticles.has(f.filename);
+      });
+      if (!hasUnreadInSource) {
+        for (var si = cidx + 1; si < displayFiles.length; si++) {
+          var f = displayFiles[si];
+          if ((f.domain || f.feed) !== currentSource && !readArticles.has(f.filename)) {
+            next = si;
+            break;
+          }
+        }
+      }
+    }
   } else {
     next = cidx > 0 ? cidx - 1 : displayFiles.length - 1;
   }
-  loadFile(next);
+  var prevActive = activeFile;
+  activeFile = displayFiles[next].filename;
+  updateSidebarActiveState(prevActive);
   const el = document.querySelector('.file-item[data-index="' + next + '"]');
-  if (el) el.scrollIntoView({ block: 'nearest' });
+  if (el) { el.scrollIntoView({ block: 'nearest' }); el.focus({ preventScroll: true }); }
+
+  // Debounce the heavy work (fetch + render)
+  _navDebounceTimer = setTimeout(function() {
+    _navDebounceTimer = null;
+    console.debug('[PR] navigateArticle', direction > 0 ? 'next' : 'prev', 'settled on', activeFile);
+    var interval = parseInt(localStorage.getItem('pr-break-interval') || '0', 10);
+    if (interval > 0 && _breakSessionStart > 0) {
+      var elapsed = (Date.now() - _breakSessionStart) / 60000;
+      if (elapsed >= interval) {
+        _breakPendingDirection = direction;
+        _breakPendingIndex = next;
+        showBreakReminder();
+        return;
+      }
+    }
+    loadFile(next);
+  }, 150);
 }
 
 
@@ -501,12 +671,17 @@ function quickAddUrl() {
 
 // ---- Sidebar nav view switching ----
 let _sidebarView = 'home';
+var _activeDrawerSource = null;
 
 function switchSidebarView(view) {
   _sidebarView = view;
   syncSidebarTabs();
 
-  if (view === 'notebooks') { openSingleNotebook(); }
+  if (view === 'notebooks') {
+    clearSourceFilter();
+    closeDrawer();
+    openSingleNotebook();
+  }
   else if (view === 'home') goHome();
 }
 
@@ -517,20 +692,21 @@ function openSingleNotebook() {
 }
 
 function syncSidebarTabs() {
-  document.querySelectorAll('.sidebar-nav-tab').forEach(function(t) {
-    t.classList.toggle('active', t.dataset.view === _sidebarView);
+  document.querySelectorAll('.sidebar-tab[data-tab]').forEach(function(t) {
+    t.classList.toggle('active', t.dataset.tab === _sidebarView);
   });
-  // Always show file list and count — articles + notebooks visible on all tabs
+
+  // File list always visible; sort bar only on articles tab
   var fileCount = document.getElementById('file-count');
   var fileList = document.getElementById('file-list');
-  if (fileCount) fileCount.style.display = '';
+  if (fileCount) fileCount.style.display = _sidebarView === 'home' ? '' : 'none';
   if (fileList) fileList.style.display = '';
 
   // Update search placeholder contextually
   var search = document.getElementById('search');
   if (search) {
     if (_sidebarView === 'notebooks') search.placeholder = 'Search notebooks...';
-    else search.placeholder = 'Search... try is:favorite or tag:tech';
+    else search.placeholder = 'Search... try is:starred or tag:tech';
   }
 
   // Pinned filters only apply to articles (home view)
@@ -539,9 +715,440 @@ function syncSidebarTabs() {
   var pinBtn = document.getElementById('search-pin');
   if (pinBtn && _sidebarView !== 'home') pinBtn.style.display = 'none';
 
-  // Hide read toggle only applies to articles
-  var hideReadBtn = document.getElementById('hide-read-toggle');
-  if (hideReadBtn) hideReadBtn.style.display = _sidebarView === 'home' ? '' : 'none';
+  // Sort toggles visibility handled by file-count container above
+
+  // Nav items only visible on home tab
+  var navEl = document.getElementById('sidebar-nav');
+  if (navEl) navEl.style.display = _sidebarView === 'home' ? '' : 'none';
+}
+
+// ---- Sidebar nav filter (All Items / Sources / Tags / Unread / Starred) ----
+function sidebarNavFilter(filter) {
+  // Update active state on nav items
+  document.querySelectorAll('.sidebar-nav-item').forEach(function(item) {
+    item.classList.toggle('active', item.dataset.nav === filter);
+  });
+
+  var search = document.getElementById('search');
+  if (filter === 'all') {
+    if (search) search.value = '';
+    clearSourceFilter();
+    filterFiles();
+    closeDrawer();
+    if (displayFiles.length > 0) loadFile(0);
+  } else if (filter === 'unread') {
+    if (search) search.value = 'is:unread';
+    closeDrawer();
+    filterFiles();
+    if (displayFiles.length > 0) loadFile(0);
+  } else if (filter === 'starred') {
+    if (search) search.value = 'is:starred';
+    closeDrawer();
+    filterFiles();
+    if (displayFiles.length > 0) loadFile(0);
+  } else if (filter === 'sources') {
+    openSourcesDrawer();
+  } else if (filter === 'tags') {
+    openTagsDrawer();
+  }
+}
+
+function drawerFaviconFallback(el, name) {
+  var letter = (name || '?').replace(/^(the |www\.)/i, '').charAt(0).toUpperCase();
+  var colors = ['#b45535','#5b7a5e','#4a6fa5','#8b6b4a','#6b5b8a','#5a8a7a','#8a5a5a','#5a6b8a'];
+  var color = colors[letter.charCodeAt(0) % colors.length];
+  el.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="' + color + '"/><text x="32" y="32" dominant-baseline="central" text-anchor="middle" fill="white" font-family="system-ui,sans-serif" font-size="28" font-weight="600">' + letter + '</text></svg>');
+  el.onerror = null;
+}
+
+function openSourcesDrawer() {
+  var title = document.getElementById('drawer-title');
+  var contentEl = document.getElementById('drawer-content');
+  var footerEl = document.getElementById('drawer-footer');
+  if (title) title.textContent = 'Sources';
+
+  // Group articles by feed/domain
+  var domainArticles = {};
+  for (var i = 0; i < allFiles.length; i++) {
+    var f = allFiles[i];
+    var key = f.feed || f.domain || 'unknown';
+    if (!domainArticles[key]) domainArticles[key] = [];
+    domainArticles[key].push(f);
+  }
+
+  var entries = Object.entries(domainArticles);
+
+  // Count podcast items
+  var podcastCount = 0;
+  for (var j = 0; j < allFiles.length; j++) {
+    if (allFiles[j].enclosureUrl && allFiles[j].enclosureType && allFiles[j].enclosureType.startsWith('audio/')) podcastCount++;
+  }
+
+  var sortMode = localStorage.getItem('pr-sources-sort') || 'recent';
+  var _drawerFilter = '';
+
+  function sortEntries(mode) {
+    if (mode === 'az') {
+      entries.sort(function(a, b) { return a[0].localeCompare(b[0]); });
+    } else if (mode === 'recent') {
+      entries.sort(function(a, b) {
+        var latestA = '', latestB = '';
+        for (var k = 0; k < a[1].length; k++) {
+          if (a[1][k].bookmarked > latestA) latestA = a[1][k].bookmarked;
+        }
+        for (var k = 0; k < b[1].length; k++) {
+          if (b[1][k].bookmarked > latestB) latestB = b[1][k].bookmarked;
+        }
+        return latestB > latestA ? 1 : latestB < latestA ? -1 : 0;
+      });
+    } else {
+      entries.sort(function(a, b) { return b[1].length - a[1].length; });
+    }
+  }
+
+  function renderSources() {
+    var html = '';
+
+    // Search/filter input
+    html += '<div class="drawer-search">';
+    html += '<input type="text" id="drawer-filter-input" placeholder="Filter sources\u2026" value="' + escapeHtml(_drawerFilter) + '">';
+    html += '</div>';
+
+    // Sort bar
+    html += '<div class="drawer-sort-bar">';
+    html += '<button class="drawer-sort-btn' + (sortMode === 'recent' ? ' active' : '') + '" data-sort="recent" title="Sort by most recent article">Recent</button>';
+    html += '<button class="drawer-sort-btn' + (sortMode === 'az' ? ' active' : '') + '" data-sort="az" title="Sort alphabetically by name">A\u2013Z</button>';
+    html += '<button class="drawer-sort-btn' + (sortMode === 'count' ? ' active' : '') + '" data-sort="count" title="Sort by number of articles">Count</button>';
+    html += '</div>';
+
+    var filterLower = _drawerFilter.toLowerCase();
+
+    // Podcast row
+    if (podcastCount > 0 && (!filterLower || 'podcasts'.indexOf(filterLower) !== -1)) {
+      var podUnread = 0;
+      for (var pj = 0; pj < allFiles.length; pj++) {
+        if (allFiles[pj].enclosureUrl && allFiles[pj].enclosureType && allFiles[pj].enclosureType.startsWith('audio/') && !readArticles.has(allFiles[pj].filename)) podUnread++;
+      }
+      var podActive = _activeDrawerSource === '__podcasts__' ? ' active' : '';
+      var podDim = podUnread === 0 ? ' dimmed' : '';
+      html += '<div class="drawer-group-label">Media Type</div>';
+      html += '<div class="drawer-item' + podActive + podDim + '" data-source="__podcasts__" onclick="filterBySource(\'__podcasts__\')">'
+        + '<svg class="drawer-item-icon" aria-hidden="true"><use href="#i-headphones"/></svg>'
+        + '<span class="drawer-item-name">Podcasts</span>'
+        + '<span class="drawer-item-count">' + podUnread + '</span></div>';
+    }
+
+    // Source rows
+    sortEntries(sortMode);
+    html += '<div class="drawer-group-label">Sources</div>';
+    for (var si = 0; si < entries.length; si++) {
+      var name = entries[si][0];
+      if (filterLower && name.toLowerCase().indexOf(filterLower) === -1) continue;
+      var articles = entries[si][1];
+      var unread = 0;
+      for (var ui = 0; ui < articles.length; ui++) {
+        if (!readArticles.has(articles[ui].filename)) unread++;
+      }
+      var domain = articles[0].domain || '';
+      var isActive = _activeDrawerSource === name ? ' active' : '';
+      var isDimmed = unread === 0 ? ' dimmed' : '';
+      var faviconHtml = domain && domain !== 'pullread'
+        ? '<img class="drawer-item-favicon" src="/favicons/' + encodeURIComponent(domain) + '.png" alt="" loading="lazy" onerror="drawerFaviconFallback(this,\'' + escapeJsStr(name) + '\')">'
+        : '<svg class="drawer-item-icon" aria-hidden="true"><use href="#i-globe"/></svg>';
+      html += '<div class="drawer-item' + isActive + isDimmed + '" data-source="' + escapeHtml(name) + '" onclick="filterBySource(\'' + escapeJsStr(name) + '\')">'
+        + faviconHtml
+        + '<span class="drawer-item-name">' + escapeHtml(name) + '</span>'
+        + '<span class="drawer-item-count">' + unread + '</span></div>';
+    }
+
+    if (contentEl) {
+      contentEl.innerHTML = html;
+
+      // Wire sort buttons
+      var btns = contentEl.querySelectorAll('.drawer-sort-btn');
+      for (var b = 0; b < btns.length; b++) {
+        btns[b].addEventListener('click', function() {
+          sortMode = this.dataset.sort;
+          localStorage.setItem('pr-sources-sort', sortMode);
+          renderSources();
+        });
+      }
+
+      // Wire search filter
+      var filterInput = document.getElementById('drawer-filter-input');
+      if (filterInput) {
+        filterInput.addEventListener('input', function() {
+          _drawerFilter = this.value;
+          var pos = this.selectionStart;
+          renderSources();
+          var fi = document.getElementById('drawer-filter-input');
+          if (fi) { fi.focus(); fi.setSelectionRange(pos, pos); }
+        });
+      }
+    }
+  }
+
+  // Show footer with "Add source" button
+  if (footerEl) {
+    footerEl.style.display = '';
+    footerEl.innerHTML = '<button onclick="closeDrawer();showSettingsPage(\'settings-feeds\')">'
+      + '<svg aria-hidden="true"><use href="#i-plus"/></svg>'
+      + 'Add source'
+      + '</button>';
+  }
+
+  renderSources();
+  openDrawer();
+}
+
+function openTagsDrawer() {
+  var title = document.getElementById('drawer-title');
+  var content = document.getElementById('drawer-content');
+  var footerEl = document.getElementById('drawer-footer');
+  if (title) title.textContent = 'Tags';
+  if (footerEl) footerEl.style.display = 'none';
+
+  // Collect tags from annotations index
+  var tagCounts = {};
+  for (var filename in allNotesIndex) {
+    var notes = allNotesIndex[filename];
+    var allTags = (notes.tags || []).concat(notes.machineTags || []);
+    for (var i = 0; i < allTags.length; i++) {
+      tagCounts[allTags[i]] = (tagCounts[allTags[i]] || 0) + 1;
+    }
+  }
+
+  var entries = Object.entries(tagCounts);
+  var sortMode = localStorage.getItem('pr-tags-sort') || 'count';
+  var _tagFilter = '';
+
+  function sortEntries(mode) {
+    if (mode === 'az') {
+      entries.sort(function(a, b) { return a[0].localeCompare(b[0]); });
+    } else {
+      entries.sort(function(a, b) { return b[1] - a[1]; });
+    }
+  }
+
+  function renderTags() {
+    var html = '';
+
+    // Search/filter input
+    html += '<div class="drawer-search">';
+    html += '<input type="text" id="drawer-tag-filter" placeholder="Filter tags\u2026" value="' + escapeHtml(_tagFilter) + '">';
+    html += '</div>';
+
+    // Sort bar
+    html += '<div class="drawer-sort-bar">';
+    html += '<button class="drawer-sort-btn' + (sortMode === 'count' ? ' active' : '') + '" data-sort="count" title="Sort by frequency">Count</button>';
+    html += '<button class="drawer-sort-btn' + (sortMode === 'az' ? ' active' : '') + '" data-sort="az" title="Sort alphabetically">A\u2013Z</button>';
+    html += '</div>';
+
+    var filterLower = _tagFilter.toLowerCase();
+    sortEntries(sortMode);
+
+    var shown = 0;
+    for (var ti = 0; ti < entries.length; ti++) {
+      var tag = entries[ti][0];
+      var count = entries[ti][1];
+      if (filterLower && tag.toLowerCase().indexOf(filterLower) === -1) continue;
+      html += '<div class="drawer-item" onclick="filterByTag(\'' + escapeJsStr(tag) + '\')">'
+        + '<span class="drawer-item-dot" style="background:var(--link)"></span>'
+        + '<span class="drawer-item-name">' + escapeHtml(tag) + '</span>'
+        + '<span class="drawer-item-count">' + count + '</span></div>';
+      shown++;
+    }
+
+    if (!entries.length) {
+      html += '<div style="padding:16px 8px;color:var(--muted);font-size:13px;text-align:center">No tags yet. Tags appear when articles are auto-tagged or you add them manually.</div>';
+    } else if (!shown) {
+      html += '<div style="padding:16px 8px;color:var(--muted);font-size:13px;text-align:center">No tags matching \u201c' + escapeHtml(_tagFilter) + '\u201d</div>';
+    }
+
+    if (content) {
+      content.innerHTML = html;
+
+      // Wire sort buttons
+      var btns = content.querySelectorAll('.drawer-sort-btn');
+      for (var b = 0; b < btns.length; b++) {
+        btns[b].addEventListener('click', function() {
+          sortMode = this.dataset.sort;
+          localStorage.setItem('pr-tags-sort', sortMode);
+          renderTags();
+        });
+      }
+
+      // Wire search filter
+      var filterInput = document.getElementById('drawer-tag-filter');
+      if (filterInput) {
+        filterInput.addEventListener('input', function() {
+          _tagFilter = this.value;
+          var pos = this.selectionStart;
+          renderTags();
+          var fi = document.getElementById('drawer-tag-filter');
+          if (fi) { fi.focus(); fi.setSelectionRange(pos, pos); }
+        });
+      }
+    }
+  }
+
+  renderTags();
+  openDrawer();
+}
+
+function filterBySource(source) {
+  var search = document.getElementById('search');
+  if (source === '__podcasts__') {
+    if (search) search.value = 'is:podcast';
+    showSourceFilterBar('Podcasts');
+    _activeDrawerSource = '__podcasts__';
+  } else {
+    if (search) search.value = 'feed:"' + source + '"';
+    showSourceFilterBar(source);
+    _activeDrawerSource = source;
+  }
+  filterFiles();
+  updateDrawerActiveState();
+  // Load the most recent article from this source
+  if (displayFiles.length > 0) loadFile(0);
+}
+
+function filterByTag(tag) {
+  var search = document.getElementById('search');
+  if (search) search.value = 'tag:"' + tag + '"';
+  showSourceFilterBar(tag);
+  _activeDrawerSource = null;
+  filterFiles();
+  updateDrawerActiveState();
+  if (displayFiles.length > 0) loadFile(0);
+}
+
+function refreshDrawerCounts() {
+  var drawer = document.getElementById('drawer');
+  if (!drawer || !drawer.classList.contains('open')) return;
+  var title = document.getElementById('drawer-title');
+  if (!title) return;
+
+  if (title.textContent === 'Sources') {
+    // Update counts in-place to preserve scroll position
+    var items = drawer.querySelectorAll('.drawer-item[data-source]');
+    for (var i = 0; i < items.length; i++) {
+      var src = items[i].dataset.source;
+      var countEl = items[i].querySelector('.drawer-item-count');
+      if (!countEl) continue;
+      var unread = 0;
+      if (src === '__podcasts__') {
+        for (var j = 0; j < allFiles.length; j++) {
+          if (allFiles[j].enclosureUrl && allFiles[j].enclosureType && allFiles[j].enclosureType.startsWith('audio/') && !readArticles.has(allFiles[j].filename)) unread++;
+        }
+      } else {
+        for (var j = 0; j < allFiles.length; j++) {
+          var key = allFiles[j].feed || allFiles[j].domain || 'unknown';
+          if (key === src && !readArticles.has(allFiles[j].filename)) unread++;
+        }
+      }
+      countEl.textContent = unread;
+      items[i].classList.toggle('dimmed', unread === 0);
+    }
+  } else if (title.textContent === 'Tags') {
+    // Tags drawer — just re-render since tag counts change less often
+    openTagsDrawer();
+  }
+}
+
+function updateDrawerActiveState() {
+  var items = document.querySelectorAll('#drawer-content .drawer-item[data-source]');
+  for (var i = 0; i < items.length; i++) {
+    items[i].classList.toggle('active', items[i].dataset.source === _activeDrawerSource);
+  }
+}
+
+function showSourceFilterBar(name) {
+  var bar = document.getElementById('source-filter-bar');
+  var nameEl = document.getElementById('source-filter-name');
+  if (bar) bar.style.display = '';
+  if (nameEl) nameEl.textContent = name;
+}
+
+function clearSourceFilter() {
+  var bar = document.getElementById('source-filter-bar');
+  if (bar) bar.style.display = 'none';
+  var search = document.getElementById('search');
+  if (search) search.value = '';
+  _activeDrawerSource = null;
+  // Reset nav to All Items
+  document.querySelectorAll('.sidebar-nav-item').forEach(function(item) {
+    item.classList.toggle('active', item.dataset.nav === 'all');
+  });
+  filterFiles();
+}
+
+// Schedule nav count update (debounced via rAF)
+var _navCountsPending = false;
+function scheduleNavCounts() {
+  if (_navCountsPending) return;
+  _navCountsPending = true;
+  requestAnimationFrame(function() {
+    _navCountsPending = false;
+    updateNavCounts();
+  });
+}
+
+function updateNavCounts() {
+  var allCount = document.getElementById('nav-count-all');
+  var sourcesCount = document.getElementById('nav-count-sources');
+  var tagsCount = document.getElementById('nav-count-tags');
+  var unreadCount = document.getElementById('nav-count-unread');
+  var starredCount = document.getElementById('nav-count-starred');
+
+  if (allCount) {
+    allCount.textContent = '';
+    allCount.title = allFiles.length ? allFiles.length.toLocaleString() + ' articles' : '';
+  }
+
+  // Count unique sources
+  if (sourcesCount) {
+    var domains = {};
+    for (var i = 0; i < allFiles.length; i++) {
+      var key = allFiles[i].feed || allFiles[i].domain || '';
+      if (key) domains[key] = true;
+    }
+    var sc = Object.keys(domains).length;
+    sourcesCount.textContent = sc ? approxCount(sc) : '';
+    sourcesCount.title = sc ? sc.toLocaleString() + ' sources' : '';
+  }
+
+  // Count unique tags
+  if (tagsCount) {
+    var tags = {};
+    for (var fn in allNotesIndex) {
+      var n = allNotesIndex[fn];
+      (n.tags || []).concat(n.machineTags || []).forEach(function(t) { tags[t] = true; });
+    }
+    var tc = Object.keys(tags).length;
+    tagsCount.textContent = tc ? approxCount(tc) : '';
+    tagsCount.title = tc ? tc.toLocaleString() + ' tags' : '';
+  }
+
+  // Count unread
+  if (unreadCount) {
+    var ur = 0;
+    for (var j = 0; j < allFiles.length; j++) {
+      if (!readArticles.has(allFiles[j].filename)) ur++;
+    }
+    unreadCount.textContent = ur ? approxCount(ur) : '';
+    unreadCount.title = ur ? ur.toLocaleString() + ' unread' : '';
+  }
+
+  // Count starred
+  if (starredCount) {
+    var st = 0;
+    for (var fn2 in allNotesIndex) {
+      if (allNotesIndex[fn2].isFavorite) st++;
+    }
+    starredCount.textContent = st ? approxCount(st) : '';
+    starredCount.title = st ? st.toLocaleString() + ' starred' : '';
+  }
 }
 
 let _writingFocusActive = false;
@@ -876,7 +1483,7 @@ function openBreakBook(filename) {
       displayFiles.push(filteredFiles[allIdx]);
       loadFile(displayFiles.length - 1);
     } else {
-      renderDashboard();
+      renderHub();
     }
   }
 }
@@ -928,7 +1535,7 @@ function showBreakReminder() {
   html += '</div>';
 
   content.innerHTML = html;
-  document.getElementById('content-pane').scrollTop = 0;
+  document.getElementById('content-scroll').scrollTop = 0;
 }
 
 function dismissBreakReminder() {
@@ -939,9 +1546,9 @@ function dismissBreakReminder() {
   } else if (activeFile) {
     var idx = displayFiles.findIndex(function(f) { return f.filename === activeFile; });
     if (idx >= 0) loadFile(idx);
-    else renderDashboard();
+    else renderHub();
   } else {
-    renderDashboard();
+    renderHub();
   }
 }
 

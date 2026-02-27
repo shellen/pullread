@@ -46,6 +46,16 @@ Body`;
     const meta = parseFrontmatter(content);
     expect(meta.title).toBe('He said "hello"');
   });
+
+  test('preserves categories array as raw string', () => {
+    const content = `---
+title: "Tagged Article"
+categories: ["Technology", "Programming"]
+---
+Body`;
+    const meta = parseFrontmatter(content);
+    expect(meta.categories).toBe('["Technology", "Programming"]');
+  });
 });
 
 describe('reprocessFile', () => {
@@ -144,6 +154,58 @@ summary: "This is a summary of the article."
     const updated = readFileSync(filePath, 'utf-8');
     expect(updated).toContain('summary:');
     expect(updated).toContain('This is a summary of the article.');
+  });
+
+  test('sets source: extracted in reprocessed article', async () => {
+    const filePath = join(testDir, 'feed-article.md');
+    writeFileSync(filePath, `---
+title: "Feed Article"
+url: https://example.com/feed-article
+domain: example.com
+bookmarked: 2025-01-15T00:00:00Z
+source: feed
+---
+# Short feed content`);
+
+    mockFetchAndExtract.mockResolvedValue({
+      title: 'Feed Article',
+      content: '<p>Full extracted content</p>',
+      markdown: 'Full extracted content',
+      byline: 'Author',
+    });
+
+    const result = await reprocessFile(filePath);
+    expect(result.ok).toBe(true);
+
+    const updated = readFileSync(filePath, 'utf-8');
+    expect(updated).toContain('source: extracted');
+    expect(updated).not.toContain('source: feed');
+  });
+
+  test('preserves thumbnail and categories from existing frontmatter', async () => {
+    const filePath = join(testDir, 'with-meta.md');
+    writeFileSync(filePath, `---
+title: "Article With Meta"
+url: https://example.com/meta-article
+domain: example.com
+bookmarked: 2025-01-15T00:00:00Z
+categories: ["Technology", "Programming"]
+thumbnail: https://example.com/hero.jpg
+---
+# Old content`);
+
+    mockFetchAndExtract.mockResolvedValue({
+      title: 'Article With Meta',
+      content: '<p>New content</p>',
+      markdown: 'New content',
+    });
+
+    const result = await reprocessFile(filePath);
+    expect(result.ok).toBe(true);
+
+    const updated = readFileSync(filePath, 'utf-8');
+    expect(updated).toContain('thumbnail: https://example.com/hero.jpg');
+    expect(updated).toContain('categories: ["Technology", "Programming"]');
   });
 
   test('returns error message from fetch exceptions', async () => {
@@ -268,5 +330,188 @@ describe('XSS sanitization', () => {
   test('09-notebooks.js sanitizes marked.parse output in preview', () => {
     const notebooks = readFileSync(join(rootDir, 'viewer', '09-notebooks.js'), 'utf-8');
     expect(notebooks).toMatch(/sanitizeHtml\s*\(\s*marked\.parse\s*\(/);
+  });
+});
+
+describe('approxCount', () => {
+  let approxCount: (n: number) => string;
+
+  beforeAll(() => {
+    const rootDir = join(__dirname, '..');
+    const utils = readFileSync(join(rootDir, 'viewer', '02-utils.js'), 'utf-8');
+    const fn = new Function(utils + '\nreturn { approxCount };');
+    approxCount = fn().approxCount;
+  });
+
+  test('returns exact number for 0-99', () => {
+    expect(approxCount(0)).toBe('0');
+    expect(approxCount(1)).toBe('1');
+    expect(approxCount(42)).toBe('42');
+    expect(approxCount(99)).toBe('99');
+  });
+
+  test('rounds down to nearest hundred with + for 100-999', () => {
+    expect(approxCount(100)).toBe('100+');
+    expect(approxCount(247)).toBe('200+');
+    expect(approxCount(999)).toBe('900+');
+  });
+
+  test('shows K+ for 1000+', () => {
+    expect(approxCount(1000)).toBe('1K+');
+    expect(approxCount(1500)).toBe('1K+');
+    expect(approxCount(13000)).toBe('13K+');
+    expect(approxCount(13999)).toBe('13K+');
+  });
+});
+
+describe('timeAgo / timeAgoTitle', () => {
+  // Eval the pure functions from the client-side JS so we can unit test them
+  let timeAgo: (dateStr: string) => string;
+  let timeAgoTitle: (dateStr: string) => string;
+
+  beforeAll(() => {
+    const rootDir = join(__dirname, '..');
+    const utils = readFileSync(join(rootDir, 'viewer', '02-utils.js'), 'utf-8');
+    // Extract timeAgo and timeAgoTitle functions
+    const fn = new Function(utils + '\nreturn { timeAgo, timeAgoTitle };');
+    const fns = fn();
+    timeAgo = fns.timeAgo;
+    timeAgoTitle = fns.timeAgoTitle;
+  });
+
+  test('returns empty string for falsy input', () => {
+    expect(timeAgo('')).toBe('');
+    expect(timeAgoTitle('')).toBe('');
+  });
+
+  test('returns "just now" for dates less than a minute ago', () => {
+    const now = new Date().toISOString();
+    expect(timeAgo(now)).toBe('just now');
+  });
+
+  test('returns minutes ago for recent dates', () => {
+    const fiveMinAgo = new Date(Date.now() - 5 * 60000).toISOString();
+    expect(timeAgo(fiveMinAgo)).toBe('5m ago');
+  });
+
+  test('returns hours ago for same-day dates', () => {
+    const threeHoursAgo = new Date(Date.now() - 3 * 3600000).toISOString();
+    expect(timeAgo(threeHoursAgo)).toBe('3h ago');
+  });
+
+  test('returns "yesterday" for 1 day ago', () => {
+    const yesterday = new Date(Date.now() - 86400000).toISOString();
+    expect(timeAgo(yesterday)).toBe('yesterday');
+  });
+
+  test('returns days ago for 2-6 days', () => {
+    const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString();
+    expect(timeAgo(threeDaysAgo)).toBe('3d ago');
+  });
+
+  test('returns "Mon DD" for dates 7+ days in current year', () => {
+    const now = new Date();
+    // Pick a date 30 days ago in same year (if possible)
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000);
+    if (thirtyDaysAgo.getFullYear() === now.getFullYear()) {
+      const result = timeAgo(thirtyDaysAgo.toISOString());
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      expect(result).toBe(months[thirtyDaysAgo.getMonth()] + ' ' + thirtyDaysAgo.getDate());
+    }
+  });
+
+  test('returns "Mon DD, YYYY" for dates in a previous year', () => {
+    const result = timeAgo('2023-06-15T12:00:00Z');
+    expect(result).toBe('Jun 15, 2023');
+  });
+
+  test('returns date slice for invalid date strings', () => {
+    expect(timeAgo('not-a-date')).toBe('not-a-date');
+  });
+
+  test('timeAgoTitle returns full datetime string', () => {
+    const result = timeAgoTitle('2025-03-15T14:30:00Z');
+    // Should contain date and time parts (exact output depends on timezone)
+    expect(result).toMatch(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}/);
+  });
+
+  test('timeAgoTitle returns raw string for invalid dates', () => {
+    expect(timeAgoTitle('not-a-date')).toBe('not-a-date');
+  });
+});
+
+describe('feed-extract prompt', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('04-article.js includes feed-extract-prompt for source: feed articles', () => {
+    const article = readFileSync(join(rootDir, 'viewer', '04-article.js'), 'utf-8');
+    expect(article).toContain('feed-extract-prompt');
+    expect(article).toContain("meta.source === 'feed'");
+    expect(article).toContain('reprocessFromMenu()');
+  });
+
+  test('viewer.css styles feed-extract-prompt and button', () => {
+    const css = readFileSync(join(rootDir, 'viewer.css'), 'utf-8');
+    expect(css).toContain('.feed-extract-prompt');
+    expect(css).toContain('.feed-extract-btn');
+  });
+});
+
+describe('race condition guards', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('preloadAnnotations returns data instead of setting globals', () => {
+    const annotations = readFileSync(join(rootDir, 'viewer', '06-annotations.js'), 'utf-8');
+    // Must return data object, not set globals directly
+    expect(annotations).toMatch(/return\s*\{\s*highlights/);
+    expect(annotations).toMatch(/return\s+defaults/);
+  });
+
+  test('applyAnnotationData function exists', () => {
+    const annotations = readFileSync(join(rootDir, 'viewer', '06-annotations.js'), 'utf-8');
+    expect(annotations).toMatch(/function\s+applyAnnotationData/);
+  });
+
+  test('loadFile checks activeFile after preloadAnnotations', () => {
+    const sidebar = readFileSync(join(rootDir, 'viewer', '05-sidebar.js'), 'utf-8');
+    // After annotations load, guard check must exist before applying
+    expect(sidebar).toContain('applyAnnotationData');
+    // The pattern: await preloadAnnotations -> guard check -> applyAnnotationData
+    const annotationsIdx = sidebar.indexOf('preloadAnnotations');
+    const guardIdx = sidebar.indexOf('activeFile !== targetFile', annotationsIdx);
+    const applyIdx = sidebar.indexOf('applyAnnotationData', guardIdx);
+    expect(annotationsIdx).toBeGreaterThan(-1);
+    expect(guardIdx).toBeGreaterThan(annotationsIdx);
+    expect(applyIdx).toBeGreaterThan(guardIdx);
+  });
+
+  test('loadFile checks activeFile after fetch response', () => {
+    const sidebar = readFileSync(join(rootDir, 'viewer', '05-sidebar.js'), 'utf-8');
+    // Must have guard checks after the fetch call too
+    const fetchIdx = sidebar.indexOf("fetch('/api/file");
+    const guardAfterFetch = sidebar.indexOf('activeFile !== targetFile', fetchIdx);
+    expect(fetchIdx).toBeGreaterThan(-1);
+    expect(guardAfterFetch).toBeGreaterThan(fetchIdx);
+  });
+
+  test('loadFile uses AbortController for stale fetches', () => {
+    const sidebar = readFileSync(join(rootDir, 'viewer', '05-sidebar.js'), 'utf-8');
+    expect(sidebar).toContain('AbortController');
+    expect(sidebar).toContain('_loadFileAbort');
+    expect(sidebar).toContain('AbortError');
+  });
+
+  test('markAsRead uses delayed timer, not instant', () => {
+    const sidebar = readFileSync(join(rootDir, 'viewer', '05-sidebar.js'), 'utf-8');
+    expect(sidebar).toContain('_markAsReadDelayTimer');
+    expect(sidebar).toMatch(/setTimeout\s*\(\s*function/);
+    // Timer delay should be 3000ms
+    expect(sidebar).toContain('3000');
+  });
+
+  test('goHome clears markAsRead timer', () => {
+    const article = readFileSync(join(rootDir, 'viewer', '04-article.js'), 'utf-8');
+    expect(article).toContain('_markAsReadDelayTimer');
+    expect(article).toMatch(/clearTimeout\s*\(\s*_markAsReadDelayTimer\s*\)/);
   });
 });

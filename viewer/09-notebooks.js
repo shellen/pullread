@@ -152,6 +152,8 @@ function openNotebookInPane(id) {
   activeFile = null;
   var toc = document.getElementById('toc-container');
   if (toc) toc.innerHTML = '';
+  var toolbar = document.getElementById('reader-toolbar');
+  if (toolbar) toolbar.style.display = 'none';
   _activeNotebook = nb;
   if (!nb.notes) nb.notes = [];
 
@@ -262,7 +264,7 @@ function openNoteInPane(noteId) {
   html += '</div>';
   content.innerHTML = html;
 
-  document.getElementById('content-pane').scrollTop = 0;
+  document.getElementById('content-scroll').scrollTop = 0;
 
   // Render diagrams in preview mode
   if (_notebookPreviewMode) {

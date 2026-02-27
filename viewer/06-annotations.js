@@ -1,24 +1,38 @@
 // ABOUTME: Highlights, inline annotations, and footnote rendering for article content.
 // ABOUTME: Manages highlight creation/deletion, footnote numbering, and the notes panel.
 
-async function preloadAnnotations(filename) {
-  if (!serverMode) return;
+async function preloadAnnotations(filename, signal) {
+  var defaults = { highlights: [], notes: { articleNote: '', annotations: [], tags: [], isFavorite: false } };
+  if (!serverMode) {
+    articleHighlights = defaults.highlights;
+    articleNotes = defaults.notes;
+    return defaults;
+  }
   try {
+    var opts = signal ? { signal: signal } : {};
     const [hlRes, notesRes] = await Promise.all([
-      fetch('/api/highlights?name=' + encodeURIComponent(filename)),
-      fetch('/api/notes?name=' + encodeURIComponent(filename))
+      fetch('/api/highlights?name=' + encodeURIComponent(filename), opts),
+      fetch('/api/notes?name=' + encodeURIComponent(filename), opts)
     ]);
-    articleHighlights = hlRes.ok ? await hlRes.json() : [];
+    var hl = hlRes.ok ? await hlRes.json() : [];
     const notesData = notesRes.ok ? await notesRes.json() : {};
-    articleNotes = { articleNote: '', annotations: [], tags: [], isFavorite: false, ...notesData };
-  } catch {
-    articleHighlights = [];
-    articleNotes = { articleNote: '', annotations: [], tags: [], isFavorite: false };
+    var notes = { articleNote: '', annotations: [], tags: [], isFavorite: false, ...notesData };
+    return { highlights: hl, notes: notes };
+  } catch (e) {
+    if (e.name === 'AbortError') throw e;
+    return defaults;
   }
 }
 
+// Apply fetched annotation data to globals (call after verifying active file hasn't changed)
+function applyAnnotationData(data) {
+  articleHighlights = data.highlights;
+  articleNotes = data.notes;
+}
+
 async function loadAnnotations(filename) {
-  await preloadAnnotations(filename);
+  var data = await preloadAnnotations(filename);
+  applyAnnotationData(data);
   applyHighlights();
   renderNotesPanel();
 }
@@ -421,12 +435,41 @@ function showHlToolbar(x, y) {
     <button class="hl-green-btn" aria-label="Highlight green" onclick="createHighlight('green')"></button>
     <button class="hl-blue-btn" aria-label="Highlight blue" onclick="createHighlight('blue')"></button>
     <button class="hl-pink-btn" aria-label="Highlight pink" onclick="createHighlight('pink')"></button>
+    <button class="hl-share-btn" aria-label="Share quote" onclick="shareHighlightQuote(event)"><svg class="icon icon-xs" aria-hidden="true"><use href="#i-share"/></svg></button>
     <button class="hl-note-btn" aria-label="Add note" onclick="addInlineNote()">+ Note</button>
   `;
   bar.style.left = x + 'px';
   bar.style.top = y + 'px';
-  document.getElementById('content-pane').appendChild(bar);
+  document.getElementById('content-scroll').appendChild(bar);
   hlToolbarEl = bar;
+}
+
+function shareHighlightQuote(e) {
+  if (e) e.stopPropagation();
+  var sel = window.getSelection();
+  if (!sel || sel.isCollapsed) return;
+  var quoteText = sel.toString().trim();
+  if (!quoteText) return;
+
+  var file = allFiles.find(function(f) { return f.filename === activeFile; });
+  var title = file ? file.title : '';
+  var url = file ? (file.url || '') : '';
+
+  showQuoteSharePanel(quoteText, title, url);
+  removeHlToolbar();
+}
+
+function shareExistingHighlight(id, e) {
+  if (e) e.stopPropagation();
+  var hl = articleHighlights.find(function(h) { return h.id === id; });
+  if (!hl || !hl.text) return;
+
+  var file = allFiles.find(function(f) { return f.filename === activeFile; });
+  var title = file ? file.title : '';
+  var url = file ? (file.url || '') : '';
+
+  removeHlToolbar();
+  showQuoteSharePanel(hl.text, title, url);
 }
 
 function showHighlightContextMenu(e, hl) {
@@ -440,10 +483,11 @@ function showHighlightContextMenu(e, hl) {
     <button class="hl-green-btn" aria-label="Green" onclick="changeHighlightColor('${hl.id}','green')"></button>
     <button class="hl-blue-btn" aria-label="Blue" onclick="changeHighlightColor('${hl.id}','blue')"></button>
     <button class="hl-pink-btn" aria-label="Pink" onclick="changeHighlightColor('${hl.id}','pink')"></button>
+    <button class="hl-share-btn" aria-label="Share quote" onclick="shareExistingHighlight('${hl.id}', event)"><svg class="icon icon-xs" aria-hidden="true"><use href="#i-share"/></svg></button>
     <button class="hl-note-btn" aria-label="${noteLabel}" onclick="editHighlightNote('${hl.id}', event)">${noteLabel}</button>
     <button class="hl-note-btn" style="color:red;border-color:red" aria-label="Delete highlight" onclick="deleteHighlight('${hl.id}')">Del</button>
   `;
-  const pane = document.getElementById('content-pane');
+  const pane = document.getElementById('content-scroll');
   bar.style.left = (e.clientX - pane.getBoundingClientRect().left) + 'px';
   bar.style.top = (e.clientY - pane.getBoundingClientRect().top + pane.scrollTop - 40) + 'px';
   pane.appendChild(bar);
@@ -466,7 +510,7 @@ function editHighlightNote(id, e) {
   const hl = articleHighlights.find(h => h.id === id);
   if (!hl) return;
 
-  const pane = document.getElementById('content-pane');
+  const pane = document.getElementById('content-scroll');
   const paneRect = pane.getBoundingClientRect();
   const popover = document.createElement('div');
   popover.className = 'annotation-popover';
@@ -544,7 +588,7 @@ document.addEventListener('mouseup', e => {
   // Don't show highlight toolbar on Guide or Explore pages
   if (!activeFile) return;
 
-  const pane = document.getElementById('content-pane');
+  const pane = document.getElementById('content-scroll');
   const range = sel.getRangeAt(0);
   const rect = range.getBoundingClientRect();
   const paneRect = pane.getBoundingClientRect();
@@ -559,7 +603,7 @@ function addInlineNote() {
   const sel = window.getSelection();
   if (!sel || sel.isCollapsed || !sel.toString().trim()) return;
   const anchorText = sel.toString();
-  const pane = document.getElementById('content-pane');
+  const pane = document.getElementById('content-scroll');
   const range = sel.getRangeAt(0);
   const rect = range.getBoundingClientRect();
   const paneRect = pane.getBoundingClientRect();
@@ -623,7 +667,7 @@ function showAnnotationPopover(e, ann) {
   removeAnnotationPopover();
   removeHlToolbar();
 
-  const pane = document.getElementById('content-pane');
+  const pane = document.getElementById('content-scroll');
   const paneRect = pane.getBoundingClientRect();
   const popover = document.createElement('div');
   popover.className = 'annotation-popover';
@@ -670,20 +714,31 @@ function updateAnnotation(id, btn) {
   removeAnnotationPopover();
 }
 
-// Render tags in the article header
+// Render tags in the article header pub-bar
 function renderNotesPanel() {
+  _tagEditMode = false;
   var container = document.getElementById('header-tags');
   if (!container) return;
 
   var tags = articleNotes.tags || [];
   var machineTags = articleNotes.machineTags || [];
-  var tagsHtml = tags.map(function(t) { return '<span class="tag">' + escapeHtml(t) + '<span class="tag-remove" onclick="removeTag(\'' + escapeHtml(t.replace(/'/g, "\\'")) + '\')">&times;</span></span>'; }).join('')
-    + machineTags.map(function(t) { return '<span class="tag tag-machine" title="Auto-generated">' + escapeHtml(t) + '</span>'; }).join('');
+  var fileMeta = allFiles.find(function(f) { return f.filename === activeFile; });
+  var sourceTags = (fileMeta && fileMeta.categories) || [];
 
-  container.innerHTML = '<div class="tags-row">'
-    + tagsHtml
-    + '<input type="text" placeholder="Add tag\u2026" onkeydown="handleTagKey(event)" />'
-    + '</div>';
+  var html = '';
+  for (var i = 0; i < tags.length; i++) {
+    var t = tags[i];
+    html += '<a class="tag" href="#" onclick="event.preventDefault();document.getElementById(\'search\').value=\'tag:\\x22' + escapeJsStr(t) + '\\x22\';filterFiles()">' + escapeHtml(t) + '</a>';
+  }
+  for (var j = 0; j < machineTags.length; j++) {
+    var mt = machineTags[j];
+    html += '<a class="tag tag-machine" href="#" onclick="event.preventDefault();document.getElementById(\'search\').value=\'tag:\\x22' + escapeJsStr(mt) + '\\x22\';filterFiles()" title="Auto-generated">' + escapeHtml(mt) + '</a>';
+  }
+  for (var k = 0; k < sourceTags.length; k++) {
+    var st = sourceTags[k];
+    html += '<a class="tag tag-source" href="#" onclick="event.preventDefault();document.getElementById(\'search\').value=\'tag:\\x22' + escapeJsStr(st) + '\\x22\';filterFiles()" title="From feed">' + escapeHtml(st) + '</a>';
+  }
+  container.innerHTML = html;
 }
 
 function toggleFavorite(btn) {
@@ -692,18 +747,38 @@ function toggleFavorite(btn) {
   renderNotesPanel();
   updateSidebarItem(activeFile);
   updateHeaderActions();
+  scheduleNavCounts();
 }
 
 // Alias for backward compatibility with header button onclick
 var toggleFavoriteFromHeader = toggleFavorite;
 
+var _tagEditMode = false;
+
 function toggleNotesFromHeader() {
   var container = document.getElementById('header-tags');
-  if (container) {
-    container.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    var input = container.querySelector('input');
-    if (input) input.focus();
+  if (!container) return;
+
+  if (_tagEditMode) {
+    _tagEditMode = false;
+    renderNotesPanel();
+    return;
   }
+
+  _tagEditMode = true;
+  var tags = (articleNotes.tags || []);
+  var machineTags = (articleNotes.machineTags || []);
+  var tagsHtml = tags.map(function(t) {
+    return '<span class="tag tag-editable">' + escapeHtml(t) + '<span class="tag-remove" onclick="removeTag(\'' + escapeHtml(t.replace(/'/g, "\\'")) + '\')">&times;</span></span>';
+  }).join('');
+  var machineHtml = machineTags.map(function(t) {
+    return '<span class="tag tag-editable tag-machine">' + escapeHtml(t) + '<span class="tag-remove" onclick="removeMachineTag(\'' + escapeHtml(t.replace(/'/g, "\\'")) + '\')">&times;</span></span>';
+  }).join('');
+
+  container.innerHTML = tagsHtml + machineHtml + '<input type="text" class="tag-input" placeholder="Add tag\u2026" onkeydown="handleTagKey(event)" />';
+
+  var input = container.querySelector('input');
+  if (input) input.focus();
 }
 
 function scrollToHighlight(id) {
@@ -716,19 +791,27 @@ function scrollToHighlight(id) {
 }
 
 function updateHeaderActions() {
-  const actions = document.querySelector('.article-actions');
+  const actions = document.getElementById('reader-toolbar-actions');
   if (!actions) return;
   const favBtn = actions.querySelector('button');
   if (favBtn) {
-    favBtn.className = articleNotes.isFavorite ? 'active-fav' : '';
-    favBtn.innerHTML = '<svg class="icon icon-sm"><use href="#i-' + (articleNotes.isFavorite ? 'heart' : 'heart-o') + '"/></svg> Favorite';
+    favBtn.className = 'toolbar-action-btn' + (articleNotes.isFavorite ? ' active-fav' : '');
+    favBtn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (articleNotes.isFavorite ? 'heart' : 'heart-o') + '"/></svg><span class="toolbar-action-label"> Star</span>';
   }
 }
 
 function handleTagKey(e) {
   handleTagInput(e,
     function() { if (!articleNotes.tags) articleNotes.tags = []; return articleNotes.tags; },
-    function() { saveNotes(); renderNotesPanel(); updateSidebarItem(activeFile); }
+    function() {
+      saveNotes(); updateSidebarItem(activeFile);
+      if (_tagEditMode) {
+        _tagEditMode = false;
+        toggleNotesFromHeader();
+      } else {
+        renderNotesPanel();
+      }
+    }
   );
 }
 
@@ -736,8 +819,26 @@ function removeTag(tag) {
   if (!articleNotes.tags) return;
   articleNotes.tags = articleNotes.tags.filter(t => t !== tag);
   saveNotes();
-  renderNotesPanel();
   updateSidebarItem(activeFile);
+  if (_tagEditMode) {
+    _tagEditMode = false;
+    toggleNotesFromHeader();
+  } else {
+    renderNotesPanel();
+  }
+}
+
+function removeMachineTag(tag) {
+  if (!articleNotes.machineTags) return;
+  articleNotes.machineTags = articleNotes.machineTags.filter(t => t !== tag);
+  saveNotes();
+  updateSidebarItem(activeFile);
+  if (_tagEditMode) {
+    _tagEditMode = false;
+    toggleNotesFromHeader();
+  } else {
+    renderNotesPanel();
+  }
 }
 
 // ---- Voice Notes (Web Speech API) ----

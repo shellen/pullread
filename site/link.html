@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Open in Pull Read</title>
+<meta name="description" content="Open this article in Pull Read, the local-first article reader for macOS.">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://pullread.com/link">
+<meta property="og:title" content="Open in Pull Read">
+<meta property="og:description" content="Open this article in Pull Read, the local-first article reader for macOS.">
+<meta property="og:image" content="https://pullread.com/og-image.png">
+<meta property="og:site_name" content="Pull Read">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --teal: #2a9d8f;
+    --teal-dark: #21867a;
+    --fg: #111111;
+    --body: #374151;
+    --muted: #6b7280;
+    --light: #9ca3af;
+    --bg: #fafaf9;
+    --white: #ffffff;
+    --border: #e5e7eb;
+    --border-light: #f3f4f6;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: rgba(250, 250, 249, 0.8);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    padding: 0 32px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 17px;
+    color: var(--fg);
+    text-decoration: none;
+    letter-spacing: -0.02em;
+  }
+
+  .nav-brand svg { flex-shrink: 0; }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    list-style: none;
+  }
+
+  .nav-links a {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: color 0.15s;
+    padding: 6px 14px;
+    border-radius: 8px;
+  }
+
+  .nav-links a:hover { color: var(--fg); }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 22px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 15px;
+    font-family: inherit;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border: none;
+    cursor: pointer;
+    letter-spacing: -0.01em;
+  }
+
+  .btn-primary {
+    background: var(--fg);
+    color: var(--white);
+  }
+
+  .btn-primary:hover {
+    background: #333;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  }
+
+  .btn-teal {
+    background: var(--teal);
+    color: var(--white);
+  }
+
+  .btn-teal:hover {
+    background: var(--teal-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  }
+
+  .btn-sm {
+    padding: 7px 16px;
+    font-size: 13px;
+    border-radius: 8px;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted);
+    padding: 10px 18px;
+  }
+
+  .btn-ghost:hover {
+    color: var(--fg);
+    background: rgba(0,0,0,0.04);
+  }
+
+  /* Card */
+  .link-page {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 100px 20px 60px;
+  }
+
+  .link-card {
+    max-width: 480px;
+    width: 100%;
+    background: var(--white);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    padding: 40px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+
+  .link-card .icon {
+    margin-bottom: 20px;
+  }
+
+  .link-card h1 {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 8px;
+  }
+
+  .link-card .status {
+    color: var(--muted);
+    font-size: 15px;
+    margin-bottom: 24px;
+  }
+
+  .link-card .article-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--body);
+    margin-bottom: 4px;
+    word-break: break-word;
+  }
+
+  .link-card .article-url {
+    font-size: 13px;
+    color: var(--light);
+    word-break: break-all;
+    margin-bottom: 24px;
+  }
+
+  .link-card .article-url a {
+    color: var(--light);
+    text-decoration: none;
+  }
+
+  .link-card .article-url a:hover {
+    color: var(--teal);
+  }
+
+  .link-card .actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .link-card .actions a {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2.5px solid var(--border);
+    border-top-color: var(--teal);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 16px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .hidden { display: none; }
+
+  /* Footer */
+  footer {
+    border-top: 1px solid var(--border-light);
+    padding: 36px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 1100px;
+    margin: 0 auto;
+    font-size: 13px;
+    color: var(--light);
+    width: 100%;
+  }
+
+  footer a {
+    color: var(--muted);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+
+  footer a:hover { color: var(--fg); }
+
+  .footer-links {
+    display: flex;
+    gap: 20px;
+    list-style: none;
+  }
+
+  @media (max-width: 640px) {
+    nav { padding: 0 20px; }
+    .nav-links { display: none; }
+    .link-card { padding: 32px 24px; }
+    footer {
+      flex-direction: column;
+      gap: 12px;
+      text-align: center;
+    }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-brand">
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+      <rect x="1" y="1" width="26" height="26" rx="6" fill="#2a9d8f"/>
+      <rect x="5" y="5" width="18" height="20" rx="2" fill="#fff"/>
+      <rect x="8" y="10" width="12" height="2" rx="1" fill="#444"/>
+      <rect x="8" y="14" width="12" height="2" rx="1" fill="#444"/>
+      <rect x="8" y="18" width="8" height="2" rx="1" fill="#444"/>
+      <path d="M17 3v6l2-1.5L21 9V3z" fill="#e76f51"/>
+    </svg>
+    Pull Read
+  </a>
+  <ul class="nav-links">
+    <li><a href="/">Home</a></li>
+    <li><a href="/releases">Releases</a></li>
+    <li><a href="/faq">FAQ</a></li>
+    <li><a href="https://github.com/shellen/pullread/releases/download/latest/PullRead.dmg" class="btn btn-sm btn-teal">Download</a></li>
+  </ul>
+</nav>
+
+<main class="link-page">
+  <div class="link-card">
+    <!-- Loading state: shown while attempting deep link -->
+    <div id="loading-state">
+      <div class="spinner"></div>
+      <h1>Opening in Pull Read&hellip;</h1>
+      <p class="status">Trying to open this article in the app.</p>
+    </div>
+
+    <!-- Fallback state: shown if app doesn't respond -->
+    <div id="fallback-state" class="hidden">
+      <div class="icon">
+        <svg width="48" height="48" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+          <rect x="1" y="1" width="26" height="26" rx="6" fill="#2a9d8f"/>
+          <rect x="5" y="5" width="18" height="20" rx="2" fill="#fff"/>
+          <rect x="8" y="10" width="12" height="2" rx="1" fill="#444"/>
+          <rect x="8" y="14" width="12" height="2" rx="1" fill="#444"/>
+          <rect x="8" y="18" width="8" height="2" rx="1" fill="#444"/>
+          <path d="M17 3v6l2-1.5L21 9V3z" fill="#e76f51"/>
+        </svg>
+      </div>
+      <h1>Read this in Pull Read</h1>
+      <p class="status">Save, highlight, and annotate articles locally on your Mac.</p>
+      <div id="article-info"></div>
+      <div class="actions">
+        <a id="try-open" href="#" class="btn btn-primary">Open in Pull Read</a>
+        <a id="source-link" href="#" class="btn btn-ghost">View original article</a>
+        <a href="https://github.com/shellen/pullread/releases/download/latest/PullRead.dmg" class="btn btn-ghost">Download Pull Read</a>
+      </div>
+    </div>
+
+    <!-- No URL state: shown if link params are missing -->
+    <div id="no-url-state" class="hidden">
+      <div class="icon">
+        <svg width="48" height="48" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+          <rect x="1" y="1" width="26" height="26" rx="6" fill="#2a9d8f"/>
+          <rect x="5" y="5" width="18" height="20" rx="2" fill="#fff"/>
+          <rect x="8" y="10" width="12" height="2" rx="1" fill="#444"/>
+          <rect x="8" y="14" width="12" height="2" rx="1" fill="#444"/>
+          <rect x="8" y="18" width="8" height="2" rx="1" fill="#444"/>
+          <path d="M17 3v6l2-1.5L21 9V3z" fill="#e76f51"/>
+        </svg>
+      </div>
+      <h1>Pull Read</h1>
+      <p class="status">This link is missing an article URL. It may have been shared incorrectly.</p>
+      <div class="actions">
+        <a href="/" class="btn btn-primary">Visit pullread.com</a>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <a href="https://alittledrive.com" style="font-weight: 600; letter-spacing: -0.01em;">A Little Drive</a>
+  <ul class="footer-links">
+    <li><a href="/privacy">Privacy</a></li>
+    <li><a href="/terms">Terms</a></li>
+    <li><a href="/releases">Releases</a></li>
+    <li><a href="/faq">FAQ</a></li>
+  </ul>
+</footer>
+
+<script>
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  var url = params.get('url');
+  var title = params.get('title') || '';
+
+  if (!url) {
+    document.getElementById('loading-state').classList.add('hidden');
+    document.getElementById('no-url-state').classList.remove('hidden');
+    return;
+  }
+
+  // Build the deep link
+  var deepLink = 'pullread://save?url=' + encodeURIComponent(url);
+  if (title) deepLink += '&title=' + encodeURIComponent(title);
+
+  // Attempt the deep link via hidden iframe (avoids navigation if app isn't installed)
+  var iframe = document.createElement('iframe');
+  iframe.style.display = 'none';
+  iframe.src = deepLink;
+  document.body.appendChild(iframe);
+
+  // Set up the fallback state
+  var infoEl = document.getElementById('article-info');
+  if (title) {
+    infoEl.innerHTML = '<p class="article-title">' + escapeHtml(title) + '</p>' +
+      '<p class="article-url"><a href="' + escapeHtml(url) + '">' + escapeHtml(truncateUrl(url)) + '</a></p>';
+  } else {
+    infoEl.innerHTML = '<p class="article-url"><a href="' + escapeHtml(url) + '">' + escapeHtml(truncateUrl(url)) + '</a></p>';
+  }
+
+  document.getElementById('try-open').href = deepLink;
+  document.getElementById('source-link').href = url;
+
+  // After 2.5 seconds, show fallback (app either opened or isn't installed)
+  setTimeout(function() {
+    document.getElementById('loading-state').classList.add('hidden');
+    document.getElementById('fallback-state').classList.remove('hidden');
+  }, 2500);
+
+  function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function truncateUrl(u) {
+    try {
+      var parsed = new URL(u);
+      var display = parsed.hostname + parsed.pathname;
+      return display.length > 60 ? display.substring(0, 57) + '...' : display;
+    } catch(e) {
+      return u.length > 60 ? u.substring(0, 57) + '...' : u;
+    }
+  }
+})();
+</script>
+
+</body>
+</html>

@@ -27,20 +27,24 @@ function providerLabel(provider) {
   return labels[provider] || provider;
 }
 
-function providerBadgeColor(provider) {
-  const colors = { anthropic: 'amber', openai: 'green', gemini: 'blue', openrouter: 'purple', apple: 'indigo' };
-  return colors[provider] || 'gray';
-}
-
-function summaryBadgesHtml(provider, model) {
-  let html = '<span class="badge badge-gray">Summary</span>';
-  if (provider) {
-    const color = providerBadgeColor(provider);
-    html += ' <span class="badge badge-' + color + '">' + escapeHtml(providerLabel(provider)) + '</span>';
-  }
-  if (model) {
-    html += ' <span class="badge badge-gray">' + escapeHtml(model) + '</span>';
-  }
+function summaryBlockHtml(provider, model, text) {
+  var label = provider ? providerLabel(provider) : '';
+  var sparkle = '<svg width="11" height="11" viewBox="0 0 16 16" fill="none">'
+    + '<path d="M8 1C8 1 9 5.5 11 7C12.5 8.2 15 8 15 8C15 8 12.5 8.2 11 9.5C9 11 8 15 8 15C8 15 7 11 5 9.5C3.5 8.2 1 8 1 8C1 8 3.5 8.2 5 7C7 5.5 8 1 8 1Z" fill="currentColor"/>'
+    + '</svg>';
+  var html = '<div class="summary-border">'
+    + '<div class="summary-label">Summary</div>'
+    + '<p class="summary-text" id="summary-text">' + escapeHtml(text) + '</p>'
+    + '<div class="summary-footer"><div class="summary-footer-left">'
+    + '<div class="attribution">' + sparkle + '<span>' + escapeHtml(label) + '</span></div>'
+    + '</div><div class="summary-actions">'
+    + '<button class="summary-icon-btn" onclick="regenerateSummary(this)" title="Regenerate">'
+    + '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5M8 2.5V5.5M8 2.5L10.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    + '</button>'
+    + '<button class="summary-icon-btn" onclick="dismissSummary()" title="Remove">'
+    + '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4.5 4.5L11.5 11.5M11.5 4.5L4.5 11.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>'
+    + '</button>'
+    + '</div></div></div>';
   return html;
 }
 
@@ -138,18 +142,23 @@ async function summarizeArticle() {
     // Insert summary into the DOM
     const existingSummary = content.querySelector('.article-summary');
     if (existingSummary) existingSummary.remove();
+    const existingDismissed = content.querySelector('.summary-dismissed');
+    if (existingDismissed) existingDismissed.remove();
 
     const summaryDiv = document.createElement('div');
     summaryDiv.className = 'article-summary';
-    summaryDiv.innerHTML = '<div class="summary-header"><div class="summary-header-left">'
-      + summaryBadgesHtml(lastSummaryProvider, lastSummaryModel)
-      + '</div><span class="summary-actions"><button onclick="hideSummary()" title="Hide summary"><svg class="icon icon-sm"><use href="#i-xmark"/></svg></button></span></div>'
-      + escapeHtml(data.summary);
+    summaryDiv.innerHTML = summaryBlockHtml(lastSummaryProvider, lastSummaryModel, data.summary);
+
+    const dismissedBar = document.createElement('div');
+    dismissedBar.className = 'summary-dismissed';
+    dismissedBar.innerHTML = '<span>Summary removed</span><button onclick="undismissSummary()">Undo</button>';
 
     const articleHeader = content.querySelector('.article-header');
     if (articleHeader) {
       articleHeader.after(summaryDiv);
+      summaryDiv.after(dismissedBar);
     } else {
+      content.prepend(dismissedBar);
       content.prepend(summaryDiv);
     }
 
@@ -164,18 +173,32 @@ async function summarizeArticle() {
   }
 }
 
-function hideSummary() {
-  const content = document.getElementById('content');
-  const summary = content.querySelector('.article-summary');
-  if (summary) summary.remove();
-  // Reset summarize button
-  const btn = document.getElementById('summarize-btn');
+function dismissSummary() {
+  var block = document.querySelector('.article-summary');
+  var bar = document.querySelector('.summary-dismissed');
+  if (block) block.style.display = 'none';
+  if (bar) bar.style.display = 'flex';
+  var btn = document.getElementById('summarize-btn');
   if (btn) {
     btn.innerHTML = '<svg class="icon icon-sm"><use href="#i-wand"/></svg> Summarize';
     btn.title = 'Summarize';
     btn.disabled = false;
     btn.onclick = null;
   }
+}
+
+function undismissSummary() {
+  var block = document.querySelector('.article-summary');
+  var bar = document.querySelector('.summary-dismissed');
+  if (block) block.style.display = '';
+  if (bar) bar.style.display = 'none';
+}
+
+function regenerateSummary(btn) {
+  btn.classList.add('summary-spinning');
+  var textEl = document.getElementById('summary-text');
+  if (textEl) textEl.classList.add('regenerating');
+  summarizeArticle();
 }
 
 // Modal focus management
@@ -208,6 +231,7 @@ function toggleShareDropdown(e) {
   panel.innerHTML = `
     <div class="share-group-label">Actions</div>
     <button onclick="copyArticleLink()"><svg class="share-icon" viewBox="0 0 640 512"><use href="#i-link"/></svg> Copy Link</button>
+    <button onclick="copyPullReadLink()"><svg class="share-icon" viewBox="0 0 640 512"><use href="#i-link"/></svg> Copy Pull Read Link</button>
     <button onclick="showExportMarkdownModal()"><svg class="share-icon" viewBox="0 0 640 512"><use href="#i-cloud-download"/></svg> Export Markdown</button>
     <button onclick="exportArticlePdf()"><svg class="share-icon" viewBox="0 0 640 512"><use href="#i-cloud-download"/></svg> Export PDF</button>
     <button onclick="startNotebookFromArticle()"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-pen"/></svg> Write About This</button>
@@ -215,8 +239,7 @@ function toggleShareDropdown(e) {
     <div class="share-group-label">Share to</div>
     <button onclick="prOpenExternal('https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}')"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-linkedin"/></svg> LinkedIn</button>
     <button onclick="prOpenExternal('https://bsky.app/intent/compose?text=${encodedText}')"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-bluesky"/></svg> Bluesky</button>
-    <button onclick="prOpenExternal('https://mastodon.social/share?text=${encodedText}')"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-mastodon"/></svg> Mastodon</button>
-    <button onclick="prOpenExternal('https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}')"><svg class="share-icon" viewBox="0 0 320 512"><use href="#i-facebook"/></svg> Facebook</button>
+    <button onclick="shareMastodon('${encodedText}')"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-mastodon"/></svg> Mastodon</button>
     <button onclick="prOpenExternal('https://www.threads.net/intent/post?text=${encodedText}')"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-threads"/></svg> Threads</button>
     <hr>
     <div class="share-group-label">Send</div>
@@ -268,6 +291,20 @@ function copyArticleLink() {
     const existing = document.querySelector('.share-dropdown-panel');
     if (existing) {
       const btn = existing.querySelector('button');
+      if (btn) { const orig = btn.innerHTML; btn.innerHTML = '<span class="share-icon">&#10003;</span> Copied!'; setTimeout(() => { btn.innerHTML = orig; }, 1200); }
+    }
+  });
+}
+
+function copyPullReadLink() {
+  const data = getShareData();
+  if (!data) return;
+  const prUrl = `https://pullread.com/link?url=${encodeURIComponent(data.url)}&title=${encodeURIComponent(data.title)}`;
+  navigator.clipboard.writeText(prUrl).then(() => {
+    const existing = document.querySelector('.share-dropdown-panel');
+    if (existing) {
+      const btns = existing.querySelectorAll('button');
+      const btn = btns[1];
       if (btn) { const orig = btn.innerHTML; btn.innerHTML = '<span class="share-icon">&#10003;</span> Copied!'; setTimeout(() => { btn.innerHTML = orig; }, 1200); }
     }
   });
@@ -560,6 +597,117 @@ async function doExportArticlePdf() {
   prPrintHtml(content);
 }
 
+function shareMastodon(encodedText) {
+  var server = localStorage.getItem('pr-mastodon-instance');
+  if (server) {
+    prOpenExternal('https://' + server + '/share?text=' + encodedText);
+  } else {
+    promptMastodonSetup(encodedText);
+  }
+}
+
+function promptMastodonSetup(encodedText) {
+  // Close any share dropdown
+  var panel = document.querySelector('.share-dropdown-panel');
+  if (panel) panel.remove();
+
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Mastodon Setup');
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+  overlay.innerHTML = '\
+    <div class="modal-card" onclick="event.stopPropagation()" style="max-width:400px">\
+      <h2>Mastodon Instance</h2>\
+      <p style="color:var(--muted);font-size:13px;margin-bottom:12px">Enter your Mastodon server to share articles there.</p>\
+      <input type="text" id="mastodon-setup-input" placeholder="e.g., xoxo.zone, mastodon.social" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:14px;font-family:inherit;box-sizing:border-box" autofocus>\
+      <div class="modal-actions">\
+        <button class="btn-secondary" onclick="this.closest(\'.modal-overlay\').remove()">Cancel</button>\
+        <button class="btn-primary" onclick="saveMastodonAndShare(\'' + encodedText + '\')">Save &amp; Share</button>\
+      </div>\
+    </div>\
+  ';
+  document.body.appendChild(overlay);
+  var input = overlay.querySelector('#mastodon-setup-input');
+  if (input) {
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') saveMastodonAndShare(encodedText);
+    });
+    input.focus();
+  }
+}
+
+function saveMastodonAndShare(encodedText) {
+  var input = document.getElementById('mastodon-setup-input');
+  var val = (input ? input.value : '').trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  if (!val) return;
+  localStorage.setItem('pr-mastodon-instance', val);
+  var overlay = input.closest('.modal-overlay');
+  if (overlay) overlay.remove();
+  prOpenExternal('https://' + val + '/share?text=' + encodedText);
+}
+
+function showQuoteSharePanel(quote, title, url) {
+  // Close any existing share panel
+  var existing = document.querySelector('.share-dropdown-panel');
+  if (existing) existing.remove();
+
+  var attribution = title ? ('\n\n\u2014 ' + title + (url ? ' ' + url : '')) : (url ? '\n\n' + url : '');
+  var shareText = '\u201c' + quote + '\u201d' + attribution;
+  var encodedText = encodeURIComponent(shareText);
+  var clipboardText = '\u201c' + quote + '\u201d' + (title ? ' \u2014 ' + title : '') + (url ? ' ' + url : '');
+
+  var panel = document.createElement('div');
+  panel.className = 'share-dropdown-panel quote-share-panel';
+  panel.onclick = function(ev) { ev.stopPropagation(); };
+
+  var html = '';
+  html += '<div class="share-group-label">Quote</div>';
+  html += '<div class="quote-share-preview">\u201c' + escapeHtml(quote.length > 140 ? quote.slice(0, 140) + '\u2026' : quote) + '\u201d</div>';
+  html += '<button onclick="copyQuoteToClipboard(this)"><svg class="share-icon" viewBox="0 0 640 512"><use href="#i-link"/></svg> Copy Quote</button>';
+  html += '<hr>';
+  html += '<div class="share-group-label">Share to</div>';
+  html += '<button onclick="prOpenExternal(\'https://www.linkedin.com/sharing/share-offsite/?url=' + encodeURIComponent(url) + '\')"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-linkedin"/></svg> LinkedIn</button>';
+  html += '<button onclick="prOpenExternal(\'https://bsky.app/intent/compose?text=' + encodedText + '\')"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-bluesky"/></svg> Bluesky</button>';
+  html += '<button onclick="shareMastodon(\'' + encodedText + '\')"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-mastodon"/></svg> Mastodon</button>';
+  html += '<button onclick="prOpenExternal(\'https://www.threads.net/intent/post?text=' + encodedText + '\')"><svg class="share-icon" viewBox="0 0 448 512"><use href="#i-threads"/></svg> Threads</button>';
+  html += '<hr>';
+  html += '<div class="share-group-label">Send</div>';
+  html += '<button onclick="prOpenExternal(\'mailto:?subject=' + encodeURIComponent(title) + '&body=' + encodedText + '\')"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-envelope"/></svg> Email</button>';
+  html += '<button onclick="prOpenExternal(\'sms:&body=' + encodedText + '\')"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-comment"/></svg> Messages</button>';
+
+  panel.innerHTML = html;
+  panel.setAttribute('data-clipboard-text', clipboardText);
+
+  // Position near the selection
+  var sel = window.getSelection();
+  var pane = document.getElementById('content-scroll');
+  if (sel && sel.rangeCount > 0 && pane) {
+    var range = sel.getRangeAt(0);
+    var rect = range.getBoundingClientRect();
+    var paneRect = pane.getBoundingClientRect();
+    panel.style.position = 'absolute';
+    panel.style.left = Math.max(10, rect.left - paneRect.left) + 'px';
+    panel.style.top = (rect.bottom - paneRect.top + pane.scrollTop + 8) + 'px';
+    pane.appendChild(panel);
+  } else {
+    document.body.appendChild(panel);
+  }
+}
+
+function copyQuoteToClipboard(btn) {
+  var panel = btn.closest('.quote-share-panel');
+  var text = panel ? panel.getAttribute('data-clipboard-text') : '';
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(function() {
+    var orig = btn.innerHTML;
+    btn.innerHTML = '<span class="share-icon">&#10003;</span> Copied!';
+    setTimeout(function() { btn.innerHTML = orig; }, 1200);
+  });
+}
+
 // Close share dropdown when clicking outside
 document.addEventListener('click', function(e) {
   const panel = document.querySelector('.share-dropdown-panel');
@@ -604,7 +752,7 @@ async function batchAutotagAll(force) {
       await loadAnnotationsIndex();
       renderFileList();
       // Refresh the explore page if open
-      setTimeout(function() { var ep = document.querySelector('.explore-tabs'); if (ep) showTagCloud(); }, 2000);
+      setTimeout(function() { var ep = document.querySelector('.explore-tabs'); if (ep) goHome(); }, 2000);
     }
   } catch (err) {
     alert('Auto-tag request failed.');

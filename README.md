@@ -65,12 +65,13 @@ PullRead connects to bookmark services like Instapaper, Pinboard, Raindrop, and 
 - **Retry mechanism** - Failed extractions are tracked and can be retried later
 - **Podcast support** - Saves episode metadata with audio links (perfect for show notes)
 - **Built-in article reader** - Two-pane local web UI with full keyboard navigation, highlights, notes, and tags
+- **Sources & tags browsers** - Browse articles by feed or topic with sortable sources (Recent, A–Z, Count)
 - **Homepage dashboard** - Card-based landing page with continue reading, reviews, favorites, and recent articles
 - **Search operators** - Filter articles with `is:favorite`, `tag:tech`, `has:summary`, AND/OR logic, and more
 - **Weekly reviews** - AI-generated summaries of your recent reading (daily/weekly schedule or on-demand)
 - **Cross-platform desktop app** - Tauri-based menu bar app with bundled CLI (macOS first, Windows/Linux planned)
 - **Article summaries** - On-demand summarization with 5 LLM providers, shown with provider/model badges
-- **Text-to-speech** - Listen to articles via browser TTS (free), Kokoro local AI, OpenAI, or ElevenLabs
+- **Text-to-speech** - Listen to articles via browser TTS (free), OpenAI, or ElevenLabs
 - **Voice notes** - Record article notes using your microphone via Web Speech API
 - **Export markdown** - Share articles as .md with optional highlights, notes, summary, and tags
 - **Cloud-sync friendly** - Output folder can be Dropbox, iCloud, Google Drive, etc.
@@ -489,7 +490,7 @@ On other platforms, these features degrade gracefully (API keys in config file, 
 
 ### Article Reader
 
-The built-in article reader (**View Articles** in the menu bar) is a two-pane web UI served on a dynamic localhost port. It supports themes (Light, Dark, Sepia), multiple font families, adjustable text sizes, highlights, notes, and full keyboard navigation.
+The built-in article reader (**View Articles** in the menu bar) is a two-pane web UI served on a dynamic localhost port. It supports themes (Light, Dark, Sepia, High Contrast), multiple reading fonts (Inter, Lora, Source Serif, Work Sans, Literata, OpenDyslexic), adjustable text sizes, highlights, notes, and full keyboard navigation. App chrome (toolbars, menus, sidebar) uses Work Sans regardless of your reading font choice.
 
 #### Highlights & Notes
 
@@ -504,6 +505,16 @@ Select any text in an article to see a floating toolbar with highlight color opt
 - **Favorites** mark articles with a heart icon in the sidebar
 - Sidebar items show indicator dots for favorites (heart), highlights (yellow), notes (blue), and summaries
 - Feed source and clickable author names shown in article metadata
+
+#### Sources & Tags
+
+Click **Sources** or **Tags** in the sidebar to browse articles grouped by feed or topic. The Sources drawer includes sort buttons:
+
+- **Recent** — feeds with the most recently bookmarked articles first (default)
+- **A–Z** — alphabetical by feed name
+- **Count** — feeds with the most articles first
+
+Your sort preference is remembered between sessions. Each source shows its favicon; sources without an icon display a neutral placeholder.
 
 #### Summaries
 
@@ -572,7 +583,6 @@ Listen to articles read aloud with multiple TTS providers:
 | Provider | Cost | Notes |
 |----------|------|-------|
 | **Browser** (default) | Free | Built-in speech synthesis, works offline |
-| **Kokoro** | Free | Local AI voice (~86MB model, auto-downloads on first use) |
 | **OpenAI** | ~$0.15/article | Cloud API, bring your own key |
 | **ElevenLabs** | ~$1.20-2.40/article | Cloud API, bring your own key |
 
@@ -591,21 +601,30 @@ Share articles as markdown files with optional content:
 
 #### Keyboard Shortcuts
 
+Shortcuts follow Google Reader conventions where possible.
+
 | Key | Action |
 |-----|--------|
-| `j` / `Right Arrow` | Next article |
-| `k` / `Left Arrow` | Previous article |
-| `Up Arrow` / `Down Arrow` | Scroll content (navigates to prev/next article at top/bottom) |
+| `j` / `n` | Next article |
+| `k` / `p` | Previous article |
+| `Space` | Page down (next article at bottom) |
+| `Shift+Space` | Page up |
+| `Up` / `Down` | Scroll content (navigates at boundaries) |
+| `s` | Star / unstar article |
+| `m` | Toggle read / unread |
+| `v` | Open original in new tab |
+| `r` | Refresh article list |
+| `Shift+A` | Mark all visible as read |
 | `/` | Focus search (opens sidebar if collapsed) |
 | `[` | Toggle sidebar |
 | `h` | Highlight selected text (yellow) |
-| `n` | Toggle article notes panel |
+| `Shift+N` | Toggle article notes panel |
+| `a` | Add article by URL |
 | `f` | Toggle focus mode |
-| `p` | Print article |
+| `?` | Show keyboard shortcuts |
 | `Escape` | Clear search / dismiss popover |
-| `Enter` | Reload current article |
 
-Arrow key scrolling is boundary-aware: when you reach the bottom of an article and press Down, or the top and press Up, it automatically advances to the next or previous article.
+**Audio playback** (when player is active): `>` / `<` skip tracks, `Shift+S` cycles speed, `Shift+M` toggles mini player.
 
 ### URL Scheme
 
@@ -694,7 +713,7 @@ pullread/
 │   ├── storage.ts                 # SQLite-backed sync state
 │   ├── summarizer.ts              # Article summarization (5 LLM providers)
 │   ├── autotagger.ts              # Machine tagging using LLM providers
-│   ├── tts.ts                     # Text-to-speech (Kokoro, OpenAI, ElevenLabs)
+│   ├── tts.ts                     # Text-to-speech (OpenAI, ElevenLabs)
 │   ├── review.ts                  # Weekly review generation
 │   ├── cookies.ts                 # Site login cookie management
 │   └── *.test.ts                  # Unit tests (194 tests across 7 suites)
@@ -742,8 +761,6 @@ pullread/
 ├── scripts/
 │   ├── build-tauri.sh             # Full Tauri build pipeline
 │   ├── prepare-sidecar.sh         # Copy Bun binary with target triple naming
-│   ├── download-kokoro-model.sh   # Downloads Kokoro TTS model for bundling
-│   ├── bundle-kokoro.ts           # Copies Kokoro runtime files to Tauri resources
 │   ├── embed-viewer.ts            # Inlines viewer modules into viewer-html.ts
 │   ├── fetch-gutenberg.ts         # Downloads Project Gutenberg books for break reading
 │   └── setup-signing-secrets.sh   # Configures GitHub Actions signing secrets
@@ -772,8 +789,7 @@ pullread/
 ├── highlights.json                # Article highlights
 ├── notes.json                     # Article notes, tags, and annotations
 ├── inbox.json                     # URLs saved via pullread:// scheme
-├── tts-cache/                     # Cached TTS audio files (mp3/wav)
-└── kokoro-model/                  # Local Kokoro TTS model (~86MB)
+└── tts-cache/                     # Cached TTS audio files (mp3/wav)
 ```
 
 ### Data Flow
@@ -812,6 +828,20 @@ feeds.json
                ~/Dropbox/Articles/
                └── 2024-01-29-article-title.md
 ```
+
+See [docs/processing-flow.d2](docs/processing-flow.d2) for the article processing pipeline.
+
+### Feed Content Preservation
+
+Many RSS, Atom, and RDF feeds include the full article HTML in their `content:encoded` or `<content>` fields. PullRead preserves this raw HTML on the `contentHtml` field of each feed entry and compares it against the separately web-extracted content — whichever produces more markdown wins.
+
+**Why this matters:** Some sites (notably Substack) serve the complete article body in their feed XML but return minimal or paywalled content when PullRead fetches the webpage directly. Without feed content preservation, these articles would appear empty or require a manual "re-fetch from source."
+
+**Rules for feed parsers:**
+- All feed format parsers (Atom, RSS, RDF, JSON Feed) **must** preserve raw HTML content when it exceeds 200 characters
+- The content is stored on `FeedEntry.contentHtml` as a raw HTML string
+- The ingestion pipeline (`index.ts`) converts both feed HTML and web-extracted HTML to markdown via `htmlToMarkdown()`, then keeps whichever is longer
+- Never strip HTML from feed content before evaluating its length — `extractTextFromHtml()` is for generating short annotation/description text only, not for content comparison
 
 ### Storage Format
 
@@ -870,7 +900,6 @@ cd src-tauri && cargo tauri dev
 | `@mozilla/readability` | Article content extraction |
 | `linkedom` | DOM simulation for Readability |
 | `turndown` | HTML to Markdown conversion |
-| `kokoro-js` | Local TTS voice synthesis (optional) |
 
 **Tauri Shell (Rust):**
 
@@ -999,8 +1028,7 @@ bash scripts/build-tauri.sh
 # 2. Embed viewer HTML
 # 3. Compile Bun CLI binary
 # 4. Copy to src-tauri/binaries/ with target triple naming
-# 5. Download Kokoro TTS model (~92MB)
-# 6. Code-sign sidecar with entitlements (macOS, if APPLE_SIGNING_IDENTITY set)
+# 5. Code-sign sidecar with entitlements (macOS, if APPLE_SIGNING_IDENTITY set)
 # 7. cargo tauri build (compiles Rust, packages DMG)
 ```
 
@@ -1158,7 +1186,7 @@ PullRead is a tool that fetches, extracts, and saves web content at your directi
 
 ### Privacy
 
-PullRead is local-first by design. Articles, highlights, notes, and reading history stay on your machine. Data is only sent to third parties when you explicitly use optional AI features (summaries, auto-tagging, reviews, cloud TTS), at which point article text is transmitted to your selected provider using your own API key. Browser TTS, Kokoro local TTS, and all reading features work entirely on-device. See [Privacy Policy](https://pullread.com/privacy) for details.
+PullRead is local-first by design. Articles, highlights, notes, and reading history stay on your machine. Data is only sent to third parties when you explicitly use optional AI features (summaries, auto-tagging, reviews, cloud TTS), at which point article text is transmitted to your selected provider using your own API key. Browser TTS and all reading features work entirely on-device. See [Privacy Policy](https://pullread.com/privacy) for details.
 
 ### Third-party services
 
@@ -1181,7 +1209,6 @@ See [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES) for open-source license attributi
 - [Mozilla Readability](https://github.com/mozilla/readability) - The excellent article extraction algorithm
 - [Turndown](https://github.com/mixmark-io/turndown) - HTML to Markdown conversion
 - [fast-xml-parser](https://github.com/NaturalIntelligence/fast-xml-parser) - Fast and reliable XML parsing
-- [Kokoro](https://github.com/hexgrad/kokoro) - High-quality local text-to-speech model
 - [Bun](https://bun.sh) - Fast JavaScript runtime used to build standalone binaries
 - [Tauri](https://tauri.app) - Lightweight cross-platform desktop app framework
 

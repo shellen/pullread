@@ -10,9 +10,21 @@ let ttsGenerating = false;
 let ttsProgressTimer = null;
 let _ttsChunkSession = null; // { id, totalChunks, currentChunk, elapsedTime }
 var _ttsNextPrefetch = null;  // { filename, sessionId, totalChunks, currentChunk, done }
-var podcastAutoplay = localStorage.getItem('pr-podcast-autoplay') === '1';
+var _browserTTSState = null;  // { text, estimatedSeconds, startTime, seekOffset, voice, lang }
+// Migrate old boolean to tri-state; 'off' | 'podcasts' | 'everything'
+var autoplayMode = localStorage.getItem('pr-autoplay-mode') || (localStorage.getItem('pr-podcast-autoplay') === '1' ? 'podcasts' : 'off');
 
 const TTS_SPEEDS = [0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.15, 1.2, 1.3, 1.5, 1.75, 2.0];
+
+/** Deterministic hash of a string to an index in [0, max). djb2 algorithm. */
+function hashStringToIndex(str, max) {
+  var hash = 5381;
+  for (var i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash) + str.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return Math.abs(hash) % max;
+}
 
 function playCueSound() {
   try { new Audio('/audio/cue.webm').play(); } catch(e) {}
@@ -165,90 +177,24 @@ async function addToTTSQueue(filename) {
   }
   ttsQueue.push(item);
   renderAudioPlayer();
-  // Auto-play if this is the first item in the queue
-  if (ttsQueue.length === 1) playTTSItem(0);
+  // Auto-play if nothing is currently playing
+  if (!ttsPlaying && !ttsGenerating) playTTSItem(ttsQueue.length - 1);
 }
 
 function renderAudioPlayer() {
-  const panel = document.getElementById('audio-player');
-  if (!panel) return;
-
-  var app = document.querySelector('.app');
-
-  if (ttsQueue.length === 0) {
-    panel.classList.add('hidden');
-    if (app) app.classList.remove('has-bottom-bar');
-    updateSidebarAudioIndicators();
-    updateArticleNowPlaying();
-    return;
+  var player = document.querySelector('pr-player');
+  if (player) {
+    player.update({
+      queue: ttsQueue,
+      currentIndex: ttsCurrentIndex,
+      playing: ttsPlaying,
+      generating: ttsGenerating,
+      speed: ttsSpeed,
+    });
   }
-  panel.classList.remove('hidden');
-  if (app) app.classList.add('has-bottom-bar');
-
-  const label = document.getElementById('audio-now-label');
-  const status = document.getElementById('audio-now-status');
-  const playBtn = document.getElementById('tts-play-btn');
-
-  var currentItem = (ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length) ? ttsQueue[ttsCurrentIndex] : null;
-  label.textContent = currentItem ? currentItem.title : 'No article playing';
-
-  // Update artwork: article image > favicon > volume icon
-  var artworkEl = document.getElementById('bottom-bar-artwork');
-  if (artworkEl) {
-    var artSrc = '';
-    if (currentItem) {
-      if (currentItem.image) artSrc = currentItem.image;
-      else if (currentItem.domain) artSrc = '/favicons/' + encodeURIComponent(currentItem.domain) + '.png';
-    }
-    var fallbackIcon = '<svg class="bottom-bar-icon" aria-hidden="true"><use href="#i-volume"/></svg>';
-    if (artSrc) {
-      var img = new Image();
-      img.src = artSrc;
-      img.alt = '';
-      img.onerror = function() { artworkEl.innerHTML = fallbackIcon; };
-      artworkEl.innerHTML = '';
-      artworkEl.appendChild(img);
-    } else {
-      artworkEl.innerHTML = fallbackIcon;
-    }
-  }
-
-  if (ttsGenerating) {
-    status.textContent = 'Generating\u2026';
-  } else if (ttsPlaying) {
-    status.textContent = 'Playing';
-  } else if (ttsCurrentIndex >= 0) {
-    status.textContent = 'Paused';
-  } else {
-    status.textContent = '';
-  }
-
-  playBtn.innerHTML = ttsPlaying
-    ? '<svg><use href="#i-pause"/></svg>'
-    : '<svg><use href="#i-play"/></svg>';
-
-  // Render queue
-  const queueSection = document.getElementById('audio-queue-section');
-  const queueList = document.getElementById('audio-queue-list');
-  var queueToggle = document.getElementById('bottom-bar-queue-toggle');
-  if (ttsQueue.length > 1) {
-    if (queueToggle) queueToggle.classList.add('active');
-    queueList.innerHTML = ttsQueue.map((item, i) =>
-      '<div class="audio-queue-item' + (i === ttsCurrentIndex ? ' playing' : '') + '" onclick="playTTSItem(' + i + ')">'
-      + '<span style="font-size:10px;color:var(--muted);width:14px;text-align:center">' + (i === ttsCurrentIndex ? '&#9654;' : (i + 1)) + '</span>'
-      + '<span class="queue-title">' + escapeHtml(item.title) + '</span>'
-      + '<button class="queue-remove" onclick="event.stopPropagation();removeTTSQueueItem(' + i + ')" title="Remove">&times;</button>'
-      + '</div>'
-    ).join('');
-  } else {
-    if (queueToggle) queueToggle.classList.remove('active');
-    queueSection.style.display = 'none';
-  }
-
   updateListenButtonState();
   updateSidebarAudioIndicators();
   updateArticleNowPlaying();
-  renderMiniMode();
   saveTTSState();
 }
 
@@ -317,6 +263,7 @@ async function playTTSItem(index) {
   ttsCurrentIndex = index;
   if (index < 0 || index >= ttsQueue.length) return;
 
+  playCueSound();
   const item = ttsQueue[index];
   ttsPlaying = true;
   renderAudioPlayer();
@@ -331,7 +278,7 @@ async function playTTSItem(index) {
   await loadTTSSettings();
 
   if (ttsProvider === 'browser') {
-    await playBrowserTTS(item.filename);
+    await playBrowserTTS(item.filename, item.domain);
   } else {
     await playCloudTTS(item.filename);
   }
@@ -348,7 +295,7 @@ async function loadTTSSettings() {
   } catch { ttsProvider = 'browser'; }
 }
 
-async function playBrowserTTS(filename) {
+async function playBrowserTTS(filename, domain) {
   const synth = window.speechSynthesis;
   if (!synth) {
     showToast('Speech synthesis not available in this browser.');
@@ -369,7 +316,11 @@ async function playBrowserTTS(filename) {
   const ttsText = (meta && meta.title ? meta.title + '\n\n' : '') + body;
   const plainText = stripMarkdownForTTS(ttsText);
 
-  // Cancel any existing
+  // Detach old utterance handlers before cancel to prevent stale onend/onerror
+  if (ttsSynthUtterance) {
+    ttsSynthUtterance.onend = null;
+    ttsSynthUtterance.onerror = null;
+  }
   synth.cancel();
 
   const utterance = new SpeechSynthesisUtterance(plainText);
@@ -378,48 +329,171 @@ async function playBrowserTTS(filename) {
   // fall back to browser locale
   var articleLang = document.querySelector('.content-wrap')?.getAttribute('lang');
   utterance.lang = articleLang || navigator.language || 'en-US';
-  ttsSynthUtterance = utterance;
+  var savedVoice = localStorage.getItem('pr-tts-browser-voice') || '';
+  var browserType = localStorage.getItem('pr-tts-browser-type') || 'google';
+  var sysVoices = synth.getVoices();
+
+  // Filter to platform type
+  var platformVoices = sysVoices.filter(function(v) {
+    return browserType === 'google' ? v.name.indexOf('Google') === 0 : v.name.indexOf('Google') !== 0;
+  });
+
+  // Try saved voice first
+  var match = savedVoice ? platformVoices.find(function(v) { return v.name === savedVoice; }) : null;
+
+  // If saved voice doesn't match article language, find a better one
+  var langPrefix = (articleLang || '').split('-')[0];
+  if (match && langPrefix && langPrefix !== 'en') {
+    var langMatch = platformVoices.find(function(v) { return v.lang.indexOf(langPrefix) === 0; });
+    if (langMatch) match = langMatch;
+  }
+
+  // If no saved voice, pick first voice matching article language
+  if (!match && langPrefix) {
+    match = platformVoices.find(function(v) { return v.lang.indexOf(langPrefix) === 0; });
+  }
+
+  // Final fallback: first platform voice, then any voice
+  if (!match && platformVoices.length > 0) match = platformVoices[0];
+  if (!match && sysVoices.length > 0) match = sysVoices[0];
+
+  // Randomize voice per source domain if enabled
+  var randomize = localStorage.getItem('pr-tts-randomize-voices') === '1';
+  var isEnglish = !langPrefix || langPrefix === 'en';
+  if (randomize && isEnglish && domain) {
+    // Prefer Premium/Enhanced voices for higher quality
+    var qualityVoices = platformVoices.filter(function(v) {
+      return v.lang.indexOf('en') === 0 &&
+        (v.name.indexOf('(Premium)') !== -1 || v.name.indexOf('(Enhanced)') !== -1);
+    });
+    if (qualityVoices.length === 0) {
+      qualityVoices = platformVoices.filter(function(v) { return v.lang.indexOf('en') === 0; });
+    }
+    if (qualityVoices.length > 0) {
+      match = qualityVoices[hashStringToIndex(domain, qualityVoices.length)];
+    }
+  }
+
+  if (match) utterance.voice = match;
 
   // Estimate total duration (browser TTS doesn't give real progress)
   const estimatedWords = plainText.split(/\s+/).length;
-  const estimatedSeconds = estimatedWords / (150 * ttsSpeed); // ~150 wpm base
-  let startTime = Date.now();
+  const estimatedSeconds = estimatedWords / (180 * ttsSpeed); // ~180 wpm base
+
+  _browserTTSState = {
+    text: plainText,
+    estimatedSeconds: estimatedSeconds,
+    startTime: null,
+    seekOffset: 0,
+    voice: match,
+    lang: utterance.lang,
+  };
+
+  _startBrowserUtterance(plainText, 0);
+}
+
+function _startBrowserProgressTimer() {
+  clearInterval(ttsProgressTimer);
+  ttsProgressTimer = setInterval(function() {
+    var state = _browserTTSState;
+    if (!state || !state.startTime) return;
+    var player = document.querySelector('pr-player');
+    if (player && player._dragging) return;
+
+    var elapsed = (Date.now() - state.startTime) / 1000;
+    var overallPct, totalEst;
+
+    if (state.lastBoundaryPct > 0) {
+      overallPct = (state.seekOffset + state.lastBoundaryPct * (1 - state.seekOffset)) * 100;
+      totalEst = elapsed / state.lastBoundaryPct;
+      // Blend with WPM estimate until enough boundary data accumulates
+      if (state.lastBoundaryPct < 0.05) {
+        totalEst = state.estimatedSeconds;
+      }
+    } else {
+      var baseTime = state.seekOffset * state.estimatedSeconds;
+      overallPct = Math.min(100, ((baseTime + elapsed) / state.estimatedSeconds) * 100);
+      totalEst = state.estimatedSeconds;
+    }
+
+    var currentTime = state.seekOffset * totalEst + elapsed;
+    document.getElementById('tts-progress').style.width = Math.min(100, overallPct) + '%';
+    document.getElementById('tts-time-current').textContent = formatTime(currentTime);
+    document.getElementById('tts-time-total').textContent = formatTime(totalEst);
+  }, 200);
+}
+
+function _startBrowserUtterance(text, seekOffset) {
+  var synth = window.speechSynthesis;
+  var state = _browserTTSState;
+  if (!state) return;
+
+  clearInterval(ttsProgressTimer);
+  // Detach old utterance handlers before cancel to prevent stale onend/onerror
+  if (ttsSynthUtterance) {
+    ttsSynthUtterance.onend = null;
+    ttsSynthUtterance.onerror = null;
+  }
+  synth.cancel();
+
+  var utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = ttsSpeed;
+  utterance.lang = state.lang;
+  if (state.voice) utterance.voice = state.voice;
+  ttsSynthUtterance = utterance;
+  state.seekOffset = seekOffset;
 
   utterance.onstart = function() {
-    playCueSound();
+    clearTimeout(state._watchdog);
     stopListenLoading();
     ttsPlaying = true;
-    startTime = Date.now();
+    state.startTime = Date.now();
     renderAudioPlayer();
-    document.getElementById('tts-time-total').textContent = formatTime(estimatedSeconds);
-    ttsProgressTimer = setInterval(() => {
-      const elapsed = (Date.now() - startTime) / 1000;
-      const pct = Math.min(100, (elapsed / estimatedSeconds) * 100);
-      document.getElementById('tts-progress').style.width = pct + '%';
-      document.getElementById('tts-time-current').textContent = formatTime(elapsed);
-    }, 200);
+    document.getElementById('tts-time-total').textContent = '~' + formatTime(state.estimatedSeconds);
+    _startBrowserProgressTimer();
+  };
+
+  state.lastBoundaryPct = 0;
+  state.currentTextLen = text.length;
+  utterance.onboundary = function(e) {
+    if (e.name === 'word') {
+      state.lastBoundaryPct = e.charIndex / state.currentTextLen;
+    }
   };
 
   utterance.onend = function() {
+    clearTimeout(state._watchdog);
     clearInterval(ttsProgressTimer);
     ttsPlaying = false;
     ttsSynthUtterance = null;
+    _browserTTSState = null;
     document.getElementById('tts-progress').style.width = '100%';
     renderAudioPlayer();
-    // Auto-play next
     if (ttsCurrentIndex + 1 < ttsQueue.length) {
-      setTimeout(() => playTTSItem(ttsCurrentIndex + 1), 500);
+      setTimeout(function() { playTTSItem(ttsCurrentIndex + 1); }, 500);
+    } else {
+      autoplayNext(ttsQueue[ttsCurrentIndex] ? ttsQueue[ttsCurrentIndex].filename : '');
     }
   };
 
   utterance.onerror = function() {
+    clearTimeout(state._watchdog);
     clearInterval(ttsProgressTimer);
     ttsPlaying = false;
     ttsSynthUtterance = null;
+    _browserTTSState = null;
     renderAudioPlayer();
   };
 
   synth.speak(utterance);
+
+  // Watchdog: retry if onstart never fires (browser speech can silently fail)
+  state._watchdog = setTimeout(function() {
+    if (state === _browserTTSState && !state.startTime) {
+      synth.cancel();
+      synth.speak(utterance);
+    }
+  }, 2000);
 }
 
 async function playCloudTTS(filename) {
@@ -439,8 +513,9 @@ async function playCloudTTS(filename) {
     if (!startRes.ok) {
       const err = await startRes.json().catch(function() { return { error: 'TTS failed' }; });
       if (err.fallback === 'browser') {
-        console.warn('Kokoro unavailable, falling back to browser TTS:', err.error);
-        await playBrowserTTS(filename);
+        console.warn('Server TTS unavailable, falling back to browser TTS:', err.error);
+        var fallbackItem = ttsQueue[ttsCurrentIndex];
+        await playBrowserTTS(filename, fallbackItem ? fallbackItem.domain : '');
         return;
       }
       stopListenLoading();
@@ -465,6 +540,7 @@ async function playCloudTTS(filename) {
       currentChunk: 0,
       elapsedTime: 0,
       estimatedTotalDuration: 0,
+      chunkDurations: [],
     };
 
     ttsPlaying = true;
@@ -490,16 +566,17 @@ async function playCloudTTSCached(filename) {
     });
 
     audio.addEventListener('playing', function() {
-      playCueSound();
       stopListenLoading();
       ttsPlaying = true;
       renderAudioPlayer();
-      // Cached playback means Kokoro is idle — pre-generate next queue item
+      // Cached playback — pre-generate next queue item
       ttsPrefetchNextQueueItem();
     });
 
     audio.addEventListener('timeupdate', function() {
       if (!audio.duration) return;
+      var player = document.querySelector('pr-player');
+      if (player && player._dragging) return;
       var pct = Math.min(100, (audio.currentTime / audio.duration) * 100);
       document.getElementById('tts-progress').style.width = pct + '%';
       document.getElementById('tts-time-current').textContent = formatTime(audio.currentTime);
@@ -513,6 +590,8 @@ async function playCloudTTSCached(filename) {
       renderAudioPlayer();
       if (ttsCurrentIndex + 1 < ttsQueue.length) {
         setTimeout(function() { playTTSItem(ttsCurrentIndex + 1); }, 500);
+      } else {
+        autoplayNext(ttsQueue[ttsCurrentIndex] ? ttsQueue[ttsCurrentIndex].filename : '');
       }
     });
 
@@ -551,11 +630,9 @@ async function playPodcastAudio(item) {
       }
     });
 
-    var _cuePlayed = false;
     audio.addEventListener('playing', function() {
       if (ttsAudio !== audio) return;
       stopListenLoading();
-      if (!_cuePlayed) { _cuePlayed = true; playCueSound(); }
       ttsPlaying = true;
       renderAudioPlayer();
     });
@@ -564,6 +641,8 @@ async function playPodcastAudio(item) {
     audio.addEventListener('timeupdate', function() {
       if (ttsAudio !== audio) return;
       if (!audio.duration) return;
+      var player = document.querySelector('pr-player');
+      if (player && player._dragging) return;
       var pct = Math.min(100, (audio.currentTime / audio.duration) * 100);
       document.getElementById('tts-progress').style.width = pct + '%';
       document.getElementById('tts-time-current').textContent = formatTime(audio.currentTime);
@@ -581,8 +660,8 @@ async function playPodcastAudio(item) {
       renderAudioPlayer();
       if (ttsCurrentIndex + 1 < ttsQueue.length) {
         setTimeout(function() { playTTSItem(ttsCurrentIndex + 1); }, 500);
-      } else if (podcastAutoplay) {
-        autoplayNextPodcast(item.filename);
+      } else {
+        autoplayNext(item.filename);
       }
     });
 
@@ -605,13 +684,19 @@ async function playPodcastAudio(item) {
   }
 }
 
-/** Find and play the next podcast after the current one finishes */
-function autoplayNextPodcast(currentFilename) {
-  var podcasts = allFiles.filter(function(f) {
-    return f.enclosureUrl && f.enclosureType && f.enclosureType.startsWith('audio/');
-  });
-  var currentIdx = podcasts.findIndex(function(f) { return f.filename === currentFilename; });
-  var next = currentIdx >= 0 && currentIdx + 1 < podcasts.length ? podcasts[currentIdx + 1] : null;
+/** Auto-play the next item based on autoplayMode setting */
+function autoplayNext(currentFilename) {
+  if (autoplayMode === 'off') return;
+  var candidates;
+  if (autoplayMode === 'podcasts') {
+    candidates = allFiles.filter(function(f) {
+      return f.enclosureUrl && f.enclosureType && f.enclosureType.startsWith('audio/');
+    });
+  } else {
+    candidates = allFiles;
+  }
+  var currentIdx = candidates.findIndex(function(f) { return f.filename === currentFilename; });
+  var next = currentIdx >= 0 && currentIdx + 1 < candidates.length ? candidates[currentIdx + 1] : null;
   if (!next) return;
   setTimeout(function() { addToTTSQueue(next.filename); }, 500);
 }
@@ -722,6 +807,8 @@ async function ttsPlayNextChunk(index, seekPct) {
     renderAudioPlayer();
     if (ttsCurrentIndex + 1 < ttsQueue.length) {
       setTimeout(function() { playTTSItem(ttsCurrentIndex + 1); }, 500);
+    } else {
+      autoplayNext(ttsQueue[ttsCurrentIndex] ? ttsQueue[ttsCurrentIndex].filename : '');
     }
     return;
   }
@@ -739,8 +826,15 @@ async function ttsPlayNextChunk(index, seekPct) {
       if (session !== _ttsChunkSession) return;
       var chunkDuration = audio.duration;
 
-      if (index === 0 && !seekPct) {
-        session.estimatedTotalDuration = chunkDuration * session.totalChunks;
+      // Refine total duration estimate using actual chunk durations
+      if (!seekPct) {
+        if (session.chunkDurations.length > 0) {
+          var actualAvg = session.elapsedTime / session.chunkDurations.length;
+          var remaining = session.totalChunks - session.chunkDurations.length;
+          session.estimatedTotalDuration = session.elapsedTime + (actualAvg * remaining);
+        } else {
+          session.estimatedTotalDuration = chunkDuration * session.totalChunks;
+        }
         document.getElementById('tts-time-total').textContent = '~' + formatTime(session.estimatedTotalDuration);
       }
 
@@ -752,7 +846,6 @@ async function ttsPlayNextChunk(index, seekPct) {
 
     audio.addEventListener('playing', function() {
       if (session !== _ttsChunkSession) return;
-      if (index === 0) playCueSound();
       stopListenLoading();
       ttsPlaying = true;
       renderAudioPlayer();
@@ -761,13 +854,15 @@ async function ttsPlayNextChunk(index, seekPct) {
       if (index + 1 < session.totalChunks) {
         ttsPrefetchChunk(index + 1);
       } else {
-        // Last chunk playing — Kokoro is idle, pre-generate next queue item
+        // Last chunk playing — pre-generate next queue item
         ttsPrefetchNextQueueItem();
       }
     });
 
     audio.addEventListener('timeupdate', function() {
       if (session !== _ttsChunkSession) return;
+      var player = document.querySelector('pr-player');
+      if (player && player._dragging) return;
       var chunkDuration = audio.duration || 1;
       var chunkProgress = Math.min(1, audio.currentTime / chunkDuration);
       var overallPct = ((index + chunkProgress) / session.totalChunks) * 100;
@@ -778,6 +873,7 @@ async function ttsPlayNextChunk(index, seekPct) {
 
     audio.addEventListener('ended', function() {
       if (session !== _ttsChunkSession) return;
+      session.chunkDurations.push(audio.duration || 0);
       session.elapsedTime += audio.duration || 0;
       // Show loading words only if next chunk isn't pre-warmed on the server yet
       var nextReady = _ttsChunkBuffer.get(index + 1) === 'ready';
@@ -817,12 +913,15 @@ function stopTTS() {
   _ttsChunkSession = null;
   _ttsChunkBuffer.clear();
   _ttsNextPrefetch = null;
+  _browserTTSState = null;
   if (ttsAudio) {
     ttsAudio.pause();
     ttsAudio.src = '';
     ttsAudio = null;
   }
   if (ttsSynthUtterance) {
+    ttsSynthUtterance.onend = null;
+    ttsSynthUtterance.onerror = null;
     window.speechSynthesis.cancel();
     ttsSynthUtterance = null;
   }
@@ -845,18 +944,15 @@ function ttsTogglePlay() {
       synth.pause();
       ttsPlaying = false;
       clearInterval(ttsProgressTimer);
+      if (_browserTTSState) _browserTTSState.pausedAt = Date.now();
     } else if (synth.paused) {
       synth.resume();
       ttsPlaying = true;
-      // Restart progress timer
-      ttsProgressTimer = setInterval(() => {
-        const timeEl = document.getElementById('tts-time-current');
-        const totalEl = document.getElementById('tts-time-total');
-        // parse current time and increment
-        const parts = timeEl.textContent.split(':');
-        let secs = parseInt(parts[0]) * 60 + parseInt(parts[1]) + 0.2;
-        timeEl.textContent = formatTime(secs);
-      }, 200);
+      if (_browserTTSState && _browserTTSState.pausedAt) {
+        _browserTTSState.startTime += (Date.now() - _browserTTSState.pausedAt);
+        _browserTTSState.pausedAt = null;
+      }
+      _startBrowserProgressTimer();
     } else if (ttsCurrentIndex >= 0) {
       playTTSItem(ttsCurrentIndex);
     } else {
@@ -923,12 +1019,19 @@ function skipTime(seconds) {
     seekToChunkPosition(pct);
     return;
   }
+  if (_browserTTSState && _browserTTSState.startTime) {
+    var elapsed = (Date.now() - _browserTTSState.startTime) / 1000;
+    var baseOffset = _browserTTSState.seekOffset || 0;
+    var currentPct = baseOffset + (elapsed / _browserTTSState.estimatedSeconds) * (1 - baseOffset);
+    var deltaPct = seconds / _browserTTSState.estimatedSeconds;
+    ttsSeek(Math.max(0, Math.min(1, currentPct + deltaPct)));
+    return;
+  }
   if (ttsAudio && ttsAudio.duration) {
     var newTime = ttsAudio.currentTime + seconds;
     ttsAudio.currentTime = Math.max(0, Math.min(newTime, ttsAudio.duration));
     return;
   }
-  // Browser TTS doesn't support seeking
 }
 
 function seekToChunkPosition(pct) {
@@ -941,9 +1044,12 @@ function seekToChunkPosition(pct) {
   if (targetChunk >= session.totalChunks) targetChunk = session.totalChunks - 1;
   var seekPct = targetChunkFloat - targetChunk;
 
-  // Estimate elapsed time up to target chunk
-  var avgChunkDuration = session.estimatedTotalDuration / session.totalChunks;
-  session.elapsedTime = targetChunk * avgChunkDuration;
+  // Estimate elapsed time up to target chunk using actual durations where available
+  var elapsed = 0;
+  for (var i = 0; i < targetChunk; i++) {
+    elapsed += session.chunkDurations[i] || (session.estimatedTotalDuration / session.totalChunks);
+  }
+  session.elapsedTime = elapsed;
 
   // Stop current audio and play from target chunk
   if (ttsAudio) {
@@ -959,169 +1065,23 @@ function ttsSeek(pct) {
     seekToChunkPosition(pct);
     return;
   }
+  if (_browserTTSState) {
+    var text = _browserTTSState.text;
+    var charOffset = Math.floor(pct * text.length);
+    // Snap to nearest word boundary
+    while (charOffset > 0 && text[charOffset] !== ' ') charOffset--;
+    if (charOffset > 0) charOffset++; // skip past the space
+    _startBrowserUtterance(text.slice(charOffset), pct);
+    return;
+  }
   if (ttsAudio && ttsAudio.duration) {
     ttsAudio.currentTime = pct * ttsAudio.duration;
   }
-  // Browser TTS doesn't support seeking
 }
-
-function initProgressDrag() {
-  var wrap = document.getElementById('audio-progress-wrap');
-  if (!wrap) return;
-
-  function seekFromEvent(e) {
-    // Don't seek if nothing is playing or generating
-    if (!ttsPlaying && ttsCurrentIndex < 0) return;
-    var rect = wrap.getBoundingClientRect();
-    var clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    var pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    ttsSeek(pct);
-  }
-
-  function onMove(e) { seekFromEvent(e); }
-  function onEnd() {
-    document.removeEventListener('mousemove', onMove);
-    document.removeEventListener('mouseup', onEnd);
-    document.removeEventListener('touchmove', onMove);
-    document.removeEventListener('touchend', onEnd);
-  }
-
-  wrap.addEventListener('mousedown', function(e) {
-    e.preventDefault();
-    seekFromEvent(e);
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onEnd);
-  });
-
-  wrap.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    seekFromEvent(e);
-    document.addEventListener('touchmove', onMove, { passive: false });
-    document.addEventListener('touchend', onEnd);
-  }, { passive: false });
-}
-
-// Initialize drag on the progress bar
-initProgressDrag();
-
-let _ttsSpeedPopup = null;
 
 function ttsToggleSpeedSlider() {
-  if (_ttsSpeedPopup) { ttsCloseSpeedSlider(); return; }
-
-  var btn = document.getElementById('tts-speed-btn');
-  var rect = btn.getBoundingClientRect();
-  var count = TTS_SPEEDS.length;
-
-  var popup = document.createElement('div');
-  popup.className = 'tts-speed-popup';
-
-  // Build tick labels — show value for major speeds, dot for minor ones
-  var majorSpeeds = [0.5, 1.0, 1.5, 2.0];
-  var ticksHtml = '';
-  for (var i = count - 1; i >= 0; i--) {
-    var s = TTS_SPEEDS[i];
-    if (majorSpeeds.indexOf(s) >= 0) {
-      ticksHtml += '<div class="tts-speed-tick">' + s + 'x</div>';
-    } else {
-      ticksHtml += '<div class="tts-speed-tick-dot">\u00b7</div>';
-    }
-  }
-
-  popup.innerHTML =
-    '<div class="tts-speed-popup-value" id="tts-speed-popup-val">' + ttsSpeed + 'x</div>' +
-    '<div class="tts-speed-track-wrap" id="tts-speed-track-wrap">' +
-      '<div class="tts-speed-track" id="tts-speed-track">' +
-        '<div class="tts-speed-thumb" id="tts-speed-thumb"></div>' +
-      '</div>' +
-    '</div>' +
-    '<div class="tts-speed-ticks">' + ticksHtml + '</div>';
-
-  document.body.appendChild(popup);
-
-  // Position above the button, centered horizontally
-  var popW = popup.offsetWidth;
-  var popH = popup.offsetHeight;
-  var left = rect.left + rect.width / 2 - popW / 2;
-  var top = rect.top - popH - 6;
-  // Keep on screen
-  if (left < 4) left = 4;
-  if (top < 4) { top = rect.bottom + 6; }
-  popup.style.left = left + 'px';
-  popup.style.top = top + 'px';
-
-  // Set thumb position for current speed
-  ttsPositionThumb();
-  _ttsSpeedPopup = popup;
-
-  // Drag handling
-  var trackWrap = document.getElementById('tts-speed-track-wrap');
-
-  function onDrag(clientY) {
-    var trackRect = trackWrap.getBoundingClientRect();
-    var pct = (clientY - trackRect.top) / trackRect.height;
-    pct = Math.max(0, Math.min(1, pct));
-    // Top = fastest (last index), bottom = slowest (first index)
-    var idx = Math.round((1 - pct) * (count - 1));
-    idx = Math.max(0, Math.min(count - 1, idx));
-    ttsSetSpeed(TTS_SPEEDS[idx]);
-    ttsPositionThumb();
-  }
-
-  trackWrap.addEventListener('mousedown', function(e) {
-    e.preventDefault();
-    onDrag(e.clientY);
-    function onMove(ev) { onDrag(ev.clientY); }
-    function onUp() {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    }
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  });
-
-  trackWrap.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    onDrag(e.touches[0].clientY);
-    function onTouchMove(ev) { ev.preventDefault(); onDrag(ev.touches[0].clientY); }
-    function onTouchEnd() {
-      document.removeEventListener('touchmove', onTouchMove);
-      document.removeEventListener('touchend', onTouchEnd);
-    }
-    document.addEventListener('touchmove', onTouchMove, { passive: false });
-    document.addEventListener('touchend', onTouchEnd);
-  }, { passive: false });
-
-  // Close on click outside (delay to avoid catching the opening click)
-  setTimeout(function() {
-    document.addEventListener('mousedown', ttsSpeedOutsideClick);
-    document.addEventListener('touchstart', ttsSpeedOutsideClick);
-  }, 0);
-}
-
-function ttsSpeedOutsideClick(e) {
-  if (_ttsSpeedPopup && !_ttsSpeedPopup.contains(e.target) && e.target.id !== 'tts-speed-btn') {
-    ttsCloseSpeedSlider();
-  }
-}
-
-function ttsCloseSpeedSlider() {
-  if (_ttsSpeedPopup) {
-    _ttsSpeedPopup.remove();
-    _ttsSpeedPopup = null;
-  }
-  document.removeEventListener('mousedown', ttsSpeedOutsideClick);
-  document.removeEventListener('touchstart', ttsSpeedOutsideClick);
-}
-
-function ttsPositionThumb() {
-  var thumb = document.getElementById('tts-speed-thumb');
-  if (!thumb) return;
-  var idx = TTS_SPEEDS.indexOf(ttsSpeed);
-  if (idx < 0) idx = TTS_SPEEDS.indexOf(1.0);
-  // Top = fastest (last index), bottom = slowest (first index)
-  var pct = 1 - idx / (TTS_SPEEDS.length - 1);
-  thumb.style.top = (pct * 100) + '%';
+  var player = document.querySelector('pr-player');
+  if (player) player._toggleSpeedSlider();
 }
 
 function ttsSetSpeed(speed) {
@@ -1130,8 +1090,6 @@ function ttsSetSpeed(speed) {
   if (speedBtn) speedBtn.textContent = speed + 'x';
   var popupVal = document.getElementById('tts-speed-popup-val');
   if (popupVal) popupVal.textContent = speed + 'x';
-  var miniSpeedBtn = document.getElementById('mini-mode-speed-btn');
-  if (miniSpeedBtn) miniSpeedBtn.textContent = speed + 'x';
   // Update article inline speed button
   var anpSpeed = document.querySelector('.article-now-playing .anp-speed');
   if (anpSpeed) anpSpeed.textContent = speed + 'x';
@@ -1309,8 +1267,7 @@ function showTTSSettings() {
     if (!card) return;
 
     var providers = [
-      { id: 'kokoro', label: 'Kokoro — natural voice, free & private' },
-      { id: 'browser', label: 'Built-in Voice (Apple) — free' },
+      { id: 'browser', label: 'Built-in Voice — free' },
       { id: 'openai', label: 'OpenAI — premium quality' },
       { id: 'elevenlabs', label: 'ElevenLabs — premium quality' },
     ];
@@ -1319,9 +1276,8 @@ function showTTSSettings() {
     overlay._ttsData = data;
 
     var isCloud = data.provider === 'openai' || data.provider === 'elevenlabs';
-    var kokoroInstalled = data.kokoro && data.kokoro.installed;
 
-    var ttsModalLabels = {kokoro:'Kokoro',browser:'Browser',openai:'OpenAI',elevenlabs:'ElevenLabs'};
+    var ttsModalLabels = {browser:'Browser',openai:'OpenAI',elevenlabs:'ElevenLabs'};
     card.innerHTML =
       '<h2>Voice Settings</h2>' +
       '<div style="margin:12px 0">' +
@@ -1329,34 +1285,7 @@ function showTTSSettings() {
         '<div class="settings-btn-group">' +
           providers.map(function(p) { return '<button data-val="' + p.id + '" class="' + (data.provider === p.id ? 'active' : '') + '" onclick="settingsBtnSelect(this,\'tts-provider-select\',\'' + p.id + '\');ttsSettingsProviderChanged()">' + (ttsModalLabels[p.id] || p.id) + '</button>'; }).join('') +
         '</div>' +
-        '<input type="hidden" id="tts-provider-select" value="' + escapeHtml(data.provider || 'kokoro') + '">' +
-      '</div>' +
-      '<div id="tts-kokoro-settings" style="display:' + (data.provider === 'kokoro' ? 'block' : 'none') + '">' +
-        '<div style="background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin:10px 0;font-size:12px;line-height:1.6">' +
-          '<strong style="color:var(--fg)">Kokoro — natural-sounding voice, completely free</strong><br>' +
-          '<span style="color:var(--muted)">Runs entirely on your Mac using the Kokoro voice engine — your articles stay private and never leave your machine.</span><br>' +
-          '<span style="color:var(--muted)">Sets itself up automatically the first time you listen (~86MB download).</span>' +
-          '<div id="kokoro-status" style="margin-top:6px">' +
-            (kokoroInstalled
-              ? '<span style="color:#22c55e">&#10003; Ready to go</span>'
-              : '<span style="color:var(--muted)">Will set up automatically on first listen</span>') +
-          '</div>' +
-        '</div>' +
-        '<div style="margin:12px 0;position:relative">' +
-          '<label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Voice</label>' +
-          '<button onclick="toggleTTSModalVoicePicker(\'tts-kokoro-voice-btn\',\'tts-kokoro-voice\',\'kokoro\')" id="tts-kokoro-voice-btn" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;cursor:pointer;font-family:inherit">' + escapeHtml(ttsModalGetVoiceLabel('kokoro', data.voice)) + ' <span style="opacity:0.5">\u25BE</span></button>' +
-          '<input type="hidden" id="tts-kokoro-voice" value="' + escapeHtml(data.voice || '') + '">' +
-        '</div>' +
-        '<div style="margin:12px 0" id="tts-kokoro-quality">' +
-          '<label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Quality</label>' +
-          ((data.model === 'kokoro-v1-q4')
-            ? '<div style="font-size:12px;color:#22c55e">&#10003; High quality</div>'
-            : '<div style="font-size:12px;color:var(--fg)">Standard quality'
-              + '<br><button onclick="ttsUpgradeKokoroQuality()" style="margin-top:6px;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--link);font-size:12px;cursor:pointer;font-family:inherit">Upgrade to high quality</button>'
-              + '<span style="color:var(--muted);font-size:11px;margin-left:6px">Free &middot; 305MB download</span></div>'
-          ) +
-          '<input type="hidden" id="tts-kokoro-model" value="' + escapeHtml(data.model || 'kokoro-v1-q8') + '">' +
-        '</div>' +
+        '<input type="hidden" id="tts-provider-select" value="' + escapeHtml(data.provider || 'browser') + '">' +
       '</div>' +
       '<div id="tts-cost-info" style="display:' + (isCloud ? 'block' : 'none') + '">' +
         '<div id="tts-cost-estimate" style="background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin:10px 0;font-size:12px;line-height:1.5">' +
@@ -1476,11 +1405,9 @@ function ttsSettingsProviderChanged() {
   const provider = document.getElementById('tts-provider-select').value;
   const cloudSettings = document.getElementById('tts-cloud-settings');
   const costInfo = document.getElementById('tts-cost-info');
-  const kokoroSettings = document.getElementById('tts-kokoro-settings');
   const isCloud = provider === 'openai' || provider === 'elevenlabs';
   cloudSettings.style.display = isCloud ? 'block' : 'none';
   costInfo.style.display = isCloud ? 'block' : 'none';
-  if (kokoroSettings) kokoroSettings.style.display = provider === 'kokoro' ? 'block' : 'none';
 
   // Reset consent checkbox when changing providers
   const consent = document.getElementById('tts-consent');
@@ -1497,15 +1424,6 @@ function ttsSettingsProviderChanged() {
     var firstVoice = data.voices[provider][0];
     if (voiceHidden) voiceHidden.value = firstVoice ? firstVoice.id : '';
     voiceBtn.firstChild.textContent = firstVoice ? firstVoice.label : 'No voices';
-  }
-
-  // Update kokoro voice picker button
-  var kokoroBtn = document.getElementById('tts-kokoro-voice-btn');
-  var kokoroHidden = document.getElementById('tts-kokoro-voice');
-  if (kokoroBtn && data.voices && data.voices.kokoro) {
-    var firstKokoro = data.voices.kokoro[0];
-    if (kokoroHidden) kokoroHidden.value = firstKokoro ? firstKokoro.id : '';
-    kokoroBtn.firstChild.textContent = firstKokoro ? firstKokoro.label : 'No voices';
   }
 
   // Rebuild model button group
@@ -1526,28 +1444,11 @@ function ttsSettingsProviderChanged() {
   if (costEl) costEl.innerHTML = ttsGetCostHtml(provider, modelHidden ? modelHidden.value : '');
 }
 
-function ttsUpgradeKokoroQuality() {
-  var hidden = document.getElementById('tts-kokoro-model');
-  if (hidden) hidden.value = 'kokoro-v1-q4';
-  var container = document.getElementById('tts-kokoro-quality');
-  if (container) {
-    var label = container.querySelector('label');
-    container.innerHTML = '';
-    if (label) container.appendChild(label);
-    container.insertAdjacentHTML('beforeend',
-      '<div style="font-size:12px;color:#22c55e">&#10003; High quality — will download on next listen</div>'
-      + '<input type="hidden" id="tts-kokoro-model" value="kokoro-v1-q4">');
-  }
-}
-
 function saveTTSSettings() {
   const provider = document.getElementById('tts-provider-select').value;
   const config = { provider };
 
-  if (provider === 'kokoro') {
-    config.voice = document.getElementById('tts-kokoro-voice').value;
-    config.model = document.getElementById('tts-kokoro-model').value;
-  } else if (provider !== 'browser') {
+  if (provider !== 'browser') {
     const consent = document.getElementById('tts-consent');
     if (!consent || !consent.checked) {
       // Briefly highlight the consent checkbox
@@ -1677,140 +1578,4 @@ if (typeof _ttsStateRestored === 'undefined') {
   setTimeout(restoreTTSState, 500);
 }
 
-// ---- Mini Mode ----
-
-var _miniModeSyncTimer = null;
-function startMiniModeSync() {
-  if (_miniModeSyncTimer) return;
-  _miniModeSyncTimer = setInterval(function() {
-    if (!miniMode) { stopMiniModeSync(); return; }
-    var fill = document.getElementById('mini-mode-progress-fill');
-    var cur = document.getElementById('mini-mode-time-current');
-    var tot = document.getElementById('mini-mode-time-total');
-    var mainFill = document.getElementById('tts-progress');
-    var mainCur = document.getElementById('tts-time-current');
-    var mainTot = document.getElementById('tts-time-total');
-    if (fill && mainFill) fill.style.width = mainFill.style.width;
-    if (cur && mainCur) cur.textContent = mainCur.textContent;
-    if (tot && mainTot) tot.textContent = mainTot.textContent;
-  }, 250);
-}
-function stopMiniModeSync() {
-  if (_miniModeSyncTimer) { clearInterval(_miniModeSyncTimer); _miniModeSyncTimer = null; }
-}
-
-function toggleMiniMode() {
-  miniMode = !miniMode;
-  document.body.classList.toggle('mini-mode', miniMode);
-  var container = document.getElementById('mini-mode-container');
-  if (container) container.style.display = miniMode ? '' : 'none';
-  if (miniMode) {
-    renderMiniMode();
-    initMiniModeProgressDrag();
-    startMiniModeSync();
-  } else {
-    stopMiniModeSync();
-  }
-  localStorage.setItem('pr-mini-mode', miniMode ? '1' : '0');
-}
-
-function renderMiniMode() {
-  var container = document.getElementById('mini-mode-container');
-  if (!container || !miniMode) return;
-
-  var titleEl = document.getElementById('mini-mode-title');
-  var statusEl = document.getElementById('mini-mode-status');
-  var playBtn = document.getElementById('mini-mode-play-btn');
-  var speedBtn = document.getElementById('mini-mode-speed-btn');
-  var queueEl = document.getElementById('mini-mode-queue');
-
-  if (ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length) {
-    titleEl.textContent = ttsQueue[ttsCurrentIndex].title;
-  } else {
-    titleEl.textContent = 'No article playing';
-  }
-
-  if (ttsGenerating) {
-    statusEl.textContent = 'Generating...';
-  } else if (ttsPlaying) {
-    statusEl.textContent = 'Playing';
-  } else if (ttsCurrentIndex >= 0) {
-    statusEl.textContent = 'Paused';
-  } else {
-    statusEl.textContent = '';
-  }
-
-  playBtn.innerHTML = ttsPlaying
-    ? '<svg><use href="#i-pause"/></svg>'
-    : '<svg><use href="#i-play"/></svg>';
-
-  speedBtn.textContent = ttsSpeed + 'x';
-
-  // Sync progress from main player
-  var mainProgress = document.getElementById('tts-progress');
-  var mainCurrent = document.getElementById('tts-time-current');
-  var mainTotal = document.getElementById('tts-time-total');
-  if (mainProgress) document.getElementById('mini-mode-progress-fill').style.width = mainProgress.style.width;
-  if (mainCurrent) document.getElementById('mini-mode-time-current').textContent = mainCurrent.textContent;
-  if (mainTotal) document.getElementById('mini-mode-time-total').textContent = mainTotal.textContent;
-
-  // Render queue
-  if (ttsQueue.length > 1) {
-    queueEl.innerHTML = ttsQueue.map(function(item, i) {
-      return '<div class="mini-mode-queue-item' + (i === ttsCurrentIndex ? ' playing' : '') + '" onclick="playTTSItem(' + i + ')">'
-        + '<span style="font-size:10px;color:var(--muted);width:14px;text-align:center">' + (i === ttsCurrentIndex ? '&#9654;' : (i + 1)) + '</span>'
-        + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(item.title) + '</span>'
-        + '</div>';
-    }).join('');
-  } else {
-    queueEl.innerHTML = '';
-  }
-
-  // Auto-exit mini mode when queue empties
-  if (ttsQueue.length === 0) {
-    miniMode = false;
-    document.body.classList.remove('mini-mode');
-    container.style.display = 'none';
-    localStorage.setItem('pr-mini-mode', '0');
-  }
-}
-
-var _miniModeProgressDragInit = false;
-function initMiniModeProgressDrag() {
-  if (_miniModeProgressDragInit) return;
-  _miniModeProgressDragInit = true;
-
-  var wrap = document.getElementById('mini-mode-progress-wrap');
-  if (!wrap) return;
-
-  function seekFromEvent(e) {
-    if (!ttsPlaying && ttsCurrentIndex < 0) return;
-    var rect = wrap.getBoundingClientRect();
-    var clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    var pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    ttsSeek(pct);
-  }
-
-  function onMove(e) { seekFromEvent(e); }
-  function onEnd() {
-    document.removeEventListener('mousemove', onMove);
-    document.removeEventListener('mouseup', onEnd);
-    document.removeEventListener('touchmove', onMove);
-    document.removeEventListener('touchend', onEnd);
-  }
-
-  wrap.addEventListener('mousedown', function(e) {
-    e.preventDefault();
-    seekFromEvent(e);
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onEnd);
-  });
-
-  wrap.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    seekFromEvent(e);
-    document.addEventListener('touchmove', onMove, { passive: false });
-    document.addEventListener('touchend', onEnd);
-  }, { passive: false });
-}
 

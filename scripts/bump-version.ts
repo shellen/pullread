@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 // ABOUTME: Propagates the version from package.json to site/index.html, tauri.conf.json, and Cargo.toml
-// ABOUTME: Run via `bun scripts/bump-version.ts` (or `bun scripts/bump-version.ts 0.3.5` to set a version)
+// ABOUTME: Run via `bun scripts/bump-version.ts` (or `bun scripts/bump-version.ts 0.4.0` to set a version)
 
 import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';

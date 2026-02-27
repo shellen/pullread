@@ -39,7 +39,7 @@ function loadModelsConfig(): Record<string, { models: string[]; default: string 
     return {
       anthropic: { models: ['claude-haiku-4-5-20251001', 'claude-sonnet-4-5-20250929', 'claude-opus-4-6'], default: 'claude-haiku-4-5-20251001' },
       openai: { models: ['gpt-5-nano', 'gpt-5-mini', 'gpt-5', 'o3-mini'], default: 'gpt-5-nano' },
-      gemini: { models: ['gemini-2.5-flash-lite-preview', 'gemini-2.5-flash', 'gemini-2.5-pro'], default: 'gemini-2.5-flash-lite-preview' },
+      gemini: { models: ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro'], default: 'gemini-2.5-flash-lite' },
       openrouter: { models: ['anthropic/claude-haiku-4.5', 'google/gemini-2.5-flash', 'anthropic/claude-sonnet-4.5'], default: 'anthropic/claude-haiku-4.5' },
       apple: { models: ['on-device'], default: 'on-device' }
     };
@@ -252,91 +252,109 @@ async function httpPost(url: string, headers: Record<string, string>, body: stri
 
 const SUMMARIZE_PROMPT = `Summarize this article in 2-3 concise sentences. Focus on the key argument or finding. Do not use phrases like "This article discusses" — just state the main points directly. Respond in the same language as the article.`;
 
+const CLOUD_SECTION_WORDS = 4000;
+
+const NOTES_PROMPT = 'Read this section of a longer article and extract the key facts, arguments, and findings as brief bullet points. Respond in the same language as the article.';
+
+const SYNTHESIZE_PROMPT = 'These are notes from reading sections of an article. Write a 2-3 sentence summary of the full article. Focus on the key argument or finding. Do not use phrases like "This article discusses" — just state the main points directly. Respond in the same language as the notes.';
+
 async function callAnthropic(apiKey: string, model: string, articleText: string): Promise<SummarizeResult> {
-  // Trim to ~6000 words to stay within context limits
-  const trimmed = articleText.split(/\s+/).slice(0, 6000).join(' ');
+  const words = articleText.split(/\s+/);
 
-  const body = JSON.stringify({
-    model,
-    max_tokens: 300,
-    messages: [
-      { role: 'user', content: `${SUMMARIZE_PROMPT}\n\n---\n\n${trimmed}` }
-    ]
-  });
+  const call: ProviderCallFn = async (prompt, maxTokens) => {
+    const body = JSON.stringify({
+      model, max_tokens: maxTokens,
+      messages: [{ role: 'user', content: prompt }]
+    });
+    const response = await httpPost('https://api.anthropic.com/v1/messages', {
+      'x-api-key': apiKey, 'anthropic-version': '2023-06-01'
+    }, body);
+    const data = JSON.parse(response);
+    return (data.content?.[0]?.text || '').trim();
+  };
 
-  const response = await httpPost('https://api.anthropic.com/v1/messages', {
-    'x-api-key': apiKey,
-    'anthropic-version': '2023-06-01'
-  }, body);
+  if (words.length <= 6000) {
+    const text = await call(`${SUMMARIZE_PROMPT}\n\n---\n\n${words.join(' ')}`, 300);
+    return { summary: text, model };
+  }
 
-  const data = JSON.parse(response);
-  const text = data.content?.[0]?.text || '';
-  return { summary: text.trim(), model: data.model || model };
+  const summary = await chunkedSummarize(articleText, call);
+  return { summary, model };
 }
 
 async function callOpenAI(apiKey: string, model: string, articleText: string): Promise<SummarizeResult> {
-  const trimmed = articleText.split(/\s+/).slice(0, 6000).join(' ');
+  const words = articleText.split(/\s+/);
 
-  const body = JSON.stringify({
-    model,
-    max_tokens: 300,
-    messages: [
-      { role: 'system', content: SUMMARIZE_PROMPT },
-      { role: 'user', content: trimmed }
-    ]
-  });
+  const call: ProviderCallFn = async (prompt, maxTokens) => {
+    const body = JSON.stringify({
+      model, max_tokens: maxTokens,
+      messages: [{ role: 'user', content: prompt }]
+    });
+    const response = await httpPost('https://api.openai.com/v1/chat/completions', {
+      'Authorization': `Bearer ${apiKey}`
+    }, body);
+    const data = JSON.parse(response);
+    return (data.choices?.[0]?.message?.content || '').trim();
+  };
 
-  const response = await httpPost('https://api.openai.com/v1/chat/completions', {
-    'Authorization': `Bearer ${apiKey}`
-  }, body);
+  if (words.length <= 6000) {
+    const text = await call(`${SUMMARIZE_PROMPT}\n\n---\n\n${words.join(' ')}`, 300);
+    return { summary: text, model };
+  }
 
-  const data = JSON.parse(response);
-  const text = data.choices?.[0]?.message?.content || '';
-  return { summary: text.trim(), model: data.model || model };
+  const summary = await chunkedSummarize(articleText, call);
+  return { summary, model };
 }
 
 async function callGemini(apiKey: string, model: string, articleText: string): Promise<SummarizeResult> {
-  const trimmed = articleText.split(/\s+/).slice(0, 6000).join(' ');
+  const words = articleText.split(/\s+/);
 
-  const body = JSON.stringify({
-    contents: [{
-      parts: [{ text: `${SUMMARIZE_PROMPT}\n\n---\n\n${trimmed}` }]
-    }],
-    generationConfig: { maxOutputTokens: 300 }
-  });
+  const call: ProviderCallFn = async (prompt, maxTokens) => {
+    const body = JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: maxTokens }
+    });
+    const response = await httpPost(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {}, body
+    );
+    const data = JSON.parse(response);
+    return (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
+  };
 
-  const response = await httpPost(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-    {},
-    body
-  );
+  if (words.length <= 6000) {
+    const text = await call(`${SUMMARIZE_PROMPT}\n\n---\n\n${words.join(' ')}`, 300);
+    return { summary: text, model };
+  }
 
-  const data = JSON.parse(response);
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  return { summary: text.trim(), model };
+  const summary = await chunkedSummarize(articleText, call);
+  return { summary, model };
 }
 
 async function callOpenRouter(apiKey: string, model: string, articleText: string): Promise<SummarizeResult> {
-  const trimmed = articleText.split(/\s+/).slice(0, 6000).join(' ');
+  const words = articleText.split(/\s+/);
 
-  const body = JSON.stringify({
-    model,
-    max_tokens: 300,
-    messages: [
-      { role: 'system', content: SUMMARIZE_PROMPT },
-      { role: 'user', content: trimmed }
-    ]
-  });
+  const call: ProviderCallFn = async (prompt, maxTokens) => {
+    const body = JSON.stringify({
+      model, max_tokens: maxTokens,
+      messages: [{ role: 'user', content: prompt }]
+    });
+    const response = await httpPost('https://openrouter.ai/api/v1/chat/completions', {
+      'Authorization': `Bearer ${apiKey}`,
+      'HTTP-Referer': 'https://github.com/shellen/pullread',
+      'X-Title': 'PullRead'
+    }, body);
+    const data = JSON.parse(response);
+    return (data.choices?.[0]?.message?.content || '').trim();
+  };
 
-  const response = await httpPost('https://openrouter.ai/api/v1/chat/completions', {
-    'Authorization': `Bearer ${apiKey}`,
-    'HTTP-Referer': 'https://github.com/shellen/pullread',
-    'X-Title': 'PullRead'
-  }, body);
+  if (words.length <= 6000) {
+    const text = await call(`${SUMMARIZE_PROMPT}\n\n---\n\n${words.join(' ')}`, 300);
+    return { summary: text, model };
+  }
 
-  const data = JSON.parse(response);
-  const text = data.choices?.[0]?.message?.content || '';
-  return { summary: text.trim(), model: data.model || model };
+  const summary = await chunkedSummarize(articleText, call);
+  return { summary, model };
 }
 
 // Low-level helper: run a prompt through Apple Intelligence via Foundation Models
@@ -391,8 +409,6 @@ function runApplePrompt(prompt: string): string {
     try { unlinkSync(tmpPrompt); } catch {}
   }
 }
-
-const CHUNK_WORD_LIMIT = 2000;
 
 // Apple Intelligence has a 4096-token context window.
 // Each turn needs room for prompt overhead + response, so sections must be small.
@@ -580,4 +596,42 @@ export async function summarizeText(articleText: string, config?: LLMConfig): Pr
 
 export function getDefaultModel(provider: string): string {
   return _modelsConfig[provider]?.default || 'gpt-5-nano';
+}
+
+export type ProviderCallFn = (prompt: string, maxTokens: number) => Promise<string>;
+
+// Exported for testing
+export async function chunkedSummarize(articleText: string, callFn: ProviderCallFn): Promise<string> {
+  const sections = splitIntoSections(articleText, CLOUD_SECTION_WORDS);
+
+  // Map: extract notes from each section
+  const notesList: string[] = [];
+  for (const section of sections) {
+    const prompt = `${NOTES_PROMPT}\n\n---\n\nSection ${notesList.length + 1} of ${sections.length}:\n\n${section}`;
+    const notes = await callFn(prompt, 500);
+    notesList.push(notes);
+  }
+
+  // Reduce: synthesize final summary from notes
+  const allNotes = notesList.map((n, i) => `Section ${i + 1}:\n${n}`).join('\n\n');
+  return callFn(`${SYNTHESIZE_PROMPT}\n\n---\n\n${allNotes}`, 300);
+}
+
+export function splitIntoSections(text: string, wordLimit: number): string[] {
+  const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
+  const sections: string[] = [];
+  let current: string[] = [];
+  let wc = 0;
+  for (const para of paragraphs) {
+    const w = para.split(/\s+/).length;
+    if (wc + w > wordLimit && current.length > 0) {
+      sections.push(current.join('\n\n'));
+      current = [];
+      wc = 0;
+    }
+    current.push(para);
+    wc += w;
+  }
+  if (current.length > 0) sections.push(current.join('\n\n'));
+  return sections;
 }

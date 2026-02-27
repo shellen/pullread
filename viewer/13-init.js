@@ -100,12 +100,21 @@ async function migrateAnnotationsIfNeeded() {
     console.log('Migration: ' + migrated + ' migrated, ' + cleaned + ' duplicates cleaned');
     await loadAnnotationsIndex(); // Refresh
     renderFileList();
+    scheduleNavCounts();
   }
 }
 
 // Refresh article list from server
+let _refreshInFlight = false;
+let _refreshQueued = false;
 async function refreshArticleList(silent) {
   if (!serverMode) return;
+  // Re-entrance guard: if a refresh is already running, queue one follow-up
+  if (_refreshInFlight) {
+    _refreshQueued = true;
+    return;
+  }
+  _refreshInFlight = true;
   const btn = document.getElementById('refresh-btn');
   if (!silent) btn.classList.add('spinning');
   try {
@@ -118,6 +127,7 @@ async function refreshArticleList(silent) {
       filteredFiles = allFiles;
       await loadAnnotationsIndex();
       filterFiles();
+      scheduleNavCounts();
       // Highlight new articles with a fade-in effect
       if (silent && allFiles.length > prevCount) {
         requestAnimationFrame(() => {
@@ -135,11 +145,17 @@ async function refreshArticleList(silent) {
         const idx = displayFiles.findIndex(f => f.filename === activeFile);
         if (idx >= 0 && !silent) loadFile(idx);
       } else if (!silent) {
-        renderDashboard();
+        renderHub();
       }
     }
   } catch {}
   if (!silent) btn.classList.remove('spinning');
+  _refreshInFlight = false;
+  // If another refresh was requested while we were running, do one more
+  if (_refreshQueued) {
+    _refreshQueued = false;
+    refreshArticleList(true);
+  }
 }
 
 // Auto-refresh: poll lightweight /api/files-changed every 5s, full refresh only when files change
@@ -224,18 +240,13 @@ async function init() {
   if (savedLeading && savedLeading !== 'default') setLineHeight(savedLeading);
   if (savedSpacing && savedSpacing !== 'default') setSpacing(savedSpacing);
   if (savedWidth && savedWidth !== 'default') setWidth(savedWidth);
-  if (savedSidebar === '0' || window.innerWidth <= 768) {
+  if (savedSidebar === '0') {
     document.getElementById('sidebar').classList.add('collapsed');
-    document.getElementById('sidebar-toggle-btn').setAttribute('aria-expanded', 'false');
   }
 
-  // Restore mini mode
-  if (localStorage.getItem('pr-mini-mode') === '1') {
-    miniMode = true;
-    document.body.classList.add('mini-mode');
-    var miniContainer = document.getElementById('mini-mode-container');
-    if (miniContainer) miniContainer.style.display = '';
-    startMiniModeSync();
+  // Restore mini player mode
+  if (localStorage.getItem('pr-mini-mode') === '1' && ttsQueue.length > 0) {
+    setPlayerMode('mini');
   }
 
   // Restore focus mode
@@ -249,6 +260,10 @@ async function init() {
   hideRead = localStorage.getItem('pr-hide-read') === '1';
   document.getElementById('hide-read-toggle').classList.toggle('active', hideRead);
 
+  // Restore magic sort
+  magicSort = localStorage.getItem('pr-magic-sort') === '1';
+  document.getElementById('magic-sort-toggle').classList.toggle('active', magicSort);
+
   try {
     const res = await fetch('/api/files');
     if (res.ok) {
@@ -261,23 +276,21 @@ async function init() {
       await Promise.all([loadAnnotationsIndex(), checkLLMConfig(), loadNotebooks()]);
 
       renderFileList();
+      scheduleNavCounts();
       renderPinnedFilters();
 
       // Run one-time migration and load sync status in background
       migrateAnnotationsIfNeeded();
       loadSyncStatus();
 
-      // Preload Kokoro TTS model if it's the selected provider
+      // Load TTS provider setting
       fetch('/api/tts-settings').then(function(r) { return r.ok ? r.json() : null; }).then(function(cfg) {
         if (!cfg) return;
         ttsProvider = cfg.provider || 'browser';
-        if (cfg.provider === 'kokoro') {
-          fetch('/api/kokoro-preload', { method: 'POST' }).catch(function() {});
-        }
       }).catch(function() {});
 
       // Show dashboard instead of auto-loading first article
-      renderDashboard();
+      renderHub();
       showOnboardingIfNeeded();
       // Seed the change tracker so first poll doesn't false-trigger
       fetch('/api/files-changed').then(function(r) { return r.ok ? r.json() : null; }).then(function(d) { if (d) _lastKnownChangeAt = d.changedAt; }).catch(function() {});

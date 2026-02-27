@@ -23,6 +23,8 @@ const turndown = new TurndownService({
   codeBlockStyle: 'fenced'
 });
 
+turndown.remove(['script', 'style', 'noscript']);
+
 // When <a> wraps an <img> — directly or inside a wrapper <div>/<figure>/<picture>
 // (Substack uses <a> > <div class="captioned-image-container"> > <img>).
 // Without this rule, Turndown produces [![alt](long-url)](long-url) which
@@ -144,6 +146,11 @@ export function shouldSkipUrl(url: string): string | null {
  * Sites like NPR include "Download / Embed / Transcript" sections with
  * raw iframe HTML shown as visible text, which Readability captures.
  */
+/** Convert raw HTML (e.g. from RSS feed content) to clean markdown. */
+export function htmlToMarkdown(html: string, baseUrl: string): string {
+  return stripEmbedNoise(resolveRelativeUrls(turndown.turndown(html), baseUrl));
+}
+
 export function stripEmbedNoise(markdown: string): string {
   // Remove lines containing raw <iframe as visible text
   markdown = markdown.replace(/^.*<\s*iframe\b[^]*?(?:>|$).*$/gm, '');
@@ -154,6 +161,10 @@ export function stripEmbedNoise(markdown: string): string {
   // Remove standalone "Download" and "Transcript" list items from player UI
   // (only when they appear as bare bullets with no meaningful content after)
   markdown = markdown.replace(/^\*\s+\*?\*?Download\*?\*?\s*$/gm, '');
+
+  // Remove ad network script remnants (Google AdSense, etc.)
+  markdown = markdown.replace(/^\s*\(?\s*adsbygoogle\b[^]*?$/gm, '');
+  markdown = markdown.replace(/^\s*window\.adsbygoogle\b[^]*?$/gm, '');
 
   // Collapse runs of 3+ blank lines into 2
   markdown = markdown.replace(/\n{4,}/g, '\n\n\n');
@@ -169,15 +180,26 @@ export function resolveRelativeUrls(markdown: string, baseUrl: string): string {
     return markdown;
   }
 
-  // Resolve root-relative URLs in markdown images: ![alt](/path) -> ![alt](https://domain.com/path)
+  // Resolve protocol-relative URLs: ![alt](//cdn.example.com/img.png) -> ![alt](https://cdn.example.com/img.png)
   markdown = markdown.replace(
-    /!\[([^\]]*)\]\((\/[^)]+)\)/g,
+    /!\[([^\]]*)\]\((\/\/[^)]+)\)/g,
+    (_, alt, path) => `![${alt}](https:${path})`
+  );
+  markdown = markdown.replace(
+    /(?<!!)\[([^\]]*)\]\((\/\/[^)]+)\)/g,
+    (_, text, path) => `[${text}](https:${path})`
+  );
+
+  // Resolve root-relative URLs in markdown images: ![alt](/path) -> ![alt](https://domain.com/path)
+  // Skips protocol-relative URLs (already handled above)
+  markdown = markdown.replace(
+    /!\[([^\]]*)\]\((\/(?!\/)[^)]+)\)/g,
     (_, alt, path) => `![${alt}](${origin}${path})`
   );
 
   // Resolve root-relative URLs in markdown links: [text](/path) -> [text](https://domain.com/path)
   markdown = markdown.replace(
-    /(?<!!)\[([^\]]*)\]\((\/[^)]+)\)/g,
+    /(?<!!)\[([^\]]*)\]\((\/(?!\/)[^)]+)\)/g,
     (_, text, path) => `[${text}](${origin}${path})`
   );
 
@@ -688,6 +710,32 @@ export function isPdfUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
     return parsed.pathname.toLowerCase().endsWith('.pdf');
+  } catch {
+    return false;
+  }
+}
+
+const BINARY_EXTENSIONS = new Set([
+  // Audio
+  '.mp3', '.m4a', '.wav', '.ogg', '.aac', '.flac', '.wma', '.opus',
+  // Video
+  '.mp4', '.webm', '.avi', '.mov', '.mkv', '.wmv', '.m4v',
+  // Image
+  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.ico', '.svg', '.tiff',
+  // Archive / binary
+  '.zip', '.tar', '.gz', '.rar', '.7z', '.exe', '.dmg', '.iso', '.bin', '.msi',
+]);
+
+/**
+ * Check if a URL points to a binary file (audio, video, image, archive)
+ */
+export function isBinaryUrl(url: string): boolean {
+  try {
+    const pathname = new URL(url).pathname.toLowerCase();
+    for (const ext of BINARY_EXTENSIONS) {
+      if (pathname.endsWith(ext)) return true;
+    }
+    return false;
   } catch {
     return false;
   }
@@ -1310,6 +1358,11 @@ async function extractAcademicPaper(
     if (!response.ok) return null;
 
     const contentType = response.headers.get('content-type') || '';
+    // Reject binary content types
+    if (/^(audio|video|image)\//.test(contentType) ||
+        contentType.includes('application/octet-stream')) {
+      return null;
+    }
     if (contentType.includes('application/pdf') || isPdfUrl(cleanUrl)) {
       const buffer = await response.arrayBuffer();
       const article = await extractPdf(new Uint8Array(buffer), cleanUrl);
@@ -1351,6 +1404,11 @@ export async function fetchAndExtract(
   const skipReason = shouldSkipUrl(url);
   if (skipReason) {
     throw new Error(skipReason);
+  }
+
+  // Reject binary file URLs (audio, video, image, archive)
+  if (isBinaryUrl(url)) {
+    throw new Error(`Binary file URL, not extractable: ${url}`);
   }
 
   // Resolve Apple News shortlinks to original article URLs
@@ -1435,6 +1493,12 @@ export async function fetchAndExtract(
       }
 
       const contentType = response.headers.get('content-type') || '';
+
+      // Reject binary content types (audio, video, image, octet-stream)
+      if (/^(audio|video|image)\//.test(contentType) ||
+          contentType.includes('application/octet-stream')) {
+        throw new Error(`Binary content-type (${contentType}), not extractable: ${url}`);
+      }
 
       // Handle PDF responses
       if (contentType.includes('application/pdf') || isPdfUrl(cleanUrl)) {

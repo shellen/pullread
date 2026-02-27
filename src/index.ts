@@ -5,10 +5,10 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from '
 import { join, basename } from 'path';
 import { homedir } from 'os';
 import { fetchFeed, FeedEntry } from './feed';
-import { fetchAndExtract, FetchOptions, shouldSkipUrl, classifyFetchError } from './extractor';
+import { fetchAndExtract, FetchOptions, shouldSkipUrl, isBinaryUrl, classifyFetchError, htmlToMarkdown } from './extractor';
 import { writeArticle, listMarkdownFiles, resolveFilePath } from './writer';
 import { Storage } from './storage';
-import { startViewer } from './viewer';
+import { startViewer, reprocessFile, parseFrontmatter } from './viewer';
 import { summarizeText, loadLLMConfig } from './summarizer';
 import { autotagBatch } from './autotagger';
 import { parseBookmarksHtml, bookmarksToEntries } from './bookmarks';
@@ -194,19 +194,53 @@ async function syncFeed(
         continue;
       }
 
+      // Skip binary file URLs (audio, video, image) that lack enclosure metadata
+      if (!entry.enclosure && isBinaryUrl(entry.url)) {
+        console.log(`      Skipped: Binary file URL (${entry.url})`);
+        storage.markFailed(entry.url, 'Binary file URL, not extractable');
+        failed++;
+        continue;
+      }
+
       let content: string;
       let title = entry.title;
       let author: string | undefined;
       let excerpt: string | undefined;
       let thumbnail: string | undefined;
       let lang: string | undefined;
+      let source: string | undefined;
 
       if (entry.enclosure) {
         content = entry.annotation || 'No description available.';
+      } else if (entry.contentHtml) {
+        // Feed has content — use it directly, skip extraction
+        content = htmlToMarkdown(entry.contentHtml, entry.url);
+        author = entry.author;
+        thumbnail = entry.thumbnail;
+        source = 'feed';
       } else {
-        const article = await fetchAndExtract(entry.url, fetchOptions);
+        // No feed content — extract from URL
+        let article = await fetchAndExtract(entry.url, fetchOptions);
 
-        if (!article) {
+        // Retry once if extraction returned suspiciously short content
+        if (article && article.markdown.length < 200) {
+          console.log(`      Short content (${article.markdown.length} chars), retrying after delay...`);
+          await new Promise(r => setTimeout(r, 3_000));
+          const retry = await fetchAndExtract(entry.url, fetchOptions);
+          if (retry && retry.markdown.length > article.markdown.length) {
+            article = retry;
+          }
+        }
+
+        // After retry, if still short, mark failed so --retry-failed picks it up
+        if (article && article.markdown.length < 200) {
+          console.log(`      Still short (${article.markdown.length} chars), marking failed`);
+          storage.markFailed(entry.url, `Content too short (${article.markdown.length} chars)`);
+          failed++;
+          continue;
+        }
+
+        if (!article?.markdown) {
           console.log(`      Skipped: Could not extract content`);
           storage.markFailed(entry.url, 'No extractable content');
           failed++;
@@ -215,10 +249,14 @@ async function syncFeed(
 
         content = article.markdown;
         title = article.title || entry.title;
-        author = article.byline || entry.author;
+        author = entry.author || article.byline;
         excerpt = article.excerpt;
-        thumbnail = article.thumbnail;
+        thumbnail = entry.thumbnail || article.thumbnail;
         lang = article.lang;
+        source = 'extracted';
+
+        // Throttle between extraction requests to avoid rate limiting
+        await new Promise(r => setTimeout(r, 2_000));
       }
 
       const filename = writeArticle(outputPath, {
@@ -233,7 +271,9 @@ async function syncFeed(
         author,
         excerpt,
         thumbnail,
-        lang
+        lang,
+        categories: entry.categories,
+        source,
       });
 
       storage.markProcessed({
@@ -379,6 +419,24 @@ async function sync(feedFilter?: string, retryFailed = false): Promise<void> {
         }
       } catch {}
     }
+
+    // Post-sync repair: re-extract articles with suspiciously short content
+    const allArticles = listMarkdownFiles(config.outputPath);
+    let repaired = 0;
+    for (const filePath of allArticles) {
+      const fileContent = readFileSync(filePath, 'utf-8');
+      const fmMatch = fileContent.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+      if (!fmMatch) continue;
+      const meta = parseFrontmatter(fileContent);
+      const body = fmMatch[2];
+      if (meta.url && meta.source !== 'feed' && body.trim().length < 200) {
+        console.log(`  Repairing: ${basename(filePath)}`);
+        const result = await reprocessFile(filePath);
+        if (result.ok) repaired++;
+        await new Promise(r => setTimeout(r, 2_000));
+      }
+    }
+    if (repaired > 0) console.log(`  Repaired ${repaired} short articles`);
 
     console.log(`\nDone: ${totalSuccess} saved, ${totalFailed} failed`);
 

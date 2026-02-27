@@ -174,31 +174,8 @@ impl SidecarState {
     fn process_env(&self, app: &AppHandle) -> Vec<(String, String)> {
         let mut env = Vec::new();
 
-        // Point to bundled resources for Kokoro TTS model
+        // Point to bundled resources directory
         if let Ok(resource_dir) = app.path().resource_dir() {
-            let kokoro_dir = resource_dir.join("kokoro-model");
-            if kokoro_dir.exists() {
-                env.push((
-                    "PULLREAD_KOKORO_MODEL_DIR".to_string(),
-                    kokoro_dir.to_string_lossy().to_string(),
-                ));
-            }
-            let kokoro_js = resource_dir.join("kokoro.web.js");
-            if kokoro_js.exists() {
-                env.push((
-                    "PULLREAD_KOKORO_JS_PATH".to_string(),
-                    kokoro_js.to_string_lossy().to_string(),
-                ));
-            }
-            let ort_dir = resource_dir.join("ort-wasm");
-            if ort_dir.join("ort.mjs").exists() {
-                env.push((
-                    "PULLREAD_ORT_WASM_DIR".to_string(),
-                    ort_dir.to_string_lossy().to_string(),
-                ));
-            }
-
-            // DYLD_LIBRARY_PATH for ONNX Runtime native lib
             env.push((
                 "DYLD_LIBRARY_PATH".to_string(),
                 resource_dir.to_string_lossy().to_string(),

@@ -613,6 +613,48 @@
     margin-left: 4px;
   }
 
+  .reader-sidebar-nav {
+    display: flex;
+    gap: 2px;
+    margin: 0 4px 6px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .reader-sidebar-nav span {
+    padding: 4px 10px;
+    border-radius: 5px;
+    color: var(--muted);
+    cursor: default;
+  }
+
+  .reader-sidebar-nav span.active {
+    background: rgba(0,0,0,0.06);
+    color: var(--fg);
+    font-weight: 600;
+  }
+
+  .reader-sidebar-nav .nav-count {
+    font-size: 10px;
+    color: var(--light);
+    margin-left: 3px;
+  }
+
+  .reader-sidebar-item .favicon {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    background: #808080;
+    display: inline-block;
+    vertical-align: -2px;
+    margin-right: 4px;
+  }
+
+  .reader-sidebar-item .favicon.teal { background: var(--teal); }
+  .reader-sidebar-item .favicon.orange { background: var(--orange); }
+  .reader-sidebar-item .favicon.blue { background: #2563eb; }
+  .reader-sidebar-item .favicon.purple { background: #7c3aed; }
+
   .reader-content {
     padding: 36px 44px;
     text-align: left;
@@ -927,7 +969,7 @@
 <section class="hero">
   <div class="hero-badge">
     <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 1v12M1 7h12"/></svg>
-    Version 0.3.5
+    Version 0.4.0
   </div>
   <h1>Keep what<br>you read.</h1>
   <p>Save articles from your bookmarks as clean Markdown. Read, highlight, summarize, and listen&mdash;all yours, all local.</p>
@@ -1014,7 +1056,7 @@
           <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10a7 7 0 0114 0"/><path d="M6 10a4 4 0 018 0"/><circle cx="10" cy="10" r="1"/><path d="M10 11v5M8 16h4"/></svg>
         </div>
         <h3>Text-to-speech</h3>
-        <p>Listen to articles via browser TTS, Kokoro local AI, OpenAI, or ElevenLabs. Consent gates and cost estimates for paid providers.</p>
+        <p>Listen to articles via browser TTS, OpenAI, or ElevenLabs. Consent gates and cost estimates for paid providers.</p>
       </div>
 
       <div class="feature-card">
@@ -1030,7 +1072,7 @@
           <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v6l3-2 3 2V3M3 18V5a2 2 0 012-2h6"/><path d="M3 18l7-4 8 4"/></svg>
         </div>
         <h3>Dashboard &amp; Explore</h3>
-        <p>Card-based homepage with continue reading, weekly reviews, and favorites. Explore view shows tags, sources, and connections.</p>
+        <p>Card-based homepage with continue reading, weekly reviews, and favorites. Browse sources sorted by recent, A&ndash;Z, or article count. Explore tags and connections.</p>
       </div>
 
       <div class="feature-card">
@@ -1134,14 +1176,6 @@
         <div class="tts-price">Free</div>
       </div>
       <div class="tts-card">
-        <div class="tts-icon" style="background: #faf5ff; color: #9333ea;">
-          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M8 8v8M16 6v12M4 11v2M20 10v4"/></svg>
-        </div>
-        <h3>Kokoro</h3>
-        <p>Local AI model, 11 voices, runs on your machine</p>
-        <div class="tts-price">Free &amp; local</div>
-      </div>
-      <div class="tts-card">
         <div class="tts-icon" style="background: #f0fdf4; color: #16a34a;">
           <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M8 8v8M16 6v12M4 11v2M20 10v4"/></svg>
         </div>
@@ -1167,7 +1201,7 @@
     <div class="reveal" style="text-align: center;">
       <div class="section-label">Built-in reader</div>
       <h2 class="section-title">A reading experience you'll enjoy</h2>
-      <p class="section-subtitle" style="margin: 0 auto;">Four themes. Multiple fonts including Work Sans. Keyboard shortcuts. Highlights in four colors. Notes, tags, and voice recording.</p>
+      <p class="section-subtitle" style="margin: 0 auto;">Four themes. Multiple reading fonts with Work Sans app chrome. Google Reader keyboard shortcuts. Highlights in four colors. Sortable sources, notes, tags, and voice recording.</p>
     </div>
 
     <div class="reader-preview reveal">
@@ -1184,8 +1218,13 @@
             <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="5" r="4"/><path d="M8 8l3 3"/></svg>
             Search articles...
           </div>
+          <div class="reader-sidebar-nav">
+            <span class="active">All<span class="nav-count">842</span></span>
+            <span>Sources<span class="nav-count">24</span></span>
+            <span>Tags<span class="nav-count">67</span></span>
+          </div>
           <div class="reader-sidebar-item">
-            How to Write Better Code
+            <span class="favicon teal"></span>How to Write Better Code
             <div class="meta">
               <span>Feb 8</span>
               <span class="dot-sep"></span>
@@ -1193,7 +1232,7 @@
             </div>
           </div>
           <div class="reader-sidebar-item active">
-            The Case for Local-First
+            <span class="favicon orange"></span>The Case for Local-First
             <div class="meta">
               <span>Feb 7</span>
               <span class="dot-sep"></span>
@@ -1202,7 +1241,7 @@
             </div>
           </div>
           <div class="reader-sidebar-item">
-            Understanding WebAssembly
+            <span class="favicon blue"></span>Understanding WebAssembly
             <div class="meta">
               <span>Feb 6</span>
               <span class="dot-sep"></span>
@@ -1211,7 +1250,7 @@
             </div>
           </div>
           <div class="reader-sidebar-item">
-            Why RSS Still Matters
+            <span class="favicon"></span>Why RSS Still Matters
             <div class="meta">
               <span>Feb 5</span>
               <span class="dot-sep"></span>
@@ -1219,7 +1258,7 @@
             </div>
           </div>
           <div class="reader-sidebar-item">
-            Building CLI Tools in Bun
+            <span class="favicon purple"></span>Building CLI Tools in Bun
             <div class="meta">
               <span>Feb 4</span>
               <span class="dot-sep"></span>

@@ -93,6 +93,31 @@ describe('generateMarkdown', () => {
     expect(md).toContain('title: "Article with \\"quotes\\""');
   });
 
+  test('includes categories when present', () => {
+    const md = generateMarkdown({
+      title: 'Tagged Article',
+      url: 'https://example.com/tagged',
+      bookmarkedAt: '2024-01-29T12:00:00Z',
+      domain: 'example.com',
+      content: 'Content',
+      categories: ['Technology', 'Programming']
+    });
+
+    expect(md).toContain('categories: ["Technology", "Programming"]');
+  });
+
+  test('omits categories when empty or absent', () => {
+    const md = generateMarkdown({
+      title: 'No Tags',
+      url: 'https://example.com/none',
+      bookmarkedAt: '2024-01-29T12:00:00Z',
+      domain: 'example.com',
+      content: 'Content'
+    });
+
+    expect(md).not.toContain('categories');
+  });
+
   test('includes lang when present', () => {
     const md = generateMarkdown({
       title: 'Article en français',
@@ -139,6 +164,44 @@ describe('generateMarkdown', () => {
     expect(md).toContain('enclosure_duration: "00:45:30"');
     // Should NOT use nested YAML
     expect(md).not.toContain('enclosure:\n');
+  });
+
+  test('includes source when present', () => {
+    const md = generateMarkdown({
+      title: 'Feed Article',
+      url: 'https://example.com/feed-article',
+      bookmarkedAt: '2024-01-29T12:00:00Z',
+      domain: 'example.com',
+      content: 'Content from feed',
+      source: 'feed'
+    });
+
+    expect(md).toContain('source: feed');
+  });
+
+  test('includes source: extracted', () => {
+    const md = generateMarkdown({
+      title: 'Extracted Article',
+      url: 'https://example.com/extracted',
+      bookmarkedAt: '2024-01-29T12:00:00Z',
+      domain: 'example.com',
+      content: 'Extracted content',
+      source: 'extracted'
+    });
+
+    expect(md).toContain('source: extracted');
+  });
+
+  test('omits source when absent', () => {
+    const md = generateMarkdown({
+      title: 'No Source',
+      url: 'https://example.com/none',
+      bookmarkedAt: '2024-01-29T12:00:00Z',
+      domain: 'example.com',
+      content: 'Content'
+    });
+
+    expect(md).not.toContain('source:');
   });
 
   test('omits enclosure_duration when not provided', () => {

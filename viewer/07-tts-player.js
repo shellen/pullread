@@ -1,0 +1,440 @@
+// ABOUTME: Custom element <pr-player> that renders the TTS audio player bottom bar.
+// ABOUTME: Supports expanded (content pane) and mini (sidebar) modes with seamless switching.
+
+class PrPlayer extends HTMLElement {
+  static get observedAttributes() { return ['mode']; }
+
+  constructor() {
+    super();
+    this._lastQueueLen = 0;
+    this._lastIndex = -1;
+    this._mode = 'expanded';
+    this._initialized = false;
+  }
+
+  // ---- State getters (read from playback engine in 07-tts.js) ----
+  get queue() { return ttsQueue; }
+  get currentIndex() { return ttsCurrentIndex; }
+  get playing() { return ttsPlaying; }
+  get speed() { return ttsSpeed; }
+  get generating() { return ttsGenerating; }
+  get provider() { return ttsProvider; }
+  get currentItem() {
+    return (ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length)
+      ? ttsQueue[ttsCurrentIndex] : null;
+  }
+
+  // ---- Public API ----
+  enqueue(item) { addToTTSQueue(item.filename); }
+  playItem(index) { playTTSItem(index); }
+  stop() { stopTTS(); }
+  togglePlay() { ttsTogglePlay(); }
+  skip(seconds) { skipTime(seconds); }
+  seek(pct) { ttsSeek(pct); }
+  setSpeed(speed) { ttsSetSpeed(speed); }
+  cycleSpeed() { ttsCycleSpeed(); }
+  removeItem(index) { removeTTSQueueItem(index); }
+  clearQueue() { ttsClearQueue(); }
+  dismiss() { ttsDismissPlayer(); }
+
+  connectedCallback() {
+    if (this._initialized) {
+      // Re-inserted after a mode switch — just re-init drag listeners
+      this._initProgressDrag();
+      return;
+    }
+    this._initialized = true;
+    this._mode = this.getAttribute('mode') || 'expanded';
+    if (this._mode === 'mini' && window.innerWidth <= 750) this._mode = 'expanded';
+    this.id = 'audio-player';
+    this._renderCurrentMode();
+  }
+
+  /** Render the template for the current mode */
+  _renderCurrentMode() {
+    this._closeSpeedSlider();
+    if (this._mode === 'mini') {
+      this._renderMini();
+    } else {
+      this._renderExpanded();
+    }
+    this._initProgressDrag();
+  }
+
+  /** Build the full expanded player template */
+  _renderExpanded() {
+    this.className = 'bottom-bar hidden';
+    this.innerHTML =
+      '<div class="bottom-bar-inner">' +
+        '<div class="bottom-bar-now" id="bottom-bar-now" onclick="bottomBarGoToArticle()">' +
+          '<div class="bottom-bar-artwork" id="bottom-bar-artwork"><svg class="bottom-bar-icon" aria-hidden="true"><use href="#i-volume"/></svg></div>' +
+          '<div class="bottom-bar-info">' +
+            '<span class="bottom-bar-title" id="audio-now-label">No article queued</span>' +
+            '<span class="bottom-bar-status" id="audio-now-status"></span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="bottom-bar-controls">' +
+          '<button class="skip-btn" onpointerdown="ttsStartHoldSkip(-15)" onpointerup="ttsStopHoldSkip()" onpointerleave="ttsStopHoldSkip()" title="Rewind 15s (hold to scan)" id="tts-prev-btn"><svg><use href="#i-backward"/></svg><span class="skip-label">15</span></button>' +
+          '<button class="bottom-bar-play" onclick="ttsTogglePlay()" title="Play/Pause" id="tts-play-btn"><svg><use href="#i-play"/></svg></button>' +
+          '<button class="skip-btn" onpointerdown="ttsStartHoldSkip(15)" onpointerup="ttsStopHoldSkip()" onpointerleave="ttsStopHoldSkip()" title="Forward 15s (hold to scan)" id="tts-next-btn"><svg><use href="#i-forward"/></svg><span class="skip-label">15</span></button>' +
+        '</div>' +
+        '<div class="bottom-bar-progress-row">' +
+          '<span class="audio-time" id="tts-time-current">0:00</span>' +
+          '<div class="audio-progress-wrap" id="audio-progress-wrap">' +
+            '<div class="audio-progress"><div class="audio-progress-fill" id="tts-progress"></div></div>' +
+          '</div>' +
+          '<span class="audio-time" id="tts-time-total">0:00</span>' +
+        '</div>' +
+        '<div class="bottom-bar-right">' +
+          '<button class="audio-speed-btn" onclick="ttsToggleSpeedSlider()" title="Playback speed" id="tts-speed-btn">1x</button>' +
+          '<button class="bottom-bar-queue-btn" onclick="toggleBottomBarQueue()" title="Queue" id="bottom-bar-queue-toggle"><svg><use href="#i-queue"/></svg></button>' +
+          '<button class="bottom-bar-settings-btn" onclick="showSettingsPage(\'settings-voice\')" title="Voice settings"><svg><use href="#i-sliders"/></svg></button>' +
+          '<button class="mini-toggle" onclick="setPlayerMode(\'mini\')" title="Minimize to sidebar"><svg class="icon icon-sm"><use href="#i-chevron-left"/></svg></button>' +
+          '<button class="bottom-bar-close-btn" onclick="ttsDismissPlayer()" title="Close player"><svg><use href="#i-xmark"/></svg></button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="bottom-bar-queue" id="audio-queue-section" style="display:none">' +
+        '<div class="audio-queue-header">' +
+          '<span>Queue</span>' +
+          '<button class="audio-queue-clear" onclick="ttsClearQueue()">Clear</button>' +
+        '</div>' +
+        '<div id="audio-queue-list"></div>' +
+      '</div>';
+  }
+
+  /** Build the compact mini player template for sidebar */
+  _renderMini() {
+    this.className = 'bottom-bar-mini hidden';
+    this.innerHTML =
+      '<div class="mini-player-inner">' +
+        '<button class="mini-player-play" onclick="ttsTogglePlay()" title="Play/Pause" id="tts-play-btn"><svg><use href="#i-play"/></svg></button>' +
+        '<div class="mini-player-info" onclick="bottomBarGoToArticle()">' +
+          '<span class="mini-player-title" id="audio-now-label">No article queued</span>' +
+          '<span class="mini-player-status" id="audio-now-status"></span>' +
+        '</div>' +
+        '<button class="mini-player-expand" onclick="setPlayerMode(\'expanded\')" title="Expand player"><svg class="icon icon-sm"><use href="#i-chevron-right"/></svg></button>' +
+      '</div>' +
+      '<div class="mini-player-progress-row">' +
+        '<div class="audio-progress-wrap" id="audio-progress-wrap">' +
+          '<div class="audio-progress"><div class="audio-progress-fill" id="tts-progress"></div></div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  /** Switch between expanded and mini modes */
+  _updateMode() {
+    var oldMode = this._mode;
+    this._mode = this.getAttribute('mode') || 'expanded';
+    // On mobile, always use expanded mode (mini lives in sidebar which is off-screen)
+    if (this._mode === 'mini' && window.innerWidth <= 750) this._mode = 'expanded';
+    if (this._mode === oldMode) return;
+
+    // Re-render with the new template
+    this._renderCurrentMode();
+
+    // Move element to the correct mount point
+    if (this._mode === 'mini') {
+      var mount = document.getElementById('player-mini-mount');
+      if (mount) mount.appendChild(this);
+    } else {
+      var pane = document.getElementById('content-pane');
+      if (pane) pane.appendChild(this);
+    }
+
+    // Re-apply current state to the new DOM
+    renderAudioPlayer();
+
+    // Persist mode preference
+    localStorage.setItem('pr-mini-mode', this._mode === 'mini' ? '1' : '0');
+  }
+
+  /** Set up mouse/touch drag on the progress bar for seeking */
+  _initProgressDrag() {
+    var wrap = this.querySelector('#audio-progress-wrap');
+    if (!wrap) return;
+    var self = this;
+
+    function pctFromEvent(e) {
+      var rect = wrap.getBoundingClientRect();
+      var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    }
+
+    function visualUpdate(pct) {
+      var fill = wrap.querySelector('.audio-progress-fill');
+      if (fill) fill.style.width = (pct * 100) + '%';
+    }
+
+    var dragPct = 0;
+
+    function onMove(e) {
+      e.preventDefault();
+      dragPct = pctFromEvent(e);
+      visualUpdate(dragPct);
+    }
+
+    function onEnd() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onEnd);
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onEnd);
+      self._dragging = false;
+      ttsSeek(dragPct);
+    }
+
+    wrap.addEventListener('mousedown', function(e) {
+      if (!ttsPlaying && ttsCurrentIndex < 0) return;
+      e.preventDefault();
+      self._dragging = true;
+      dragPct = pctFromEvent(e);
+      visualUpdate(dragPct);
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onEnd);
+    });
+
+    wrap.addEventListener('touchstart', function(e) {
+      if (!ttsPlaying && ttsCurrentIndex < 0) return;
+      e.preventDefault();
+      self._dragging = true;
+      dragPct = pctFromEvent(e);
+      visualUpdate(dragPct);
+      document.addEventListener('touchmove', onMove, { passive: false });
+      document.addEventListener('touchend', onEnd);
+    }, { passive: false });
+  }
+
+  /** Toggle the speed slider popup open/closed */
+  _toggleSpeedSlider() {
+    if (this._speedPopup) { this._closeSpeedSlider(); return; }
+
+    var btn = this.querySelector('#tts-speed-btn');
+    if (!btn) return;
+    var rect = btn.getBoundingClientRect();
+    var count = TTS_SPEEDS.length;
+
+    var popup = document.createElement('div');
+    popup.className = 'tts-speed-popup';
+
+    var majorSpeeds = [0.5, 1.0, 1.5, 2.0];
+    var ticksHtml = '';
+    for (var i = count - 1; i >= 0; i--) {
+      var s = TTS_SPEEDS[i];
+      if (majorSpeeds.indexOf(s) >= 0) {
+        ticksHtml += '<div class="tts-speed-tick">' + s + 'x</div>';
+      } else {
+        ticksHtml += '<div class="tts-speed-tick-dot">\u00b7</div>';
+      }
+    }
+
+    popup.innerHTML =
+      '<div class="tts-speed-popup-value" id="tts-speed-popup-val">' + ttsSpeed + 'x</div>' +
+      '<div class="tts-speed-track-wrap" id="tts-speed-track-wrap">' +
+        '<div class="tts-speed-track" id="tts-speed-track">' +
+          '<div class="tts-speed-thumb" id="tts-speed-thumb"></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="tts-speed-ticks">' + ticksHtml + '</div>';
+
+    document.body.appendChild(popup);
+
+    var popW = popup.offsetWidth;
+    var popH = popup.offsetHeight;
+    var left = rect.left + rect.width / 2 - popW / 2;
+    var top = rect.top - popH - 6;
+    if (left < 4) left = 4;
+    if (top < 4) { top = rect.bottom + 6; }
+    popup.style.left = left + 'px';
+    popup.style.top = top + 'px';
+
+    this._positionThumb();
+    this._speedPopup = popup;
+
+    // Drag handling
+    var trackWrap = document.getElementById('tts-speed-track-wrap');
+    var self = this;
+
+    function onDrag(clientY) {
+      var trackRect = trackWrap.getBoundingClientRect();
+      var pct = (clientY - trackRect.top) / trackRect.height;
+      pct = Math.max(0, Math.min(1, pct));
+      var idx = Math.round((1 - pct) * (count - 1));
+      idx = Math.max(0, Math.min(count - 1, idx));
+      ttsSetSpeed(TTS_SPEEDS[idx]);
+      self._positionThumb();
+    }
+
+    trackWrap.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      onDrag(e.clientY);
+      function onMove(ev) { onDrag(ev.clientY); }
+      function onUp() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+
+    trackWrap.addEventListener('touchstart', function(e) {
+      e.preventDefault();
+      onDrag(e.touches[0].clientY);
+      function onTouchMove(ev) { ev.preventDefault(); onDrag(ev.touches[0].clientY); }
+      function onTouchEnd() {
+        document.removeEventListener('touchmove', onTouchMove);
+        document.removeEventListener('touchend', onTouchEnd);
+      }
+      document.addEventListener('touchmove', onTouchMove, { passive: false });
+      document.addEventListener('touchend', onTouchEnd);
+    }, { passive: false });
+
+    // Close on click outside (delay to avoid catching the opening click)
+    this._speedOutsideClick = function(e) {
+      if (self._speedPopup && !self._speedPopup.contains(e.target) && e.target.id !== 'tts-speed-btn') {
+        self._closeSpeedSlider();
+      }
+    };
+    setTimeout(function() {
+      document.addEventListener('mousedown', self._speedOutsideClick);
+      document.addEventListener('touchstart', self._speedOutsideClick);
+    }, 0);
+  }
+
+  /** Close the speed slider popup */
+  _closeSpeedSlider() {
+    if (this._speedPopup) {
+      this._speedPopup.remove();
+      this._speedPopup = null;
+    }
+    if (this._speedOutsideClick) {
+      document.removeEventListener('mousedown', this._speedOutsideClick);
+      document.removeEventListener('touchstart', this._speedOutsideClick);
+      this._speedOutsideClick = null;
+    }
+  }
+
+  /** Position the speed slider thumb to match current ttsSpeed */
+  _positionThumb() {
+    var thumb = document.getElementById('tts-speed-thumb');
+    if (!thumb) return;
+    var idx = TTS_SPEEDS.indexOf(ttsSpeed);
+    if (idx < 0) idx = TTS_SPEEDS.indexOf(1.0);
+    var pct = 1 - idx / (TTS_SPEEDS.length - 1);
+    thumb.style.top = (pct * 100) + '%';
+  }
+
+  /** Update all player DOM elements from TTS state */
+  update(state) {
+    var queue = state.queue || [];
+    var currentIndex = state.currentIndex;
+    var playing = state.playing;
+    var generating = state.generating;
+
+    // Fire custom events when state changes
+    if (queue.length !== this._lastQueueLen) {
+      this._lastQueueLen = queue.length;
+      this.dispatchEvent(new CustomEvent('pr-player:queue-change', {
+        bubbles: true, detail: { length: queue.length }
+      }));
+    }
+    if (currentIndex !== this._lastIndex) {
+      this._lastIndex = currentIndex;
+      var item = (currentIndex >= 0 && currentIndex < queue.length) ? queue[currentIndex] : null;
+      this.dispatchEvent(new CustomEvent('pr-player:now-playing', {
+        bubbles: true, detail: item ? { filename: item.filename, title: item.title } : null
+      }));
+    }
+
+    var app = document.querySelector('.app');
+
+    if (queue.length === 0) {
+      this.classList.add('hidden');
+      if (app) app.classList.remove('has-bottom-bar');
+      return;
+    }
+    this.classList.remove('hidden');
+    if (this._mode !== 'mini' && app) app.classList.add('has-bottom-bar');
+    if (this._mode === 'mini' && app) app.classList.remove('has-bottom-bar');
+
+    var label = this.querySelector('#audio-now-label');
+    var status = this.querySelector('#audio-now-status');
+    var playBtn = this.querySelector('#tts-play-btn');
+
+    var currentItem = (currentIndex >= 0 && currentIndex < queue.length) ? queue[currentIndex] : null;
+    if (label) label.textContent = currentItem ? currentItem.title : 'No article playing';
+
+    // Update artwork (expanded mode only)
+    var artworkEl = this.querySelector('#bottom-bar-artwork');
+    if (artworkEl) {
+      var artSrc = '';
+      if (currentItem) {
+        if (currentItem.image) artSrc = currentItem.image;
+        else if (currentItem.domain) artSrc = '/favicons/' + encodeURIComponent(currentItem.domain) + '.png';
+      }
+      var fallbackIcon = '<svg class="bottom-bar-icon" aria-hidden="true"><use href="#i-volume"/></svg>';
+      if (artSrc) {
+        var img = new Image();
+        img.src = artSrc;
+        img.alt = '';
+        img.onerror = function() { artworkEl.innerHTML = fallbackIcon; };
+        artworkEl.innerHTML = '';
+        artworkEl.appendChild(img);
+      } else {
+        artworkEl.innerHTML = fallbackIcon;
+      }
+    }
+
+    if (status) {
+      if (generating) {
+        status.textContent = 'Generating\u2026';
+      } else if (playing) {
+        status.textContent = 'Playing';
+      } else if (currentIndex >= 0) {
+        status.textContent = 'Paused';
+      } else {
+        status.textContent = '';
+      }
+    }
+
+    if (playBtn) {
+      playBtn.innerHTML = playing
+        ? '<svg><use href="#i-pause"/></svg>'
+        : '<svg><use href="#i-play"/></svg>';
+    }
+
+    // Render queue (expanded mode only)
+    var queueSection = this.querySelector('#audio-queue-section');
+    var queueList = this.querySelector('#audio-queue-list');
+    var queueToggle = this.querySelector('#bottom-bar-queue-toggle');
+    if (queueSection) {
+      if (queue.length > 1) {
+        if (queueToggle) queueToggle.classList.add('active');
+        if (queueList) {
+          queueList.innerHTML = queue.map(function(item, i) {
+            return '<div class="audio-queue-item' + (i === currentIndex ? ' playing' : '') + '" onclick="playTTSItem(' + i + ')">'
+              + '<span style="font-size:10px;color:var(--muted);width:14px;text-align:center">' + (i === currentIndex ? '&#9654;' : (i + 1)) + '</span>'
+              + '<span class="queue-title">' + escapeHtml(item.title) + '</span>'
+              + '<button class="queue-remove" onclick="event.stopPropagation();removeTTSQueueItem(' + i + ')" title="Remove">&times;</button>'
+              + '</div>';
+          }).join('');
+        }
+      } else {
+        if (queueToggle) queueToggle.classList.remove('active');
+        queueSection.style.display = 'none';
+      }
+    }
+  }
+
+  attributeChangedCallback(name, oldVal, newVal) {
+    if (name === 'mode' && oldVal !== newVal && this._initialized) {
+      this._updateMode();
+    }
+  }
+}
+
+customElements.define('pr-player', PrPlayer);
+
+/** Global helper for inline onclick handlers to switch player mode */
+function setPlayerMode(mode) {
+  var player = document.querySelector('pr-player');
+  if (player) player.setAttribute('mode', mode);
+}

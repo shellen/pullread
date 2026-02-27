@@ -18,8 +18,11 @@ export interface FeedEntry {
   updatedAt: string;
   domain: string;
   annotation?: string;
+  contentHtml?: string;
   enclosure?: Enclosure;
   author?: string;
+  categories?: string[];
+  thumbnail?: string;
 }
 
 type FeedType = 'atom' | 'rss' | 'rdf' | 'json';
@@ -50,6 +53,31 @@ function formatDuration(seconds: number): string {
   return m + ':' + String(s).padStart(2, '0');
 }
 
+function extractMediaUrl(media: any): string | undefined {
+  if (!media) return undefined;
+  // Single element: { '@_url': '...' }
+  if (media['@_url']) return media['@_url'];
+  // Array of media:content elements — pick the first image
+  if (Array.isArray(media)) {
+    const img = media.find((m: any) => !m['@_medium'] || m['@_medium'] === 'image');
+    return img?.['@_url'] || media[0]?.['@_url'] || undefined;
+  }
+  return undefined;
+}
+
+function extractCategories(raw: any): string[] | undefined {
+  if (!raw) return undefined;
+  const items = Array.isArray(raw) ? raw : [raw];
+  const cats = items.map((c: any) => {
+    if (typeof c === 'string') return c.trim();
+    if (c?.['@_term']) return String(c['@_term']).trim();
+    if (c?.['#text']) return String(c['#text']).trim();
+    if (c?.__cdata) return String(c.__cdata).trim();
+    return String(c).trim();
+  }).filter(Boolean);
+  return cats.length > 0 ? cats : undefined;
+}
+
 function parseJsonFeed(text: string): FeedEntry[] {
   const feed = JSON.parse(text);
   const items = Array.isArray(feed.items) ? feed.items : [];
@@ -60,10 +88,12 @@ function parseJsonFeed(text: string): FeedEntry[] {
     try { domain = new URL(url).hostname.replace(/^www\./, ''); } catch {}
 
     let annotation: string | undefined;
+    let contentHtml: string | undefined;
     if (item.content_text?.trim()) {
       annotation = item.content_text.trim();
     } else if (item.content_html?.trim()) {
       annotation = item.content_html.replace(/<[^>]+>/g, '').trim() || undefined;
+      if (item.content_html.trim().length > 50) contentHtml = item.content_html.trim();
     } else if (item.summary?.trim()) {
       annotation = item.summary.trim();
     }
@@ -83,14 +113,23 @@ function parseJsonFeed(text: string): FeedEntry[] {
     const jsonAuthor = item.authors?.[0]?.name || item.author?.name || '';
     const jsonAuthorStr = typeof jsonAuthor === 'string' ? jsonAuthor.trim() : '';
 
+    const categories = Array.isArray(item.tags) && item.tags.length > 0
+      ? item.tags.filter((t: any) => typeof t === 'string' && t.trim()).map((t: string) => t.trim())
+      : undefined;
+
+    const thumbnail = item.image || item.banner_image || undefined;
+
     return {
       title: item.title || 'Untitled',
       url,
       updatedAt: item.date_published || item.date_modified || '',
       domain,
       annotation: annotation || undefined,
+      contentHtml: contentHtml || undefined,
       enclosure,
-      author: jsonAuthorStr || undefined
+      author: jsonAuthorStr || undefined,
+      categories: categories?.length ? categories : undefined,
+      thumbnail
     };
   });
 }
@@ -141,13 +180,20 @@ function parseAtomFeed(feed: any): FeedEntry[] {
     const domain = new URL(url).hostname.replace(/^www\./, '');
 
     let annotation: string | undefined;
-    if (entry.content && typeof entry.content === 'string' && entry.content.trim()) {
-      annotation = extractTextFromHtml(entry.content);
-    } else if (entry.content?.['#text']?.trim()) {
-      annotation = extractTextFromHtml(entry.content['#text']);
+    let contentHtml: string | undefined;
+    const rawHtml = typeof entry.content === 'string' ? entry.content.trim()
+      : entry.content?.['__cdata']?.trim() || entry.content?.['#text']?.trim() || undefined;
+    if (rawHtml) {
+      annotation = extractTextFromHtml(rawHtml);
+      if (rawHtml.length > 50) contentHtml = rawHtml;
     }
 
     const author = extractAtomAuthorName(entry.author) || feedAuthor;
+    const categories = extractCategories(entry.category);
+
+    const thumbnail = extractMediaUrl(entry['media:content'])
+      || extractMediaUrl(entry['media:thumbnail'])
+      || undefined;
 
     return {
       title: extractTitle(entry.title),
@@ -155,7 +201,10 @@ function parseAtomFeed(feed: any): FeedEntry[] {
       updatedAt: entry.updated,
       domain,
       annotation: annotation || undefined,
-      author: author || undefined
+      contentHtml: contentHtml || undefined,
+      author: author || undefined,
+      categories,
+      thumbnail
     };
   });
 }
@@ -184,9 +233,23 @@ function parseRssFeed(rss: any): FeedEntry[] {
     let domain = '';
     try { domain = new URL(url).hostname.replace(/^www\./, ''); } catch {}
 
-    const description = item.description
+    // Extract raw HTML from description (handles string, CDATA, #text)
+    const rawDescription = typeof item.description === 'string' ? item.description.trim()
+      : item.description?.__cdata?.trim() || item.description?.['#text']?.trim() || '';
+    const description = rawDescription
       ? extractTextFromHtml(extractTitle(item.description))
       : undefined;
+
+    // Preserve full HTML from content:encoded (RSS 2.0 full-content feeds)
+    const rawContentEncoded = item['content:encoded'] || item['content\\:encoded'];
+    const contentEncodedStr = typeof rawContentEncoded === 'string' ? rawContentEncoded
+      : rawContentEncoded?.__cdata || '';
+    let contentHtml: string | undefined;
+    if (contentEncodedStr.trim().length > 50) {
+      contentHtml = contentEncodedStr.trim();
+    } else if (rawDescription.length > 50 && /<(p|div|h[1-6]|article|blockquote|ul|ol|figure)\b/i.test(rawDescription)) {
+      contentHtml = rawDescription;
+    }
 
     let enclosure: Enclosure | undefined;
     if (item.enclosure) {
@@ -206,14 +269,24 @@ function parseRssFeed(rss: any): FeedEntry[] {
       ? (authorStr.match(/\(([^)]+)\)/)?.[1] || '').trim()
       : authorStr;
 
+    const categories = extractCategories(item.category);
+
+    const thumbnail = extractMediaUrl(item['media:content'])
+      || extractMediaUrl(item['media:thumbnail'])
+      || item['itunes:image']?.['@_href']
+      || undefined;
+
     return [{
       title: extractTitle(item.title),
       url,
       updatedAt: parseRssDate(item.pubDate),
       domain,
       annotation: description || undefined,
+      contentHtml: contentHtml || undefined,
       enclosure,
-      author: authorName || undefined
+      author: authorName || undefined,
+      categories,
+      thumbnail
     }];
   });
 }
@@ -231,6 +304,13 @@ function parseRdfFeed(rdf: any): FeedEntry[] {
       ? extractTextFromHtml(extractTitle(item.description))
       : undefined;
 
+    // Preserve full HTML from content:encoded (RDF feeds can include it)
+    const rawContentEncoded = item['content:encoded'] || item['content\\:encoded'];
+    const contentEncodedStr = typeof rawContentEncoded === 'string' ? rawContentEncoded
+      : rawContentEncoded?.__cdata || '';
+    const contentHtml = contentEncodedStr.trim().length > 50
+      ? contentEncodedStr.trim() : undefined;
+
     // Dublin Core date (dc:date) is ISO 8601
     const dateStr = item['dc:date'] || item.pubDate || '';
     let updatedAt = dateStr;
@@ -238,6 +318,7 @@ function parseRdfFeed(rdf: any): FeedEntry[] {
 
     const rdfAuthor = item['dc:creator'] || '';
     const rdfAuthorStr = typeof rdfAuthor === 'string' ? rdfAuthor.trim() : '';
+    const categories = extractCategories(item['dc:subject'] || item.category);
 
     return {
       title: extractTitle(item.title),
@@ -245,7 +326,9 @@ function parseRdfFeed(rdf: any): FeedEntry[] {
       updatedAt,
       domain,
       annotation: description || undefined,
-      author: rdfAuthorStr || undefined
+      contentHtml: contentHtml || undefined,
+      author: rdfAuthorStr || undefined,
+      categories
     };
   });
 }

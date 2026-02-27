@@ -1,3 +1,10 @@
+// Abbreviate large numbers: 0-99 exact, 100+ → "100+", 1000+ → "1K+", 13000 → "13K+"
+function approxCount(n) {
+  if (n < 100) return String(n);
+  if (n < 1000) return Math.floor(n / 100) * 100 + '+';
+  return Math.floor(n / 1000) + 'K+';
+}
+
 // Fold accented characters to ASCII for accent-insensitive search
 function foldAccents(s) {
   return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -136,6 +143,38 @@ function cleanMarkdown(md) {
   return md;
 }
 
+// Format a date string as relative time for recent, named date for older
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  var d = new Date(dateStr);
+  if (isNaN(d)) return dateStr.slice(0, 10);
+  var now = new Date();
+  var diffMs = now - d;
+  var diffMins = Math.floor(diffMs / 60000);
+  var diffHours = Math.floor(diffMs / 3600000);
+  var diffDays = Math.floor(diffMs / 86400000);
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return diffMins + 'm ago';
+  if (diffHours < 24) return diffHours + 'h ago';
+  if (diffDays === 1) return 'yesterday';
+  if (diffDays < 7) return diffDays + 'd ago';
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  if (d.getFullYear() === now.getFullYear()) {
+    return months[d.getMonth()] + ' ' + d.getDate();
+  }
+  return months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+}
+
+// Full datetime string for tooltip hover
+function timeAgoTitle(dateStr) {
+  if (!dateStr) return '';
+  var d = new Date(dateStr);
+  if (isNaN(d)) return dateStr;
+  var pad = function(n) { return n < 10 ? '0' + n : n; };
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())
+    + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
 // Check if a feed name roughly matches an article's domain
 function feedMatchesDomain(feedName, domain) {
   var f = feedName.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -172,6 +211,21 @@ function handleTagInput(e, getTagsArray, onAdd) {
     }
     e.target.value = '';
   }
+}
+
+// Block/unblock tags from Explore and Home
+function blockTag(tag) {
+  blockedTags.add(tag);
+  localStorage.setItem('pr-blocked-tags', JSON.stringify([...blockedTags]));
+  showToast('Blocked "' + tag + '"');
+}
+function unblockTag(tag) {
+  blockedTags.delete(tag);
+  localStorage.setItem('pr-blocked-tags', JSON.stringify([...blockedTags]));
+  showToast('Unblocked "' + tag + '"');
+}
+function isTagBlocked(tag) {
+  return blockedTags.has(tag);
 }
 
 // Print styled HTML content using the system print dialog (Save as PDF on macOS).

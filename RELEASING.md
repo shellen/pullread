@@ -153,3 +153,22 @@ Provider docs:
 - [OpenAI](https://platform.openai.com/docs/models)
 - [Gemini](https://ai.google.dev/gemini-api/docs/models)
 - [OpenRouter](https://openrouter.ai/models)
+
+## Keeping Kokoro TTS Up to Date
+
+Before releasing, verify the Kokoro model files are still available on HuggingFace:
+
+```bash
+# Check q8 model (default, ~92MB)
+curl -sI "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/onnx/model_quantized.onnx" | head -1
+
+# Check q4 model (high quality, ~305MB)
+curl -sI "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/onnx/model_q4.onnx" | head -1
+
+# Both should return HTTP 302 (redirect to CDN)
+```
+
+If files return 404, check the HuggingFace repo for renamed/updated models:
+https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/tree/main/onnx
+
+Update `src/tts.ts` (`kokoroModelFile` and `ensureKokoroModelCached`) and `scripts/download-kokoro-model.sh` if paths change.

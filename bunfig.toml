@@ -1,0 +1,5 @@
+# ABOUTME: Bun runtime configuration.
+# ABOUTME: Excludes Playwright e2e tests from bun's test runner.
+
+[test]
+root = "./src"

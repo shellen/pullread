@@ -1,8 +1,8 @@
 // ABOUTME: Text-to-speech provider abstraction for article audio playback
-// ABOUTME: Supports Kokoro (local), OpenAI TTS, and ElevenLabs; browser speech synthesis is handled client-side
+// ABOUTME: Supports OpenAI TTS and ElevenLabs; browser speech synthesis is handled client-side
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'fs';
-import { join, dirname } from 'path';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { join } from 'path';
 import { homedir } from 'os';
 import { createHash } from 'crypto';
 import { request as httpsRequest } from 'https';
@@ -10,7 +10,6 @@ import { saveToKeychain, loadFromKeychain } from './keychain';
 
 const SETTINGS_PATH = join(homedir(), '.config', 'pullread', 'settings.json');
 const CACHE_DIR = join(homedir(), '.config', 'pullread', 'tts-cache');
-const KOKORO_MODEL_DIR = join(homedir(), '.config', 'pullread', 'kokoro-model');
 
 /** Active TTS generation session for progressive chunk-based playback */
 interface TtsSession {
@@ -32,38 +31,14 @@ setInterval(() => {
   }
 }, 60 * 1000);
 
-/** Resolve the best Kokoro model directory — bundled (from app Resources) or user cache */
-function resolveKokoroModelDir(): string {
-  // If running inside the macOS app, SyncService sets this to the bundled model path
-  const bundled = process.env.PULLREAD_KOKORO_MODEL_DIR;
-  if (bundled && existsSync(bundled)) {
-    return bundled;
-  }
-  // Fall back to user cache directory (downloaded on first use)
-  return KOKORO_MODEL_DIR;
-}
-
 export interface TTSConfig {
-  provider: 'browser' | 'kokoro' | 'openai' | 'elevenlabs';
+  provider: 'browser' | 'openai' | 'elevenlabs';
   apiKey?: string;
   voice?: string;
   model?: string;
 }
 
 export const TTS_VOICES: Record<string, { id: string; label: string }[]> = {
-  kokoro: [
-    { id: 'af_heart', label: 'Heart \u2014 warm, expressive' },
-    { id: 'af_bella', label: 'Bella \u2014 clear, lively' },
-    { id: 'af_nicole', label: 'Nicole \u2014 low, breathy' },
-    { id: 'af_sarah', label: 'Sarah \u2014 friendly, natural' },
-    { id: 'af_sky', label: 'Sky \u2014 light, airy' },
-    { id: 'am_adam', label: 'Adam \u2014 deep, steady' },
-    { id: 'am_michael', label: 'Michael \u2014 warm, smooth' },
-    { id: 'bf_emma', label: 'Emma \u2014 clear, polished' },
-    { id: 'bf_isabella', label: 'Isabella \u2014 refined, elegant' },
-    { id: 'bm_george', label: 'George \u2014 authoritative, rich' },
-    { id: 'bm_lewis', label: 'Lewis \u2014 measured, calm' },
-  ],
   openai: [
     { id: 'alloy', label: 'Alloy' },
     { id: 'ash', label: 'Ash' },
@@ -87,10 +62,6 @@ export const TTS_VOICES: Record<string, { id: string; label: string }[]> = {
 };
 
 export const TTS_MODELS: Record<string, { id: string; label: string }[]> = {
-  kokoro: [
-    { id: 'kokoro-v1-q8', label: 'Kokoro v1 (q8, 92MB)' },
-    { id: 'kokoro-v1-q4', label: 'Kokoro v1 (q4, 305MB)' },
-  ],
   openai: [
     { id: 'tts-1', label: 'TTS-1 (fast)' },
     { id: 'tts-1-hd', label: 'TTS-1 HD (quality)' },
@@ -109,6 +80,10 @@ export function loadTTSConfig(): TTSConfig {
       const settings = JSON.parse(readFileSync(SETTINGS_PATH, 'utf-8'));
       if (settings.tts) {
         const config = settings.tts as TTSConfig;
+        // Migrate legacy Kokoro provider to browser
+        if ((config as any).provider === 'kokoro') {
+          config.provider = 'browser';
+        }
         // Read API key from Keychain if not in settings
         if (!config.apiKey && (config.provider === 'openai' || config.provider === 'elevenlabs')) {
           config.apiKey = loadFromKeychain('tts-api-key') || '';
@@ -117,7 +92,7 @@ export function loadTTSConfig(): TTSConfig {
       }
     }
   } catch {}
-  return { provider: 'kokoro' };
+  return { provider: 'browser' };
 }
 
 export function saveTTSConfig(config: TTSConfig): void {
@@ -194,8 +169,7 @@ function cacheKey(articleName: string, provider: string, voice: string, model: s
 export function getCachedAudioPath(articleName: string, config: TTSConfig): string | null {
   if (!existsSync(CACHE_DIR)) return null;
   const key = cacheKey(articleName, config.provider, config.voice || '', config.model || '');
-  const ext = config.provider === 'kokoro' ? '.wav' : '.mp3';
-  const path = join(CACHE_DIR, key + ext);
+  const path = join(CACHE_DIR, key + '.mp3');
   return existsSync(path) ? path : null;
 }
 
@@ -203,8 +177,7 @@ export function getCachedAudioPath(articleName: string, config: TTSConfig): stri
 function saveCachedAudio(articleName: string, config: TTSConfig, audio: Buffer): string {
   if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true });
   const key = cacheKey(articleName, config.provider, config.voice || '', config.model || '');
-  const ext = config.provider === 'kokoro' ? '.wav' : '.mp3';
-  const path = join(CACHE_DIR, key + ext);
+  const path = join(CACHE_DIR, key + '.mp3');
   writeFileSync(path, audio);
   return path;
 }
@@ -283,350 +256,6 @@ function httpsPost(url: string, headers: Record<string, string>, body: string | 
   });
 }
 
-/** Check if Kokoro model is downloaded and ready */
-export function getKokoroStatus(): { installed: boolean; modelPath: string; bundled: boolean } {
-  const modelDir = resolveKokoroModelDir();
-  const installed = existsSync(modelDir) && readdirSync(modelDir).length > 0;
-  const bundled = !!process.env.PULLREAD_KOKORO_MODEL_DIR && existsSync(process.env.PULLREAD_KOKORO_MODEL_DIR);
-  return { installed, modelPath: modelDir, bundled };
-}
-
-/**
- * Pre-download the Kokoro model in the background.
- * Returns a promise that resolves when the model is ready.
- */
-export async function preloadKokoro(model: string = 'kokoro-v1-q8'): Promise<{ ready: boolean; error?: string }> {
-  try {
-    await getKokoroPipeline(model);
-    return { ready: true };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return { ready: false, error: msg };
-  }
-}
-
-/** Lazy-loaded Kokoro pipeline singleton */
-let kokoroPipeline: any = null;
-let kokoroLoading = false;
-
-/**
- * Find the kokoro.web.js self-contained bundle on the filesystem.
- * This is used as a fallback when the normal `import('kokoro-js')` fails
- * (e.g. in Bun compiled binaries where module resolution is broken).
- */
-function resolveKokoroWebBuild(): string | null {
-  // 1. Explicit env var (set by Tauri sidecar launcher)
-  const explicit = process.env.PULLREAD_KOKORO_JS_PATH;
-  if (explicit && existsSync(explicit)) return explicit;
-
-  // 2. Adjacent to the bundled model directory (app Resources/)
-  const modelDir = process.env.PULLREAD_KOKORO_MODEL_DIR;
-  if (modelDir) {
-    const adjacent = join(dirname(modelDir), 'kokoro.web.js');
-    if (existsSync(adjacent)) return adjacent;
-  }
-
-  // 3. In node_modules (dev / non-bundled installs)
-  let dir = __dirname;
-  for (let i = 0; i < 5; i++) {
-    const candidate = join(dir, 'node_modules', 'kokoro-js', 'dist', 'kokoro.web.js');
-    if (existsSync(candidate)) return candidate;
-    const parent = dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-
-  return null;
-}
-
-/**
- * Find the onnxruntime-web directory containing ort.mjs and WASM files.
- * Required for the web build fallback — the bundled ORT inside kokoro.web.js
- * fails to self-initialize in Bun, so we load ort.mjs separately and
- * register it on globalThis for kokoro.web.js to discover.
- */
-function resolveOrtWasmDir(): string | null {
-  // 1. Explicit env var (set by Tauri sidecar launcher)
-  const explicit = process.env.PULLREAD_ORT_WASM_DIR;
-  if (explicit && existsSync(join(explicit, 'ort.mjs'))) return explicit;
-
-  // 2. Adjacent to kokoro.web.js in app Resources/
-  const modelDir = process.env.PULLREAD_KOKORO_MODEL_DIR;
-  if (modelDir) {
-    const adjacent = join(dirname(modelDir), 'ort-wasm');
-    if (existsSync(join(adjacent, 'ort.mjs'))) return adjacent;
-  }
-
-  // 3. In node_modules (dev / non-bundled installs)
-  let dir = __dirname;
-  for (let i = 0; i < 5; i++) {
-    const candidate = join(dir, 'node_modules', 'onnxruntime-web', 'dist');
-    if (existsSync(join(candidate, 'ort.mjs'))) return candidate;
-    const parent = dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-
-  return null;
-}
-
-/**
- * Patch kokoro.web.js source to work with externally-registered ORT.
- *
- * kokoro.web.js bundles its own onnxruntime-web internally, but that bundled
- * copy fails to initialize in Bun (the WASM backend never registers properly).
- * When we pre-register a working ORT on globalThis[Symbol.for("onnxruntime")],
- * kokoro.web.js finds it but skips device setup. These patches fix that:
- *
- * 1. Populate the WASM device list when using the globalThis ORT path
- * 2. Map "cpu" device requests to "wasm" (the model config defaults to "cpu")
- */
-function patchKokoroWebSource(src: string): string {
-  // Patch 1: Add device setup for globalThis ORT path
-  const p1_find = 'if(u in globalThis)g=globalThis[u];else';
-  const p1_replace = 'if(u in globalThis){g=globalThis[u];l.push("wasm"),c=["wasm"]}else';
-  if (src.includes(p1_find)) {
-    src = src.replace(p1_find, p1_replace);
-  }
-
-  // Patch 2: Map "cpu" device to "wasm" in the device resolver
-  const p2_find = 'if(l.includes(e))return[o[e]??e];throw';
-  const p2_replace = 'if(l.includes(e))return[o[e]??e];if(e==="cpu"&&l.includes("wasm"))return["wasm"];throw';
-  if (src.includes(p2_find)) {
-    src = src.replace(p2_find, p2_replace);
-  }
-
-  return src;
-}
-
-/**
- * Pre-register onnxruntime-web on globalThis so kokoro.web.js can find it.
- * Also configures WASM for single-threaded, no-proxy mode (Bun compatible).
- */
-async function preRegisterOrt(ortWasmDir: string): Promise<void> {
-  const ortSymbol = Symbol.for('onnxruntime');
-  if (ortSymbol in globalThis) return; // Already registered
-
-  const ortPath = join(ortWasmDir, 'ort.mjs');
-  const ort = await import(ortPath);
-
-  ort.env.wasm.numThreads = 1;
-  ort.env.wasm.proxy = false;
-  ort.env.wasm.wasmPaths = ortWasmDir + '/';
-
-  (globalThis as any)[ortSymbol] = ort;
-}
-
-async function getKokoroPipeline(model: string): Promise<any> {
-  if (kokoroPipeline) return kokoroPipeline;
-  if (kokoroLoading) {
-    // Wait for concurrent load to finish
-    while (kokoroLoading) await new Promise(r => setTimeout(r, 100));
-    if (kokoroPipeline) return kokoroPipeline;
-  }
-
-  kokoroLoading = true;
-  try {
-    let KokoroTTS: any;
-    let usingWebBuild = false;
-
-    // Strategy 1: normal import — works in dev mode (ts-node / unbundled bun)
-    // where node_modules is available on the filesystem.
-    try {
-      const mod = await import('kokoro-js');
-      KokoroTTS = mod.KokoroTTS;
-    } catch {
-      // Strategy 2: load the patched kokoro.web.js with external ORT.
-      //
-      // In Bun compiled binaries, `import('kokoro-js')` fails because:
-      //   (a) Bun's bundler corrupts @huggingface/transformers' webpack internals
-      //   (b) onnxruntime-node's native .node addon can't dlopen from Bun's virtual FS
-      //
-      // The fix uses three pieces:
-      //   1. onnxruntime-web (ort.mjs) — loaded separately and registered on
-      //      globalThis[Symbol.for("onnxruntime")] so kokoro.web.js discovers it
-      //   2. kokoro.web.js — runtime-patched to set up WASM device list and
-      //      map "cpu" device requests to "wasm"
-      //   3. ort-wasm-simd-threaded.jsep.wasm — the WASM binary for ONNX inference
-      const webBuildPath = resolveKokoroWebBuild();
-      if (!webBuildPath) {
-        throw new Error(
-          'Kokoro voice engine not found — neither the kokoro-js package nor ' +
-          'the bundled kokoro.web.js could be located.'
-        );
-      }
-
-      const ortWasmDir = resolveOrtWasmDir();
-      if (!ortWasmDir) {
-        throw new Error(
-          'Kokoro WASM runtime not found — the onnxruntime-web dist directory ' +
-          'could not be located. Ensure ort.mjs and ort-wasm-simd-threaded.jsep.wasm ' +
-          'are bundled in the app Resources/ort-wasm/ directory.'
-        );
-      }
-
-      // Pre-register ORT on globalThis before loading kokoro.web.js
-      await preRegisterOrt(ortWasmDir);
-
-      // Patch kokoro.web.js and load from a temp file
-      const { readFileSync: readFS, writeFileSync: writeFS } = await import('fs');
-      const src = readFS(webBuildPath, 'utf-8');
-      const patched = patchKokoroWebSource(src);
-      const tmpDir = join((await import('os')).tmpdir(), 'pullread-kokoro');
-      if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
-      const patchedPath = join(tmpDir, 'kokoro.web.patched.js');
-      writeFS(patchedPath, patched);
-
-      const mod = await import(patchedPath);
-      KokoroTTS = mod.KokoroTTS;
-      usingWebBuild = true;
-    }
-
-    const dtype = model === 'kokoro-v1-q4' ? 'q4' : 'q8';
-    const modelDir = resolveKokoroModelDir();
-
-    // If the model is bundled inside the app, use that path directly.
-    // Otherwise fall back to downloading from HuggingFace Hub.
-    const bundled = process.env.PULLREAD_KOKORO_MODEL_DIR && existsSync(process.env.PULLREAD_KOKORO_MODEL_DIR);
-
-    let modelSource: string;
-    if (bundled) {
-      // The web build uses fetch() for file I/O, so it needs file:// URLs
-      // to access the local filesystem. The node build uses fs directly.
-      modelSource = usingWebBuild ? 'file://' + modelDir : modelDir;
-    } else {
-      modelSource = 'onnx-community/Kokoro-82M-v1.0-ONNX';
-    }
-
-    kokoroPipeline = await KokoroTTS.from_pretrained(
-      modelSource,
-      { dtype, cache_dir: usingWebBuild ? undefined : modelDir }
-    );
-    return kokoroPipeline;
-  } finally {
-    kokoroLoading = false;
-  }
-}
-
-/** Generate speech using Kokoro (local) */
-async function kokoroTTS(text: string, config: TTSConfig): Promise<Buffer> {
-  const pipeline = await getKokoroPipeline(config.model || 'kokoro-v1-q8');
-  const voice = config.voice || 'af_heart';
-
-  // Kokoro-82M has a ~510 phoneme-token context window. At ~4-5 tokens per
-  // word that's roughly 100-125 words (~500 chars). Exceeding it silently
-  // truncates the audio output.
-  const chunks = chunkText(text, 500);
-  const pcmChunks: Float32Array[] = [];
-  let sampleRate = 24000;
-
-  for (const chunk of chunks) {
-    const audio = await pipeline.generate(chunk, { voice });
-
-    if (audio.data) {
-      pcmChunks.push(audio.data);
-      if (audio.sampling_rate) sampleRate = audio.sampling_rate;
-    } else if (typeof audio.toBlob === 'function') {
-      const blob = await audio.toBlob();
-      const arrayBuf = await blob.arrayBuffer();
-      pcmChunks.push(extractPcmFromWav(Buffer.from(arrayBuf)));
-    } else {
-      throw new Error('Unexpected Kokoro audio output format');
-    }
-  }
-
-  // Concatenate all raw PCM samples into a single array, then encode once.
-  // (Concatenating WAV files directly produces a corrupt file — only the
-  // first chunk plays because each WAV has its own header and data length.)
-  const totalLength = pcmChunks.reduce((sum, c) => sum + c.length, 0);
-  const combined = new Float32Array(totalLength);
-  let offset = 0;
-  for (const pcm of pcmChunks) {
-    combined.set(pcm, offset);
-    offset += pcm.length;
-  }
-
-  return encodeWav(combined, sampleRate);
-}
-
-/** Extract raw PCM int16 samples from a WAV buffer by scanning for the data chunk */
-function extractPcmFromWav(wavBuf: Buffer): Float32Array {
-  // Scan RIFF chunks starting after the 12-byte RIFF header (RIFF + size + WAVE)
-  for (let pos = 12; pos < wavBuf.length - 8; ) {
-    const chunkId = wavBuf.toString('ascii', pos, pos + 4);
-    const chunkSize = wavBuf.readUInt32LE(pos + 4);
-    if (chunkId === 'data') {
-      const dataStart = pos + 8;
-      const sampleCount = Math.min(chunkSize, wavBuf.length - dataStart) / 2;
-      const pcm = new Float32Array(sampleCount);
-      for (let i = 0; i < sampleCount; i++) {
-        pcm[i] = wavBuf.readInt16LE(dataStart + i * 2) / 32767;
-      }
-      return pcm;
-    }
-    pos += 8 + chunkSize;
-    if (chunkSize % 2 !== 0) pos++; // WAV chunks are word-aligned
-  }
-  throw new Error('Invalid WAV: no data chunk found');
-}
-
-/** Encode raw PCM float32 data as a WAV buffer */
-function encodeWav(samples: Float32Array, sampleRate: number): Buffer {
-  const numChannels = 1;
-  const bitsPerSample = 16;
-  const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
-  const blockAlign = numChannels * (bitsPerSample / 8);
-  const dataSize = samples.length * (bitsPerSample / 8);
-  const headerSize = 44;
-  const buf = Buffer.alloc(headerSize + dataSize);
-
-  // RIFF header
-  buf.write('RIFF', 0);
-  buf.writeUInt32LE(36 + dataSize, 4);
-  buf.write('WAVE', 8);
-  // fmt chunk
-  buf.write('fmt ', 12);
-  buf.writeUInt32LE(16, 16);
-  buf.writeUInt16LE(1, 20); // PCM
-  buf.writeUInt16LE(numChannels, 22);
-  buf.writeUInt32LE(sampleRate, 24);
-  buf.writeUInt32LE(byteRate, 28);
-  buf.writeUInt16LE(blockAlign, 30);
-  buf.writeUInt16LE(bitsPerSample, 32);
-  // data chunk
-  buf.write('data', 36);
-  buf.writeUInt32LE(dataSize, 40);
-
-  // Convert float32 to int16
-  for (let i = 0; i < samples.length; i++) {
-    const s = Math.max(-1, Math.min(1, samples[i]));
-    buf.writeInt16LE(Math.round(s * 32767), headerSize + i * 2);
-  }
-
-  return buf;
-}
-
-/** Generate a single chunk of speech using Kokoro (returns WAV) */
-async function kokoroSingleChunk(text: string, config: TTSConfig): Promise<Buffer> {
-  const pipeline = await getKokoroPipeline(config.model || 'kokoro-v1-q8');
-  const voice = config.voice || 'af_heart';
-  const audio = await pipeline.generate(text, { voice });
-
-  if (audio.data) {
-    const pcm = audio.data;
-    const sampleRate = audio.sampling_rate || 24000;
-    return encodeWav(pcm, sampleRate);
-  } else if (typeof audio.toBlob === 'function') {
-    // Return Kokoro's native WAV directly — re-encoding is lossy and
-    // produces WAVs that some decoders (WKWebView) reject
-    const blob = await audio.toBlob();
-    const arrayBuf = await blob.arrayBuffer();
-    return Buffer.from(arrayBuf);
-  } else {
-    throw new Error('Unexpected Kokoro audio output format');
-  }
-}
-
 /** Generate a single chunk of speech using OpenAI (returns MP3) */
 async function openaiSingleChunk(text: string, config: TTSConfig): Promise<Buffer> {
   const body = JSON.stringify({
@@ -664,10 +293,9 @@ async function elevenlabsSingleChunk(text: string, config: TTSConfig): Promise<B
 /** Chunk size per provider */
 function chunkSizeForProvider(provider: string): number {
   switch (provider) {
-    case 'kokoro': return 500;
     case 'openai': return 4096;
     case 'elevenlabs': return 5000;
-    default: return 500;
+    default: return 4096;
   }
 }
 
@@ -718,20 +346,6 @@ export async function generateSessionChunk(sessionId: string, chunkIndex: number
   let audio: Buffer;
 
   switch (session.config.provider) {
-    case 'kokoro':
-      try {
-        audio = await kokoroSingleChunk(text, session.config);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (msg.includes('dlopen') || msg.includes('code signature') || msg.includes('not valid for use')) {
-          throw new Error('Kokoro voice engine could not load. This may be a code signing issue — try reinstalling Pull Read from the latest release. (Detail: ' + (msg.length > 200 ? msg.slice(0, 200) + '…' : msg) + ')');
-        }
-        if (msg.includes('kokoro-js') || msg.includes('Cannot find module') || msg.includes('Cannot find package')) {
-          throw new Error('Kokoro voice engine is not available in this build — try reinstalling Pull Read from the latest release.');
-        }
-        throw new Error('Kokoro voice failed: ' + (msg.length > 120 ? msg.slice(0, 120) + '…' : msg));
-      }
-      break;
     case 'openai':
       if (!session.config.apiKey) throw new Error('OpenAI API key required for TTS');
       audio = await openaiSingleChunk(text, session.config);
@@ -762,25 +376,8 @@ function finalizeSession(session: TtsSession): void {
     if (buf) buffers.push(buf);
   }
 
-  let combined: Buffer;
-  if (session.config.provider === 'kokoro') {
-    // Extract PCM from each WAV chunk, concatenate, re-encode as single WAV
-    const pcmChunks: Float32Array[] = [];
-    for (const wavBuf of buffers) {
-      pcmChunks.push(extractPcmFromWav(wavBuf));
-    }
-    const totalLength = pcmChunks.reduce((sum, c) => sum + c.length, 0);
-    const allPcm = new Float32Array(totalLength);
-    let offset = 0;
-    for (const pcm of pcmChunks) {
-      allPcm.set(pcm, offset);
-      offset += pcm.length;
-    }
-    combined = encodeWav(allPcm, 24000);
-  } else {
-    // MP3 frames are self-contained — simple concatenation works
-    combined = Buffer.concat(buffers);
-  }
+  // MP3 frames are self-contained — simple concatenation works
+  const combined = Buffer.concat(buffers);
 
   saveCachedAudio(session.articleName, session.config, combined);
   ttsSessions.delete(session.id);
@@ -840,7 +437,7 @@ async function elevenlabsTTS(text: string, config: TTSConfig): Promise<Buffer> {
 
 /** Get the audio content type for a provider */
 export function getAudioContentType(provider: string): string {
-  return provider === 'kokoro' ? 'audio/wav' : 'audio/mpeg';
+  return 'audio/mpeg';
 }
 
 /** Generate TTS audio for the given text using the configured provider */
@@ -855,21 +452,6 @@ export async function generateSpeech(articleName: string, text: string, config: 
   let audio: Buffer;
 
   switch (config.provider) {
-    case 'kokoro':
-      try {
-        audio = await kokoroTTS(plainText, config);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        // Translate native library / code signing errors into user-friendly messages
-        if (msg.includes('dlopen') || msg.includes('code signature') || msg.includes('not valid for use')) {
-          throw new Error('Kokoro voice engine could not load. This may be a code signing issue — try reinstalling Pull Read from the latest release. (Detail: ' + (msg.length > 200 ? msg.slice(0, 200) + '…' : msg) + ')');
-        }
-        if (msg.includes('kokoro-js') || msg.includes('Cannot find module') || msg.includes('Cannot find package')) {
-          throw new Error('Kokoro voice engine is not available in this build — try reinstalling Pull Read from the latest release.');
-        }
-        throw new Error('Kokoro voice failed: ' + (msg.length > 120 ? msg.slice(0, 120) + '…' : msg));
-      }
-      break;
     case 'openai':
       if (!config.apiKey) throw new Error('OpenAI API key required for TTS');
       audio = await openaiTTS(plainText, config);

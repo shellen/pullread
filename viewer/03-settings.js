@@ -21,13 +21,55 @@ function setSize(size) {
   localStorage.setItem('pr-size', size);
 }
 
-function toggleSidebar() {
-  const sidebar = document.getElementById('sidebar');
-  sidebar.classList.toggle('collapsed');
-  const isCollapsed = sidebar.classList.contains('collapsed');
-  localStorage.setItem('pr-sidebar', isCollapsed ? '0' : '1');
-  document.getElementById('sidebar-toggle-btn').setAttribute('aria-expanded', !isCollapsed);
+function collapseSidebar() {
+  var sidebar = document.getElementById('sidebar');
+  sidebar.classList.add('collapsed');
+  localStorage.setItem('pr-sidebar', '0');
 }
+
+function expandSidebar() {
+  var sidebar = document.getElementById('sidebar');
+  sidebar.classList.remove('collapsed');
+  localStorage.setItem('pr-sidebar', '1');
+}
+
+function toggleSidebar() {
+  var sidebar = document.getElementById('sidebar');
+  if (sidebar.classList.contains('collapsed')) expandSidebar();
+  else collapseSidebar();
+}
+
+function toggleMobileSidebar() {
+  var sidebar = document.getElementById('sidebar');
+  var overlay = document.getElementById('sidebar-overlay');
+  var isOpen = sidebar.classList.contains('mobile-open');
+  if (isOpen) {
+    closeMobileSidebar();
+  } else {
+    sidebar.classList.add('mobile-open');
+    overlay.classList.add('visible');
+  }
+}
+
+function closeMobileSidebar() {
+  var sidebar = document.getElementById('sidebar');
+  var overlay = document.getElementById('sidebar-overlay');
+  sidebar.classList.remove('mobile-open');
+  overlay.classList.remove('visible');
+}
+
+function openDrawer() {
+  document.getElementById('drawer').classList.add('open');
+}
+
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('open');
+  var footerEl = document.getElementById('drawer-footer');
+  if (footerEl) footerEl.style.display = 'none';
+}
+
+// Legacy alias
+var toggleDrawer = toggleSidebar;
 
 function setLineHeight(val) {
   document.body.className = document.body.className.replace(/leading-\w+/g, '');
@@ -50,8 +92,8 @@ function setWidth(val) {
 
 function toggleSettingsDropdown() {
   const existing = document.querySelector('.settings-dropdown-panel');
-  const btn = document.getElementById('aa-settings-btn');
-  if (existing) { existing.remove(); btn.setAttribute('aria-expanded', 'false'); return; }
+  const btn = document.querySelector('.toolbar-aa-btn');
+  if (existing) { existing.remove(); if (btn) btn.setAttribute('aria-expanded', 'false'); return; }
 
   const currentTheme = document.body.getAttribute('data-theme') || 'light';
   const currentFont = localStorage.getItem('pr-font') || 'serif';
@@ -92,6 +134,8 @@ function toggleSettingsDropdown() {
       <button data-setting="size" data-val="medium" onclick="setSize('medium');updateDropdownState()" ${currentSize==='medium'?'class="active"':''} style="font-size:14px" aria-label="Medium text">A</button>
       <button data-setting="size" data-val="large" onclick="setSize('large');updateDropdownState()" ${currentSize==='large'?'class="active"':''} style="font-size:17px" aria-label="Large text">A</button>
       <button data-setting="size" data-val="xlarge" onclick="setSize('xlarge');updateDropdownState()" ${currentSize==='xlarge'?'class="active"':''} style="font-size:20px" aria-label="Extra large text">A</button>
+      <button data-setting="size" data-val="xxlarge" onclick="setSize('xxlarge');updateDropdownState()" ${currentSize==='xxlarge'?'class="active"':''} style="font-size:23px" aria-label="2X large text">A</button>
+      <button data-setting="size" data-val="xxxlarge" onclick="setSize('xxxlarge');updateDropdownState()" ${currentSize==='xxxlarge'?'class="active"':''} style="font-size:26px" aria-label="3X large text">A</button>
     </div>
     <label>Line height</label>
     <div class="setting-row">
@@ -114,16 +158,30 @@ function toggleSettingsDropdown() {
     </div>
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0 8px">
     <div class="setting-row">
-      <button onclick="var p=document.querySelector('.settings-dropdown-panel');if(p)p.remove();var b=document.getElementById('aa-settings-btn');if(b)b.setAttribute('aria-expanded','false');showShortcutsModal()" style="flex:1;text-align:center"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-keyboard"/></svg> Keyboard Shortcuts</button>
+      <button onclick="var p=document.querySelector('.settings-dropdown-panel');if(p)p.remove();var b=document.querySelector('.toolbar-aa-btn');if(b)b.setAttribute('aria-expanded','false');showShortcutsModal()" style="flex:1;text-align:center"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-keyboard"/></svg> Keyboard Shortcuts</button>
     </div>
     ${breakStatus}
   `;
   document.body.appendChild(panel);
-  btn.setAttribute('aria-expanded', 'true');
+  if (btn) btn.setAttribute('aria-expanded', 'true');
 }
 
-var _fontLabels = {serif:'Serif',sans:'Sans-serif',system:'Charter',mono:'Monospace',inter:'Inter',lora:'Lora',literata:'Literata','source-serif':'Source Serif','work-sans':'Work Sans',opendyslexic:'OpenDyslexic'};
-var _fontOptions = [['serif','Serif'],['sans','Sans-serif'],['system','Charter'],['mono','Monospace'],['inter','Inter'],['lora','Lora'],['literata','Literata'],['source-serif','Source Serif'],['work-sans','Work Sans'],['opendyslexic','OpenDyslexic']];
+var _fontLabels = {serif:'Serif',sans:'Sans-serif',system:'Charter',mono:'Monospace',inter:'Inter',lora:'Lora',literata:'Literata','source-serif':'Source Serif','work-sans':'Work Sans','instrument-serif':'Instrument Serif',opendyslexic:'OpenDyslexic'};
+var _fontOptions = [['work-sans','Work Sans'],['instrument-serif','Instrument Serif'],['serif','Serif'],['sans','Sans-serif'],['system','Charter'],['mono','Monospace'],['inter','Inter'],['lora','Lora'],['literata','Literata'],['source-serif','Source Serif'],['opendyslexic','OpenDyslexic']];
+
+var _fontFamilies = {
+  'serif': 'Georgia, "Times New Roman", serif',
+  'sans': '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  'system': 'Charter, "Bitstream Charter", serif',
+  'mono': '"SF Mono", "Fira Code", monospace',
+  'inter': 'Inter, -apple-system, sans-serif',
+  'lora': 'Lora, Georgia, serif',
+  'literata': 'Literata, Georgia, serif',
+  'source-serif': '"Source Serif 4", Georgia, serif',
+  'work-sans': '"Work Sans", -apple-system, sans-serif',
+  'instrument-serif': '"Instrument Serif", Georgia, serif',
+  'opendyslexic': 'OpenDyslexic, sans-serif'
+};
 
 function toggleFontPicker() {
   var current = localStorage.getItem('pr-font') || 'serif';
@@ -194,6 +252,9 @@ function settingsCustomSelect(btnId, options, currentVal, onSelect) {
     opt.textContent = options[i][1];
     opt.setAttribute('data-val', options[i][0]);
     if (options[i][0] === currentVal) opt.className = 'active';
+    if (btnId === 'aa-font-picker' && _fontFamilies[options[i][0]]) {
+      opt.style.fontFamily = _fontFamilies[options[i][0]];
+    }
     opt.onclick = (function(val) {
       return function() {
         onSelect(val);
@@ -232,9 +293,9 @@ function updateDropdownState() {
 // Close settings dropdown when clicking outside
 document.addEventListener('click', function(e) {
   const panel = document.querySelector('.settings-dropdown-panel');
-  if (panel && !panel.contains(e.target) && !e.target.closest('#aa-settings-btn')) {
+  if (panel && !panel.contains(e.target) && !e.target.closest('.toolbar-aa-btn')) {
     panel.remove();
-    var btn = document.getElementById('aa-settings-btn');
+    var btn = document.querySelector('.toolbar-aa-btn');
     if (btn) btn.setAttribute('aria-expanded', 'false');
   }
 });
@@ -248,10 +309,13 @@ function showSettingsPage(scrollToSection) {
   const empty = document.getElementById('empty-state');
   empty.style.display = 'none';
   content.style.display = 'block';
+  content.classList.add('settings-view');
   document.title = 'Settings — PullRead';
   document.getElementById('margin-notes').innerHTML = '';
   var toc = document.getElementById('toc-container');
   if (toc) toc.innerHTML = '';
+  var toolbar = document.getElementById('reader-toolbar');
+  if (toolbar) toolbar.style.display = 'none';
   updateSidebarActiveState(prevActive);
 
   var currentTheme = document.body.getAttribute('data-theme') || 'light';
@@ -318,6 +382,15 @@ function showSettingsPage(scrollToSection) {
   html += '<p style="color:var(--muted);font-size:13px">Loading AI settings...</p>';
   html += '</div>';
 
+  // ---- Sharing section ----
+  var mastodonInstance = localStorage.getItem('pr-mastodon-instance') || '';
+  html += '<div class="settings-section" id="settings-sharing">';
+  html += '<h2>Sharing</h2>';
+  html += '<div class="settings-row"><div><label>Mastodon instance</label><div class="settings-desc">Your Mastodon server (e.g., xoxo.zone, mastodon.social)</div></div>';
+  html += '<input type="text" id="sp-mastodon-instance" value="' + escapeHtml(mastodonInstance) + '" placeholder="mastodon.social" style="min-width:200px">';
+  html += '</div>';
+  html += '</div>';
+
   // ---- Save Settings bar ----
   html += '<div class="settings-save-bar">';
   html += '<button class="btn-primary" onclick="settingsPageSaveAll()" style="font-size:13px;padding:8px 24px">Save Settings</button>';
@@ -379,7 +452,7 @@ function showSettingsPage(scrollToSection) {
   html += '<div class="settings-row"><label>Version</label><span id="sp-version" style="color:var(--muted);font-size:13px"></span></div>';
   html += '<div class="settings-row" style="gap:12px">';
   html += '<a href="https://pullread.com" target="_blank" rel="noopener" style="font-size:13px;color:var(--link)">pullread.com</a>';
-  html += '<a href="#" onclick="prOpenExternal(\'https://pullread.com/releases#v\' + (window._prCurrentVersion || \'0.3.5\'));return false" style="font-size:13px;color:var(--link)">What\'s New</a>';
+  html += '<a href="#" onclick="prOpenExternal(\'https://pullread.com/releases#v\' + (window._prCurrentVersion || \'0.4.0\'));return false" style="font-size:13px;color:var(--link)">What\'s New</a>';
   html += '<a href="/api/log" target="_blank" style="font-size:13px;color:var(--link)">View Logs</a>';
   html += '<button style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit" onclick="showTour()">Show Tour</button>';
   html += '</div>';
@@ -387,7 +460,7 @@ function showSettingsPage(scrollToSection) {
   html += '</div>';
 
   content.innerHTML = html;
-  document.getElementById('content-pane').scrollTop = 0;
+  document.getElementById('content-scroll').scrollTop = 0;
 
 
   if (scrollToSection) {
@@ -567,25 +640,52 @@ function showSettingsPage(scrollToSection) {
     fetch('/api/tts-settings').then(function(r) { return r.json(); }).then(function(data) {
       var sec = document.getElementById('settings-voice');
       if (!sec) return;
+      var allVoices = window.speechSynthesis ? speechSynthesis.getVoices() : [];
+      var hasGoogle = allVoices.some(function(v) { return v.name.indexOf('Google') === 0; });
+      var hasApple = allVoices.some(function(v) { return v.name.indexOf('Google') !== 0; });
       var providers = [
-        { id: 'kokoro', label: 'Kokoro — free, on-device' },
-        { id: 'browser', label: 'Built-in Voice (Apple) — free' },
+        { id: 'apple', label: 'Apple — free' },
+        { id: 'google', label: 'Google — free' },
         { id: 'openai', label: 'OpenAI — premium' },
         { id: 'elevenlabs', label: 'ElevenLabs — premium' },
       ];
-      var ttsShortLabels = {kokoro:'Kokoro',browser:'Browser',openai:'OpenAI',elevenlabs:'ElevenLabs'};
+      var ttsShortLabels = {google:'Google',apple:'Apple',openai:'OpenAI',elevenlabs:'ElevenLabs'};
+      // Resolve server's 'browser' provider to google/apple sub-type
+      var activeProv = data.provider || 'google';
+      if (activeProv === 'browser') {
+        var savedType = localStorage.getItem('pr-tts-browser-type');
+        if (savedType === 'apple' || savedType === 'google') {
+          activeProv = savedType;
+        } else {
+          activeProv = hasApple ? 'apple' : 'google';
+        }
+      }
       var h = '<h2>Voice Playback</h2>';
       h += '<div class="settings-row"><div><label>Provider</label><div class="settings-desc">Choose how articles are read aloud</div></div>';
-      h += '<div class="settings-btn-group">';
+      h += '<div class="settings-btn-group" id="sp-tts-provider-btns">';
       for (var i = 0; i < providers.length; i++) {
-        h += '<button data-val="' + providers[i].id + '" class="' + (data.provider === providers[i].id ? 'active' : '') + '" onclick="settingsBtnSelect(this,\'sp-tts-provider\',\'' + providers[i].id + '\');settingsPageTTSChanged()">' + (ttsShortLabels[providers[i].id] || providers[i].id) + '</button>';
+        var pid = providers[i].id;
+        var isUnavail = (pid === 'google' && !hasGoogle) || (pid === 'apple' && !hasApple);
+        var cls = activeProv === pid ? 'active' : '';
+        if (isUnavail) cls += (cls ? ' ' : '') + 'unavailable';
+        var note = '';
+        if (pid === 'google' && !hasGoogle) note = ' <span style="font-size:10px;opacity:0.7">(Chrome)</span>';
+        if (pid === 'apple' && !hasApple) note = ' <span style="font-size:10px;opacity:0.7">(Safari/macOS)</span>';
+        h += '<button data-val="' + pid + '" class="' + cls + '" onclick="settingsBtnSelect(this,\'sp-tts-provider\',\'' + pid + '\');settingsPageTTSChanged()">' + (ttsShortLabels[pid] || pid) + note + '</button>';
       }
-      h += '</div><input type="hidden" id="sp-tts-provider" value="' + escapeHtml(data.provider || 'kokoro') + '">';
+      h += '</div><input type="hidden" id="sp-tts-provider" value="' + escapeHtml(activeProv) + '">';
       h += '</div>';
 
       // Voice picker (custom dropdown)
-      if (data.voices) {
-        var prov = data.provider || 'browser';
+      var prov = activeProv;
+      var isBrowserProv = prov === 'google' || prov === 'apple';
+      if (isBrowserProv) {
+        var browserVoiceLabel = localStorage.getItem('pr-tts-browser-voice') || 'Default';
+        h += '<div class="settings-row" id="sp-tts-voice-row" style="position:relative"><label>Voice</label>';
+        h += '<button onclick="toggleTTSVoicePicker()" id="sp-tts-voice-btn" style="flex:1;text-align:left;display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;cursor:pointer;font-family:inherit;min-width:160px">' + escapeHtml(browserVoiceLabel) + ' <span style="opacity:0.5">\u25BE</span></button>';
+        h += '<input type="hidden" id="sp-tts-voice" value="">';
+        h += '</div>';
+      } else if (data.voices) {
         var voices = data.voices[prov] || [];
         var voiceLabel = data.voice || '';
         for (var vi = 0; vi < voices.length; vi++) { if (voices[vi].id === data.voice) { voiceLabel = voices[vi].label; break; } }
@@ -595,27 +695,23 @@ function showSettingsPage(scrollToSection) {
         h += '</div>';
       }
 
-      // Model / quality select
-      if (data.models) {
-        if (data.provider === 'kokoro') {
-          h += '<div class="settings-row" id="sp-tts-model-row"><label>Quality</label>';
-          if (data.model === 'kokoro-v1-q4') {
-            h += '<span style="font-size:12px;color:#22c55e">&#10003; High quality</span>';
-          } else {
-            h += '<span style="font-size:12px">Standard <button onclick="spUpgradeKokoroQuality()" style="margin-left:8px;padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--link);font-size:11px;cursor:pointer;font-family:inherit">Upgrade</button> <span style="color:var(--muted);font-size:11px">Free &middot; 305MB</span></span>';
-          }
-          h += '<input type="hidden" id="sp-tts-model" value="' + escapeHtml(data.model || 'kokoro-v1-q8') + '">';
-          h += '</div>';
-        } else {
-          h += '<div class="settings-row" id="sp-tts-model-row"><label>Model</label>';
-          var models = data.models[data.provider] || [];
-          h += '<div class="settings-btn-group">';
-          for (var mi = 0; mi < models.length; mi++) {
-            h += '<button data-val="' + models[mi].id + '" class="' + (data.model === models[mi].id ? 'active' : '') + '" onclick="settingsBtnSelect(this,\'sp-tts-model\',\'' + models[mi].id + '\')">' + escapeHtml(models[mi].label) + '</button>';
-          }
-          h += '</div><input type="hidden" id="sp-tts-model" value="' + escapeHtml(data.model || '') + '">';
-          h += '</div>';
+      // Randomize voices checkbox (browser providers only)
+      var randomizeOn = localStorage.getItem('pr-tts-randomize-voices') === '1';
+      h += '<div class="settings-row" id="sp-tts-randomize-row" style="display:' + (isBrowserProv ? 'flex' : 'none') + '">';
+      h += '<div><label>Randomize voices</label><div class="settings-desc">Each source gets a consistent random voice</div></div>';
+      h += '<input type="checkbox" id="sp-tts-randomize"' + (randomizeOn ? ' checked' : '') + ' onchange="localStorage.setItem(\'pr-tts-randomize-voices\',this.checked?\'1\':\'0\')" style="width:18px;height:18px;accent-color:var(--link)">';
+      h += '</div>';
+
+      // Model select (hidden for browser voice providers)
+      if (data.models && !isBrowserProv) {
+        h += '<div class="settings-row" id="sp-tts-model-row"><label>Model</label>';
+        var models = data.models[data.provider] || [];
+        h += '<div class="settings-btn-group">';
+        for (var mi = 0; mi < models.length; mi++) {
+          h += '<button data-val="' + models[mi].id + '" class="' + (data.model === models[mi].id ? 'active' : '') + '" onclick="settingsBtnSelect(this,\'sp-tts-model\',\'' + models[mi].id + '\')">' + escapeHtml(models[mi].label) + '</button>';
         }
+        h += '</div><input type="hidden" id="sp-tts-model" value="' + escapeHtml(data.model || '') + '">';
+        h += '</div>';
       }
 
       // API key for cloud providers
@@ -625,24 +721,37 @@ function showSettingsPage(scrollToSection) {
       h += '<input type="password" id="sp-tts-key" placeholder="' + (data.hasKey && isCloud ? '••••••••' : 'Paste API key') + '" style="min-width:200px">';
       h += '</div>';
 
-      // Kokoro status
-      // Auto-play next podcast toggle
-      h += '<div class="settings-row"><div><label>Auto-play next podcast</label><div class="settings-desc">When a podcast ends, automatically play the next one</div></div>';
-      h += '<input type="checkbox" id="sp-podcast-autoplay"' + (podcastAutoplay ? ' checked' : '') + ' onchange="podcastAutoplay=this.checked;localStorage.setItem(\'pr-podcast-autoplay\',this.checked?\'1\':\'0\')">';
-      h += '</div>';
+      // Auto-play next setting
+      h += '<div class="settings-row"><div><label>Auto-play next</label><div class="settings-desc">Automatically play the next item when playback ends</div></div>';
+      h += '<div class="settings-btn-group">';
+      h += '<button data-val="off"' + (autoplayMode === 'off' ? ' class="active"' : '') + ' onclick="settingsBtnSelect(this,null,\'off\');autoplayMode=\'off\';localStorage.setItem(\'pr-autoplay-mode\',\'off\')">Off</button>';
+      h += '<button data-val="podcasts"' + (autoplayMode === 'podcasts' ? ' class="active"' : '') + ' onclick="settingsBtnSelect(this,null,\'podcasts\');autoplayMode=\'podcasts\';localStorage.setItem(\'pr-autoplay-mode\',\'podcasts\')">Podcasts</button>';
+      h += '<button data-val="everything"' + (autoplayMode === 'everything' ? ' class="active"' : '') + ' onclick="settingsBtnSelect(this,null,\'everything\');autoplayMode=\'everything\';localStorage.setItem(\'pr-autoplay-mode\',\'everything\')">Everything</button>';
+      h += '</div></div>';
 
-      h += '<div id="sp-kokoro-status" style="display:' + (data.provider === 'kokoro' ? 'block' : 'none') + ';padding:8px 0">';
-      if (data.kokoro && data.kokoro.bundled) {
-        h += '<div style="font-size:12px;color:var(--muted)"><span class="settings-status ok">Kokoro bundled</span> Runs on-device, no API key or download needed</div>';
-      } else if (data.kokoro && data.kokoro.installed) {
-        h += '<div style="font-size:12px;color:var(--muted)"><span class="settings-status ok">Kokoro ready</span> Runs on-device, no API key needed</div>';
-      } else {
-        h += '<div style="font-size:12px;color:var(--muted)">Will download on first listen (~86MB). Runs on-device after that.</div>';
-      }
+      var hasQualityVoices = allVoices.some(function(v) { return v.name.indexOf('(Premium)') !== -1 || v.name.indexOf('(Enhanced)') !== -1; });
+      var showVoiceHint = isBrowserProv && prov === 'apple' && !hasQualityVoices;
+      h += '<div id="sp-voice-hint" style="display:' + (showVoiceHint ? 'block' : 'none') + ';padding:8px 0">';
+      h += '<div style="font-size:12px;color:var(--muted)">Tip: Install better voices in System Settings &rarr; Accessibility &rarr; Spoken Content &rarr; Manage Voices</div>';
       h += '</div>';
 
       sec.innerHTML = h;
       sec._ttsData = data;
+      // Chrome loads voices asynchronously — update button availability when ready
+      if (window.speechSynthesis && speechSynthesis.onvoiceschanged !== undefined) {
+        speechSynthesis.onvoiceschanged = function() {
+          var btns = document.getElementById('sp-tts-provider-btns');
+          if (!btns) return;
+          var v = speechSynthesis.getVoices();
+          var goog = v.some(function(x) { return x.name.indexOf('Google') === 0; });
+          var appl = v.some(function(x) { return x.name.indexOf('Google') !== 0; });
+          btns.querySelectorAll('button').forEach(function(b) {
+            var val = b.getAttribute('data-val');
+            if (val === 'google') b.classList.toggle('unavailable', !goog);
+            if (val === 'apple') b.classList.toggle('unavailable', !appl);
+          });
+        };
+      }
     }).catch(function() {
       var sec = document.getElementById('settings-voice');
       if (sec) sec.innerHTML = '<h2>Voice Playback</h2><p style="color:var(--muted);font-size:13px">Could not load voice settings.</p>';
@@ -773,7 +882,7 @@ function settingsPageSaveTimeFormat() {
 
 function settingsOpenAa() {
   // Navigate to dashboard/last article so the Aa button is in context, then open the dropdown
-  renderDashboard();
+  renderHub();
   setTimeout(function() { toggleSettingsDropdown(); }, 100);
 }
 
@@ -795,21 +904,60 @@ function settingsPageModelChanged(providerId) {
   customDiv.style.display = sel.value === '__custom' ? 'flex' : 'none';
 }
 
+function getSystemVoiceOptions(type) {
+  var synth = window.speechSynthesis;
+  if (!synth) return [];
+  var voices = synth.getVoices();
+  if (type === 'google') {
+    voices = voices.filter(function(v) { return v.name.indexOf('Google') === 0; });
+  } else if (type === 'apple') {
+    voices = voices.filter(function(v) { return v.name.indexOf('Google') !== 0; });
+    var voiceQuality = function(name) {
+      if (name.indexOf('(Premium)') !== -1) return 0;
+      if (name.indexOf('(Enhanced)') !== -1) return 1;
+      if (name.indexOf('Siri') !== -1) return 2;
+      if (name === 'Alex') return 3;
+      return 4;
+    };
+    voices.sort(function(a, b) { return voiceQuality(a.name) - voiceQuality(b.name); });
+  }
+  return voices.map(function(v) {
+    var label = v.name;
+    if (v.lang) label += ' (' + v.lang + ')';
+    return [v.name, label];
+  });
+}
+
 function toggleTTSVoicePicker() {
   var sec = document.getElementById('settings-voice');
   var data = sec ? sec._ttsData : null;
-  if (!data || !data.voices) return;
   var provider = document.getElementById('sp-tts-provider').value;
-  var voices = data.voices[provider] || [];
-  var current = document.getElementById('sp-tts-voice').value;
-  var options = voices.map(function(v) { return [v.id, v.label]; });
+
+  var options, current;
+  if (provider === 'google' || provider === 'apple') {
+    options = getSystemVoiceOptions(provider);
+    current = localStorage.getItem('pr-tts-browser-voice') || '';
+  } else {
+    if (!data || !data.voices) return;
+    var voices = data.voices[provider] || [];
+    current = document.getElementById('sp-tts-voice').value;
+    options = voices.map(function(v) { return [v.id, v.label]; });
+  }
+
   settingsCustomSelect('sp-tts-voice-btn', options, current, function(val) {
-    var hidden = document.getElementById('sp-tts-voice');
-    if (hidden) hidden.value = val;
-    var btn = document.getElementById('sp-tts-voice-btn');
-    var label = val;
-    for (var i = 0; i < voices.length; i++) { if (voices[i].id === val) { label = voices[i].label; break; } }
-    if (btn) btn.firstChild.textContent = label;
+    if (provider === 'google' || provider === 'apple') {
+      localStorage.setItem('pr-tts-browser-voice', val);
+      var btn = document.getElementById('sp-tts-voice-btn');
+      if (btn) btn.firstChild.textContent = val;
+    } else {
+      var hidden = document.getElementById('sp-tts-voice');
+      if (hidden) hidden.value = val;
+      var btn2 = document.getElementById('sp-tts-voice-btn');
+      var label = val;
+      var vList = data.voices[provider] || [];
+      for (var i = 0; i < vList.length; i++) { if (vList[i].id === val) { label = vList[i].label; break; } }
+      if (btn2) btn2.firstChild.textContent = label;
+    }
   });
 }
 
@@ -818,75 +966,71 @@ function settingsPageTTSChanged() {
   var sec = document.getElementById('settings-voice');
   var data = sec ? sec._ttsData : null;
   var keyRow = document.getElementById('sp-tts-key-row');
-  var kokoroStatus = document.getElementById('sp-kokoro-status');
   var isCloud = provider === 'openai' || provider === 'elevenlabs';
   if (keyRow) keyRow.style.display = isCloud ? 'flex' : 'none';
-  if (kokoroStatus) kokoroStatus.style.display = provider === 'kokoro' ? 'block' : 'none';
+  var voiceHint = document.getElementById('sp-voice-hint');
+  if (voiceHint) {
+    var showHint = provider === 'apple' && window.speechSynthesis &&
+      !speechSynthesis.getVoices().some(function(v) { return v.name.indexOf('(Premium)') !== -1 || v.name.indexOf('(Enhanced)') !== -1; });
+    voiceHint.style.display = showHint ? 'block' : 'none';
+  }
+
+  var randomizeRow = document.getElementById('sp-tts-randomize-row');
+  var isBrowser = provider === 'google' || provider === 'apple';
+  if (randomizeRow) randomizeRow.style.display = isBrowser ? 'flex' : 'none';
 
   // Update voice picker button label
-  if (data) {
-    var voiceBtn = document.getElementById('sp-tts-voice-btn');
-    var voiceHidden = document.getElementById('sp-tts-voice');
-    if (voiceBtn && data.voices && data.voices[provider]) {
-      var voices = data.voices[provider];
-      var firstVoice = voices.length > 0 ? voices[0] : null;
-      if (firstVoice) {
-        if (voiceHidden) voiceHidden.value = firstVoice.id;
-        voiceBtn.firstChild.textContent = firstVoice.label;
-      } else {
-        if (voiceHidden) voiceHidden.value = '';
-        voiceBtn.firstChild.textContent = 'No voices';
-      }
+  var voiceBtn = document.getElementById('sp-tts-voice-btn');
+  if (isBrowser && voiceBtn) {
+    var voiceOpts = getSystemVoiceOptions(provider);
+    var savedVoice = localStorage.getItem('pr-tts-browser-voice') || '';
+    if (voiceOpts.length === 0) {
+      voiceBtn.firstChild.textContent = 'No voices available';
+    } else {
+      voiceBtn.firstChild.textContent = savedVoice || 'Default';
     }
-
-    // Update model row
-    var modelRow = document.getElementById('sp-tts-model-row');
-    if (modelRow && provider === 'kokoro') {
-      var label = modelRow.querySelector('label');
-      modelRow.innerHTML = '';
-      if (label) modelRow.appendChild(label);
-      modelRow.insertAdjacentHTML('beforeend',
-        '<span style="font-size:12px">Standard <button onclick="spUpgradeKokoroQuality()" style="margin-left:8px;padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--link);font-size:11px;cursor:pointer;font-family:inherit">Upgrade</button> <span style="color:var(--muted);font-size:11px">Free &middot; 305MB</span></span>'
-        + '<input type="hidden" id="sp-tts-model" value="kokoro-v1-q8">');
-    } else if (modelRow && data.models && data.models[provider]) {
-      var label2 = modelRow.querySelector('label');
-      var models = data.models[provider];
-      modelRow.innerHTML = '';
-      if (label2) modelRow.appendChild(label2);
-      var grp = '<div class="settings-btn-group">';
-      for (var mi = 0; mi < models.length; mi++) {
-        grp += '<button data-val="' + models[mi].id + '"' + (mi === 0 ? ' class="active"' : '') + ' onclick="settingsBtnSelect(this,\'sp-tts-model\',\'' + models[mi].id + '\')">' + escapeHtml(models[mi].label) + '</button>';
-      }
-      grp += '</div><input type="hidden" id="sp-tts-model" value="' + (models.length > 0 ? models[0].id : '') + '">';
-      modelRow.insertAdjacentHTML('beforeend', grp);
+  } else if (data && voiceBtn && data.voices && data.voices[provider]) {
+    var voiceHidden = document.getElementById('sp-tts-voice');
+    var voices = data.voices[provider];
+    var firstVoice = voices.length > 0 ? voices[0] : null;
+    if (firstVoice) {
+      if (voiceHidden) voiceHidden.value = firstVoice.id;
+      voiceBtn.firstChild.textContent = firstVoice.label;
+    } else {
+      if (voiceHidden) voiceHidden.value = '';
+      voiceBtn.firstChild.textContent = 'No voices';
     }
   }
-}
 
-function spUpgradeKokoroQuality() {
-  var hidden = document.getElementById('sp-tts-model');
-  if (hidden) hidden.value = 'kokoro-v1-q4';
-  var row = document.getElementById('sp-tts-model-row');
-  if (row) {
-    var label = row.querySelector('label');
-    row.innerHTML = '';
-    if (label) row.appendChild(label);
-    row.insertAdjacentHTML('beforeend',
-      '<span style="font-size:12px;color:#22c55e">&#10003; High quality — save to apply</span>'
-      + '<input type="hidden" id="sp-tts-model" value="kokoro-v1-q4">');
+  // Update model row
+  var modelRow = document.getElementById('sp-tts-model-row');
+  if (modelRow && isBrowser) {
+    modelRow.style.display = 'none';
+  } else if (modelRow && data && data.models && data.models[provider]) {
+    modelRow.style.display = '';
+    var label2 = modelRow.querySelector('label');
+    var models = data.models[provider];
+    modelRow.innerHTML = '';
+    if (label2) modelRow.appendChild(label2);
+    var grp = '<div class="settings-btn-group">';
+    for (var mi = 0; mi < models.length; mi++) {
+      grp += '<button data-val="' + models[mi].id + '"' + (mi === 0 ? ' class="active"' : '') + ' onclick="settingsBtnSelect(this,\'sp-tts-model\',\'' + models[mi].id + '\')">' + escapeHtml(models[mi].label) + '</button>';
+    }
+    grp += '</div><input type="hidden" id="sp-tts-model" value="' + (models.length > 0 ? models[0].id : '') + '">';
+    modelRow.insertAdjacentHTML('beforeend', grp);
   }
 }
 
 function settingsPageSaveTTS(skipRefresh) {
   var provider = document.getElementById('sp-tts-provider').value;
-  var config = { provider: provider };
+  var isBrowser = provider === 'google' || provider === 'apple';
+  // Save google/apple as 'browser' server-side, store sub-type in localStorage
+  var config = { provider: isBrowser ? 'browser' : provider };
+  if (isBrowser) {
+    localStorage.setItem('pr-tts-browser-type', provider);
+  }
 
-  if (provider === 'kokoro') {
-    var kVoice = document.getElementById('sp-tts-voice');
-    var kModel = document.getElementById('sp-tts-model');
-    if (kVoice) config.voice = kVoice.value;
-    if (kModel) config.model = kModel.value;
-  } else if (provider !== 'browser') {
+  if (!isBrowser) {
     var apiKey = document.getElementById('sp-tts-key').value;
     if (apiKey) { config.apiKey = apiKey; } else { config.preserveKey = true; }
     var voice = document.getElementById('sp-tts-voice');
@@ -901,7 +1045,7 @@ function settingsPageSaveTTS(skipRefresh) {
     body: JSON.stringify(config),
   }).then(function(r) {
     if (r.ok) {
-      ttsProvider = provider;
+      ttsProvider = isBrowser ? 'browser' : provider;
       ttsQueue = [];
       ttsCurrentIndex = -1;
       if (ttsAudio) { ttsAudio.pause(); ttsAudio.src = ''; ttsAudio = null; }
@@ -954,7 +1098,14 @@ function settingsPageSaveAll() {
   if (document.getElementById('sp-output-path')) saves.push(settingsPageSaveConfig(true));
   if (document.getElementById('sp-tts-provider')) saves.push(settingsPageSaveTTS(true));
   if (document.getElementById('sp-llm-default')) saves.push(settingsPageSaveLLM(true));
-  if (saves.length === 0) return;
+  // Save Mastodon instance (localStorage only, no server round-trip)
+  var mastodonInput = document.getElementById('sp-mastodon-instance');
+  if (mastodonInput) {
+    var val = mastodonInput.value.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    if (val) localStorage.setItem('pr-mastodon-instance', val);
+    else localStorage.removeItem('pr-mastodon-instance');
+  }
+  if (saves.length === 0) { showSettingsPage(); return; }
   Promise.all(saves).then(function() {
     showSettingsPage();
   });
@@ -1001,7 +1152,7 @@ function settingsAddRecFeed(name, url) {
     if (!sec._configData.feeds) sec._configData.feeds = {};
     sec._configData.feeds[name] = url;
   }
-  var pane = document.getElementById('content-pane');
+  var pane = document.getElementById('content-scroll');
   var scrollPos = pane ? pane.scrollTop : 0;
   settingsPageSaveConfig().then(function() {
     if (pane) pane.scrollTop = scrollPos;

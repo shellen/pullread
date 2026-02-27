@@ -5,7 +5,7 @@ import {
   extractArticle, resolveRelativeUrls, simplifySubstackUrl, isYouTubeUrl, extractYouTubeId,
   matchPaperSource, fixPdfLigatures, stripRunningHeaders, buildParagraphs, extractPdfTitle,
   parseCaptionTracks, extractTweetId, isThreadsUrl, formatTweetMarkdown, fetchAndExtract,
-  stripEmbedNoise,
+  stripEmbedNoise, htmlToMarkdown, shouldSkipUrl, isBinaryUrl,
   type FxTweet
 } from './extractor';
 
@@ -219,6 +219,24 @@ describe('resolveRelativeUrls', () => {
     expect(result).toContain('https://example.com/img/2.png');
     expect(result).toContain('https://example.com/page2');
   });
+
+  test('resolves protocol-relative image URLs to https', () => {
+    const md = '![chart](//static.lukew.com/bench_toolcalls.png)';
+    const result = resolveRelativeUrls(md, 'https://www.lukew.com/ff/entry.asp?123');
+    expect(result).toBe('![chart](https://static.lukew.com/bench_toolcalls.png)');
+  });
+
+  test('resolves protocol-relative link URLs to https', () => {
+    const md = '[read more](//cdn.example.com/page)';
+    const result = resolveRelativeUrls(md, baseUrl);
+    expect(result).toBe('[read more](https://cdn.example.com/page)');
+  });
+
+  test('does not double-prefix protocol-relative URLs with origin', () => {
+    const md = '![img](//static.lukew.com/image.png) and [link](//cdn.example.com/doc)';
+    const result = resolveRelativeUrls(md, 'https://www.lukew.com/ff/rss');
+    expect(result).toBe('![img](https://static.lukew.com/image.png) and [link](https://cdn.example.com/doc)');
+  });
 });
 
 describe('stripEmbedNoise', () => {
@@ -261,6 +279,56 @@ describe('stripEmbedNoise', () => {
     const md = '# Title\n\nSome article text.\n\n## Subtitle\n\nMore text.';
     const result = stripEmbedNoise(md);
     expect(result).toBe(md);
+  });
+
+  test('strips Google AdSense script remnants', () => {
+    const md = 'Article content.\n\n(adsbygoogle = window.adsbygoogle || []).push({});\n\nMore content.';
+    const result = stripEmbedNoise(md);
+    expect(result).not.toContain('adsbygoogle');
+    expect(result).toContain('Article content.');
+    expect(result).toContain('More content.');
+  });
+
+  test('strips window.adsbygoogle variant', () => {
+    const md = 'Intro.\n\nwindow.adsbygoogle = window.adsbygoogle || [];\n\nBody text.';
+    const result = stripEmbedNoise(md);
+    expect(result).not.toContain('adsbygoogle');
+    expect(result).toContain('Intro.');
+    expect(result).toContain('Body text.');
+  });
+});
+
+describe('htmlToMarkdown', () => {
+  test('converts HTML to markdown with resolved URLs', () => {
+    const html = '<p>Hello <strong>world</strong></p><p>A <a href="/page">link</a></p>';
+    const result = htmlToMarkdown(html, 'https://example.com/article');
+    expect(result).toContain('Hello **world**');
+    expect(result).toContain('[link](https://example.com/page)');
+  });
+
+  test('converts Substack-style feed content to clean markdown', () => {
+    const html = '<h2>Introduction</h2><p>This is the first paragraph of a Substack article.</p>'
+      + '<p>It has <em>formatting</em> and <a href="https://example.com">links</a>.</p>';
+    const result = htmlToMarkdown(html, 'https://newcomer.co/p/some-article');
+    expect(result).toContain('## Introduction');
+    expect(result).toContain('first paragraph');
+    expect(result).toContain('_formatting_');
+    expect(result).toContain('[links](https://example.com)');
+  });
+
+  test('strips script tags from HTML content', () => {
+    const html = '<p>Article text.</p><script>(adsbygoogle = window.adsbygoogle || []).push({});</script><p>More text.</p>';
+    const result = htmlToMarkdown(html, 'https://example.com');
+    expect(result).not.toContain('adsbygoogle');
+    expect(result).toContain('Article text.');
+    expect(result).toContain('More text.');
+  });
+
+  test('strips style tags from HTML content', () => {
+    const html = '<style>.ad { display: block; }</style><p>Content here.</p>';
+    const result = htmlToMarkdown(html, 'https://example.com');
+    expect(result).not.toContain('.ad');
+    expect(result).toContain('Content here.');
   });
 });
 
@@ -894,5 +962,85 @@ describe('extractTweet via fetchAndExtract', () => {
     const result = await fetchAndExtract('https://x.com/user/status/999');
     expect(result).not.toBeNull();
     expect(result!.markdown).toContain('Fallback tweet text');
+  });
+});
+
+describe('isBinaryUrl', () => {
+  test('detects audio file extensions', () => {
+    expect(isBinaryUrl('https://cdn.example.com/episode.mp3')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/episode.m4a')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/episode.wav')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/episode.ogg')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/episode.aac')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/episode.flac')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/episode.wma')).toBe(true);
+  });
+
+  test('detects video file extensions', () => {
+    expect(isBinaryUrl('https://cdn.example.com/clip.mp4')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/clip.webm')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/clip.avi')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/clip.mov')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/clip.mkv')).toBe(true);
+  });
+
+  test('detects image file extensions', () => {
+    expect(isBinaryUrl('https://cdn.example.com/photo.jpg')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/photo.jpeg')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/photo.png')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/photo.gif')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/photo.webp')).toBe(true);
+  });
+
+  test('detects archive/binary file extensions', () => {
+    expect(isBinaryUrl('https://cdn.example.com/archive.zip')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/archive.tar.gz')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/app.exe')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/app.dmg')).toBe(true);
+  });
+
+  test('returns false for article URLs', () => {
+    expect(isBinaryUrl('https://example.com/article')).toBe(false);
+    expect(isBinaryUrl('https://example.com/article.html')).toBe(false);
+    expect(isBinaryUrl('https://example.com/post/123')).toBe(false);
+  });
+
+  test('handles query strings after extension', () => {
+    expect(isBinaryUrl('https://cdn.example.com/episode.mp3?token=abc')).toBe(true);
+  });
+
+  test('is case insensitive', () => {
+    expect(isBinaryUrl('https://cdn.example.com/episode.MP3')).toBe(true);
+    expect(isBinaryUrl('https://cdn.example.com/clip.MP4')).toBe(true);
+  });
+});
+
+describe('fetchAndExtract — binary content safeguards', () => {
+  test('rejects binary URLs before fetching', async () => {
+    await expect(
+      fetchAndExtract('https://cdn.npr.org/podcast/episode.mp3')
+    ).rejects.toThrow(/binary/i);
+  });
+
+  test('rejects audio content-type responses', async () => {
+    globalThis.fetch = async () => new Response('binary garbage', {
+      status: 200,
+      headers: { 'content-type': 'audio/mpeg' },
+    }) as any;
+
+    await expect(
+      fetchAndExtract('https://cdn.npr.org/podcast/episode')
+    ).rejects.toThrow(/binary/i);
+  });
+
+  test('rejects video content-type responses', async () => {
+    globalThis.fetch = async () => new Response('binary garbage', {
+      status: 200,
+      headers: { 'content-type': 'video/mp4' },
+    }) as any;
+
+    await expect(
+      fetchAndExtract('https://example.com/stream')
+    ).rejects.toThrow(/binary/i);
   });
 });

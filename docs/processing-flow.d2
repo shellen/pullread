@@ -1,0 +1,179 @@
+# ABOUTME: Architecture diagram showing article processing pipeline
+# ABOUTME: Render with: d2 docs/processing-flow.d2 docs/processing-flow.svg
+
+direction: down
+
+title: {
+  label: PullRead — Article Processing Pipeline
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+# ──────────────────────────────────────────
+# Feed Fetch & Parse
+# ──────────────────────────────────────────
+
+fetch: "1. Fetch RSS/Atom/JSON feed" {
+  shape: step
+  style.fill: "#e3f2fd"
+}
+
+parse: "2. Parse feed entries" {
+  shape: step
+  style.fill: "#e3f2fd"
+}
+
+parse_detail: {
+  style.fill: "#e8eaf6"
+  label: |md
+    Extract per entry:
+    - title, url, date, author
+    - categories, thumbnail
+    - enclosure (audio/video)
+    - contentHtml (full article body)
+  |
+}
+
+# ──────────────────────────────────────────
+# Storage Check
+# ──────────────────────────────────────────
+
+check: "3. Already processed?" {
+  shape: diamond
+  style.fill: "#fff3e0"
+}
+
+skip: "Skip" {
+  shape: step
+  style.fill: "#f5f5f5"
+}
+
+# ──────────────────────────────────────────
+# Three Content Paths
+# ──────────────────────────────────────────
+
+paths: "4. Determine content path" {
+  shape: step
+  style.fill: "#e8f5e9"
+}
+
+path_enclosure: "Path A: Enclosure" {
+  shape: step
+  style.fill: "#c8e6c9"
+  label: |md
+    **Podcast / media**
+    Use annotation text as body
+    Store enclosure URL in frontmatter
+  |
+}
+
+path_feed: "Path B: Feed content" {
+  shape: step
+  style.fill: "#c8e6c9"
+  label: |md
+    **Feed has full HTML**
+    Convert contentHtml → markdown
+    Mark source: 'feed'
+  |
+}
+
+path_extract: "Path C: Web extraction" {
+  shape: step
+  style.fill: "#c8e6c9"
+  label: |md
+    **No feed content**
+    Fetch URL → Readability extract
+    Retry once if < 200 chars
+    Mark failed if still short
+  |
+}
+
+# ──────────────────────────────────────────
+# Write & Store
+# ──────────────────────────────────────────
+
+write: "5. Write markdown file" {
+  shape: step
+  style.fill: "#e3f2fd"
+  label: |md
+    YAML frontmatter + body
+    Filename: YYYY-MM-DD-slug.md
+  |
+}
+
+mark: "6. Mark processed in SQLite" {
+  shape: step
+  style.fill: "#e3f2fd"
+}
+
+# ──────────────────────────────────────────
+# Post-Sync Repair
+# ──────────────────────────────────────────
+
+repair: "7. Post-sync repair pass" {
+  shape: step
+  style.fill: "#fce4ec"
+  label: |md
+    Scan all articles for bodies < 200 chars
+    Re-extract from source URL
+    Throttle 2s between requests
+  |
+}
+
+done: "Done" {
+  shape: step
+  style.fill: "#e8f5e9"
+  style.bold: true
+}
+
+# ──────────────────────────────────────────
+# Output
+# ──────────────────────────────────────────
+
+output: "~/Articles/" {
+  shape: cylinder
+  style.fill: "#f5f5f5"
+  style.stroke-dash: 3
+  label: |md
+    **Output folder**
+    - 2024-01-29-article-title.md
+    - 2024-01-30-podcast-episode.md
+    - ...
+  |
+}
+
+db: "pullread.db" {
+  shape: cylinder
+  style.fill: "#f5f5f5"
+  style.stroke-dash: 3
+}
+
+# ──────────────────────────────────────────
+# Connections
+# ──────────────────────────────────────────
+
+fetch -> parse
+parse -> parse_detail
+parse -> check
+
+check -> skip: "yes"
+check -> paths: "no"
+
+paths -> path_enclosure: "has enclosure"
+paths -> path_feed: "has contentHtml"
+paths -> path_extract: "neither"
+
+path_enclosure -> write
+path_feed -> write
+path_extract -> write: "content OK"
+path_extract -> mark: "too short → markFailed"
+
+write -> mark
+write -> output: "writes .md"
+mark -> db: "updates"
+
+mark -> repair: "after all feeds"
+repair -> output: "re-extracts"
+repair -> done
