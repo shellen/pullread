@@ -4312,6 +4312,106 @@
   .tag-pill-pink:hover { background: color-mix(in srgb, #ec4899 20%, var(--bg)); }
   [data-theme="dark"] .tag-pill-pink { color: #f472b6; }
 
+  /* Related Reading (article detail) */
+  .related-reading {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+  .related-heading {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 12px;
+    color: var(--fg);
+  }
+  .related-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .related-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--code-bg);
+    text-decoration: none;
+    color: var(--fg);
+    transition: background 0.15s;
+  }
+  .related-card:hover {
+    background: var(--sidebar-active);
+  }
+  .related-card-title {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.3;
+  }
+  .related-card-domain {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .related-card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 2px;
+  }
+
+  /* Small tag pills for inline use */
+  .tag-pill-sm {
+    display: inline-block;
+    padding: 1px 7px;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--muted);
+    background: color-mix(in srgb, var(--fg) 6%, var(--bg));
+    border-radius: 4px;
+    line-height: 1.5;
+  }
+
+  /* Your Topics (For You tab) */
+  .your-topics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 4px;
+  }
+
+  /* Topic Clusters (Tags tab) */
+  .topic-cluster {
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--code-bg);
+  }
+  .topic-cluster-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+  .topic-cluster-articles {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .topic-cluster-articles a {
+    font-size: 13px;
+    color: var(--link);
+    text-decoration: none;
+    line-height: 1.3;
+  }
+  .topic-cluster-articles a:hover {
+    text-decoration: underline;
+  }
+  .topic-cluster-more {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
   /* Explore stats bar */
   /* Settings page */
   .content-wrap.settings-view {
