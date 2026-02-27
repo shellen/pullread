@@ -13,7 +13,7 @@ import { initAnnotations, loadAnnotation, saveAnnotation, allHighlights, allNote
 import { APP_ICON } from './app-icon';
 import { fetchAndExtract } from './extractor';
 import { generateMarkdown, writeArticle, ArticleData, downloadFavicon, resolveFilePath, listMarkdownFiles, listEpubFiles, migrateToDateFolders, exportNotebook, removeExportedNotebook } from './writer';
-import { loadTTSConfig, saveTTSConfig, generateSpeech, getAudioContentType, getKokoroStatus, preloadKokoro, getCachedAudioPath, createTtsSession, generateSessionChunk, TTS_VOICES, TTS_MODELS } from './tts';
+import { loadTTSConfig, saveTTSConfig, generateSpeech, getAudioContentType, getCachedAudioPath, createTtsSession, generateSessionChunk, TTS_VOICES, TTS_MODELS } from './tts';
 import { listSiteLogins, removeSiteLogin, saveSiteLoginCookies } from './cookies';
 
 interface FileMeta {
@@ -1747,15 +1747,13 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
     if (url.pathname === '/api/tts-settings') {
       if (req.method === 'GET') {
         const config = loadTTSConfig();
-        const kokoroStatus = getKokoroStatus();
         sendJson(res, {
           provider: config.provider,
           voice: config.voice || '',
           model: config.model || '',
-          hasKey: config.provider === 'browser' || config.provider === 'kokoro' || !!config.apiKey,
+          hasKey: config.provider === 'browser' || !!config.apiKey,
           voices: TTS_VOICES,
           models: TTS_MODELS,
-          kokoro: kokoroStatus,
         });
         return;
       }
@@ -1841,10 +1839,8 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         res.end(audio);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Chunk generation failed';
-        const isNativeLoadError = msg.includes('Kokoro voice engine could not load') || msg.includes('not available in this build');
-        const status = isNativeLoadError ? 503 : 500;
-        res.writeHead(status, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: msg, ...(isNativeLoadError && { fallback: 'browser' }) }));
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: msg }));
       }
       return;
     }
@@ -1877,10 +1873,8 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         res.end(audio);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'TTS generation failed';
-        const isNativeLoadError = msg.includes('Kokoro voice engine could not load') || msg.includes('not available in this build');
-        const status = isNativeLoadError ? 503 : 500;
-        res.writeHead(status, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: msg, ...(isNativeLoadError && { fallback: 'browser' }) }));
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: msg }));
       }
       return;
     }
@@ -1925,22 +1919,9 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         res.end(audio);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'TTS generation failed';
-        // When Kokoro fails due to native library issues, tell the client to
-        // fall back to browser TTS so the user still hears something.
-        const isNativeLoadError = msg.includes('Kokoro voice engine could not load') || msg.includes('not available in this build');
-        const status = isNativeLoadError ? 503 : 500;
-        res.writeHead(status, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: msg, ...(isNativeLoadError && { fallback: 'browser' }) }));
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: msg }));
       }
-      return;
-    }
-
-    // Kokoro preload API — trigger background model download
-    if (url.pathname === '/api/kokoro-preload' && req.method === 'POST') {
-      const config = loadTTSConfig();
-      const model = config.model || 'kokoro-v1-q8';
-      sendJson(res, { status: 'downloading' });
-      preloadKokoro(model).catch(() => {});
       return;
     }
 
@@ -2197,27 +2178,6 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
     console.log(`PullRead viewer running at ${url}`);
     console.log(`Reading from: ${outputPath}`);
     console.log('Press Ctrl+C to stop\n');
-
-    // Eagerly preload Kokoro if it's the configured TTS provider so the model
-    // is warm on first listen and native-library errors surface immediately.
-    const ttsConfig = loadTTSConfig();
-    if (ttsConfig.provider === 'kokoro') {
-      const model = ttsConfig.model || 'kokoro-v1-q8';
-      const status = getKokoroStatus();
-      if (status.bundled) {
-        console.log(`[TTS] Kokoro model bundled with app — loading ${model}...`);
-      } else {
-        console.log(`[TTS] Kokoro is configured — preloading ${model} (may download on first run)...`);
-      }
-      preloadKokoro(model).then(result => {
-        if (result.ready) {
-          console.log('[TTS] Kokoro model loaded and ready');
-        } else {
-          console.error('[TTS] Kokoro preload failed:', result.error);
-          console.error('[TTS] Audio will fall back to browser speech synthesis');
-        }
-      });
-    }
 
     if (openBrowser) {
       const cmd = process.platform === 'darwin' ? 'open'

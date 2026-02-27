@@ -1,20 +1,25 @@
 // ABOUTME: Tests for TTS module utilities
-// ABOUTME: Validates model filename mapping and markdown stripping
+// ABOUTME: Validates markdown stripping for TTS input
 
 jest.mock('./keychain', () => ({ saveToKeychain: jest.fn(), loadFromKeychain: jest.fn() }));
 
-import { kokoroModelFile, stripMarkdown } from './tts';
+import { stripMarkdown } from './tts';
 
-describe('kokoroModelFile', () => {
-  it('maps q8 dtype to model_quantized.onnx', () => {
-    expect(kokoroModelFile('q8')).toBe('onnx/model_quantized.onnx');
+describe('stripMarkdown', () => {
+  it('removes images', () => {
+    expect(stripMarkdown('Hello ![alt](http://img.png) world')).toBe('Hello  world');
   });
 
-  it('maps q4 dtype to model_q4.onnx', () => {
-    expect(kokoroModelFile('q4')).toBe('onnx/model_q4.onnx');
+  it('converts links to text', () => {
+    expect(stripMarkdown('[click here](http://example.com)')).toBe('click here');
   });
 
-  it('maps other dtypes using the dtype name', () => {
-    expect(kokoroModelFile('fp32')).toBe('onnx/model_fp32.onnx');
+  it('removes header markers', () => {
+    expect(stripMarkdown('## Title')).toBe('Title');
+  });
+
+  it('adds period after title before body', () => {
+    const result = stripMarkdown('Title\n\nBody text');
+    expect(result).toBe('Title.\n\nBody text');
   });
 });
