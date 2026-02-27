@@ -7,7 +7,7 @@ function renderHub() {
   var empty = document.getElementById('empty-state');
   var content = document.getElementById('content');
   empty.style.display = '';
-  if (content) content.style.display = 'none';
+  if (content) { content.style.display = 'none'; content.classList.remove('settings-view'); }
   var toolbar = document.getElementById('reader-toolbar');
   if (toolbar) toolbar.style.display = 'none';
 

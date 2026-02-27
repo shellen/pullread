@@ -196,7 +196,7 @@ function settingsActivateBtn(container, hiddenId, val) {
   var hidden = document.getElementById(hiddenId);
   if (hidden) hidden.value = val;
   var group = hidden ? hidden.previousElementSibling : null;
-  if (group && group.classList.contains('settings-btn-group')) {
+  if (group && (group.classList.contains('settings-btn-group') || group.classList.contains('pill-group'))) {
     group.querySelectorAll('button').forEach(function(b) {
       b.classList.toggle('active', b.getAttribute('data-val') === val);
     });
@@ -301,6 +301,49 @@ document.addEventListener('click', function(e) {
 });
 
 // ---- Full Settings Page ----
+var _settingsActiveTab = 'general';
+var _settingsTabMap = {
+  'settings-sync': 'general',
+  'settings-feeds': 'general',
+  'settings-viewer-mode': 'general',
+  'settings-sharing': 'general',
+  'settings-voice': 'reading',
+  'settings-ai': 'reading',
+  'settings-breaks': 'reading',
+  'settings-backup': 'advanced',
+  'settings-site-logins': 'advanced',
+  'settings-about': 'advanced',
+};
+
+function settingsSwitchTab(tabName) {
+  _settingsActiveTab = tabName;
+  document.querySelectorAll('.settings-view .seg-btn').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('data-tab') === tabName);
+  });
+  document.querySelectorAll('.settings-view .tab-panel').forEach(function(p) {
+    p.classList.toggle('active', p.getAttribute('data-tab') === tabName);
+  });
+}
+
+function settingsClearSave(input) {
+  var indicator = input.parentNode.querySelector('.save-indicator');
+  if (indicator) indicator.classList.remove('visible');
+}
+
+function settingsSaveMastodon(input) {
+  var val = input.value.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  if (val) localStorage.setItem('pr-mastodon-instance', val);
+  else localStorage.removeItem('pr-mastodon-instance');
+  var indicator = input.parentNode.querySelector('.save-indicator');
+  if (indicator) indicator.classList.add('visible');
+}
+
+function settingsSaveBreakActivity(input) {
+  localStorage.setItem('pr-break-activity', input.value);
+  var indicator = input.parentNode.querySelector('.save-indicator');
+  if (indicator) indicator.classList.add('visible');
+}
+
 function showSettingsPage(scrollToSection) {
   var prevActive = activeFile;
   activeFile = null;
@@ -310,7 +353,7 @@ function showSettingsPage(scrollToSection) {
   empty.style.display = 'none';
   content.style.display = 'block';
   content.classList.add('settings-view');
-  document.title = 'Settings — PullRead';
+  document.title = 'Settings \u2014 PullRead';
   document.getElementById('margin-notes').innerHTML = '';
   var toc = document.getElementById('toc-container');
   if (toc) toc.innerHTML = '';
@@ -318,150 +361,184 @@ function showSettingsPage(scrollToSection) {
   if (toolbar) toolbar.style.display = 'none';
   updateSidebarActiveState(prevActive);
 
-  var currentTheme = document.body.getAttribute('data-theme') || 'light';
-  function themeBtn(val, label) {
-    return '<button class="' + (currentTheme === val ? 'active' : '') + '" onclick="setTheme(\'' + val + '\');showSettingsPage()">' + label + '</button>';
+  // Resolve deep-link to tab
+  var targetTab = _settingsActiveTab;
+  if (scrollToSection && _settingsTabMap[scrollToSection]) {
+    targetTab = _settingsTabMap[scrollToSection];
   }
 
-  var html = '<div class="article-header"><h1>Settings</h1></div>';
+  var html = '';
 
-  // ---- Display section ----
-  html += '<div class="settings-section">';
-  html += '<h2>Display</h2>';
-  html += '<div class="settings-row"><label>Theme</label><div class="settings-btn-group">'
-    + themeBtn('light', 'Light') + themeBtn('dark', 'Dark') + themeBtn('sepia', 'Sepia') + themeBtn('high-contrast', 'Hi-Con')
-    + '</div></div>';
-  html += '<div class="settings-row"><div><label>Article font &amp; layout</label><div class="settings-desc">Font, text size, line height, spacing, and content width</div></div>';
-  html += '<button onclick="settingsOpenAa()" style="font-size:13px;padding:6px 14px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit;white-space:nowrap">Open Aa reader settings</button>';
-  html += '</div>';
+  // Header
+  html += '<div class="settings-header"><h1>Settings</h1></div>';
+
+  // Segmented control
+  html += '<div class="segmented-control-wrapper">';
+  html += '<div class="segmented-control">';
+  html += '<button class="seg-btn' + (targetTab === 'general' ? ' active' : '') + '" data-tab="general" onclick="settingsSwitchTab(\'general\')">General</button>';
+  html += '<button class="seg-btn' + (targetTab === 'reading' ? ' active' : '') + '" data-tab="reading" onclick="settingsSwitchTab(\'reading\')">Reading</button>';
+  html += '<button class="seg-btn' + (targetTab === 'advanced' ? ' active' : '') + '" data-tab="advanced" onclick="settingsSwitchTab(\'advanced\')">Advanced</button>';
+  html += '</div></div>';
+
+  html += '<div class="tab-content">';
+
+  // ==== GENERAL TAB ====
+  html += '<div class="tab-panel' + (targetTab === 'general' ? ' active' : '') + '" data-tab="general">';
+
+  // -- Sync card (loaded async) --
+  html += '<div class="card" id="settings-sync">';
+  html += '<div class="card-title">Sync</div>';
+  html += '<div class="card-desc">Output folder, sync schedule, and article age limits.</div>';
+  html += '<p style="color:var(--muted);font-size:13px">Loading sync settings\u2026</p>';
   html += '</div>';
 
-  // ---- Open In section (Tauri only) ----
-  html += '<div class="settings-section" id="settings-viewer-mode" style="display:none">';
-  html += '<h2>Open In</h2>';
-  html += '<div class="settings-row"><div><label>Viewer window</label><div class="settings-desc">Where PullRead opens when you click View Articles</div></div>';
-  html += '<div class="settings-btn-group">';
-  html += '<button data-val="app" class="active" onclick="settingsBtnSelect(this,\'sp-viewer-mode\',\'app\');settingsPageSaveViewerMode()">PullRead window</button>';
-  html += '<button data-val="browser" onclick="settingsBtnSelect(this,\'sp-viewer-mode\',\'browser\');settingsPageSaveViewerMode()">Default browser</button>';
+  // -- Open In card (Tauri/server only) --
+  html += '<div class="card" id="settings-viewer-mode" style="display:none">';
+  html += '<div class="card-title">Open In</div>';
+  html += '<div class="setting-row">';
+  html += '<div class="setting-label"><label>Viewer window</label><div class="setting-desc">Where PullRead opens when you click View Articles</div></div>';
+  html += '<div class="setting-control"><div class="pill-group">';
+  html += '<button class="pill active" data-val="app" onclick="settingsBtnSelect(this,\'sp-viewer-mode\',\'app\');settingsPageSaveViewerMode()">PullRead window</button>';
+  html += '<button class="pill" data-val="browser" onclick="settingsBtnSelect(this,\'sp-viewer-mode\',\'browser\');settingsPageSaveViewerMode()">Default browser</button>';
   html += '</div><input type="hidden" id="sp-viewer-mode" value="app"></div>';
-  html += '<div class="settings-row"><div><label>Time format</label><div class="settings-desc">How times appear in the menu bar</div></div>';
-  html += '<div class="settings-btn-group">';
-  html += '<button data-val="12h" class="active" onclick="settingsBtnSelect(this,\'sp-time-format\',\'12h\');settingsPageSaveTimeFormat()">12-hour</button>';
-  html += '<button data-val="24h" onclick="settingsBtnSelect(this,\'sp-time-format\',\'24h\');settingsPageSaveTimeFormat()">24-hour</button>';
+  html += '</div>';
+  html += '<div class="setting-row">';
+  html += '<div class="setting-label"><label>Time format</label><div class="setting-desc">How times appear in the menu bar</div></div>';
+  html += '<div class="setting-control"><div class="pill-group">';
+  html += '<button class="pill active" data-val="12h" onclick="settingsBtnSelect(this,\'sp-time-format\',\'12h\');settingsPageSaveTimeFormat()">12-hour</button>';
+  html += '<button class="pill" data-val="24h" onclick="settingsBtnSelect(this,\'sp-time-format\',\'24h\');settingsPageSaveTimeFormat()">24-hour</button>';
   html += '</div><input type="hidden" id="sp-time-format" value="12h"></div>';
   html += '</div>';
-
-  // ---- Feeds & Sync section (placeholder, loaded async) ----
-  html += '<div class="settings-section" id="settings-feeds">';
-  html += '<h2>Bookmarks &amp; Sync</h2>';
-  html += '<p style="color:var(--muted);font-size:13px">Loading feed configuration...</p>';
   html += '</div>';
 
-  // ---- Site Logins section (Tauri only) ----
+  // -- Notifications card --
+  html += '<div class="card">';
+  html += '<div class="card-title">Notifications</div>';
+  html += '<div class="card-desc">PullRead sends notifications when syncs complete, articles are saved, and reviews are ready.</div>';
+  html += '<div class="callout">';
+  html += '<span style="flex-shrink:0;font-size:14px">&#9881;</span>';
+  html += '<span>To change notification preferences, go to <strong style="color:var(--fg)">System Settings &rarr; Notifications &rarr; PullRead</strong>. You can enable or disable alerts, banners, and sounds there.</span>';
+  html += '</div>';
+  html += '</div>';
+
+  // -- Sharing card --
+  var mastodonInstance = localStorage.getItem('pr-mastodon-instance') || '';
+  html += '<div class="card" id="settings-sharing">';
+  html += '<div class="card-title">Sharing</div>';
+  html += '<div class="setting-row">';
+  html += '<div class="setting-label"><label>Mastodon instance</label><div class="setting-desc">Your Mastodon server (e.g., xoxo.zone, mastodon.social)</div></div>';
+  html += '<div class="setting-control"><div class="input-wrap">';
+  html += '<input type="text" id="sp-mastodon-instance" value="' + escapeHtml(mastodonInstance) + '" placeholder="mastodon.social" class="input-field" onfocus="settingsClearSave(this)" onblur="settingsSaveMastodon(this)">';
+  html += '<span class="save-indicator">\u2713</span>';
+  html += '</div></div>';
+  html += '</div>';
+  html += '</div>';
+
+  html += '</div>'; // end general tab
+
+  // ==== READING TAB ====
+  html += '<div class="tab-panel' + (targetTab === 'reading' ? ' active' : '') + '" data-tab="reading">';
+
+  // -- Voice Playback card (loaded async) --
+  html += '<div class="card" id="settings-voice">';
+  html += '<div class="card-title">Voice Playback</div>';
+  html += '<div class="card-desc">Choose how articles are read aloud.</div>';
+  html += '<p style="color:var(--muted);font-size:13px">Loading voice settings\u2026</p>';
+  html += '</div>';
+
+  // -- AI Summaries & Tagging card (loaded async) --
+  html += '<div class="card" id="settings-ai">';
+  html += '<div class="card-title">AI Summaries &amp; Tagging</div>';
+  html += '<div class="card-desc">Choose a provider for article summaries and auto-tagging.</div>';
+  html += '<p style="color:var(--muted);font-size:13px">Loading AI settings\u2026</p>';
+  html += '</div>';
+
+  // -- Reading Breaks card --
+  var breakInterval = localStorage.getItem('pr-break-interval') || '0';
+  var breakActivity = localStorage.getItem('pr-break-activity') || '';
+  html += '<div class="card" id="settings-breaks">';
+  html += '<div class="card-title">Reading Breaks</div>';
+  html += '<div class="card-desc">Get a gentle reminder to take a break after reading for a while.</div>';
+  var breakOpts = [['0','Off'],['10','10m'],['15','15m'],['20','20m'],['25','25m'],['30','30m']];
+  html += '<div class="setting-row">';
+  html += '<div class="setting-label"><label>Timer interval</label><div class="setting-desc">How long before suggesting a break</div></div>';
+  html += '<div class="setting-control"><div class="pill-group">';
+  for (var bi = 0; bi < breakOpts.length; bi++) {
+    html += '<button class="pill' + (breakInterval === breakOpts[bi][0] ? ' active' : '') + '" onclick="settingsBtnSelect(this,\'sp-break-interval\',\'' + breakOpts[bi][0] + '\');localStorage.setItem(\'pr-break-interval\',\'' + breakOpts[bi][0] + '\');_breakSessionStart=0">' + breakOpts[bi][1] + '</button>';
+  }
+  html += '</div><input type="hidden" id="sp-break-interval" value="' + escapeHtml(breakInterval) + '"></div>';
+  html += '</div>';
+  html += '<div class="setting-row">';
+  html += '<div class="setting-label"><label>Activity suggestion</label><div class="setting-desc">Leave blank for random suggestions</div></div>';
+  html += '<div class="setting-control"><div class="input-wrap">';
+  html += '<input type="text" id="sp-break-activity" value="' + escapeHtml(breakActivity) + '" placeholder="e.g. Take a walk, Play guitar" class="input-field" onfocus="settingsClearSave(this)" onblur="settingsSaveBreakActivity(this)">';
+  html += '<span class="save-indicator">\u2713</span>';
+  html += '</div></div>';
+  html += '</div>';
+  html += '<div style="padding:6px 0"><button onclick="showBreakReminder()" style="font-size:12px;padding:4px 12px;background:var(--sidebar-bg);color:var(--link);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit">Preview break reminder</button></div>';
+  html += '</div>';
+
+  html += '</div>'; // end reading tab
+
+  // ==== ADVANCED TAB ====
+  html += '<div class="tab-panel' + (targetTab === 'advanced' ? ' active' : '') + '" data-tab="advanced">';
+
+  // -- Backup & Restore card --
+  html += '<div class="card" id="settings-backup">';
+  html += '<div class="card-title">Backup &amp; Restore</div>';
+  html += '<div class="card-desc">Export your settings, highlights, notes, notebooks, and feed configuration.</div>';
+  html += '<div style="display:flex;gap:10px;flex-wrap:wrap">';
+  html += '<button class="btn-primary" onclick="settingsBackup()" style="font-size:13px;padding:6px 16px">Download Backup</button>';
+  html += '<button style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit" onclick="settingsRestore()">Restore from File\u2026</button>';
+  html += '</div>';
+  html += '<div id="backup-status" style="font-size:12px;color:var(--muted);padding-top:8px"></div>';
+  html += '<hr style="border:none;border-top:1px solid var(--border);margin:16px 0 12px">';
+  html += '<button id="reimport-all-btn" style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit" onclick="reimportAllArticles()"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-cloud-download"/></svg>Reimport All Articles</button>';
+  html += '<div id="reimport-status" style="font-size:12px;color:var(--muted);padding-top:8px"></div>';
+  html += '</div>';
+
+  // -- Site Logins card (Tauri only) --
   if (window.PR_TAURI) {
-    html += '<div class="settings-section" id="settings-site-logins">';
-    html += '<h2>Site Logins</h2>';
-    html += '<p style="color:var(--muted);font-size:13px;margin-bottom:12px">Log in to sites for paywalled or authenticated content.</p>';
+    html += '<div class="card" id="settings-site-logins">';
+    html += '<div class="card-title">Site Logins</div>';
+    html += '<div class="card-desc">Log in to sites for paywalled or authenticated content.</div>';
     html += '<div id="site-logins-list"><p style="color:var(--muted);font-size:12px">Loading\u2026</p></div>';
     html += '<div style="display:flex;gap:8px;margin-top:8px">';
-    html += '<input type="text" id="site-login-domain" placeholder="Domain (e.g. medium.com, nytimes.com)" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;font-family:inherit" onkeydown="if(event.key===\'Enter\')addSiteLogin()">';
+    html += '<input type="text" id="site-login-domain" placeholder="Domain (e.g. medium.com, nytimes.com)" class="input-field" style="flex:1" onkeydown="if(event.key===\'Enter\')addSiteLogin()">';
     html += '<button class="btn-primary" onclick="addSiteLogin()" style="font-size:13px;padding:6px 14px">Log in</button>';
     html += '</div>';
     html += '</div>';
   }
 
-  // ---- Voice Playback section (placeholder, loaded async) ----
-  html += '<div class="settings-section" id="settings-voice">';
-  html += '<h2>Voice Playback</h2>';
-  html += '<p style="color:var(--muted);font-size:13px">Loading voice settings...</p>';
-  html += '</div>';
-
-  // ---- AI Summaries section (placeholder, loaded async) ----
-  html += '<div class="settings-section" id="settings-ai">';
-  html += '<h2>AI Summaries &amp; Tagging</h2>';
-  html += '<p style="color:var(--muted);font-size:13px">Loading AI settings...</p>';
-  html += '</div>';
-
-  // ---- Sharing section ----
-  var mastodonInstance = localStorage.getItem('pr-mastodon-instance') || '';
-  html += '<div class="settings-section" id="settings-sharing">';
-  html += '<h2>Sharing</h2>';
-  html += '<div class="settings-row"><div><label>Mastodon instance</label><div class="settings-desc">Your Mastodon server (e.g., xoxo.zone, mastodon.social)</div></div>';
-  html += '<input type="text" id="sp-mastodon-instance" value="' + escapeHtml(mastodonInstance) + '" placeholder="mastodon.social" style="min-width:200px">';
-  html += '</div>';
-  html += '</div>';
-
-  // ---- Save Settings bar ----
-  html += '<div class="settings-save-bar">';
-  html += '<button class="btn-primary" onclick="settingsPageSaveAll()" style="font-size:13px;padding:8px 24px">Save Settings</button>';
-  html += '</div>';
-
-  // ---- Notifications section ----
-  html += '<div class="settings-section">';
-  html += '<h2>Notifications</h2>';
-  html += '<p style="font-size:13px;color:var(--muted);margin-bottom:12px">PullRead sends notifications when syncs complete, articles are saved, and reviews are ready. Notification sounds are off by default.</p>';
-  html += '<div style="display:flex;gap:8px;align-items:flex-start;padding:10px 12px;background:color-mix(in srgb, var(--fg) 4%, transparent);border-radius:8px;font-size:12px;color:var(--muted)">'
-    + '<span style="flex-shrink:0;font-size:14px">&#9881;</span>'
-    + '<span>To change notification preferences, go to <strong style="color:var(--fg)">System Settings &rarr; Notifications &rarr; PullRead</strong>. You can enable or disable alerts, banners, and sounds there.</span>'
-    + '</div>';
-  html += '</div>';
-
-  // ---- Reading Breaks section ----
-  var breakInterval = localStorage.getItem('pr-break-interval') || '0';
-  var breakActivity = localStorage.getItem('pr-break-activity') || '';
-  html += '<div class="settings-section" id="settings-breaks">';
-  html += '<h2>Reading Breaks</h2>';
-  html += '<p style="font-size:13px;color:var(--muted);margin-bottom:16px">Get a gentle reminder to take a break after reading for a while. The reminder suggests a classic book or an activity of your choosing.</p>';
-  var breakOpts = [['0','Off'],['10','10m'],['15','15m'],['20','20m'],['25','25m'],['30','30m']];
-  html += '<div class="settings-row"><div><label>Timer interval</label><div class="settings-desc">How long before suggesting a break (Off to disable)</div></div>';
-  html += '<div class="settings-btn-group">';
-  for (var bi = 0; bi < breakOpts.length; bi++) {
-    html += '<button class="' + (breakInterval === breakOpts[bi][0] ? 'active' : '') + '" onclick="settingsBtnSelect(this,\'sp-break-interval\',\'' + breakOpts[bi][0] + '\');localStorage.setItem(\'pr-break-interval\',\'' + breakOpts[bi][0] + '\');_breakSessionStart=0">' + breakOpts[bi][1] + '</button>';
-  }
-  html += '</div><input type="hidden" id="sp-break-interval" value="' + escapeHtml(breakInterval) + '">';
-  html += '</div>';
-  html += '<div class="settings-row"><div><label>Activity suggestion</label><div class="settings-desc">Leave blank for random suggestions (walk, stretch, tea\u2026)</div></div>';
-  html += '<input type="text" id="sp-break-activity" value="' + escapeHtml(breakActivity) + '" placeholder="e.g. Take a walk, Play guitar, Call a friend" style="min-width:200px" onchange="localStorage.setItem(\'pr-break-activity\',this.value)">';
-  html += '</div>';
-  html += '<div style="padding:6px 0"><button onclick="showBreakReminder()" style="font-size:12px;padding:4px 12px;background:var(--sidebar-bg);color:var(--link);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit">Preview break reminder</button></div>';
-  html += '</div>';
-
-  // ---- Backup & Restore section ----
-  html += '<div class="settings-section">';
-  html += '<h2>Backup &amp; Restore</h2>';
-  html += '<p style="font-size:13px;color:var(--muted);margin-bottom:16px">Export your settings, highlights, notes, notebooks, and feed configuration to a single file. Use Restore to import a previous backup.</p>';
-  html += '<div class="settings-row" style="gap:12px">';
-  html += '<button class="btn-primary" onclick="settingsBackup()" style="font-size:13px;padding:6px 16px">Download Backup</button>';
-  html += '<button style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer" onclick="settingsRestore()">Restore from File\u2026</button>';
-  html += '</div>';
-  html += '<div id="backup-status" style="font-size:12px;color:var(--muted);padding-top:8px"></div>';
-  html += '<hr style="border:none;border-top:1px solid var(--border);margin:16px 0 12px">';
-  html += '<div class="settings-row" style="gap:12px">';
-  html += '<button id="reimport-all-btn" style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer" onclick="reimportAllArticles()"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-cloud-download"/></svg>Reimport All Articles</button>';
-  html += '</div>';
-  html += '<div id="reimport-status" style="font-size:12px;color:var(--muted);padding-top:8px"></div>';
-  html += '</div>';
-
-  // ---- About section ----
-  html += '<div class="settings-section" id="settings-about">';
+  // -- About card --
+  html += '<div class="card" id="settings-about">';
   html += '<div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">';
   html += '<img src="/icon-256.png" alt="Pull Read" style="width:64px;height:64px;border-radius:14px">';
-  html += '<div><h2 style="margin:0">Pull Read</h2>';
-  html += '<div style="color:var(--muted);font-size:13px;margin-top:2px">Sync articles to searchable markdown files.</div></div>';
+  html += '<div><div class="card-title" style="margin-bottom:2px">Pull Read</div>';
+  html += '<div style="color:var(--muted);font-size:13px">Sync articles to searchable markdown files.</div></div>';
   html += '</div>';
-  html += '<div class="settings-row"><label>Version</label><span id="sp-version" style="color:var(--muted);font-size:13px"></span></div>';
-  html += '<div class="settings-row" style="gap:12px">';
+  html += '<div class="setting-row">';
+  html += '<div class="setting-label"><label>Version</label></div>';
+  html += '<div class="setting-control"><span id="sp-version" style="color:var(--muted);font-size:13px"></span></div>';
+  html += '</div>';
+  html += '<div style="display:flex;gap:12px;flex-wrap:wrap;padding:8px 0">';
   html += '<a href="https://pullread.com" target="_blank" rel="noopener" style="font-size:13px;color:var(--link)">pullread.com</a>';
   html += '<a href="#" onclick="prOpenExternal(\'https://pullread.com/releases#v\' + (window._prCurrentVersion || \'0.4.0\'));return false" style="font-size:13px;color:var(--link)">What\'s New</a>';
   html += '<a href="/api/log" target="_blank" style="font-size:13px;color:var(--link)">View Logs</a>';
   html += '<button style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit" onclick="showTour()">Show Tour</button>';
   html += '</div>';
-  html += '<div class="settings-row" style="gap:12px"><span style="color:var(--muted);font-size:12px">\u00A9 A Little Drive LLC</span><a href="#" onclick="prOpenExternal(\'mailto:support@alittledrive.com\');return false" style="font-size:12px;color:var(--muted)">support@alittledrive.com</a></div>';
+  html += '<div style="padding:4px 0"><span style="color:var(--muted);font-size:12px">\u00A9 A Little Drive LLC</span> <a href="#" onclick="prOpenExternal(\'mailto:support@alittledrive.com\');return false" style="font-size:12px;color:var(--muted);margin-left:12px">support@alittledrive.com</a></div>';
   html += '</div>';
 
-  content.innerHTML = html;
-  document.getElementById('content-scroll').scrollTop = 0;
+  html += '</div>'; // end advanced tab
+  html += '</div>'; // end tab-content
 
+  // Footer
+  html += '<div class="settings-footer" style="font-size:12px;color:var(--muted)">Pull Read \u2014 Read without the feed.</div>';
+
+  content.innerHTML = html;
+  _settingsActiveTab = targetTab;
+  document.getElementById('content-scroll').scrollTop = 0;
 
   if (scrollToSection) {
     var target = document.getElementById(scrollToSection);
@@ -492,141 +569,69 @@ function showSettingsPage(scrollToSection) {
     });
   }
 
-  // Load Feeds & Sync config async
+  // Load Sync config async
   if (serverMode) {
     fetch('/api/config').then(function(r) { return r.json(); }).then(function(cfg) {
-      var sec = document.getElementById('settings-feeds');
+      var sec = document.getElementById('settings-sync');
       if (!sec) return;
-      var feeds = cfg.feeds || {};
-      var feedNames = Object.keys(feeds);
 
-      var h = '<h2>Bookmarks &amp; Sync</h2>';
-      h += '<p style="font-size:13px;color:var(--muted);margin-bottom:16px">Manage your bookmark feeds, newsletter subscriptions, output folder, and sync options.</p>';
+      var h = '<div class="card-title">Sync</div>';
+      h += '<div class="card-desc">Output folder, sync schedule, and article age limits.</div>';
 
       // Output path
-      h += '<div class="settings-row"><div><label>Output Folder</label><div class="settings-desc">Where articles are saved as markdown</div></div>';
-      h += '<div style="display:flex;gap:8px;align-items:center">';
-      h += '<input type="text" id="sp-output-path" value="' + escapeHtml(cfg.outputPath || '') + '" placeholder="~/Documents/PullRead" style="min-width:200px">';
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Output Folder</label><div class="setting-desc">Where articles are saved as markdown</div></div>';
+      h += '<div class="setting-control" style="display:flex;gap:8px;align-items:center">';
+      h += '<input type="text" id="sp-output-path" value="' + escapeHtml(cfg.outputPath || '') + '" placeholder="~/Documents/PullRead" class="input-field">';
       h += '<button onclick="pickOutputFolder(\'sp-output-path\')" style="white-space:nowrap;padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;cursor:pointer;font-family:inherit">Choose\u2026</button>';
       h += '<button onclick="revealOutputFolder()" style="white-space:nowrap;padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;cursor:pointer;font-family:inherit" title="Open in Finder">Reveal</button>';
       h += '</div></div>';
 
       // Sync interval
-      h += '<div class="settings-row"><div><label>Auto-sync</label><div class="settings-desc">How often to check for new articles</div></div>';
-      var intervals = [['30m','30min'],['1h','1h'],['4h','4h'],['12h','12h'],['manual','Manual']];
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Auto-sync</label><div class="setting-desc">How often to check for new articles</div></div>';
+      var intervals = [['30m','30m'],['1h','1h'],['4h','4h'],['12h','12h'],['manual','Manual']];
       var syncIsPreset = intervals.some(function(p) { return p[0] === cfg.syncInterval; });
       var syncCustom = !syncIsPreset && cfg.syncInterval ? cfg.syncInterval : '';
-      h += '<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">';
-      h += '<div class="settings-btn-group" id="sp-sync-presets">';
+      h += '<div class="setting-control" style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">';
+      h += '<div class="pill-group" id="sp-sync-presets">';
       for (var ii = 0; ii < intervals.length; ii++) {
-        h += '<button data-val="' + intervals[ii][0] + '" class="' + (cfg.syncInterval === intervals[ii][0] ? 'active' : '') + '" onclick="settingsSyncPreset(this,\'' + intervals[ii][0] + '\')">' + intervals[ii][1] + '</button>';
+        h += '<button class="pill' + (cfg.syncInterval === intervals[ii][0] ? ' active' : '') + '" data-val="' + intervals[ii][0] + '" onclick="settingsSyncPreset(this,\'' + intervals[ii][0] + '\')">' + intervals[ii][1] + '</button>';
       }
       h += '</div>';
       h += '<input type="text" id="sp-sync-custom" value="' + escapeHtml(syncCustom) + '" placeholder="e.g. 2h" style="width:52px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:12px;font-family:inherit;text-align:center" oninput="settingsSyncCustom(this.value)">';
       h += '</div><input type="hidden" id="sp-sync-interval" value="' + escapeHtml(cfg.syncInterval || '1h') + '">';
       h += '</div>';
 
-      // Browser cookies
-      h += '<div class="settings-row"><div><label>Chrome Cookies</label><div class="settings-desc">Use Chrome login cookies for paywalled sites (local only)</div></div>';
-      h += '<input type="checkbox" id="sp-cookies"' + (cfg.useBrowserCookies ? ' checked' : '') + '>';
+      // Chrome cookies
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Chrome Cookies</label><div class="setting-desc">Use Chrome login cookies for paywalled sites (local only)</div></div>';
+      h += '<div class="setting-control"><input type="checkbox" id="sp-cookies"' + (cfg.useBrowserCookies ? ' checked' : '') + ' style="width:18px;height:18px;accent-color:var(--link)"></div>';
       h += '</div>';
 
-      // Max age for feed entries
-      h += '<div class="settings-row"><div><label>Max article age</label><div class="settings-desc">Skip feed entries older than this (0 = no limit)</div></div>';
+      // Max age
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Max article age</label><div class="setting-desc">Skip feed entries older than this (0 = no limit)</div></div>';
       var ages = [[0,'None'],[30,'30d'],[90,'3mo'],[180,'6mo'],[365,'1yr']];
-      h += '<div class="settings-btn-group">';
+      h += '<div class="setting-control"><div class="pill-group">';
       for (var ai = 0; ai < ages.length; ai++) {
-        h += '<button data-val="' + ages[ai][0] + '" class="' + (cfg.maxAgeDays === ages[ai][0] ? 'active' : '') + '" onclick="settingsBtnSelect(this,\'sp-max-age\',\'' + ages[ai][0] + '\')">' + ages[ai][1] + '</button>';
+        h += '<button class="pill' + (cfg.maxAgeDays === ages[ai][0] ? ' active' : '') + '" data-val="' + ages[ai][0] + '" onclick="settingsBtnSelect(this,\'sp-max-age\',\'' + ages[ai][0] + '\')">' + ages[ai][1] + '</button>';
       }
-      h += '</div><input type="hidden" id="sp-max-age" value="' + (cfg.maxAgeDays || 0) + '">';
+      h += '</div><input type="hidden" id="sp-max-age" value="' + (cfg.maxAgeDays || 0) + '"></div>';
       h += '</div>';
 
-      // Feed list
-      var FEED_COLLAPSE_LIMIT = 5;
-      h += '<div style="margin-top:16px"><label style="font-size:13px;font-weight:500;margin-bottom:8px;display:block">Feeds (' + feedNames.length + ')</label>';
-      if (feedNames.length > FEED_COLLAPSE_LIMIT) {
-        h += '<input type="text" id="sp-feed-search" placeholder="Search feeds\u2026" oninput="settingsFilterFeeds(this.value)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;font-family:inherit;margin-bottom:8px;box-sizing:border-box">';
-      }
-      if (feedNames.length > 0) {
-        h += '<div id="feed-list-container" style="border:1px solid var(--border);border-radius:8px;overflow:hidden">';
-        for (var fi = 0; fi < feedNames.length; fi++) {
-          var fn = feedNames[fi];
-          var hiddenFeed = fi >= FEED_COLLAPSE_LIMIT && feedNames.length > FEED_COLLAPSE_LIMIT + 1;
-          h += '<div id="feed-row-' + fi + '" class="feed-row' + (hiddenFeed ? ' feed-row-hidden' : '') + '" data-feed-name="' + escapeHtml(fn.toLowerCase()) + '" data-feed-url="' + escapeHtml(feeds[fn].toLowerCase()) + '" style="display:' + (hiddenFeed ? 'none' : 'flex') + ';align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:' + (fi < feedNames.length - 1 ? '1px solid var(--border)' : 'none') + ';font-size:13px">'
-            + '<div style="cursor:pointer;flex:1;min-width:0" onclick="settingsEditFeed(' + fi + ')" title="Click to edit"><div style="font-weight:500">' + escapeHtml(fn) + '</div><div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px">' + escapeHtml(feeds[fn]) + '</div></div>'
-            + '<button onclick="settingsRemoveFeed(\'' + escapeHtml(fn.replace(/'/g, "\\'")) + '\')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:2px 6px" title="Remove">&times;</button>'
-            + '</div>';
-        }
-        if (feedNames.length > FEED_COLLAPSE_LIMIT + 1) {
-          h += '<div id="feed-expand-toggle" style="padding:6px 12px;font-size:12px;color:var(--link);cursor:pointer;text-align:center;border-top:1px solid var(--border)" onclick="toggleFeedList()">'
-            + 'Show ' + (feedNames.length - FEED_COLLAPSE_LIMIT) + ' more feeds</div>';
-        }
-        h += '</div>';
-      }
-      h += '<div style="display:flex;gap:8px;margin-top:10px">'
-        + '<input type="text" id="sp-new-feed" placeholder="Paste bookmark feed URL or web address\u2026" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;font-family:inherit" onkeydown="if(event.key===\'Enter\')settingsAddFeed()">'
-        + '<button class="btn-primary" onclick="settingsAddFeed()" id="sp-add-feed-btn" style="font-size:13px;padding:6px 14px">Add</button>'
-        + '<button onclick="settingsImportOPML()" style="font-size:13px;padding:6px 14px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit;white-space:nowrap">Import OPML\u2026</button>'
-        + '</div>';
-      h += '<div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6">'
-        + 'Paste a bookmark feed URL from Instapaper, Pinboard, Raindrop, or Pocket. '
-        + 'You can also subscribe to newsletters (Substack, Ghost, Buttondown), blogs, YouTube channels, and Reddit subreddits \u2014 just paste the web address.'
-        + '</div>';
-      h += '<div style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;padding:8px 10px;background:color-mix(in srgb, var(--fg) 4%, transparent);border-radius:6px;font-size:11px;color:var(--muted)">'
-        + '<span style="flex-shrink:0">&#128196;</span>'
-        + '<span>Bookmark services only sync articles you save. Newsletter and blog feeds save every post as a separate file, which can use significant disk space over time.</span>'
-        + '</div>';
-
-      // Recommended feeds
-      var recFeeds = [
-        { name: 'Daring Fireball', url: 'https://daringfireball.net/feeds/main' },
-        { name: 'Heather Cox Richardson', url: 'https://heathercoxrichardson.substack.com' },
-        { name: 'Kottke.org', url: 'https://feeds.kottke.org/main' },
-        { name: 'Craig Mod', url: 'https://craigmod.com/rss/' },
-        { name: 'Aeon Essays', url: 'https://aeon.co/feed.rss' },
-        { name: 'Longreads', url: 'https://longreads.com/feed/' },
-        { name: 'The Marginalian', url: 'https://www.themarginalian.org/feed/' },
-      ];
-      // Filter out feeds already added
-      var existingUrls = Object.values(feeds).map(function(u) { return u.toLowerCase(); });
-      var existingNames = Object.keys(feeds).map(function(n) { return n.toLowerCase(); });
-      var available = recFeeds.filter(function(rf) {
-        return existingUrls.indexOf(rf.url.toLowerCase()) === -1 &&
-               existingNames.indexOf(rf.name.toLowerCase()) === -1;
-      });
-      if (available.length > 0) {
-        h += '<div style="margin-top:14px"><label style="font-size:12px;font-weight:500;color:var(--muted);display:block;margin-bottom:6px">Recommended feeds (low traffic)</label>';
-        h += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
-        for (var ri = 0; ri < available.length; ri++) {
-          h += '<button onclick="settingsAddRecFeed(\'' + escapeHtml(available[ri].name.replace(/'/g, "\\'")) + '\',\'' + escapeHtml(available[ri].url.replace(/'/g, "\\'")) + '\')" style="font-size:12px;padding:4px 10px;background:var(--sidebar-bg);color:var(--fg);border:1px solid var(--border);border-radius:14px;cursor:pointer;font-family:inherit;white-space:nowrap">+ ' + escapeHtml(available[ri].name) + '</button>';
-        }
-        h += '</div></div>';
-      }
+      // Save button
+      h += '<div style="padding:8px 0 0;text-align:right">';
+      h += '<button class="btn-primary" onclick="settingsPageSaveConfig()" style="font-size:13px;padding:6px 18px">Save</button>';
       h += '</div>';
 
       sec.innerHTML = h;
       sec._configData = cfg;
-
-      // Load per-feed sync status and show error badges
-      fetch('/api/feed-status').then(function(r) { return r.json(); }).then(function(feedStatus) {
-        for (var si = 0; si < feedNames.length; si++) {
-          var statusName = feedNames[si];
-          var st = feedStatus[statusName];
-          if (!st || st.ok) continue;
-          var row = document.getElementById('feed-row-' + si);
-          if (!row) continue;
-          var infoDiv = row.querySelector('div[style*="cursor:pointer"]');
-          if (!infoDiv) continue;
-          var errDiv = document.createElement('div');
-          errDiv.style.cssText = 'font-size:11px;color:#dc2626;margin-top:2px;display:flex;align-items:center;gap:6px';
-          errDiv.innerHTML = '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(st.error || 'Sync failed') + '</span>'
-            + '<button onclick="event.stopPropagation();settingsRetryFeed(\'' + escapeJsStr(statusName) + '\',\'' + escapeJsStr(feeds[statusName]) + '\',' + si + ')" style="flex-shrink:0;font-size:10px;padding:2px 8px;background:#dc2626;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:inherit">Retry</button>';
-          infoDiv.appendChild(errDiv);
-        }
-      }).catch(function() {});
     }).catch(function() {
-      var sec = document.getElementById('settings-feeds');
-      if (sec) sec.innerHTML = '<h2>Bookmarks &amp; Sync</h2><p style="color:var(--muted);font-size:13px">Could not load feed configuration.</p>';
+      var sec = document.getElementById('settings-sync');
+      if (sec) {
+        sec.innerHTML = '<div class="card-title">Sync</div><p style="color:var(--muted);font-size:13px">Could not load sync configuration.</p>';
+      }
     });
   }
 
@@ -644,13 +649,12 @@ function showSettingsPage(scrollToSection) {
       var hasGoogle = allVoices.some(function(v) { return v.name.indexOf('Google') === 0; });
       var hasApple = allVoices.some(function(v) { return v.name.indexOf('Google') !== 0; });
       var providers = [
-        { id: 'apple', label: 'Apple — free' },
-        { id: 'google', label: 'Google — free' },
-        { id: 'openai', label: 'OpenAI — premium' },
-        { id: 'elevenlabs', label: 'ElevenLabs — premium' },
+        { id: 'apple', label: 'Apple \u2014 free' },
+        { id: 'google', label: 'Google \u2014 free' },
+        { id: 'openai', label: 'OpenAI \u2014 premium' },
+        { id: 'elevenlabs', label: 'ElevenLabs \u2014 premium' },
       ];
       var ttsShortLabels = {google:'Google',apple:'Apple',openai:'OpenAI',elevenlabs:'ElevenLabs'};
-      // Resolve server's 'browser' provider to google/apple sub-type
       var activeProv = data.provider || 'google';
       if (activeProv === 'browser') {
         var savedType = localStorage.getItem('pr-tts-browser-type');
@@ -660,84 +664,103 @@ function showSettingsPage(scrollToSection) {
           activeProv = hasApple ? 'apple' : 'google';
         }
       }
-      var h = '<h2>Voice Playback</h2>';
-      h += '<div class="settings-row"><div><label>Provider</label><div class="settings-desc">Choose how articles are read aloud</div></div>';
-      h += '<div class="settings-btn-group" id="sp-tts-provider-btns">';
+
+      var h = '<div class="card-title">Voice Playback</div>';
+      h += '<div class="card-desc">Choose how articles are read aloud.</div>';
+
+      // Provider
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Provider</label></div>';
+      h += '<div class="setting-control"><div class="pill-group" id="sp-tts-provider-btns">';
       for (var i = 0; i < providers.length; i++) {
         var pid = providers[i].id;
         var isUnavail = (pid === 'google' && !hasGoogle) || (pid === 'apple' && !hasApple);
-        var cls = activeProv === pid ? 'active' : '';
-        if (isUnavail) cls += (cls ? ' ' : '') + 'unavailable';
+        var cls = 'pill' + (activeProv === pid ? ' active' : '');
+        if (isUnavail) cls += ' unavailable';
         var note = '';
         if (pid === 'google' && !hasGoogle) note = ' <span style="font-size:10px;opacity:0.7">(Chrome)</span>';
         if (pid === 'apple' && !hasApple) note = ' <span style="font-size:10px;opacity:0.7">(Safari/macOS)</span>';
-        h += '<button data-val="' + pid + '" class="' + cls + '" onclick="settingsBtnSelect(this,\'sp-tts-provider\',\'' + pid + '\');settingsPageTTSChanged()">' + (ttsShortLabels[pid] || pid) + note + '</button>';
+        h += '<button class="' + cls + '" data-val="' + pid + '" onclick="settingsBtnSelect(this,\'sp-tts-provider\',\'' + pid + '\');settingsPageTTSChanged()">' + (ttsShortLabels[pid] || pid) + note + '</button>';
       }
-      h += '</div><input type="hidden" id="sp-tts-provider" value="' + escapeHtml(activeProv) + '">';
+      h += '</div><input type="hidden" id="sp-tts-provider" value="' + escapeHtml(activeProv) + '"></div>';
       h += '</div>';
 
-      // Voice picker (custom dropdown)
+      // Voice picker
       var prov = activeProv;
       var isBrowserProv = prov === 'google' || prov === 'apple';
       if (isBrowserProv) {
         var browserVoiceLabel = localStorage.getItem('pr-tts-browser-voice') || 'Default';
-        h += '<div class="settings-row" id="sp-tts-voice-row" style="position:relative"><label>Voice</label>';
-        h += '<button onclick="toggleTTSVoicePicker()" id="sp-tts-voice-btn" style="flex:1;text-align:left;display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;cursor:pointer;font-family:inherit;min-width:160px">' + escapeHtml(browserVoiceLabel) + ' <span style="opacity:0.5">\u25BE</span></button>';
+        h += '<div class="setting-row" id="sp-tts-voice-row" style="position:relative">';
+        h += '<div class="setting-label"><label>Voice</label></div>';
+        h += '<div class="setting-control">';
+        h += '<button onclick="toggleTTSVoicePicker()" id="sp-tts-voice-btn" style="text-align:left;display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;cursor:pointer;font-family:inherit;min-width:160px">' + escapeHtml(browserVoiceLabel) + ' <span style="opacity:0.5">\u25BE</span></button>';
         h += '<input type="hidden" id="sp-tts-voice" value="">';
-        h += '</div>';
+        h += '</div></div>';
       } else if (data.voices) {
         var voices = data.voices[prov] || [];
         var voiceLabel = data.voice || '';
         for (var vi = 0; vi < voices.length; vi++) { if (voices[vi].id === data.voice) { voiceLabel = voices[vi].label; break; } }
-        h += '<div class="settings-row" id="sp-tts-voice-row" style="position:relative"><label>Voice</label>';
-        h += '<button onclick="toggleTTSVoicePicker()" id="sp-tts-voice-btn" style="flex:1;text-align:left;display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;cursor:pointer;font-family:inherit;min-width:160px">' + escapeHtml(voiceLabel || 'Select voice') + ' <span style="opacity:0.5">\u25BE</span></button>';
+        h += '<div class="setting-row" id="sp-tts-voice-row" style="position:relative">';
+        h += '<div class="setting-label"><label>Voice</label></div>';
+        h += '<div class="setting-control">';
+        h += '<button onclick="toggleTTSVoicePicker()" id="sp-tts-voice-btn" style="text-align:left;display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;cursor:pointer;font-family:inherit;min-width:160px">' + escapeHtml(voiceLabel || 'Select voice') + ' <span style="opacity:0.5">\u25BE</span></button>';
         h += '<input type="hidden" id="sp-tts-voice" value="' + escapeHtml(data.voice || '') + '">';
-        h += '</div>';
+        h += '</div></div>';
       }
 
-      // Randomize voices checkbox (browser providers only)
+      // Randomize voices
       var randomizeOn = localStorage.getItem('pr-tts-randomize-voices') === '1';
-      h += '<div class="settings-row" id="sp-tts-randomize-row" style="display:' + (isBrowserProv ? 'flex' : 'none') + '">';
-      h += '<div><label>Randomize voices</label><div class="settings-desc">Each source gets a consistent random voice</div></div>';
-      h += '<input type="checkbox" id="sp-tts-randomize"' + (randomizeOn ? ' checked' : '') + ' onchange="localStorage.setItem(\'pr-tts-randomize-voices\',this.checked?\'1\':\'0\')" style="width:18px;height:18px;accent-color:var(--link)">';
+      h += '<div class="setting-row" id="sp-tts-randomize-row" style="display:' + (isBrowserProv ? 'flex' : 'none') + '">';
+      h += '<div class="setting-label"><label>Randomize voices</label><div class="setting-desc">Each source gets a consistent random voice</div></div>';
+      h += '<div class="setting-control"><input type="checkbox" id="sp-tts-randomize"' + (randomizeOn ? ' checked' : '') + ' onchange="localStorage.setItem(\'pr-tts-randomize-voices\',this.checked?\'1\':\'0\')" style="width:18px;height:18px;accent-color:var(--link)"></div>';
       h += '</div>';
 
       // Model select (hidden for browser voice providers)
       if (data.models && !isBrowserProv) {
-        h += '<div class="settings-row" id="sp-tts-model-row"><label>Model</label>';
+        h += '<div class="setting-row" id="sp-tts-model-row">';
+        h += '<div class="setting-label"><label>Model</label></div>';
         var models = data.models[data.provider] || [];
-        h += '<div class="settings-btn-group">';
+        h += '<div class="setting-control"><div class="pill-group">';
         for (var mi = 0; mi < models.length; mi++) {
-          h += '<button data-val="' + models[mi].id + '" class="' + (data.model === models[mi].id ? 'active' : '') + '" onclick="settingsBtnSelect(this,\'sp-tts-model\',\'' + models[mi].id + '\')">' + escapeHtml(models[mi].label) + '</button>';
+          h += '<button class="pill' + (data.model === models[mi].id ? ' active' : '') + '" data-val="' + models[mi].id + '" onclick="settingsBtnSelect(this,\'sp-tts-model\',\'' + models[mi].id + '\')">' + escapeHtml(models[mi].label) + '</button>';
         }
-        h += '</div><input type="hidden" id="sp-tts-model" value="' + escapeHtml(data.model || '') + '">';
+        h += '</div><input type="hidden" id="sp-tts-model" value="' + escapeHtml(data.model || '') + '"></div>';
         h += '</div>';
       }
 
       // API key for cloud providers
       var isCloud = data.provider === 'openai' || data.provider === 'elevenlabs';
-      h += '<div class="settings-row" id="sp-tts-key-row" style="display:' + (isCloud ? 'flex' : 'none') + '"><div><label>API Key</label>';
-      h += '<div class="settings-desc">' + (data.hasKey && isCloud ? '<span class="settings-status ok">Key saved</span>' : 'Required for cloud TTS') + '</div></div>';
-      h += '<input type="password" id="sp-tts-key" placeholder="' + (data.hasKey && isCloud ? '••••••••' : 'Paste API key') + '" style="min-width:200px">';
+      h += '<div class="setting-row" id="sp-tts-key-row" style="display:' + (isCloud ? 'flex' : 'none') + '">';
+      h += '<div class="setting-label"><label>API Key</label>';
+      h += '<div class="setting-desc">' + (data.hasKey && isCloud ? '<span class="settings-status ok">Key saved</span>' : 'Required for cloud TTS') + '</div></div>';
+      h += '<div class="setting-control"><input type="password" id="sp-tts-key" placeholder="' + (data.hasKey && isCloud ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : 'Paste API key') + '" style="min-width:200px"></div>';
       h += '</div>';
 
-      // Auto-play next setting
-      h += '<div class="settings-row"><div><label>Auto-play next</label><div class="settings-desc">Automatically play the next item when playback ends</div></div>';
-      h += '<div class="settings-btn-group">';
-      h += '<button data-val="off"' + (autoplayMode === 'off' ? ' class="active"' : '') + ' onclick="settingsBtnSelect(this,null,\'off\');autoplayMode=\'off\';localStorage.setItem(\'pr-autoplay-mode\',\'off\')">Off</button>';
-      h += '<button data-val="podcasts"' + (autoplayMode === 'podcasts' ? ' class="active"' : '') + ' onclick="settingsBtnSelect(this,null,\'podcasts\');autoplayMode=\'podcasts\';localStorage.setItem(\'pr-autoplay-mode\',\'podcasts\')">Podcasts</button>';
-      h += '<button data-val="everything"' + (autoplayMode === 'everything' ? ' class="active"' : '') + ' onclick="settingsBtnSelect(this,null,\'everything\');autoplayMode=\'everything\';localStorage.setItem(\'pr-autoplay-mode\',\'everything\')">Everything</button>';
+      // Auto-play next
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Auto-play next</label><div class="setting-desc">Automatically play the next item when playback ends</div></div>';
+      h += '<div class="setting-control"><div class="pill-group">';
+      h += '<button class="pill' + (autoplayMode === 'off' ? ' active' : '') + '" data-val="off" onclick="settingsBtnSelect(this,null,\'off\');autoplayMode=\'off\';localStorage.setItem(\'pr-autoplay-mode\',\'off\')">Off</button>';
+      h += '<button class="pill' + (autoplayMode === 'podcasts' ? ' active' : '') + '" data-val="podcasts" onclick="settingsBtnSelect(this,null,\'podcasts\');autoplayMode=\'podcasts\';localStorage.setItem(\'pr-autoplay-mode\',\'podcasts\')">Podcasts</button>';
+      h += '<button class="pill' + (autoplayMode === 'everything' ? ' active' : '') + '" data-val="everything" onclick="settingsBtnSelect(this,null,\'everything\');autoplayMode=\'everything\';localStorage.setItem(\'pr-autoplay-mode\',\'everything\')">Everything</button>';
       h += '</div></div>';
+      h += '</div>';
 
+      // Voice hint
       var hasQualityVoices = allVoices.some(function(v) { return v.name.indexOf('(Premium)') !== -1 || v.name.indexOf('(Enhanced)') !== -1; });
       var showVoiceHint = isBrowserProv && prov === 'apple' && !hasQualityVoices;
       h += '<div id="sp-voice-hint" style="display:' + (showVoiceHint ? 'block' : 'none') + ';padding:8px 0">';
-      h += '<div style="font-size:12px;color:var(--muted)">Tip: Install better voices in System Settings &rarr; Accessibility &rarr; Spoken Content &rarr; Manage Voices</div>';
+      h += '<div class="callout">Tip: Install better voices in System Settings &rarr; Accessibility &rarr; Spoken Content &rarr; Manage Voices</div>';
+      h += '</div>';
+
+      // Save button
+      h += '<div style="padding:8px 0 0;text-align:right">';
+      h += '<button class="btn-primary" onclick="settingsPageSaveTTS()" style="font-size:13px;padding:6px 18px">Save</button>';
       h += '</div>';
 
       sec.innerHTML = h;
       sec._ttsData = data;
-      // Chrome loads voices asynchronously — update button availability when ready
+      // Chrome loads voices asynchronously
       if (window.speechSynthesis && speechSynthesis.onvoiceschanged !== undefined) {
         speechSynthesis.onvoiceschanged = function() {
           var btns = document.getElementById('sp-tts-provider-btns');
@@ -754,7 +777,7 @@ function showSettingsPage(scrollToSection) {
       }
     }).catch(function() {
       var sec = document.getElementById('settings-voice');
-      if (sec) sec.innerHTML = '<h2>Voice Playback</h2><p style="color:var(--muted);font-size:13px">Could not load voice settings.</p>';
+      if (sec) sec.innerHTML = '<div class="card-title">Voice Playback</div><p style="color:var(--muted);font-size:13px">Could not load voice settings.</p>';
     });
 
     // Load LLM settings and model catalog concurrently
@@ -771,7 +794,6 @@ function showSettingsPage(scrollToSection) {
       var provs = llm.providers || {};
       var appleAvailable = llm.appleAvailable || false;
 
-      // Build provider/cloud lists from model catalog, with sensible fallbacks
       var providerOrder = ['apple', 'anthropic', 'openai', 'gemini', 'openrouter'];
       var llmShortLabels = {apple:'Apple',anthropic:'Claude',openai:'OpenAI',gemini:'Gemini',openrouter:'OpenRouter'};
       var cloudProviders = [];
@@ -788,30 +810,31 @@ function showSettingsPage(scrollToSection) {
         });
       }
 
-      var h = '<h2>AI Summaries &amp; Tagging</h2>';
-      h += '<p style="font-size:13px;color:var(--muted);margin-bottom:16px">Choose a provider for article summaries and auto-tagging.</p>';
+      var h = '<div class="card-title">AI Summaries &amp; Tagging</div>';
+      h += '<div class="card-desc">Choose a provider for article summaries and auto-tagging.</div>';
 
-      // Default provider selector
-      h += '<div class="settings-row"><div><label>Provider</label>';
-      h += '<div class="settings-desc">Used for summaries and auto-tagging</div></div>';
-      h += '<div class="settings-btn-group">';
+      // Provider selector
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Provider</label><div class="setting-desc">Used for summaries and auto-tagging</div></div>';
+      h += '<div class="setting-control"><div class="pill-group">';
       for (var i = 0; i < providerOrder.length; i++) {
         var p = providerOrder[i];
-        h += '<button data-val="' + p + '" class="' + (defaultProv === p ? 'active' : '') + '" onclick="settingsBtnSelect(this,\'sp-llm-default\',\'' + p + '\');settingsPageLLMProviderChanged()">' + (llmShortLabels[p] || p) + '</button>';
+        h += '<button class="pill' + (defaultProv === p ? ' active' : '') + '" data-val="' + p + '" onclick="settingsBtnSelect(this,\'sp-llm-default\',\'' + p + '\');settingsPageLLMProviderChanged()">' + (llmShortLabels[p] || p) + '</button>';
       }
-      h += '</div><input type="hidden" id="sp-llm-default" value="' + escapeHtml(defaultProv) + '">';
+      h += '</div><input type="hidden" id="sp-llm-default" value="' + escapeHtml(defaultProv) + '"></div>';
       h += '</div>';
 
-      // Apple Intelligence section
-      h += '<div id="sp-llm-apple-info" style="display:' + (defaultProv === 'apple' ? 'block' : 'none') + ';padding:10px 12px;margin-top:8px;background:color-mix(in srgb, var(--fg) 4%, transparent);border-radius:8px;font-size:12px;color:var(--muted);line-height:1.6">';
+      // Apple Intelligence
+      h += '<div id="sp-llm-apple-info" style="display:' + (defaultProv === 'apple' ? 'block' : 'none') + '">';
+      h += '<div class="callout' + (appleAvailable ? ' callout-success' : '') + '">';
       if (appleAvailable) {
         h += '<span class="settings-status ok">Apple Intelligence available</span> Runs on-device, no API key needed.';
       } else {
         h += 'Apple Intelligence requires macOS 26+ with Apple Silicon.';
       }
-      h += '</div>';
+      h += '</div></div>';
 
-      // One section per cloud provider — only the selected one is visible
+      // Cloud provider sections
       for (var ci = 0; ci < cloudProviders.length; ci++) {
         var cp = cloudProviders[ci];
         var pConfig = provs[cp.id] || {};
@@ -831,7 +854,6 @@ function showSettingsPage(scrollToSection) {
         h += '<input type="password" id="sp-llm-key-' + cp.id + '" placeholder="' + (hasKey ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : cp.placeholder) + '" style="flex:1;min-width:0">';
         h += '</div>';
 
-        // Model dropdown
         h += '<div style="display:flex;gap:8px;align-items:center">';
         h += '<label style="font-size:12px;min-width:55px;color:var(--muted)">Model</label>';
         h += '<select id="sp-llm-model-' + cp.id + '" onchange="settingsPageModelChanged(\'' + cp.id + '\')" style="flex:1;min-width:0;font-size:12px;padding:6px 8px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px">';
@@ -845,7 +867,6 @@ function showSettingsPage(scrollToSection) {
         h += '</select>';
         h += '</div>';
 
-        // Custom model text input (hidden unless custom selected)
         h += '<div id="sp-llm-custom-' + cp.id + '" style="display:' + (isCustom ? 'flex' : 'none') + ';gap:8px;align-items:center;margin-top:6px">';
         h += '<label style="font-size:12px;min-width:55px;color:var(--muted)"></label>';
         h += '<input type="text" id="sp-llm-custom-input-' + cp.id + '" value="' + escapeHtml(isCustom ? savedModel : '') + '" placeholder="model-id" style="flex:1;min-width:0;font-size:12px">';
@@ -854,13 +875,19 @@ function showSettingsPage(scrollToSection) {
         h += '</div>';
       }
 
+      // Save button
+      h += '<div style="padding:8px 0 0;text-align:right">';
+      h += '<button class="btn-primary" onclick="settingsPageSaveLLM()" style="font-size:13px;padding:6px 18px">Save</button>';
+      h += '</div>';
+
       sec.innerHTML = h;
     }).catch(function() {
       var sec = document.getElementById('settings-ai');
-      if (sec) sec.innerHTML = '<h2>AI Summaries &amp; Tagging</h2><p style="color:var(--muted);font-size:13px">Could not load AI settings. Configure in the menu bar app.</p>';
+      if (sec) sec.innerHTML = '<div class="card-title">AI Summaries &amp; Tagging</div><p style="color:var(--muted);font-size:13px">Could not load AI settings.</p>';
     });
   }
 }
+
 
 function settingsPageSaveViewerMode() {
   var mode = document.getElementById('sp-viewer-mode').value;
@@ -1008,16 +1035,14 @@ function settingsPageTTSChanged() {
     modelRow.style.display = 'none';
   } else if (modelRow && data && data.models && data.models[provider]) {
     modelRow.style.display = '';
-    var label2 = modelRow.querySelector('label');
     var models = data.models[provider];
-    modelRow.innerHTML = '';
-    if (label2) modelRow.appendChild(label2);
-    var grp = '<div class="settings-btn-group">';
+    var grp = '<div class="setting-label"><label>Model</label></div>';
+    grp += '<div class="setting-control"><div class="pill-group">';
     for (var mi = 0; mi < models.length; mi++) {
-      grp += '<button data-val="' + models[mi].id + '"' + (mi === 0 ? ' class="active"' : '') + ' onclick="settingsBtnSelect(this,\'sp-tts-model\',\'' + models[mi].id + '\')">' + escapeHtml(models[mi].label) + '</button>';
+      grp += '<button class="pill' + (mi === 0 ? ' active' : '') + '" data-val="' + models[mi].id + '" onclick="settingsBtnSelect(this,\'sp-tts-model\',\'' + models[mi].id + '\')">' + escapeHtml(models[mi].label) + '</button>';
     }
-    grp += '</div><input type="hidden" id="sp-tts-model" value="' + (models.length > 0 ? models[0].id : '') + '">';
-    modelRow.insertAdjacentHTML('beforeend', grp);
+    grp += '</div><input type="hidden" id="sp-tts-model" value="' + (models.length > 0 ? models[0].id : '') + '"></div>';
+    modelRow.innerHTML = grp;
   }
 }
 
@@ -1132,7 +1157,7 @@ function settingsPageSaveConfig(skipRefresh) {
   var syncInterval = document.getElementById('sp-sync-interval').value;
   var cookies = document.getElementById('sp-cookies').checked;
   var maxAge = parseInt(document.getElementById('sp-max-age').value, 10) || 0;
-  var sec = document.getElementById('settings-feeds');
+  var sec = document.getElementById('settings-sync');
   var cfg = sec ? sec._configData : {};
   var feeds = cfg.feeds || {};
 
