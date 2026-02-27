@@ -384,7 +384,7 @@ async function playBrowserTTS(filename, domain) {
 
   // Estimate total duration (browser TTS doesn't give real progress)
   const estimatedWords = plainText.split(/\s+/).length;
-  const estimatedSeconds = estimatedWords / (180 * ttsSpeed); // ~180 wpm base
+  const estimatedSeconds = (estimatedWords / (180 * ttsSpeed)) * 60; // ~180 wpm base → seconds
 
   _browserTTSState = {
     text: plainText,
