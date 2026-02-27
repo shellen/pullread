@@ -567,7 +567,10 @@ async function playCloudTTSCached(filename) {
 
     audio.addEventListener('playing', function() {
       stopListenLoading();
-      ttsPlaying = true;
+      if (!ttsPlaying) {
+        audio.pause();
+        return;
+      }
       renderAudioPlayer();
       // Cached playback — pre-generate next queue item
       ttsPrefetchNextQueueItem();
@@ -633,7 +636,10 @@ async function playPodcastAudio(item) {
     audio.addEventListener('playing', function() {
       if (ttsAudio !== audio) return;
       stopListenLoading();
-      ttsPlaying = true;
+      if (!ttsPlaying) {
+        audio.pause();
+        return;
+      }
       renderAudioPlayer();
     });
 
@@ -847,7 +853,11 @@ async function ttsPlayNextChunk(index, seekPct) {
     audio.addEventListener('playing', function() {
       if (session !== _ttsChunkSession) return;
       stopListenLoading();
-      ttsPlaying = true;
+      // If user paused while we were buffering, pause immediately
+      if (!ttsPlaying) {
+        audio.pause();
+        return;
+      }
       renderAudioPlayer();
 
       // Pre-fetch next chunk while this one plays
@@ -892,11 +902,17 @@ async function ttsPlayNextChunk(index, seekPct) {
       if (statusEl) statusEl.textContent = 'Playback error';
     });
 
-    audio.play();
-
-    // Store as plain HTMLAudioElement — existing toggle/speed/stop code handles this
+    // Assign before play so pause always targets the current element
     ttsAudio = audio;
+
+    // If user paused during chunk transition, don't start the new chunk
+    if (!ttsPlaying && session.currentChunk > 0) {
+      renderAudioPlayer();
+      return;
+    }
+
     ttsPlaying = true;
+    audio.play();
     renderAudioPlayer();
   } catch (err) {
     stopListenLoading();
