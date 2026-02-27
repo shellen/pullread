@@ -330,6 +330,51 @@ function settingsClearSave(input) {
   if (indicator) indicator.classList.remove('visible');
 }
 
+function settingsKeyEdit(keyId) {
+  var stateEl, inputHtml;
+  if (keyId === 'tts') {
+    stateEl = document.getElementById('sp-tts-key-state');
+    inputHtml = '<div class="input-wrap" style="display:inline-flex"><input type="password" id="sp-tts-key" placeholder="Paste new API key" class="input-field" style="min-width:200px" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveTTS(this)"><span class="save-indicator">\u2713</span></div>'
+      + ' <button class="key-action" onclick="showSettingsPage(\'settings-voice\')">Cancel</button>';
+  } else {
+    var provider = keyId.replace('llm-', '');
+    stateEl = document.getElementById('sp-llm-key-state-' + provider);
+    inputHtml = '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">'
+      + '<label style="font-size:12px;min-width:55px;color:var(--muted)">API Key</label>'
+      + '<div class="input-wrap" style="flex:1;min-width:0"><input type="password" id="sp-llm-key-' + provider + '" placeholder="Paste new API key" class="input-field" style="width:100%" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveLLM(this)"><span class="save-indicator">\u2713</span></div>'
+      + '</div>'
+      + '<div style="margin-top:4px"><button class="key-action" onclick="showSettingsPage(\'settings-ai\')">Cancel</button></div>';
+  }
+  if (stateEl) stateEl.innerHTML = inputHtml;
+}
+
+function settingsKeyRemove(keyId) {
+  if (keyId === 'tts') {
+    var provider = document.getElementById('sp-tts-provider').value;
+    var isBrowser = provider === 'google' || provider === 'apple';
+    var config = { provider: isBrowser ? 'browser' : provider, deleteKey: true };
+    var voice = document.getElementById('sp-tts-voice');
+    var model = document.getElementById('sp-tts-model');
+    if (voice) config.voice = voice.value;
+    if (model) config.model = model.value;
+    fetch('/api/tts-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+    }).then(function(r) { if (r.ok) showSettingsPage('settings-voice'); });
+  } else {
+    var provider = keyId.replace('llm-', '');
+    var defaultProvider = document.getElementById('sp-llm-default').value;
+    var providers = {};
+    providers[provider] = { deleteKey: true };
+    fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ defaultProvider: defaultProvider, providers: providers }),
+    }).then(function(r) { if (r.ok) showSettingsPage('settings-ai'); });
+  }
+}
+
 function settingsSaveMastodon(input) {
   var val = input.value.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
   if (val) localStorage.setItem('pr-mastodon-instance', val);
@@ -754,9 +799,19 @@ function showSettingsPage(scrollToSection) {
       var isCloud = data.provider === 'openai' || data.provider === 'elevenlabs';
       h += '<div class="setting-row" id="sp-tts-key-row" style="display:' + (isCloud ? 'flex' : 'none') + '">';
       h += '<div class="setting-label"><label>API Key</label>';
-      h += '<div class="setting-desc">' + (data.hasKey && isCloud ? '<span class="settings-status ok">Key saved</span>' : 'Required for cloud TTS') + '</div></div>';
-      h += '<div class="setting-control"><div class="input-wrap"><input type="password" id="sp-tts-key" placeholder="' + (data.hasKey && isCloud ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : 'Paste API key') + '" class="input-field" style="min-width:200px" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveTTS(this)"><span class="save-indicator">\u2713</span></div></div>';
-      h += '</div>';
+      h += '<div class="setting-desc">Required for cloud TTS</div></div>';
+      h += '<div class="setting-control" id="sp-tts-key-state">';
+      if (data.hasKey && isCloud) {
+        h += '<div class="key-saved">';
+        h += '<span class="key-saved-dots">\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022</span>';
+        h += '<span class="settings-status ok">Key saved</span>';
+        h += '<button class="key-action" onclick="settingsKeyEdit(\'tts\')">Change</button>';
+        h += '<button class="key-action danger" onclick="settingsKeyRemove(\'tts\')">Remove</button>';
+        h += '</div>';
+      } else {
+        h += '<div class="input-wrap"><input type="password" id="sp-tts-key" placeholder="Paste API key" class="input-field" style="min-width:200px" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveTTS(this)"><span class="save-indicator">\u2713</span></div>';
+      }
+      h += '</div></div>';
 
       // Auto-play next
       h += '<div class="setting-row">';
@@ -862,13 +917,20 @@ function showSettingsPage(scrollToSection) {
 
         h += '<div id="sp-llm-section-' + cp.id + '" style="display:' + (visible ? 'block' : 'none') + ';margin-top:8px">';
 
+        h += '<div id="sp-llm-key-state-' + cp.id + '">';
         if (hasKey) {
-          h += '<div style="font-size:12px;margin-bottom:8px"><span class="settings-status ok">Key saved</span></div>';
+          h += '<div class="key-saved" style="margin-bottom:6px">';
+          h += '<span class="key-saved-dots">\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022</span>';
+          h += '<span class="settings-status ok">Key saved</span>';
+          h += '<button class="key-action" onclick="settingsKeyEdit(\'llm-' + cp.id + '\')">Change</button>';
+          h += '<button class="key-action danger" onclick="settingsKeyRemove(\'llm-' + cp.id + '\')">Remove</button>';
+          h += '</div>';
+        } else {
+          h += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">';
+          h += '<label style="font-size:12px;min-width:55px;color:var(--muted)">API Key</label>';
+          h += '<div class="input-wrap" style="flex:1;min-width:0"><input type="password" id="sp-llm-key-' + cp.id + '" placeholder="' + cp.placeholder + '" class="input-field" style="width:100%" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveLLM(this)"><span class="save-indicator">\u2713</span></div>';
+          h += '</div>';
         }
-
-        h += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">';
-        h += '<label style="font-size:12px;min-width:55px;color:var(--muted)">API Key</label>';
-        h += '<div class="input-wrap" style="flex:1;min-width:0"><input type="password" id="sp-llm-key-' + cp.id + '" placeholder="' + (hasKey ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : cp.placeholder) + '" class="input-field" style="width:100%" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveLLM(this)"><span class="save-indicator">\u2713</span></div>';
         h += '</div>';
 
         h += '<div style="display:flex;gap:8px;align-items:center">';
@@ -1069,7 +1131,8 @@ function settingsPageSaveTTS(skipRefresh) {
   }
 
   if (!isBrowser) {
-    var apiKey = document.getElementById('sp-tts-key').value;
+    var keyInput = document.getElementById('sp-tts-key');
+    var apiKey = keyInput ? keyInput.value : '';
     if (apiKey) { config.apiKey = apiKey; } else { config.preserveKey = true; }
     var voice = document.getElementById('sp-tts-voice');
     var model = document.getElementById('sp-tts-model');
