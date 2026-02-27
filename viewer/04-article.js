@@ -878,6 +878,7 @@ function populateRelatedReading(filename) {
     if (file.domain) html += '<span class="related-card-domain">' + escapeHtml(file.domain) + '</span>';
     html += '<span class="related-card-tags">';
     for (var j = 0; j < r.sharedTags.length; j++) {
+      if (blockedTags.has(r.sharedTags[j])) continue;
       html += '<span class="tag-pill tag-pill-sm">' + escapeHtml(r.sharedTags[j]) + '</span>';
     }
     html += '</span></a>';
