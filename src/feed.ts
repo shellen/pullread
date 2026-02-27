@@ -233,7 +233,10 @@ function parseRssFeed(rss: any): FeedEntry[] {
     let domain = '';
     try { domain = new URL(url).hostname.replace(/^www\./, ''); } catch {}
 
-    const description = item.description
+    // Extract raw HTML from description (handles string, CDATA, #text)
+    const rawDescription = typeof item.description === 'string' ? item.description.trim()
+      : item.description?.__cdata?.trim() || item.description?.['#text']?.trim() || '';
+    const description = rawDescription
       ? extractTextFromHtml(extractTitle(item.description))
       : undefined;
 
@@ -241,8 +244,12 @@ function parseRssFeed(rss: any): FeedEntry[] {
     const rawContentEncoded = item['content:encoded'] || item['content\\:encoded'];
     const contentEncodedStr = typeof rawContentEncoded === 'string' ? rawContentEncoded
       : rawContentEncoded?.__cdata || '';
-    const contentHtml = contentEncodedStr.trim().length > 50
-      ? contentEncodedStr.trim() : undefined;
+    let contentHtml: string | undefined;
+    if (contentEncodedStr.trim().length > 50) {
+      contentHtml = contentEncodedStr.trim();
+    } else if (rawDescription.length > 50 && /<(p|div|h[1-6]|article|blockquote|ul|ol|figure)\b/i.test(rawDescription)) {
+      contentHtml = rawDescription;
+    }
 
     let enclosure: Enclosure | undefined;
     if (item.enclosure) {

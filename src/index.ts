@@ -246,6 +246,9 @@ async function syncFeed(
         thumbnail = entry.thumbnail || article.thumbnail;
         lang = article.lang;
         source = 'extracted';
+
+        // Throttle between extraction requests to avoid rate limiting
+        await new Promise(r => setTimeout(r, 2_000));
       }
 
       const filename = writeArticle(outputPath, {

@@ -485,6 +485,27 @@ async function loadFile(index) {
         renderArticle(text, file.filename);
         applyHighlights();
         renderNotesPanel();
+
+        // Auto-reprocess articles with suspiciously short bodies
+        var parsed = parseFrontmatter(text);
+        if (parsed.meta && parsed.meta.url && parsed.meta.source !== 'feed' && parsed.body.trim().length < 200) {
+          showToast('Fetching full article\u2026');
+          fetch('/api/reprocess', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: file.filename })
+          }).then(function(rr) { return rr.json(); }).then(function(data) {
+            if (!data.ok || activeFile !== targetFile) return;
+            return fetch('/api/file?name=' + encodeURIComponent(targetFile));
+          }).then(function(rr) {
+            if (!rr || !rr.ok || activeFile !== targetFile) return;
+            return rr.text();
+          }).then(function(updated) {
+            if (!updated || activeFile !== targetFile) return;
+            renderArticle(updated, targetFile);
+            showToast('Article updated');
+          }).catch(function() {});
+        }
       }
     } catch (e) {
       if (e.name === 'AbortError') { console.debug('[PR] loadFile aborted:', targetFile); return; }

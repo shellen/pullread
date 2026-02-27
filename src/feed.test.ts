@@ -1123,3 +1123,80 @@ describe('parseFeed - thumbnail extraction', () => {
     expect(entries[0].thumbnail).toBe('https://example.com/full.jpg');
   });
 });
+
+describe('parseFeed - RSS description as contentHtml fallback', () => {
+  test('uses HTML description as contentHtml when content:encoded is absent', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Description HTML Feed</title>
+    <item>
+      <title>Article With HTML Description</title>
+      <link>https://example.com/html-desc</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <description><![CDATA[<p>This is a full article body stored in the description element with enough content to be substantial.</p><p>It has multiple paragraphs and real HTML structure.</p>]]></description>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].contentHtml).toBeDefined();
+    expect(entries[0].contentHtml).toContain('<p>');
+    expect(entries[0].annotation).toBeDefined();
+  });
+
+  test('does not use short plain-text description as contentHtml', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Short Desc Feed</title>
+    <item>
+      <title>Short Description Article</title>
+      <link>https://example.com/short-desc</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <description>Just a brief summary.</description>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].contentHtml).toBeUndefined();
+    expect(entries[0].annotation).toBe('Just a brief summary.');
+  });
+
+  test('prefers content:encoded over HTML description for contentHtml', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Both Content Feed</title>
+    <item>
+      <title>Article With Both</title>
+      <link>https://example.com/both-content</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <description><![CDATA[<p>HTML description that is long enough to qualify as contentHtml on its own merit easily.</p>]]></description>
+      <content:encoded><![CDATA[<p>Full article from content:encoded which should be preferred over description always.</p>]]></content:encoded>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].contentHtml).toContain('content:encoded');
+    expect(entries[0].contentHtml).not.toContain('HTML description');
+  });
+
+  test('does not use description without HTML tags as contentHtml even if long', () => {
+    const longPlainText = 'This is a long plain text description without any HTML tags. '.repeat(5);
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Long Plain Feed</title>
+    <item>
+      <title>Long Plain Description</title>
+      <link>https://example.com/long-plain</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <description>${longPlainText}</description>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].contentHtml).toBeUndefined();
+    expect(entries[0].annotation).toBeDefined();
+  });
+});
