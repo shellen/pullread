@@ -19,6 +19,7 @@ export interface ArticleData {
   thumbnail?: string;
   lang?: string;
   categories?: string[];
+  source?: string;
 }
 
 export function generateFilename(title: string, bookmarkedAt: string): string {
@@ -85,6 +86,10 @@ domain: ${data.domain}`;
     if (data.enclosure.duration) {
       frontmatter += `\nenclosure_duration: "${data.enclosure.duration}"`;
     }
+  }
+
+  if (data.source) {
+    frontmatter += `\nsource: ${data.source}`;
   }
 
   frontmatter += '\n---';

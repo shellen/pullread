@@ -93,7 +93,7 @@ function parseJsonFeed(text: string): FeedEntry[] {
       annotation = item.content_text.trim();
     } else if (item.content_html?.trim()) {
       annotation = item.content_html.replace(/<[^>]+>/g, '').trim() || undefined;
-      if (item.content_html.trim().length > 200) contentHtml = item.content_html.trim();
+      if (item.content_html.trim().length > 50) contentHtml = item.content_html.trim();
     } else if (item.summary?.trim()) {
       annotation = item.summary.trim();
     }
@@ -185,7 +185,7 @@ function parseAtomFeed(feed: any): FeedEntry[] {
       : entry.content?.['#text']?.trim() || undefined;
     if (rawHtml) {
       annotation = extractTextFromHtml(rawHtml);
-      if (rawHtml.length > 200) contentHtml = rawHtml;
+      if (rawHtml.length > 50) contentHtml = rawHtml;
     }
 
     const author = extractAtomAuthorName(entry.author) || feedAuthor;
@@ -241,7 +241,7 @@ function parseRssFeed(rss: any): FeedEntry[] {
     const rawContentEncoded = item['content:encoded'] || item['content\\:encoded'];
     const contentEncodedStr = typeof rawContentEncoded === 'string' ? rawContentEncoded
       : rawContentEncoded?.__cdata || '';
-    const contentHtml = contentEncodedStr.trim().length > 200
+    const contentHtml = contentEncodedStr.trim().length > 50
       ? contentEncodedStr.trim() : undefined;
 
     let enclosure: Enclosure | undefined;
@@ -301,7 +301,7 @@ function parseRdfFeed(rdf: any): FeedEntry[] {
     const rawContentEncoded = item['content:encoded'] || item['content\\:encoded'];
     const contentEncodedStr = typeof rawContentEncoded === 'string' ? rawContentEncoded
       : rawContentEncoded?.__cdata || '';
-    const contentHtml = contentEncodedStr.trim().length > 200
+    const contentHtml = contentEncodedStr.trim().length > 50
       ? contentEncodedStr.trim() : undefined;
 
     // Dublin Core date (dc:date) is ISO 8601

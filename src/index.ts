@@ -208,10 +208,18 @@ async function syncFeed(
       let excerpt: string | undefined;
       let thumbnail: string | undefined;
       let lang: string | undefined;
+      let source: string | undefined;
 
       if (entry.enclosure) {
         content = entry.annotation || 'No description available.';
+      } else if (entry.contentHtml) {
+        // Feed has content — use it directly, skip extraction
+        content = htmlToMarkdown(entry.contentHtml, entry.url);
+        author = entry.author;
+        thumbnail = entry.thumbnail;
+        source = 'feed';
       } else {
+        // No feed content — extract from URL
         let article = await fetchAndExtract(entry.url, fetchOptions);
 
         // Retry once if extraction returned suspiciously short content
@@ -224,25 +232,20 @@ async function syncFeed(
           }
         }
 
-        // Use RSS feed HTML when it has more content than web extraction
-        const feedMarkdown = entry.contentHtml
-          ? htmlToMarkdown(entry.contentHtml, entry.url) : '';
-        const extractedMarkdown = article?.markdown || '';
-
-        if (!extractedMarkdown && !feedMarkdown) {
+        if (!article?.markdown) {
           console.log(`      Skipped: Could not extract content`);
           storage.markFailed(entry.url, 'No extractable content');
           failed++;
           continue;
         }
 
-        content = feedMarkdown.length > extractedMarkdown.length
-          ? feedMarkdown : extractedMarkdown;
-        title = article?.title || entry.title;
-        author = article?.byline || entry.author;
-        excerpt = article?.excerpt;
-        thumbnail = article?.thumbnail || entry.thumbnail;
-        lang = article?.lang;
+        content = article.markdown;
+        title = article.title || entry.title;
+        author = entry.author || article.byline;
+        excerpt = article.excerpt;
+        thumbnail = entry.thumbnail || article.thumbnail;
+        lang = article.lang;
+        source = 'extracted';
       }
 
       const filename = writeArticle(outputPath, {
@@ -258,7 +261,8 @@ async function syncFeed(
         excerpt,
         thumbnail,
         lang,
-        categories: entry.categories
+        categories: entry.categories,
+        source,
       });
 
       storage.markProcessed({

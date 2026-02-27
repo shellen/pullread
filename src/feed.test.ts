@@ -111,6 +111,25 @@ describe('parseFeed - Atom', () => {
     expect(entries[0].contentHtml).toBeUndefined();
     expect(entries[0].annotation).toBe('Some annotation text');
   });
+
+  test('preserves contentHtml for medium-length Atom content (50-200 chars)', () => {
+    const mediumContent = '<p>This is a short blog post with enough content to be worth preserving as feed HTML.</p>';
+    const feed = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Short Post Feed</title>
+  <entry>
+    <title>Short Post</title>
+    <link href="https://example.com/short-post"/>
+    <id>urn:uuid:short-1</id>
+    <updated>2024-06-01T12:00:00Z</updated>
+    <content type="html">${mediumContent.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</content>
+  </entry>
+</feed>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].contentHtml).toBeDefined();
+    expect(entries[0].contentHtml!.length).toBeGreaterThan(50);
+    expect(entries[0].contentHtml!.length).toBeLessThan(200);
+  });
 });
 
 describe('parseFeed - RSS', () => {
@@ -201,6 +220,26 @@ describe('parseFeed - RSS', () => {
 </rss>`;
     const entries = parseFeed(feed);
     expect(entries[0].title).toBe('At The Gates Announce Final Album The Ghost: Hear \u201cMask\u201d');
+  });
+
+  test('preserves contentHtml for medium-length RSS content:encoded (50-200 chars)', () => {
+    const mediumContent = '<p>A short blog post from an RSS feed with enough text to be worth keeping.</p>';
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Short Post Feed</title>
+    <item>
+      <title>Short RSS Post</title>
+      <link>https://example.com/short-rss</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <content:encoded><![CDATA[${mediumContent}]]></content:encoded>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].contentHtml).toBeDefined();
+    expect(entries[0].contentHtml!.length).toBeGreaterThan(50);
+    expect(entries[0].contentHtml!.length).toBeLessThan(200);
   });
 });
 
@@ -388,6 +427,30 @@ describe('parseFeed - RDF/RSS 1.0 (Pinboard)', () => {
 
     expect(second.title).toBe('Another Pinboard Bookmark');
     expect(second.annotation).toBeUndefined();
+  });
+
+  test('preserves contentHtml for medium-length RDF content (50-200 chars)', () => {
+    const mediumContent = '<p>A short blog post from an RDF feed with enough content to be worth saving.</p>';
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+ xmlns="http://purl.org/rss/1.0/"
+ xmlns:dc="http://purl.org/dc/elements/1.1/"
+ xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel rdf:about="https://example.com/">
+    <title>Test RDF</title>
+    <link>https://example.com/</link>
+  </channel>
+  <item rdf:about="https://example.com/medium-article">
+    <title>Medium RDF Item</title>
+    <link>https://example.com/medium-article</link>
+    <dc:date>2025-03-01T12:00:00Z</dc:date>
+    <content:encoded><![CDATA[${mediumContent}]]></content:encoded>
+  </item>
+</rdf:RDF>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].contentHtml).toBeDefined();
+    expect(entries[0].contentHtml!.length).toBeGreaterThan(50);
+    expect(entries[0].contentHtml!.length).toBeLessThan(200);
   });
 
   test('preserves contentHtml from content:encoded in RDF', () => {
@@ -636,6 +699,24 @@ describe('parseFeed - JSON Feed', () => {
     const second = entries[1];
 
     expect(second.annotation).toBe('HTML content');
+  });
+
+  test('preserves contentHtml for medium-length JSON Feed HTML (50-200 chars)', () => {
+    const feed = JSON.stringify({
+      version: 'https://jsonfeed.org/version/1.1',
+      title: 'Short Post Feed',
+      items: [{
+        id: 'medium-1',
+        title: 'Short JSON Post',
+        url: 'https://example.com/short-json',
+        content_html: '<p>A short blog post in a JSON feed with enough content to preserve.</p>',
+        date_published: '2024-01-29T12:00:00Z'
+      }]
+    });
+    const entries = parseFeed(feed);
+    expect(entries[0].contentHtml).toBeDefined();
+    expect(entries[0].contentHtml!.length).toBeGreaterThan(50);
+    expect(entries[0].contentHtml!.length).toBeLessThan(200);
   });
 
   test('handles items without title', () => {

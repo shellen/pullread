@@ -593,6 +593,14 @@ function renderArticle(text, filename) {
     }
   );
 
+  // Offer full extraction for articles sourced from feed content
+  if (serverMode && meta && meta.source === 'feed' && meta.url) {
+    html += '<div class="feed-extract-prompt">'
+      + '<button onclick="reprocessFromMenu()" class="feed-extract-btn">'
+      + '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-external"/></svg> '
+      + 'Read full article at ' + escapeHtml(meta.domain || 'source') + '</button></div>';
+  }
+
   content.innerHTML = html;
   document.title = (meta && meta.title) || filename || 'PullRead';
 

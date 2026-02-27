@@ -156,6 +156,58 @@ summary: "This is a summary of the article."
     expect(updated).toContain('This is a summary of the article.');
   });
 
+  test('sets source: extracted in reprocessed article', async () => {
+    const filePath = join(testDir, 'feed-article.md');
+    writeFileSync(filePath, `---
+title: "Feed Article"
+url: https://example.com/feed-article
+domain: example.com
+bookmarked: 2025-01-15T00:00:00Z
+source: feed
+---
+# Short feed content`);
+
+    mockFetchAndExtract.mockResolvedValue({
+      title: 'Feed Article',
+      content: '<p>Full extracted content</p>',
+      markdown: 'Full extracted content',
+      byline: 'Author',
+    });
+
+    const result = await reprocessFile(filePath);
+    expect(result.ok).toBe(true);
+
+    const updated = readFileSync(filePath, 'utf-8');
+    expect(updated).toContain('source: extracted');
+    expect(updated).not.toContain('source: feed');
+  });
+
+  test('preserves thumbnail and categories from existing frontmatter', async () => {
+    const filePath = join(testDir, 'with-meta.md');
+    writeFileSync(filePath, `---
+title: "Article With Meta"
+url: https://example.com/meta-article
+domain: example.com
+bookmarked: 2025-01-15T00:00:00Z
+categories: ["Technology", "Programming"]
+thumbnail: https://example.com/hero.jpg
+---
+# Old content`);
+
+    mockFetchAndExtract.mockResolvedValue({
+      title: 'Article With Meta',
+      content: '<p>New content</p>',
+      markdown: 'New content',
+    });
+
+    const result = await reprocessFile(filePath);
+    expect(result.ok).toBe(true);
+
+    const updated = readFileSync(filePath, 'utf-8');
+    expect(updated).toContain('thumbnail: https://example.com/hero.jpg');
+    expect(updated).toContain('categories: ["Technology", "Programming"]');
+  });
+
   test('returns error message from fetch exceptions', async () => {
     const filePath = join(testDir, 'throws.md');
     writeFileSync(filePath, `---
@@ -385,6 +437,23 @@ describe('timeAgo / timeAgoTitle', () => {
 
   test('timeAgoTitle returns raw string for invalid dates', () => {
     expect(timeAgoTitle('not-a-date')).toBe('not-a-date');
+  });
+});
+
+describe('feed-extract prompt', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('04-article.js includes feed-extract-prompt for source: feed articles', () => {
+    const article = readFileSync(join(rootDir, 'viewer', '04-article.js'), 'utf-8');
+    expect(article).toContain('feed-extract-prompt');
+    expect(article).toContain("meta.source === 'feed'");
+    expect(article).toContain('reprocessFromMenu()');
+  });
+
+  test('viewer.css styles feed-extract-prompt and button', () => {
+    const css = readFileSync(join(rootDir, 'viewer.css'), 'utf-8');
+    expect(css).toContain('.feed-extract-prompt');
+    expect(css).toContain('.feed-extract-btn');
   });
 });
 

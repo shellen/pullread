@@ -652,6 +652,15 @@ export async function reprocessFile(filePath: string): Promise<{ ok: boolean; ti
       return { ok: false, error: 'Could not extract article from URL' };
     }
 
+    // Parse categories from frontmatter (stored as '["Technology", "Programming"]')
+    let categories: string[] | undefined;
+    if (meta.categories) {
+      try {
+        const parsed = JSON.parse(meta.categories);
+        if (Array.isArray(parsed)) categories = parsed;
+      } catch {}
+    }
+
     const data: ArticleData = {
       title: meta.title || article.title,
       url: meta.url,
@@ -661,6 +670,9 @@ export async function reprocessFile(filePath: string): Promise<{ ok: boolean; ti
       feed: meta.feed || undefined,
       author: article.byline || meta.author || undefined,
       excerpt: article.excerpt || meta.excerpt || undefined,
+      thumbnail: article.thumbnail || meta.thumbnail || undefined,
+      categories,
+      source: 'extracted',
     };
     const markdown = generateMarkdown(data);
 
