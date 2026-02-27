@@ -28,9 +28,7 @@
     "externalBin": [
       "binaries/pullread-cli"
     ],
-    "resources": [
-      "resources/ort-wasm"
-    ],
+    "resources": [],
     "macOS": {
       "minimumSystemVersion": "13.0"
     }
