@@ -313,11 +313,34 @@ async function playBrowserTTS(filename) {
   var articleLang = document.querySelector('.content-wrap')?.getAttribute('lang');
   utterance.lang = articleLang || navigator.language || 'en-US';
   var savedVoice = localStorage.getItem('pr-tts-browser-voice') || '';
-  if (savedVoice) {
-    var sysVoices = synth.getVoices();
-    var match = sysVoices.find(function(v) { return v.name === savedVoice; });
-    if (match) utterance.voice = match;
+  var browserType = localStorage.getItem('pr-tts-browser-type') || 'google';
+  var sysVoices = synth.getVoices();
+
+  // Filter to platform type
+  var platformVoices = sysVoices.filter(function(v) {
+    return browserType === 'google' ? v.name.indexOf('Google') === 0 : v.name.indexOf('Google') !== 0;
+  });
+
+  // Try saved voice first
+  var match = savedVoice ? platformVoices.find(function(v) { return v.name === savedVoice; }) : null;
+
+  // If saved voice doesn't match article language, find a better one
+  var langPrefix = (articleLang || '').split('-')[0];
+  if (match && langPrefix && langPrefix !== 'en') {
+    var langMatch = platformVoices.find(function(v) { return v.lang.indexOf(langPrefix) === 0; });
+    if (langMatch) match = langMatch;
   }
+
+  // If no saved voice, pick first voice matching article language
+  if (!match && langPrefix) {
+    match = platformVoices.find(function(v) { return v.lang.indexOf(langPrefix) === 0; });
+  }
+
+  // Final fallback: first platform voice, then any voice
+  if (!match && platformVoices.length > 0) match = platformVoices[0];
+  if (!match && sysVoices.length > 0) match = sysVoices[0];
+
+  if (match) utterance.voice = match;
   ttsSynthUtterance = utterance;
 
   // Estimate total duration (browser TTS doesn't give real progress)

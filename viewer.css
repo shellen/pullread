@@ -4351,6 +4351,7 @@
   }
   .settings-btn-group button:hover { background: var(--sidebar-active); }
   .settings-btn-group button.active { background: var(--link); color: #fff; border-color: var(--link); }
+  .settings-btn-group button.unavailable { opacity: 0.4; cursor: default; pointer-events: none; }
   .settings-select-panel {
     position: absolute; z-index: 100;
     background: var(--bg); border: 1px solid var(--border);

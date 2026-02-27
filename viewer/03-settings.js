@@ -640,25 +640,47 @@ function showSettingsPage(scrollToSection) {
     fetch('/api/tts-settings').then(function(r) { return r.json(); }).then(function(data) {
       var sec = document.getElementById('settings-voice');
       if (!sec) return;
+      var allVoices = window.speechSynthesis ? speechSynthesis.getVoices() : [];
+      var hasGoogle = allVoices.some(function(v) { return v.name.indexOf('Google') === 0; });
+      var hasApple = allVoices.some(function(v) { return v.name.indexOf('Google') !== 0; });
       var providers = [
-        { id: 'kokoro', label: 'Kokoro — free, on-device' },
-        { id: 'browser', label: 'System Voice — free' },
+        { id: 'apple', label: 'Apple — free' },
+        { id: 'google', label: 'Google — free' },
+        { id: 'kokoro', label: 'Kokoro — on-device' },
         { id: 'openai', label: 'OpenAI — premium' },
         { id: 'elevenlabs', label: 'ElevenLabs — premium' },
       ];
-      var ttsShortLabels = {kokoro:'Kokoro',browser:'System',openai:'OpenAI',elevenlabs:'ElevenLabs'};
+      var ttsShortLabels = {google:'Google',apple:'Apple',kokoro:'Kokoro',openai:'OpenAI',elevenlabs:'ElevenLabs'};
+      // Resolve server's 'browser' provider to google/apple sub-type
+      var activeProv = data.provider || 'kokoro';
+      if (activeProv === 'browser') {
+        var savedType = localStorage.getItem('pr-tts-browser-type');
+        if (savedType === 'apple' || savedType === 'google') {
+          activeProv = savedType;
+        } else {
+          activeProv = hasApple ? 'apple' : hasGoogle ? 'google' : 'kokoro';
+        }
+      }
       var h = '<h2>Voice Playback</h2>';
       h += '<div class="settings-row"><div><label>Provider</label><div class="settings-desc">Choose how articles are read aloud</div></div>';
-      h += '<div class="settings-btn-group">';
+      h += '<div class="settings-btn-group" id="sp-tts-provider-btns">';
       for (var i = 0; i < providers.length; i++) {
-        h += '<button data-val="' + providers[i].id + '" class="' + (data.provider === providers[i].id ? 'active' : '') + '" onclick="settingsBtnSelect(this,\'sp-tts-provider\',\'' + providers[i].id + '\');settingsPageTTSChanged()">' + (ttsShortLabels[providers[i].id] || providers[i].id) + '</button>';
+        var pid = providers[i].id;
+        var isUnavail = (pid === 'google' && !hasGoogle) || (pid === 'apple' && !hasApple);
+        var cls = activeProv === pid ? 'active' : '';
+        if (isUnavail) cls += (cls ? ' ' : '') + 'unavailable';
+        var note = '';
+        if (pid === 'google' && !hasGoogle) note = ' <span style="font-size:10px;opacity:0.7">(Chrome)</span>';
+        if (pid === 'apple' && !hasApple) note = ' <span style="font-size:10px;opacity:0.7">(Safari/macOS)</span>';
+        h += '<button data-val="' + pid + '" class="' + cls + '" onclick="settingsBtnSelect(this,\'sp-tts-provider\',\'' + pid + '\');settingsPageTTSChanged()">' + (ttsShortLabels[pid] || pid) + note + '</button>';
       }
-      h += '</div><input type="hidden" id="sp-tts-provider" value="' + escapeHtml(data.provider || 'kokoro') + '">';
+      h += '</div><input type="hidden" id="sp-tts-provider" value="' + escapeHtml(activeProv) + '">';
       h += '</div>';
 
       // Voice picker (custom dropdown)
-      var prov = data.provider || 'browser';
-      if (prov === 'browser') {
+      var prov = activeProv;
+      var isBrowserProv = prov === 'google' || prov === 'apple';
+      if (isBrowserProv) {
         var browserVoiceLabel = localStorage.getItem('pr-tts-browser-voice') || 'Default';
         h += '<div class="settings-row" id="sp-tts-voice-row" style="position:relative"><label>Voice</label>';
         h += '<button onclick="toggleTTSVoicePicker()" id="sp-tts-voice-btn" style="flex:1;text-align:left;display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;cursor:pointer;font-family:inherit;min-width:160px">' + escapeHtml(browserVoiceLabel) + ' <span style="opacity:0.5">\u25BE</span></button>';
@@ -674,8 +696,8 @@ function showSettingsPage(scrollToSection) {
         h += '</div>';
       }
 
-      // Model / quality select (hidden for system voice provider)
-      if (data.models && prov !== 'browser') {
+      // Model / quality select (hidden for browser voice providers)
+      if (data.models && !isBrowserProv) {
         if (data.provider === 'kokoro') {
           h += '<div class="settings-row" id="sp-tts-model-row"><label>Quality</label>';
           if (data.model === 'kokoro-v1-q4') {
@@ -710,6 +732,12 @@ function showSettingsPage(scrollToSection) {
       h += '<input type="checkbox" id="sp-podcast-autoplay"' + (podcastAutoplay ? ' checked' : '') + ' onchange="podcastAutoplay=this.checked;localStorage.setItem(\'pr-podcast-autoplay\',this.checked?\'1\':\'0\')">';
       h += '</div>';
 
+      var hasQualityVoices = allVoices.some(function(v) { return v.name.indexOf('(Premium)') !== -1 || v.name.indexOf('(Enhanced)') !== -1; });
+      var showVoiceHint = isBrowserProv && prov === 'apple' && !hasQualityVoices;
+      h += '<div id="sp-voice-hint" style="display:' + (showVoiceHint ? 'block' : 'none') + ';padding:8px 0">';
+      h += '<div style="font-size:12px;color:var(--muted)">Tip: Install better voices in System Settings &rarr; Accessibility &rarr; Spoken Content &rarr; Manage Voices</div>';
+      h += '</div>';
+
       h += '<div id="sp-kokoro-status" style="display:' + (data.provider === 'kokoro' ? 'block' : 'none') + ';padding:8px 0">';
       if (data.kokoro && data.kokoro.bundled) {
         h += '<div style="font-size:12px;color:var(--muted)"><span class="settings-status ok">Kokoro bundled</span> Runs on-device, no API key or download needed</div>';
@@ -722,6 +750,21 @@ function showSettingsPage(scrollToSection) {
 
       sec.innerHTML = h;
       sec._ttsData = data;
+      // Chrome loads voices asynchronously — update button availability when ready
+      if (window.speechSynthesis && speechSynthesis.onvoiceschanged !== undefined) {
+        speechSynthesis.onvoiceschanged = function() {
+          var btns = document.getElementById('sp-tts-provider-btns');
+          if (!btns) return;
+          var v = speechSynthesis.getVoices();
+          var goog = v.some(function(x) { return x.name.indexOf('Google') === 0; });
+          var appl = v.some(function(x) { return x.name.indexOf('Google') !== 0; });
+          btns.querySelectorAll('button').forEach(function(b) {
+            var val = b.getAttribute('data-val');
+            if (val === 'google') b.classList.toggle('unavailable', !goog);
+            if (val === 'apple') b.classList.toggle('unavailable', !appl);
+          });
+        };
+      }
     }).catch(function() {
       var sec = document.getElementById('settings-voice');
       if (sec) sec.innerHTML = '<h2>Voice Playback</h2><p style="color:var(--muted);font-size:13px">Could not load voice settings.</p>';
@@ -874,10 +917,23 @@ function settingsPageModelChanged(providerId) {
   customDiv.style.display = sel.value === '__custom' ? 'flex' : 'none';
 }
 
-function getSystemVoiceOptions() {
+function getSystemVoiceOptions(type) {
   var synth = window.speechSynthesis;
   if (!synth) return [];
   var voices = synth.getVoices();
+  if (type === 'google') {
+    voices = voices.filter(function(v) { return v.name.indexOf('Google') === 0; });
+  } else if (type === 'apple') {
+    voices = voices.filter(function(v) { return v.name.indexOf('Google') !== 0; });
+    var voiceQuality = function(name) {
+      if (name.indexOf('(Premium)') !== -1) return 0;
+      if (name.indexOf('(Enhanced)') !== -1) return 1;
+      if (name.indexOf('Siri') !== -1) return 2;
+      if (name === 'Alex') return 3;
+      return 4;
+    };
+    voices.sort(function(a, b) { return voiceQuality(a.name) - voiceQuality(b.name); });
+  }
   return voices.map(function(v) {
     var label = v.name;
     if (v.lang) label += ' (' + v.lang + ')';
@@ -891,8 +947,8 @@ function toggleTTSVoicePicker() {
   var provider = document.getElementById('sp-tts-provider').value;
 
   var options, current;
-  if (provider === 'browser') {
-    options = getSystemVoiceOptions();
+  if (provider === 'google' || provider === 'apple') {
+    options = getSystemVoiceOptions(provider);
     current = localStorage.getItem('pr-tts-browser-voice') || '';
   } else {
     if (!data || !data.voices) return;
@@ -902,7 +958,7 @@ function toggleTTSVoicePicker() {
   }
 
   settingsCustomSelect('sp-tts-voice-btn', options, current, function(val) {
-    if (provider === 'browser') {
+    if (provider === 'google' || provider === 'apple') {
       localStorage.setItem('pr-tts-browser-voice', val);
       var btn = document.getElementById('sp-tts-voice-btn');
       if (btn) btn.firstChild.textContent = val;
@@ -927,12 +983,24 @@ function settingsPageTTSChanged() {
   var isCloud = provider === 'openai' || provider === 'elevenlabs';
   if (keyRow) keyRow.style.display = isCloud ? 'flex' : 'none';
   if (kokoroStatus) kokoroStatus.style.display = provider === 'kokoro' ? 'block' : 'none';
+  var voiceHint = document.getElementById('sp-voice-hint');
+  if (voiceHint) {
+    var showHint = provider === 'apple' && window.speechSynthesis &&
+      !speechSynthesis.getVoices().some(function(v) { return v.name.indexOf('(Premium)') !== -1 || v.name.indexOf('(Enhanced)') !== -1; });
+    voiceHint.style.display = showHint ? 'block' : 'none';
+  }
 
   // Update voice picker button label
+  var isBrowser = provider === 'google' || provider === 'apple';
   var voiceBtn = document.getElementById('sp-tts-voice-btn');
-  if (provider === 'browser' && voiceBtn) {
+  if (isBrowser && voiceBtn) {
+    var voiceOpts = getSystemVoiceOptions(provider);
     var savedVoice = localStorage.getItem('pr-tts-browser-voice') || '';
-    voiceBtn.firstChild.textContent = savedVoice || 'Default';
+    if (voiceOpts.length === 0) {
+      voiceBtn.firstChild.textContent = 'No voices available';
+    } else {
+      voiceBtn.firstChild.textContent = savedVoice || 'Default';
+    }
   } else if (data && voiceBtn && data.voices && data.voices[provider]) {
     var voiceHidden = document.getElementById('sp-tts-voice');
     var voices = data.voices[provider];
@@ -948,7 +1016,7 @@ function settingsPageTTSChanged() {
 
   // Update model row
   var modelRow = document.getElementById('sp-tts-model-row');
-  if (modelRow && provider === 'browser') {
+  if (modelRow && isBrowser) {
     modelRow.style.display = 'none';
   } else if (modelRow && provider === 'kokoro') {
     modelRow.style.display = '';
@@ -989,14 +1057,19 @@ function spUpgradeKokoroQuality() {
 
 function settingsPageSaveTTS(skipRefresh) {
   var provider = document.getElementById('sp-tts-provider').value;
-  var config = { provider: provider };
+  var isBrowser = provider === 'google' || provider === 'apple';
+  // Save google/apple as 'browser' server-side, store sub-type in localStorage
+  var config = { provider: isBrowser ? 'browser' : provider };
+  if (isBrowser) {
+    localStorage.setItem('pr-tts-browser-type', provider);
+  }
 
   if (provider === 'kokoro') {
     var kVoice = document.getElementById('sp-tts-voice');
     var kModel = document.getElementById('sp-tts-model');
     if (kVoice) config.voice = kVoice.value;
     if (kModel) config.model = kModel.value;
-  } else if (provider !== 'browser') {
+  } else if (!isBrowser) {
     var apiKey = document.getElementById('sp-tts-key').value;
     if (apiKey) { config.apiKey = apiKey; } else { config.preserveKey = true; }
     var voice = document.getElementById('sp-tts-voice');
@@ -1011,7 +1084,7 @@ function settingsPageSaveTTS(skipRefresh) {
     body: JSON.stringify(config),
   }).then(function(r) {
     if (r.ok) {
-      ttsProvider = provider;
+      ttsProvider = isBrowser ? 'browser' : provider;
       ttsQueue = [];
       ttsCurrentIndex = -1;
       if (ttsAudio) { ttsAudio.pause(); ttsAudio.src = ''; ttsAudio = null; }
