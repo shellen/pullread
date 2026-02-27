@@ -165,7 +165,7 @@ let html = readFileSync(htmlPath, 'utf-8');
 const css = readFileSync(cssPath, 'utf-8');
 
 // Read JS modules from viewer/ directory in sorted order (01-state.js, 02-utils.js, etc.)
-const jsFiles = readdirSync(jsDir).filter(f => f.endsWith('.js')).sort();
+const jsFiles = readdirSync(jsDir).filter(f => f.endsWith('.js') && !f.endsWith('.test.js')).sort();
 const jsModules = jsFiles.map(f => readFileSync(join(jsDir, f), 'utf-8'));
 const js = jsModules.join('\n');
 
