@@ -116,12 +116,16 @@
       <div class="reader-toolbar" id="reader-toolbar" style="display:none">
         <div class="reader-toolbar-left" id="reader-toolbar-actions"></div>
         <div class="reader-toolbar-right">
+          <div class="more-dropdown" id="more-dropdown">
+            <button onclick="toggleMoreMenu(event)" class="toolbar-nav-btn" aria-label="More actions"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-ellipsis"/></svg></button>
+          </div>
           <button onclick="navigateArticle(-1)" aria-label="Previous article" title="Previous" class="toolbar-nav-btn">
             <svg class="icon icon-sm"><use href="#i-chevron-up"/></svg>
           </button>
           <button onclick="navigateArticle(1)" aria-label="Next article" title="Next" class="toolbar-nav-btn">
             <svg class="icon icon-sm"><use href="#i-chevron-down"/></svg>
           </button>
+          <div class="toolbar-divider"></div>
           <button class="toolbar-aa-btn" onclick="toggleSettingsDropdown()" aria-label="Reader settings" aria-expanded="false">Aa</button>
         </div>
       </div>

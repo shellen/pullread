@@ -1,8 +1,9 @@
 // ABOUTME: Text-to-speech provider abstraction for article audio playback
 // ABOUTME: Supports Kokoro (local), OpenAI TTS, and ElevenLabs; browser speech synthesis is handled client-side
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, createWriteStream } from 'fs';
 import { join, dirname } from 'path';
+import { pipeline as streamPipeline } from 'stream/promises';
 import { homedir } from 'os';
 import { createHash } from 'crypto';
 import { request as httpsRequest } from 'https';
@@ -41,6 +42,42 @@ function resolveKokoroModelDir(): string {
   }
   // Fall back to user cache directory (downloaded on first use)
   return KOKORO_MODEL_DIR;
+}
+
+const HF_MODEL_BASE = 'https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/';
+
+/** Map a Kokoro dtype to its ONNX model filename on HuggingFace */
+export function kokoroModelFile(dtype: string): string {
+  return dtype === 'q8' ? 'onnx/model_quantized.onnx' : `onnx/model_${dtype}.onnx`;
+}
+
+/** Download a single file from HuggingFace Hub to a local path, following redirects */
+async function downloadHfFile(remotePath: string, localPath: string): Promise<void> {
+  const dir = dirname(localPath);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+
+  const res = await fetch(HF_MODEL_BASE + remotePath, { redirect: 'follow' });
+  if (!res.ok) throw new Error(`Failed to download ${remotePath}: HTTP ${res.status}`);
+  if (!res.body) throw new Error(`No response body for ${remotePath}`);
+
+  const fileStream = createWriteStream(localPath);
+  // @ts-ignore — ReadableStream from fetch is compatible with Readable in Bun
+  await streamPipeline(res.body as any, fileStream);
+}
+
+/** Download Kokoro model files to a local cache directory if not already present */
+async function ensureKokoroModelCached(modelDir: string, dtype: string): Promise<void> {
+  const modelFile = kokoroModelFile(dtype);
+  const requiredFiles = ['config.json', 'tokenizer.json', 'tokenizer_config.json', modelFile];
+  const missing = requiredFiles.filter(f => !existsSync(join(modelDir, f)));
+  if (missing.length === 0) return;
+
+  console.log(`[TTS] Downloading Kokoro model files (${missing.length} files)...`);
+  for (const file of missing) {
+    console.log(`[TTS]   downloading ${file}...`);
+    await downloadHfFile(file, join(modelDir, file));
+  }
+  console.log('[TTS] Kokoro model download complete');
 }
 
 export interface TTSConfig {
@@ -484,16 +521,20 @@ async function getKokoroPipeline(model: string): Promise<any> {
 
     const dtype = model === 'kokoro-v1-q4' ? 'q4' : 'q8';
     const modelDir = resolveKokoroModelDir();
+    if (!existsSync(modelDir)) mkdirSync(modelDir, { recursive: true });
 
     // If the model is bundled inside the app, use that path directly.
-    // Otherwise fall back to downloading from HuggingFace Hub.
     const bundled = process.env.PULLREAD_KOKORO_MODEL_DIR && existsSync(process.env.PULLREAD_KOKORO_MODEL_DIR);
 
     let modelSource: string;
     if (bundled) {
-      // The web build uses fetch() for file I/O, so it needs file:// URLs
-      // to access the local filesystem. The node build uses fs directly.
       modelSource = usingWebBuild ? 'file://' + modelDir : modelDir;
+    } else if (usingWebBuild) {
+      // Web build uses fetch() for file I/O — @huggingface/transformers'
+      // remote download is broken in Bun binaries (fetch('/models/...') fails,
+      // and the Hub redirect chain also breaks). Download files ourselves first.
+      await ensureKokoroModelCached(modelDir, dtype);
+      modelSource = 'file://' + modelDir;
     } else {
       modelSource = 'onnx-community/Kokoro-82M-v1.0-ONNX';
     }

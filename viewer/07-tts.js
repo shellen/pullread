@@ -312,6 +312,12 @@ async function playBrowserTTS(filename) {
   // fall back to browser locale
   var articleLang = document.querySelector('.content-wrap')?.getAttribute('lang');
   utterance.lang = articleLang || navigator.language || 'en-US';
+  var savedVoice = localStorage.getItem('pr-tts-browser-voice') || '';
+  if (savedVoice) {
+    var sysVoices = synth.getVoices();
+    var match = sysVoices.find(function(v) { return v.name === savedVoice; });
+    if (match) utterance.voice = match;
+  }
   ttsSynthUtterance = utterance;
 
   // Estimate total duration (browser TTS doesn't give real progress)

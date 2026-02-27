@@ -103,7 +103,7 @@ function showGuideModal() {
     <p>Click the microphone icon next to the notes textarea to dictate notes hands-free. Speech is transcribed in real-time using the Web Speech API and automatically saved to your article notes when you stop recording.</p>
 
     <h2>Summaries</h2>
-    <p>Click the Summarize button on any article to generate an AI summary. Summaries display with badges showing which provider and model generated them (e.g., <span class="badge badge-amber">Anthropic</span> <span class="badge badge-gray">claude-haiku-4.5</span>). Summaries are saved in the article frontmatter so they persist across sessions. Supports Anthropic, OpenAI, Gemini, OpenRouter, and Apple Intelligence.</p>
+    <p>Click the Summarize button on any article to generate an AI summary. The summary appears as italic text with a provider attribution below. You can regenerate or dismiss it. Summaries are saved in the article frontmatter so they persist across sessions. Supports Anthropic, OpenAI, Gemini, OpenRouter, and Apple Intelligence.</p>
 
     <h2>Text-to-Speech</h2>
     <p>Click the <strong>Listen</strong> button on any article to hear it read aloud. Queue multiple articles for continuous playback with speed control (0.5x&ndash;2x).</p>

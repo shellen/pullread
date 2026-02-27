@@ -698,10 +698,12 @@ function sidebarNavFilter(filter) {
     if (search) search.value = 'is:unread';
     closeDrawer();
     filterFiles();
+    if (displayFiles.length > 0) loadFile(0);
   } else if (filter === 'starred') {
     if (search) search.value = 'is:starred';
     closeDrawer();
     filterFiles();
+    if (displayFiles.length > 0) loadFile(0);
   } else if (filter === 'sources') {
     openSourcesDrawer();
   } else if (filter === 'tags') {

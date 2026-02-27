@@ -446,9 +446,6 @@ function renderArticle(text, filename) {
   if (meta && meta.url) {
     toolbarActions += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" class="toolbar-action-btn" aria-label="Share article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg><span class="toolbar-action-label"> Share</span></button></div>';
   }
-  toolbarActions += '<div class="more-dropdown">';
-  toolbarActions += '<button onclick="toggleMoreMenu(event)" class="toolbar-action-btn" aria-label="More actions"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-ellipsis"/></svg></button>';
-  toolbarActions += '</div>';
 
   var toolbarEl = document.getElementById('reader-toolbar-actions');
   if (toolbarEl) toolbarEl.innerHTML = toolbarActions;
@@ -469,10 +466,8 @@ function renderArticle(text, filename) {
   if (meta && meta.summary) {
     const sp = meta.summaryProvider || '';
     const sm = meta.summaryModel || '';
-    html += '<div class="article-summary"><div class="summary-header"><div class="summary-header-left">'
-      + summaryBadgesHtml(sp, sm)
-      + '</div><span class="summary-actions"><button onclick="hideSummary()" title="Hide summary"><svg class="icon icon-sm"><use href="#i-xmark"/></svg></button></span></div>'
-      + escapeHtml(meta.summary) + '</div>';
+    html += '<div class="article-summary">' + summaryBlockHtml(sp, sm, meta.summary) + '</div>';
+    html += '<div class="summary-dismissed"><span>Summary removed</span><button onclick="undismissSummary()">Undo</button></div>';
   }
 
   // YouTube embed: detect from frontmatter and inject responsive iframe

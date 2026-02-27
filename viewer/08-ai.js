@@ -27,20 +27,24 @@ function providerLabel(provider) {
   return labels[provider] || provider;
 }
 
-function providerBadgeColor(provider) {
-  const colors = { anthropic: 'amber', openai: 'green', gemini: 'blue', openrouter: 'purple', apple: 'indigo' };
-  return colors[provider] || 'gray';
-}
-
-function summaryBadgesHtml(provider, model) {
-  let html = '<span class="badge badge-gray">Summary</span>';
-  if (provider) {
-    const color = providerBadgeColor(provider);
-    html += ' <span class="badge badge-' + color + '">' + escapeHtml(providerLabel(provider)) + '</span>';
-  }
-  if (model) {
-    html += ' <span class="badge badge-gray">' + escapeHtml(model) + '</span>';
-  }
+function summaryBlockHtml(provider, model, text) {
+  var label = provider ? providerLabel(provider) : '';
+  var sparkle = '<svg width="11" height="11" viewBox="0 0 16 16" fill="none">'
+    + '<path d="M8 1C8 1 9 5.5 11 7C12.5 8.2 15 8 15 8C15 8 12.5 8.2 11 9.5C9 11 8 15 8 15C8 15 7 11 5 9.5C3.5 8.2 1 8 1 8C1 8 3.5 8.2 5 7C7 5.5 8 1 8 1Z" fill="currentColor"/>'
+    + '</svg>';
+  var html = '<div class="summary-border">'
+    + '<div class="summary-label">Summary</div>'
+    + '<p class="summary-text" id="summary-text">' + escapeHtml(text) + '</p>'
+    + '<div class="summary-footer"><div class="summary-footer-left">'
+    + '<div class="attribution">' + sparkle + '<span>' + escapeHtml(label) + '</span></div>'
+    + '</div><div class="summary-actions">'
+    + '<button class="summary-icon-btn" onclick="regenerateSummary(this)" title="Regenerate">'
+    + '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5M8 2.5V5.5M8 2.5L10.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    + '</button>'
+    + '<button class="summary-icon-btn" onclick="dismissSummary()" title="Remove">'
+    + '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4.5 4.5L11.5 11.5M11.5 4.5L4.5 11.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>'
+    + '</button>'
+    + '</div></div></div>';
   return html;
 }
 
@@ -138,18 +142,23 @@ async function summarizeArticle() {
     // Insert summary into the DOM
     const existingSummary = content.querySelector('.article-summary');
     if (existingSummary) existingSummary.remove();
+    const existingDismissed = content.querySelector('.summary-dismissed');
+    if (existingDismissed) existingDismissed.remove();
 
     const summaryDiv = document.createElement('div');
     summaryDiv.className = 'article-summary';
-    summaryDiv.innerHTML = '<div class="summary-header"><div class="summary-header-left">'
-      + summaryBadgesHtml(lastSummaryProvider, lastSummaryModel)
-      + '</div><span class="summary-actions"><button onclick="hideSummary()" title="Hide summary"><svg class="icon icon-sm"><use href="#i-xmark"/></svg></button></span></div>'
-      + escapeHtml(data.summary);
+    summaryDiv.innerHTML = summaryBlockHtml(lastSummaryProvider, lastSummaryModel, data.summary);
+
+    const dismissedBar = document.createElement('div');
+    dismissedBar.className = 'summary-dismissed';
+    dismissedBar.innerHTML = '<span>Summary removed</span><button onclick="undismissSummary()">Undo</button>';
 
     const articleHeader = content.querySelector('.article-header');
     if (articleHeader) {
       articleHeader.after(summaryDiv);
+      summaryDiv.after(dismissedBar);
     } else {
+      content.prepend(dismissedBar);
       content.prepend(summaryDiv);
     }
 
@@ -164,18 +173,32 @@ async function summarizeArticle() {
   }
 }
 
-function hideSummary() {
-  const content = document.getElementById('content');
-  const summary = content.querySelector('.article-summary');
-  if (summary) summary.remove();
-  // Reset summarize button
-  const btn = document.getElementById('summarize-btn');
+function dismissSummary() {
+  var block = document.querySelector('.article-summary');
+  var bar = document.querySelector('.summary-dismissed');
+  if (block) block.style.display = 'none';
+  if (bar) bar.style.display = 'flex';
+  var btn = document.getElementById('summarize-btn');
   if (btn) {
     btn.innerHTML = '<svg class="icon icon-sm"><use href="#i-wand"/></svg> Summarize';
     btn.title = 'Summarize';
     btn.disabled = false;
     btn.onclick = null;
   }
+}
+
+function undismissSummary() {
+  var block = document.querySelector('.article-summary');
+  var bar = document.querySelector('.summary-dismissed');
+  if (block) block.style.display = '';
+  if (bar) bar.style.display = 'none';
+}
+
+function regenerateSummary(btn) {
+  btn.classList.add('summary-spinning');
+  var textEl = document.getElementById('summary-text');
+  if (textEl) textEl.classList.add('regenerating');
+  summarizeArticle();
 }
 
 // Modal focus management

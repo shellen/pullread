@@ -642,11 +642,11 @@ function showSettingsPage(scrollToSection) {
       if (!sec) return;
       var providers = [
         { id: 'kokoro', label: 'Kokoro — free, on-device' },
-        { id: 'browser', label: 'Built-in Voice (Apple) — free' },
+        { id: 'browser', label: 'System Voice — free' },
         { id: 'openai', label: 'OpenAI — premium' },
         { id: 'elevenlabs', label: 'ElevenLabs — premium' },
       ];
-      var ttsShortLabels = {kokoro:'Kokoro',browser:'Browser',openai:'OpenAI',elevenlabs:'ElevenLabs'};
+      var ttsShortLabels = {kokoro:'Kokoro',browser:'System',openai:'OpenAI',elevenlabs:'ElevenLabs'};
       var h = '<h2>Voice Playback</h2>';
       h += '<div class="settings-row"><div><label>Provider</label><div class="settings-desc">Choose how articles are read aloud</div></div>';
       h += '<div class="settings-btn-group">';
@@ -657,8 +657,14 @@ function showSettingsPage(scrollToSection) {
       h += '</div>';
 
       // Voice picker (custom dropdown)
-      if (data.voices) {
-        var prov = data.provider || 'browser';
+      var prov = data.provider || 'browser';
+      if (prov === 'browser') {
+        var browserVoiceLabel = localStorage.getItem('pr-tts-browser-voice') || 'Default';
+        h += '<div class="settings-row" id="sp-tts-voice-row" style="position:relative"><label>Voice</label>';
+        h += '<button onclick="toggleTTSVoicePicker()" id="sp-tts-voice-btn" style="flex:1;text-align:left;display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;cursor:pointer;font-family:inherit;min-width:160px">' + escapeHtml(browserVoiceLabel) + ' <span style="opacity:0.5">\u25BE</span></button>';
+        h += '<input type="hidden" id="sp-tts-voice" value="">';
+        h += '</div>';
+      } else if (data.voices) {
         var voices = data.voices[prov] || [];
         var voiceLabel = data.voice || '';
         for (var vi = 0; vi < voices.length; vi++) { if (voices[vi].id === data.voice) { voiceLabel = voices[vi].label; break; } }
@@ -668,8 +674,8 @@ function showSettingsPage(scrollToSection) {
         h += '</div>';
       }
 
-      // Model / quality select
-      if (data.models) {
+      // Model / quality select (hidden for system voice provider)
+      if (data.models && prov !== 'browser') {
         if (data.provider === 'kokoro') {
           h += '<div class="settings-row" id="sp-tts-model-row"><label>Quality</label>';
           if (data.model === 'kokoro-v1-q4') {
@@ -868,21 +874,47 @@ function settingsPageModelChanged(providerId) {
   customDiv.style.display = sel.value === '__custom' ? 'flex' : 'none';
 }
 
+function getSystemVoiceOptions() {
+  var synth = window.speechSynthesis;
+  if (!synth) return [];
+  var voices = synth.getVoices();
+  return voices.map(function(v) {
+    var label = v.name;
+    if (v.lang) label += ' (' + v.lang + ')';
+    return [v.name, label];
+  });
+}
+
 function toggleTTSVoicePicker() {
   var sec = document.getElementById('settings-voice');
   var data = sec ? sec._ttsData : null;
-  if (!data || !data.voices) return;
   var provider = document.getElementById('sp-tts-provider').value;
-  var voices = data.voices[provider] || [];
-  var current = document.getElementById('sp-tts-voice').value;
-  var options = voices.map(function(v) { return [v.id, v.label]; });
+
+  var options, current;
+  if (provider === 'browser') {
+    options = getSystemVoiceOptions();
+    current = localStorage.getItem('pr-tts-browser-voice') || '';
+  } else {
+    if (!data || !data.voices) return;
+    var voices = data.voices[provider] || [];
+    current = document.getElementById('sp-tts-voice').value;
+    options = voices.map(function(v) { return [v.id, v.label]; });
+  }
+
   settingsCustomSelect('sp-tts-voice-btn', options, current, function(val) {
-    var hidden = document.getElementById('sp-tts-voice');
-    if (hidden) hidden.value = val;
-    var btn = document.getElementById('sp-tts-voice-btn');
-    var label = val;
-    for (var i = 0; i < voices.length; i++) { if (voices[i].id === val) { label = voices[i].label; break; } }
-    if (btn) btn.firstChild.textContent = label;
+    if (provider === 'browser') {
+      localStorage.setItem('pr-tts-browser-voice', val);
+      var btn = document.getElementById('sp-tts-voice-btn');
+      if (btn) btn.firstChild.textContent = val;
+    } else {
+      var hidden = document.getElementById('sp-tts-voice');
+      if (hidden) hidden.value = val;
+      var btn2 = document.getElementById('sp-tts-voice-btn');
+      var label = val;
+      var vList = data.voices[provider] || [];
+      for (var i = 0; i < vList.length; i++) { if (vList[i].id === val) { label = vList[i].label; break; } }
+      if (btn2) btn2.firstChild.textContent = label;
+    }
   });
 }
 
@@ -897,42 +929,47 @@ function settingsPageTTSChanged() {
   if (kokoroStatus) kokoroStatus.style.display = provider === 'kokoro' ? 'block' : 'none';
 
   // Update voice picker button label
-  if (data) {
-    var voiceBtn = document.getElementById('sp-tts-voice-btn');
+  var voiceBtn = document.getElementById('sp-tts-voice-btn');
+  if (provider === 'browser' && voiceBtn) {
+    var savedVoice = localStorage.getItem('pr-tts-browser-voice') || '';
+    voiceBtn.firstChild.textContent = savedVoice || 'Default';
+  } else if (data && voiceBtn && data.voices && data.voices[provider]) {
     var voiceHidden = document.getElementById('sp-tts-voice');
-    if (voiceBtn && data.voices && data.voices[provider]) {
-      var voices = data.voices[provider];
-      var firstVoice = voices.length > 0 ? voices[0] : null;
-      if (firstVoice) {
-        if (voiceHidden) voiceHidden.value = firstVoice.id;
-        voiceBtn.firstChild.textContent = firstVoice.label;
-      } else {
-        if (voiceHidden) voiceHidden.value = '';
-        voiceBtn.firstChild.textContent = 'No voices';
-      }
+    var voices = data.voices[provider];
+    var firstVoice = voices.length > 0 ? voices[0] : null;
+    if (firstVoice) {
+      if (voiceHidden) voiceHidden.value = firstVoice.id;
+      voiceBtn.firstChild.textContent = firstVoice.label;
+    } else {
+      if (voiceHidden) voiceHidden.value = '';
+      voiceBtn.firstChild.textContent = 'No voices';
     }
+  }
 
-    // Update model row
-    var modelRow = document.getElementById('sp-tts-model-row');
-    if (modelRow && provider === 'kokoro') {
-      var label = modelRow.querySelector('label');
-      modelRow.innerHTML = '';
-      if (label) modelRow.appendChild(label);
-      modelRow.insertAdjacentHTML('beforeend',
-        '<span style="font-size:12px">Standard <button onclick="spUpgradeKokoroQuality()" style="margin-left:8px;padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--link);font-size:11px;cursor:pointer;font-family:inherit">Upgrade</button> <span style="color:var(--muted);font-size:11px">Free &middot; 305MB</span></span>'
-        + '<input type="hidden" id="sp-tts-model" value="kokoro-v1-q8">');
-    } else if (modelRow && data.models && data.models[provider]) {
-      var label2 = modelRow.querySelector('label');
-      var models = data.models[provider];
-      modelRow.innerHTML = '';
-      if (label2) modelRow.appendChild(label2);
-      var grp = '<div class="settings-btn-group">';
-      for (var mi = 0; mi < models.length; mi++) {
-        grp += '<button data-val="' + models[mi].id + '"' + (mi === 0 ? ' class="active"' : '') + ' onclick="settingsBtnSelect(this,\'sp-tts-model\',\'' + models[mi].id + '\')">' + escapeHtml(models[mi].label) + '</button>';
-      }
-      grp += '</div><input type="hidden" id="sp-tts-model" value="' + (models.length > 0 ? models[0].id : '') + '">';
-      modelRow.insertAdjacentHTML('beforeend', grp);
+  // Update model row
+  var modelRow = document.getElementById('sp-tts-model-row');
+  if (modelRow && provider === 'browser') {
+    modelRow.style.display = 'none';
+  } else if (modelRow && provider === 'kokoro') {
+    modelRow.style.display = '';
+    var label = modelRow.querySelector('label');
+    modelRow.innerHTML = '';
+    if (label) modelRow.appendChild(label);
+    modelRow.insertAdjacentHTML('beforeend',
+      '<span style="font-size:12px">Standard <button onclick="spUpgradeKokoroQuality()" style="margin-left:8px;padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--link);font-size:11px;cursor:pointer;font-family:inherit">Upgrade</button> <span style="color:var(--muted);font-size:11px">Free &middot; 305MB</span></span>'
+      + '<input type="hidden" id="sp-tts-model" value="kokoro-v1-q8">');
+  } else if (modelRow && data && data.models && data.models[provider]) {
+    modelRow.style.display = '';
+    var label2 = modelRow.querySelector('label');
+    var models = data.models[provider];
+    modelRow.innerHTML = '';
+    if (label2) modelRow.appendChild(label2);
+    var grp = '<div class="settings-btn-group">';
+    for (var mi = 0; mi < models.length; mi++) {
+      grp += '<button data-val="' + models[mi].id + '"' + (mi === 0 ? ' class="active"' : '') + ' onclick="settingsBtnSelect(this,\'sp-tts-model\',\'' + models[mi].id + '\')">' + escapeHtml(models[mi].label) + '</button>';
     }
+    grp += '</div><input type="hidden" id="sp-tts-model" value="' + (models.length > 0 ? models[0].id : '') + '">';
+    modelRow.insertAdjacentHTML('beforeend', grp);
   }
 }
 
