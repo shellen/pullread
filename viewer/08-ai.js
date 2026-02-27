@@ -75,7 +75,7 @@ async function reprocessCurrentArticle(btn) {
   } catch (err) {
     btn.innerHTML = origText;
     btn.disabled = false;
-    alert('Re-fetch failed: ' + (err.message || err));
+    showToast('Re-fetch failed: ' + (err.message || err), 5000);
   }
 }
 
@@ -724,18 +724,13 @@ document.addEventListener('click', function(e) {
 async function batchAutotagAll(force) {
   if (!serverMode) return;
 
-  // Show warning before proceeding
-  var msg = force
-    ? 'This will re-tag ALL articles using AI, replacing any existing machine-generated tags. User tags will be preserved. Continue?'
-    : 'This will auto-tag all untagged articles using AI. This may take a while for large libraries. Continue?';
-  if (!confirm(msg)) return;
-
   var btn = document.getElementById('batch-tag-btn');
   var origText = btn ? btn.innerHTML : '';
   if (btn) {
     btn.disabled = true;
     btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-wand"/></svg> Tagging...';
   }
+  showToast(force ? 'Re-tagging all articles...' : 'Tagging untagged articles...', 3000);
 
   try {
     const res = await fetch('/api/autotag-batch', {
@@ -745,17 +740,16 @@ async function batchAutotagAll(force) {
     });
     const data = await res.json();
     if (data.error) {
-      alert('Auto-tag failed: ' + data.error);
+      showToast('Auto-tag failed: ' + data.error, 5000);
     } else {
+      showToast('Tagged ' + (data.tagged || 0) + ' articles', 4000);
       if (btn) btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true" style="opacity:0.5;vertical-align:-1px"><use href="#i-wand"/></svg> Done!';
-      // Refresh annotations index to pick up new tags
       await loadAnnotationsIndex();
       renderFileList();
-      // Refresh the explore page if open
       setTimeout(function() { var ep = document.querySelector('.explore-tabs'); if (ep) goHome(); }, 2000);
     }
   } catch (err) {
-    alert('Auto-tag request failed.');
+    showToast('Auto-tag request failed.', 5000);
   }
   if (btn) {
     btn.disabled = false;
