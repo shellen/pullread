@@ -123,9 +123,13 @@ function renderFileItem(f, i) {
       + '</div>';
   }
 
-  const favicon = f.domain && f.domain !== 'pullread'
-    ? '<img class="file-item-favicon" src="/favicons/' + encodeURIComponent(f.domain) + '.png" alt="" loading="lazy" onerror="this.src=\'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7\'" aria-hidden="true">'
-    : '';
+  // Podcasts with artwork use it instead of the domain favicon
+  const podcastArt = isPodcast && f.image;
+  const favicon = podcastArt
+    ? '<img class="file-item-favicon file-item-artwork" src="' + escapeHtml(f.image) + '" alt="" loading="lazy" onerror="this.src=\'/favicons/' + encodeURIComponent(f.domain || '') + '.png\';this.classList.remove(\'file-item-artwork\');this.onerror=function(){this.src=\'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7\'}" aria-hidden="true">'
+    : (f.domain && f.domain !== 'pullread'
+      ? '<img class="file-item-favicon" src="/favicons/' + encodeURIComponent(f.domain) + '.png" alt="" loading="lazy" onerror="this.src=\'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7\'" aria-hidden="true">'
+      : '');
 
   const sourceName = (f.feed && f.domain && !feedMatchesDomain(f.feed, f.domain)) ? f.feed : (f.domain || '');
 

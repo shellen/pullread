@@ -375,11 +375,19 @@ function renderArticle(text, filename) {
 
     var sourceHref = 'https://' + encodeURI(meta.domain);
 
-    // Favicon: show real favicon, colored initials fallback only on error
+    // Favicon: for podcasts with artwork, show artwork; otherwise show domain favicon
     var initials = (pubName || meta.domain).replace(/^(the |www\.)/i, '').slice(0, 2).toUpperCase();
-    var faviconHtml = '<div class="pub-favicon">'
-      + '<img src="/favicons/' + encodeURIComponent(meta.domain) + '.png" alt="" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';this.parentElement.style.background=\'' + srcColor + '\'">'
-      + '<span class="pub-favicon-fallback">' + escapeHtml(initials) + '</span></div>';
+    var hasPodcastArt = meta.thumbnail && meta.enclosure_type && meta.enclosure_type.startsWith('audio/');
+    var faviconHtml;
+    if (hasPodcastArt) {
+      faviconHtml = '<div class="pub-favicon pub-favicon-art">'
+        + '<img src="' + escapeHtml(meta.thumbnail) + '" alt="" loading="lazy" onerror="this.src=\'/favicons/' + encodeURIComponent(meta.domain) + '.png\';this.parentElement.classList.remove(\'pub-favicon-art\')">'
+        + '<span class="pub-favicon-fallback">' + escapeHtml(initials) + '</span></div>';
+    } else {
+      faviconHtml = '<div class="pub-favicon">'
+        + '<img src="/favicons/' + encodeURIComponent(meta.domain) + '.png" alt="" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';this.parentElement.style.background=\'' + srcColor + '\'">'
+        + '<span class="pub-favicon-fallback">' + escapeHtml(initials) + '</span></div>';
+    }
 
     html += '<div class="pub-bar">';
     html += '<a class="pub-identity" href="' + escapeHtml(sourceHref) + '" target="_blank" rel="noopener" title="Visit ' + escapeHtml(meta.domain) + '">';
@@ -423,7 +431,7 @@ function renderArticle(text, filename) {
 
   // Hero image from frontmatter thumbnail (feed media:content or og:image)
   if (meta && meta.thumbnail) {
-    html += '<div class="article-hero"><img src="' + escapeHtml(meta.thumbnail) + '" alt="" loading="lazy"></div>';
+    html += '<div class="article-hero"><img src="' + escapeHtml(meta.thumbnail) + '" alt="" loading="lazy" onerror="this.parentElement.style.display=\'none\'"></div>';
   }
 
   // Detect review/summary articles where Summarize doesn't make sense
@@ -593,16 +601,29 @@ function renderArticle(text, filename) {
     }
   );
 
-  // Offer full extraction for articles sourced from feed content
-  if (serverMode && meta && meta.source === 'feed' && meta.url) {
-    html += '<div class="feed-extract-prompt">'
-      + '<button onclick="reprocessFromMenu()" class="feed-extract-btn">'
+  // Link to source for feed-sourced articles, plus optional re-extraction
+  if (meta && meta.source === 'feed' && meta.url) {
+    html += '<div class="feed-extract-prompt">';
+    html += '<a href="' + escapeHtml(meta.url) + '" target="_blank" rel="noopener" class="feed-extract-btn">'
       + '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-external"/></svg> '
-      + 'Read full article at ' + escapeHtml(meta.domain || 'source') + '</button></div>';
+      + 'Read full article at ' + escapeHtml(meta.domain || 'source') + '</a>';
+    if (serverMode) {
+      html += '<button onclick="reprocessFromMenu()" class="feed-extract-btn feed-extract-fetch">'
+        + '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-cloud-download"/></svg> '
+        + 'Fetch full content</button>';
+    }
+    html += '</div>';
   }
 
   content.innerHTML = html;
   document.title = (meta && meta.title) || filename || 'PullRead';
+
+  // Hide broken images instead of showing broken-image icons
+  content.querySelectorAll('.content-wrap img, .article-hero img').forEach(function(img) {
+    if (!img.getAttribute('onerror')) {
+      img.onerror = function() { this.style.display = 'none'; };
+    }
+  });
 
   // Set article language for TTS and CSS :lang() selectors
   if (meta && meta.lang) {

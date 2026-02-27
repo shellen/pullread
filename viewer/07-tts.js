@@ -10,7 +10,8 @@ let ttsGenerating = false;
 let ttsProgressTimer = null;
 let _ttsChunkSession = null; // { id, totalChunks, currentChunk, elapsedTime }
 var _ttsNextPrefetch = null;  // { filename, sessionId, totalChunks, currentChunk, done }
-var podcastAutoplay = localStorage.getItem('pr-podcast-autoplay') === '1';
+// Migrate old boolean to tri-state; 'off' | 'podcasts' | 'everything'
+var autoplayMode = localStorage.getItem('pr-autoplay-mode') || (localStorage.getItem('pr-podcast-autoplay') === '1' ? 'podcasts' : 'off');
 
 const TTS_SPEEDS = [0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.15, 1.2, 1.3, 1.5, 1.75, 2.0];
 
@@ -369,9 +370,10 @@ async function playBrowserTTS(filename) {
     ttsSynthUtterance = null;
     document.getElementById('tts-progress').style.width = '100%';
     renderAudioPlayer();
-    // Auto-play next
     if (ttsCurrentIndex + 1 < ttsQueue.length) {
       setTimeout(() => playTTSItem(ttsCurrentIndex + 1), 500);
+    } else {
+      autoplayNext(ttsQueue[ttsCurrentIndex] ? ttsQueue[ttsCurrentIndex].filename : '');
     }
   };
 
@@ -476,6 +478,8 @@ async function playCloudTTSCached(filename) {
       renderAudioPlayer();
       if (ttsCurrentIndex + 1 < ttsQueue.length) {
         setTimeout(function() { playTTSItem(ttsCurrentIndex + 1); }, 500);
+      } else {
+        autoplayNext(ttsQueue[ttsCurrentIndex] ? ttsQueue[ttsCurrentIndex].filename : '');
       }
     });
 
@@ -544,8 +548,8 @@ async function playPodcastAudio(item) {
       renderAudioPlayer();
       if (ttsCurrentIndex + 1 < ttsQueue.length) {
         setTimeout(function() { playTTSItem(ttsCurrentIndex + 1); }, 500);
-      } else if (podcastAutoplay) {
-        autoplayNextPodcast(item.filename);
+      } else {
+        autoplayNext(item.filename);
       }
     });
 
@@ -568,13 +572,19 @@ async function playPodcastAudio(item) {
   }
 }
 
-/** Find and play the next podcast after the current one finishes */
-function autoplayNextPodcast(currentFilename) {
-  var podcasts = allFiles.filter(function(f) {
-    return f.enclosureUrl && f.enclosureType && f.enclosureType.startsWith('audio/');
-  });
-  var currentIdx = podcasts.findIndex(function(f) { return f.filename === currentFilename; });
-  var next = currentIdx >= 0 && currentIdx + 1 < podcasts.length ? podcasts[currentIdx + 1] : null;
+/** Auto-play the next item based on autoplayMode setting */
+function autoplayNext(currentFilename) {
+  if (autoplayMode === 'off') return;
+  var candidates;
+  if (autoplayMode === 'podcasts') {
+    candidates = allFiles.filter(function(f) {
+      return f.enclosureUrl && f.enclosureType && f.enclosureType.startsWith('audio/');
+    });
+  } else {
+    candidates = allFiles;
+  }
+  var currentIdx = candidates.findIndex(function(f) { return f.filename === currentFilename; });
+  var next = currentIdx >= 0 && currentIdx + 1 < candidates.length ? candidates[currentIdx + 1] : null;
   if (!next) return;
   setTimeout(function() { addToTTSQueue(next.filename); }, 500);
 }
@@ -685,6 +695,8 @@ async function ttsPlayNextChunk(index, seekPct) {
     renderAudioPlayer();
     if (ttsCurrentIndex + 1 < ttsQueue.length) {
       setTimeout(function() { playTTSItem(ttsCurrentIndex + 1); }, 500);
+    } else {
+      autoplayNext(ttsQueue[ttsCurrentIndex] ? ttsQueue[ttsCurrentIndex].filename : '');
     }
     return;
   }

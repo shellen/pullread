@@ -1006,6 +1006,13 @@
     border-radius: 3px;
     flex-shrink: 0;
     opacity: 0.7;
+  }
+  .file-item-artwork {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    opacity: 1;
+    object-fit: cover;
     filter: grayscale(100%);
     transition: filter 0.2s;
     background: #fff;
@@ -1606,6 +1613,11 @@
     object-fit: cover;
     border-radius: 8px;
     display: block;
+  }
+  .pub-favicon-art {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
   }
   .pub-favicon-fallback {
     display: none;
@@ -2302,8 +2314,9 @@
   /* ---- Mini player (sidebar) ---- */
   .player-mini-mount { flex-shrink: 0; }
   .bottom-bar-mini {
-    background: var(--sidebar-bg);
+    background: var(--bg);
     border-top: 1px solid var(--border);
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-size: 12px;
     overflow: hidden;
@@ -2314,7 +2327,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 10px;
+    padding: 10px 12px;
   }
   .mini-player-play {
     border: none;
@@ -4776,9 +4789,10 @@
     display: inline-flex; align-items: center; gap: 6px;
     padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px;
     background: none; color: var(--link); font-size: 13px;
-    font-family: inherit; cursor: pointer;
+    font-family: inherit; cursor: pointer; text-decoration: none;
   }
   .feed-extract-btn:hover { background: var(--sidebar-hover); }
+  .feed-extract-fetch { margin-left: 8px; }
 
   /* Print styles */
   @media print {

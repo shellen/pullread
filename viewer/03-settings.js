@@ -726,11 +726,13 @@ function showSettingsPage(scrollToSection) {
       h += '<input type="password" id="sp-tts-key" placeholder="' + (data.hasKey && isCloud ? '••••••••' : 'Paste API key') + '" style="min-width:200px">';
       h += '</div>';
 
-      // Kokoro status
-      // Auto-play next podcast toggle
-      h += '<div class="settings-row"><div><label>Auto-play next podcast</label><div class="settings-desc">When a podcast ends, automatically play the next one</div></div>';
-      h += '<input type="checkbox" id="sp-podcast-autoplay"' + (podcastAutoplay ? ' checked' : '') + ' onchange="podcastAutoplay=this.checked;localStorage.setItem(\'pr-podcast-autoplay\',this.checked?\'1\':\'0\')">';
-      h += '</div>';
+      // Auto-play next setting
+      h += '<div class="settings-row"><div><label>Auto-play next</label><div class="settings-desc">Automatically play the next item when playback ends</div></div>';
+      h += '<div class="settings-btn-group">';
+      h += '<button data-val="off"' + (autoplayMode === 'off' ? ' class="active"' : '') + ' onclick="settingsBtnSelect(this,null,\'off\');autoplayMode=\'off\';localStorage.setItem(\'pr-autoplay-mode\',\'off\')">Off</button>';
+      h += '<button data-val="podcasts"' + (autoplayMode === 'podcasts' ? ' class="active"' : '') + ' onclick="settingsBtnSelect(this,null,\'podcasts\');autoplayMode=\'podcasts\';localStorage.setItem(\'pr-autoplay-mode\',\'podcasts\')">Podcasts</button>';
+      h += '<button data-val="everything"' + (autoplayMode === 'everything' ? ' class="active"' : '') + ' onclick="settingsBtnSelect(this,null,\'everything\');autoplayMode=\'everything\';localStorage.setItem(\'pr-autoplay-mode\',\'everything\')">Everything</button>';
+      h += '</div></div>';
 
       var hasQualityVoices = allVoices.some(function(v) { return v.name.indexOf('(Premium)') !== -1 || v.name.indexOf('(Enhanced)') !== -1; });
       var showVoiceHint = isBrowserProv && prov === 'apple' && !hasQualityVoices;

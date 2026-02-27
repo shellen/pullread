@@ -8,7 +8,7 @@ import { fetchFeed, FeedEntry } from './feed';
 import { fetchAndExtract, FetchOptions, shouldSkipUrl, isBinaryUrl, classifyFetchError, htmlToMarkdown } from './extractor';
 import { writeArticle, listMarkdownFiles, resolveFilePath } from './writer';
 import { Storage } from './storage';
-import { startViewer } from './viewer';
+import { startViewer, reprocessFile, parseFrontmatter } from './viewer';
 import { summarizeText, loadLLMConfig } from './summarizer';
 import { autotagBatch } from './autotagger';
 import { parseBookmarksHtml, bookmarksToEntries } from './bookmarks';
@@ -232,6 +232,14 @@ async function syncFeed(
           }
         }
 
+        // After retry, if still short, mark failed so --retry-failed picks it up
+        if (article && article.markdown.length < 200) {
+          console.log(`      Still short (${article.markdown.length} chars), marking failed`);
+          storage.markFailed(entry.url, `Content too short (${article.markdown.length} chars)`);
+          failed++;
+          continue;
+        }
+
         if (!article?.markdown) {
           console.log(`      Skipped: Could not extract content`);
           storage.markFailed(entry.url, 'No extractable content');
@@ -411,6 +419,24 @@ async function sync(feedFilter?: string, retryFailed = false): Promise<void> {
         }
       } catch {}
     }
+
+    // Post-sync repair: re-extract articles with suspiciously short content
+    const allArticles = listMarkdownFiles(config.outputPath);
+    let repaired = 0;
+    for (const filePath of allArticles) {
+      const fileContent = readFileSync(filePath, 'utf-8');
+      const fmMatch = fileContent.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+      if (!fmMatch) continue;
+      const meta = parseFrontmatter(fileContent);
+      const body = fmMatch[2];
+      if (meta.url && meta.source !== 'feed' && body.trim().length < 200) {
+        console.log(`  Repairing: ${basename(filePath)}`);
+        const result = await reprocessFile(filePath);
+        if (result.ok) repaired++;
+        await new Promise(r => setTimeout(r, 2_000));
+      }
+    }
+    if (repaired > 0) console.log(`  Repaired ${repaired} short articles`);
 
     console.log(`\nDone: ${totalSuccess} saved, ${totalFailed} failed`);
 

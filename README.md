@@ -833,6 +833,8 @@ feeds.json
                └── 2024-01-29-article-title.md
 ```
 
+See [docs/processing-flow.d2](docs/processing-flow.d2) for the article processing pipeline.
+
 ### Feed Content Preservation
 
 Many RSS, Atom, and RDF feeds include the full article HTML in their `content:encoded` or `<content>` fields. PullRead preserves this raw HTML on the `contentHtml` field of each feed entry and compares it against the separately web-extracted content — whichever produces more markdown wins.
