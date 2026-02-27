@@ -985,6 +985,9 @@ function ttsTogglePlay() {
         ttsAudio.play();
         ttsPlaying = true;
       }
+    } else if (ttsPlaying || ttsGenerating) {
+      // Audio still loading/generating — cancel rather than restarting
+      stopTTS();
     } else if (ttsCurrentIndex >= 0) {
       playTTSItem(ttsCurrentIndex);
     } else {
@@ -1024,8 +1027,14 @@ function ttsStopHoldSkip() {
 function skipTime(seconds) {
   if (_ttsChunkSession) {
     var session = _ttsChunkSession;
-    // Can't seek until we have a duration estimate from the first chunk
-    if (!session.estimatedTotalDuration) return;
+    // Duration not yet known — skip within current chunk if audio exists
+    if (!session.estimatedTotalDuration) {
+      if (ttsAudio && ttsAudio.duration) {
+        var t = ttsAudio.currentTime + seconds;
+        ttsAudio.currentTime = Math.max(0, Math.min(t, ttsAudio.duration));
+      }
+      return;
+    }
     var currentChunkTime = ttsAudio ? ttsAudio.currentTime : 0;
     var targetTime = session.elapsedTime + currentChunkTime + seconds;
     if (targetTime < 0) targetTime = 0;
@@ -1068,9 +1077,10 @@ function seekToChunkPosition(pct) {
   session.elapsedTime = elapsed;
 
   // Stop current audio and play from target chunk
+  // Don't set src='' — it triggers an async error event whose handler
+  // would nuke _ttsChunkSession before the new chunk starts playing.
   if (ttsAudio) {
     ttsAudio.pause();
-    ttsAudio.src = '';
     ttsAudio = null;
   }
   ttsPlayNextChunk(targetChunk, seekPct);
