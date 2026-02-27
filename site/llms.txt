@@ -25,7 +25,7 @@ Pull Read is an open-source macOS menu bar app and CLI tool that connects to boo
 - Summary provenance with provider/model badges saved to frontmatter
 - AI-generated weekly reading reviews
 - AI-powered auto-tagging of articles
-- Text-to-speech with 4 providers: Browser (free), Kokoro local AI (free), OpenAI, ElevenLabs
+- Text-to-speech with 3 providers: Browser (free), OpenAI, ElevenLabs
 - Voice notes via Web Speech API microphone recording
 - Export articles as markdown with optional highlights, notes, summary, and tags
 - Smart deduplication and retry for failed extractions

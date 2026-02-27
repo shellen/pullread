@@ -71,7 +71,7 @@ PullRead connects to bookmark services like Instapaper, Pinboard, Raindrop, and 
 - **Weekly reviews** - AI-generated summaries of your recent reading (daily/weekly schedule or on-demand)
 - **Cross-platform desktop app** - Tauri-based menu bar app with bundled CLI (macOS first, Windows/Linux planned)
 - **Article summaries** - On-demand summarization with 5 LLM providers, shown with provider/model badges
-- **Text-to-speech** - Listen to articles via browser TTS (free), Kokoro local AI, OpenAI, or ElevenLabs
+- **Text-to-speech** - Listen to articles via browser TTS (free), OpenAI, or ElevenLabs
 - **Voice notes** - Record article notes using your microphone via Web Speech API
 - **Export markdown** - Share articles as .md with optional highlights, notes, summary, and tags
 - **Cloud-sync friendly** - Output folder can be Dropbox, iCloud, Google Drive, etc.
@@ -583,7 +583,6 @@ Listen to articles read aloud with multiple TTS providers:
 | Provider | Cost | Notes |
 |----------|------|-------|
 | **Browser** (default) | Free | Built-in speech synthesis, works offline |
-| **Kokoro** | Free | Local AI voice (~86MB model, auto-downloads on first use) |
 | **OpenAI** | ~$0.15/article | Cloud API, bring your own key |
 | **ElevenLabs** | ~$1.20-2.40/article | Cloud API, bring your own key |
 
@@ -714,7 +713,7 @@ pullread/
 │   ├── storage.ts                 # SQLite-backed sync state
 │   ├── summarizer.ts              # Article summarization (5 LLM providers)
 │   ├── autotagger.ts              # Machine tagging using LLM providers
-│   ├── tts.ts                     # Text-to-speech (Kokoro, OpenAI, ElevenLabs)
+│   ├── tts.ts                     # Text-to-speech (OpenAI, ElevenLabs)
 │   ├── review.ts                  # Weekly review generation
 │   ├── cookies.ts                 # Site login cookie management
 │   └── *.test.ts                  # Unit tests (194 tests across 7 suites)
@@ -762,8 +761,6 @@ pullread/
 ├── scripts/
 │   ├── build-tauri.sh             # Full Tauri build pipeline
 │   ├── prepare-sidecar.sh         # Copy Bun binary with target triple naming
-│   ├── download-kokoro-model.sh   # Downloads Kokoro TTS model for bundling
-│   ├── bundle-kokoro.ts           # Copies Kokoro runtime files to Tauri resources
 │   ├── embed-viewer.ts            # Inlines viewer modules into viewer-html.ts
 │   ├── fetch-gutenberg.ts         # Downloads Project Gutenberg books for break reading
 │   └── setup-signing-secrets.sh   # Configures GitHub Actions signing secrets
@@ -792,8 +789,7 @@ pullread/
 ├── highlights.json                # Article highlights
 ├── notes.json                     # Article notes, tags, and annotations
 ├── inbox.json                     # URLs saved via pullread:// scheme
-├── tts-cache/                     # Cached TTS audio files (mp3/wav)
-└── kokoro-model/                  # Local Kokoro TTS model (~86MB)
+└── tts-cache/                     # Cached TTS audio files (mp3/wav)
 ```
 
 ### Data Flow
@@ -904,7 +900,6 @@ cd src-tauri && cargo tauri dev
 | `@mozilla/readability` | Article content extraction |
 | `linkedom` | DOM simulation for Readability |
 | `turndown` | HTML to Markdown conversion |
-| `kokoro-js` | Local TTS voice synthesis (optional) |
 
 **Tauri Shell (Rust):**
 
@@ -1033,8 +1028,7 @@ bash scripts/build-tauri.sh
 # 2. Embed viewer HTML
 # 3. Compile Bun CLI binary
 # 4. Copy to src-tauri/binaries/ with target triple naming
-# 5. Download Kokoro TTS model (~92MB)
-# 6. Code-sign sidecar with entitlements (macOS, if APPLE_SIGNING_IDENTITY set)
+# 5. Code-sign sidecar with entitlements (macOS, if APPLE_SIGNING_IDENTITY set)
 # 7. cargo tauri build (compiles Rust, packages DMG)
 ```
 
@@ -1192,7 +1186,7 @@ PullRead is a tool that fetches, extracts, and saves web content at your directi
 
 ### Privacy
 
-PullRead is local-first by design. Articles, highlights, notes, and reading history stay on your machine. Data is only sent to third parties when you explicitly use optional AI features (summaries, auto-tagging, reviews, cloud TTS), at which point article text is transmitted to your selected provider using your own API key. Browser TTS, Kokoro local TTS, and all reading features work entirely on-device. See [Privacy Policy](https://pullread.com/privacy) for details.
+PullRead is local-first by design. Articles, highlights, notes, and reading history stay on your machine. Data is only sent to third parties when you explicitly use optional AI features (summaries, auto-tagging, reviews, cloud TTS), at which point article text is transmitted to your selected provider using your own API key. Browser TTS and all reading features work entirely on-device. See [Privacy Policy](https://pullread.com/privacy) for details.
 
 ### Third-party services
 
@@ -1215,7 +1209,6 @@ See [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES) for open-source license attributi
 - [Mozilla Readability](https://github.com/mozilla/readability) - The excellent article extraction algorithm
 - [Turndown](https://github.com/mixmark-io/turndown) - HTML to Markdown conversion
 - [fast-xml-parser](https://github.com/NaturalIntelligence/fast-xml-parser) - Fast and reliable XML parsing
-- [Kokoro](https://github.com/hexgrad/kokoro) - High-quality local text-to-speech model
 - [Bun](https://bun.sh) - Fast JavaScript runtime used to build standalone binaries
 - [Tauri](https://tauri.app) - Lightweight cross-platform desktop app framework
 

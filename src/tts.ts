@@ -1,5 +1,5 @@
 // ABOUTME: Text-to-speech provider abstraction for article audio playback
-// ABOUTME: Supports Kokoro (local), OpenAI TTS, and ElevenLabs; browser speech synthesis is handled client-side
+// ABOUTME: Supports OpenAI TTS and ElevenLabs; browser speech synthesis is handled client-side
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, createWriteStream } from 'fs';
 import { join, dirname } from 'path';
@@ -146,6 +146,10 @@ export function loadTTSConfig(): TTSConfig {
       const settings = JSON.parse(readFileSync(SETTINGS_PATH, 'utf-8'));
       if (settings.tts) {
         const config = settings.tts as TTSConfig;
+        // Migrate removed Kokoro provider to browser
+        if (config.provider === 'kokoro') {
+          config.provider = 'browser';
+        }
         // Read API key from Keychain if not in settings
         if (!config.apiKey && (config.provider === 'openai' || config.provider === 'elevenlabs')) {
           config.apiKey = loadFromKeychain('tts-api-key') || '';
@@ -154,7 +158,7 @@ export function loadTTSConfig(): TTSConfig {
       }
     }
   } catch {}
-  return { provider: 'kokoro' };
+  return { provider: 'browser' };
 }
 
 export function saveTTSConfig(config: TTSConfig): void {

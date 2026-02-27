@@ -111,7 +111,6 @@ function showGuideModal() {
       <thead><tr><th>Provider</th><th>Cost</th><th>Notes</th></tr></thead>
       <tbody>
         <tr><td>Browser</td><td>Free</td><td>Built-in speech synthesis, works offline</td></tr>
-        <tr><td>Kokoro</td><td>Free</td><td>Local AI voice (~86MB model, auto-downloads)</td></tr>
         <tr><td>OpenAI</td><td>~$0.15/article</td><td>Cloud API, bring your own key</td></tr>
         <tr><td>ElevenLabs</td><td>~$1.20/article</td><td>Cloud API, bring your own key</td></tr>
       </tbody>
@@ -207,7 +206,7 @@ function showGuideModal() {
     <p>Only for AI features (summaries, auto-tagging, reviews, and paid TTS). Reading, highlighting, searching, and browser TTS are all free with no API key. Apple Intelligence (macOS 26+) works without a key too.</p>
 
     <h3>Is my data sent anywhere?</h3>
-    <p>Articles stay on your Mac. Data is only sent to an API when you explicitly use summaries, auto-tagging, or cloud TTS providers (OpenAI/ElevenLabs). Kokoro TTS and browser TTS are fully local. API keys are stored locally and never shared between features (your Summaries key is separate from your TTS key).</p>
+    <p>Articles stay on your Mac. Data is only sent to an API when you explicitly use summaries, auto-tagging, or cloud TTS providers (OpenAI/ElevenLabs). Browser TTS is fully local. API keys are stored locally and never shared between features (your Summaries key is separate from your TTS key).</p>
 
     <h3>Why can't PullRead extract some articles?</h3>
     <p>Some sites use paywalls, bot detection, or JavaScript-only rendering that blocks extraction. Try enabling browser cookies in Settings to use your existing login sessions. You can also retry failed articles with <code>pullread sync --retry-failed</code>.</p>
@@ -230,7 +229,7 @@ function showGuideModal() {
     <h2>Acknowledgements</h2>
 
     <h3>Open Source Software</h3>
-    <p>PullRead uses open-source software including <strong>Kokoro TTS</strong> (Apache 2.0, by hexgrad), <strong>ONNX Runtime</strong> (MIT, by Microsoft), <strong>Mozilla Readability</strong> (Apache 2.0), <strong>Turndown</strong> (MIT), <strong>marked</strong> (MIT), <strong>highlight.js</strong> (BSD 3-Clause), <strong>Mermaid</strong> (MIT), and <strong>DOMPurify</strong> (Apache 2.0 / MPL 2.0). Kokoro was trained on audio data including Koniwa (CC BY 3.0) and SIWIS (CC BY 4.0).</p>
+    <p>PullRead uses open-source software including <strong>Mozilla Readability</strong> (Apache 2.0), <strong>Turndown</strong> (MIT), <strong>marked</strong> (MIT), <strong>highlight.js</strong> (BSD 3-Clause), <strong>Mermaid</strong> (MIT), and <strong>DOMPurify</strong> (Apache 2.0 / MPL 2.0).</p>
 
     <h3>Fonts</h3>
     <p>PullRead bundles the following typefaces for offline reading, all under the <strong>SIL Open Font License 1.1</strong>:</p>

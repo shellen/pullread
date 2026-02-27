@@ -16,6 +16,16 @@ var autoplayMode = localStorage.getItem('pr-autoplay-mode') || (localStorage.get
 
 const TTS_SPEEDS = [0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.15, 1.2, 1.3, 1.5, 1.75, 2.0];
 
+/** Deterministic hash of a string to an index in [0, max). djb2 algorithm. */
+function hashStringToIndex(str, max) {
+  var hash = 5381;
+  for (var i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash) + str.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return Math.abs(hash) % max;
+}
+
 function playCueSound() {
   try { new Audio('/audio/cue.webm').play(); } catch(e) {}
 }
@@ -268,7 +278,7 @@ async function playTTSItem(index) {
   await loadTTSSettings();
 
   if (ttsProvider === 'browser') {
-    await playBrowserTTS(item.filename);
+    await playBrowserTTS(item.filename, item.domain);
   } else {
     await playCloudTTS(item.filename);
   }
@@ -285,7 +295,7 @@ async function loadTTSSettings() {
   } catch { ttsProvider = 'browser'; }
 }
 
-async function playBrowserTTS(filename) {
+async function playBrowserTTS(filename, domain) {
   const synth = window.speechSynthesis;
   if (!synth) {
     showToast('Speech synthesis not available in this browser.');
@@ -306,7 +316,11 @@ async function playBrowserTTS(filename) {
   const ttsText = (meta && meta.title ? meta.title + '\n\n' : '') + body;
   const plainText = stripMarkdownForTTS(ttsText);
 
-  // Cancel any existing
+  // Detach old utterance handlers before cancel to prevent stale onend/onerror
+  if (ttsSynthUtterance) {
+    ttsSynthUtterance.onend = null;
+    ttsSynthUtterance.onerror = null;
+  }
   synth.cancel();
 
   const utterance = new SpeechSynthesisUtterance(plainText);
@@ -343,6 +357,23 @@ async function playBrowserTTS(filename) {
   if (!match && platformVoices.length > 0) match = platformVoices[0];
   if (!match && sysVoices.length > 0) match = sysVoices[0];
 
+  // Randomize voice per source domain if enabled
+  var randomize = localStorage.getItem('pr-tts-randomize-voices') === '1';
+  var isEnglish = !langPrefix || langPrefix === 'en';
+  if (randomize && isEnglish && domain) {
+    // Prefer Premium/Enhanced voices for higher quality
+    var qualityVoices = platformVoices.filter(function(v) {
+      return v.lang.indexOf('en') === 0 &&
+        (v.name.indexOf('(Premium)') !== -1 || v.name.indexOf('(Enhanced)') !== -1);
+    });
+    if (qualityVoices.length === 0) {
+      qualityVoices = platformVoices.filter(function(v) { return v.lang.indexOf('en') === 0; });
+    }
+    if (qualityVoices.length > 0) {
+      match = qualityVoices[hashStringToIndex(domain, qualityVoices.length)];
+    }
+  }
+
   if (match) utterance.voice = match;
 
   // Estimate total duration (browser TTS doesn't give real progress)
@@ -361,12 +392,48 @@ async function playBrowserTTS(filename) {
   _startBrowserUtterance(plainText, 0);
 }
 
+function _startBrowserProgressTimer() {
+  clearInterval(ttsProgressTimer);
+  ttsProgressTimer = setInterval(function() {
+    var state = _browserTTSState;
+    if (!state || !state.startTime) return;
+    var player = document.querySelector('pr-player');
+    if (player && player._dragging) return;
+
+    var elapsed = (Date.now() - state.startTime) / 1000;
+    var overallPct, totalEst;
+
+    if (state.lastBoundaryPct > 0) {
+      overallPct = (state.seekOffset + state.lastBoundaryPct * (1 - state.seekOffset)) * 100;
+      totalEst = elapsed / state.lastBoundaryPct;
+      // Blend with WPM estimate until enough boundary data accumulates
+      if (state.lastBoundaryPct < 0.05) {
+        totalEst = state.estimatedSeconds;
+      }
+    } else {
+      var baseTime = state.seekOffset * state.estimatedSeconds;
+      overallPct = Math.min(100, ((baseTime + elapsed) / state.estimatedSeconds) * 100);
+      totalEst = state.estimatedSeconds;
+    }
+
+    var currentTime = state.seekOffset * totalEst + elapsed;
+    document.getElementById('tts-progress').style.width = Math.min(100, overallPct) + '%';
+    document.getElementById('tts-time-current').textContent = formatTime(currentTime);
+    document.getElementById('tts-time-total').textContent = formatTime(totalEst);
+  }, 200);
+}
+
 function _startBrowserUtterance(text, seekOffset) {
   var synth = window.speechSynthesis;
   var state = _browserTTSState;
   if (!state) return;
 
   clearInterval(ttsProgressTimer);
+  // Detach old utterance handlers before cancel to prevent stale onend/onerror
+  if (ttsSynthUtterance) {
+    ttsSynthUtterance.onend = null;
+    ttsSynthUtterance.onerror = null;
+  }
   synth.cancel();
 
   var utterance = new SpeechSynthesisUtterance(text);
@@ -377,21 +444,25 @@ function _startBrowserUtterance(text, seekOffset) {
   state.seekOffset = seekOffset;
 
   utterance.onstart = function() {
+    clearTimeout(state._watchdog);
     stopListenLoading();
     ttsPlaying = true;
     state.startTime = Date.now();
     renderAudioPlayer();
-    document.getElementById('tts-time-total').textContent = formatTime(state.estimatedSeconds);
-    ttsProgressTimer = setInterval(function() {
-      var elapsed = (Date.now() - state.startTime) / 1000;
-      var baseTime = seekOffset * state.estimatedSeconds;
-      var pct = Math.min(100, ((baseTime + elapsed) / state.estimatedSeconds) * 100);
-      document.getElementById('tts-progress').style.width = pct + '%';
-      document.getElementById('tts-time-current').textContent = formatTime(baseTime + elapsed);
-    }, 200);
+    document.getElementById('tts-time-total').textContent = '~' + formatTime(state.estimatedSeconds);
+    _startBrowserProgressTimer();
+  };
+
+  state.lastBoundaryPct = 0;
+  state.currentTextLen = text.length;
+  utterance.onboundary = function(e) {
+    if (e.name === 'word') {
+      state.lastBoundaryPct = e.charIndex / state.currentTextLen;
+    }
   };
 
   utterance.onend = function() {
+    clearTimeout(state._watchdog);
     clearInterval(ttsProgressTimer);
     ttsPlaying = false;
     ttsSynthUtterance = null;
@@ -406,6 +477,7 @@ function _startBrowserUtterance(text, seekOffset) {
   };
 
   utterance.onerror = function() {
+    clearTimeout(state._watchdog);
     clearInterval(ttsProgressTimer);
     ttsPlaying = false;
     ttsSynthUtterance = null;
@@ -414,6 +486,14 @@ function _startBrowserUtterance(text, seekOffset) {
   };
 
   synth.speak(utterance);
+
+  // Watchdog: retry if onstart never fires (browser speech can silently fail)
+  state._watchdog = setTimeout(function() {
+    if (state === _browserTTSState && !state.startTime) {
+      synth.cancel();
+      synth.speak(utterance);
+    }
+  }, 2000);
 }
 
 async function playCloudTTS(filename) {
@@ -433,8 +513,9 @@ async function playCloudTTS(filename) {
     if (!startRes.ok) {
       const err = await startRes.json().catch(function() { return { error: 'TTS failed' }; });
       if (err.fallback === 'browser') {
-        console.warn('Kokoro unavailable, falling back to browser TTS:', err.error);
-        await playBrowserTTS(filename);
+        console.warn('Server TTS unavailable, falling back to browser TTS:', err.error);
+        var fallbackItem = ttsQueue[ttsCurrentIndex];
+        await playBrowserTTS(filename, fallbackItem ? fallbackItem.domain : '');
         return;
       }
       stopListenLoading();
@@ -488,12 +569,14 @@ async function playCloudTTSCached(filename) {
       stopListenLoading();
       ttsPlaying = true;
       renderAudioPlayer();
-      // Cached playback means Kokoro is idle — pre-generate next queue item
+      // Cached playback — pre-generate next queue item
       ttsPrefetchNextQueueItem();
     });
 
     audio.addEventListener('timeupdate', function() {
       if (!audio.duration) return;
+      var player = document.querySelector('pr-player');
+      if (player && player._dragging) return;
       var pct = Math.min(100, (audio.currentTime / audio.duration) * 100);
       document.getElementById('tts-progress').style.width = pct + '%';
       document.getElementById('tts-time-current').textContent = formatTime(audio.currentTime);
@@ -558,6 +641,8 @@ async function playPodcastAudio(item) {
     audio.addEventListener('timeupdate', function() {
       if (ttsAudio !== audio) return;
       if (!audio.duration) return;
+      var player = document.querySelector('pr-player');
+      if (player && player._dragging) return;
       var pct = Math.min(100, (audio.currentTime / audio.duration) * 100);
       document.getElementById('tts-progress').style.width = pct + '%';
       document.getElementById('tts-time-current').textContent = formatTime(audio.currentTime);
@@ -769,13 +854,15 @@ async function ttsPlayNextChunk(index, seekPct) {
       if (index + 1 < session.totalChunks) {
         ttsPrefetchChunk(index + 1);
       } else {
-        // Last chunk playing — Kokoro is idle, pre-generate next queue item
+        // Last chunk playing — pre-generate next queue item
         ttsPrefetchNextQueueItem();
       }
     });
 
     audio.addEventListener('timeupdate', function() {
       if (session !== _ttsChunkSession) return;
+      var player = document.querySelector('pr-player');
+      if (player && player._dragging) return;
       var chunkDuration = audio.duration || 1;
       var chunkProgress = Math.min(1, audio.currentTime / chunkDuration);
       var overallPct = ((index + chunkProgress) / session.totalChunks) * 100;
@@ -833,6 +920,8 @@ function stopTTS() {
     ttsAudio = null;
   }
   if (ttsSynthUtterance) {
+    ttsSynthUtterance.onend = null;
+    ttsSynthUtterance.onerror = null;
     window.speechSynthesis.cancel();
     ttsSynthUtterance = null;
   }
@@ -855,18 +944,15 @@ function ttsTogglePlay() {
       synth.pause();
       ttsPlaying = false;
       clearInterval(ttsProgressTimer);
+      if (_browserTTSState) _browserTTSState.pausedAt = Date.now();
     } else if (synth.paused) {
       synth.resume();
       ttsPlaying = true;
-      // Restart progress timer
-      ttsProgressTimer = setInterval(() => {
-        const timeEl = document.getElementById('tts-time-current');
-        const totalEl = document.getElementById('tts-time-total');
-        // parse current time and increment
-        const parts = timeEl.textContent.split(':');
-        let secs = parseInt(parts[0]) * 60 + parseInt(parts[1]) + 0.2;
-        timeEl.textContent = formatTime(secs);
-      }, 200);
+      if (_browserTTSState && _browserTTSState.pausedAt) {
+        _browserTTSState.startTime += (Date.now() - _browserTTSState.pausedAt);
+        _browserTTSState.pausedAt = null;
+      }
+      _startBrowserProgressTimer();
     } else if (ttsCurrentIndex >= 0) {
       playTTSItem(ttsCurrentIndex);
     } else {
@@ -1181,8 +1267,7 @@ function showTTSSettings() {
     if (!card) return;
 
     var providers = [
-      { id: 'kokoro', label: 'Kokoro — natural voice, free & private' },
-      { id: 'browser', label: 'Built-in Voice (Apple) — free' },
+      { id: 'browser', label: 'Built-in Voice — free' },
       { id: 'openai', label: 'OpenAI — premium quality' },
       { id: 'elevenlabs', label: 'ElevenLabs — premium quality' },
     ];
@@ -1191,9 +1276,8 @@ function showTTSSettings() {
     overlay._ttsData = data;
 
     var isCloud = data.provider === 'openai' || data.provider === 'elevenlabs';
-    var kokoroInstalled = data.kokoro && data.kokoro.installed;
 
-    var ttsModalLabels = {kokoro:'Kokoro',browser:'Browser',openai:'OpenAI',elevenlabs:'ElevenLabs'};
+    var ttsModalLabels = {browser:'Browser',openai:'OpenAI',elevenlabs:'ElevenLabs'};
     card.innerHTML =
       '<h2>Voice Settings</h2>' +
       '<div style="margin:12px 0">' +
@@ -1201,34 +1285,7 @@ function showTTSSettings() {
         '<div class="settings-btn-group">' +
           providers.map(function(p) { return '<button data-val="' + p.id + '" class="' + (data.provider === p.id ? 'active' : '') + '" onclick="settingsBtnSelect(this,\'tts-provider-select\',\'' + p.id + '\');ttsSettingsProviderChanged()">' + (ttsModalLabels[p.id] || p.id) + '</button>'; }).join('') +
         '</div>' +
-        '<input type="hidden" id="tts-provider-select" value="' + escapeHtml(data.provider || 'kokoro') + '">' +
-      '</div>' +
-      '<div id="tts-kokoro-settings" style="display:' + (data.provider === 'kokoro' ? 'block' : 'none') + '">' +
-        '<div style="background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin:10px 0;font-size:12px;line-height:1.6">' +
-          '<strong style="color:var(--fg)">Kokoro — natural-sounding voice, completely free</strong><br>' +
-          '<span style="color:var(--muted)">Runs entirely on your Mac using the Kokoro voice engine — your articles stay private and never leave your machine.</span><br>' +
-          '<span style="color:var(--muted)">Sets itself up automatically the first time you listen (~86MB download).</span>' +
-          '<div id="kokoro-status" style="margin-top:6px">' +
-            (kokoroInstalled
-              ? '<span style="color:#22c55e">&#10003; Ready to go</span>'
-              : '<span style="color:var(--muted)">Will set up automatically on first listen</span>') +
-          '</div>' +
-        '</div>' +
-        '<div style="margin:12px 0;position:relative">' +
-          '<label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Voice</label>' +
-          '<button onclick="toggleTTSModalVoicePicker(\'tts-kokoro-voice-btn\',\'tts-kokoro-voice\',\'kokoro\')" id="tts-kokoro-voice-btn" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;cursor:pointer;font-family:inherit">' + escapeHtml(ttsModalGetVoiceLabel('kokoro', data.voice)) + ' <span style="opacity:0.5">\u25BE</span></button>' +
-          '<input type="hidden" id="tts-kokoro-voice" value="' + escapeHtml(data.voice || '') + '">' +
-        '</div>' +
-        '<div style="margin:12px 0" id="tts-kokoro-quality">' +
-          '<label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Quality</label>' +
-          ((data.model === 'kokoro-v1-q4')
-            ? '<div style="font-size:12px;color:#22c55e">&#10003; High quality</div>'
-            : '<div style="font-size:12px;color:var(--fg)">Standard quality'
-              + '<br><button onclick="ttsUpgradeKokoroQuality()" style="margin-top:6px;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--link);font-size:12px;cursor:pointer;font-family:inherit">Upgrade to high quality</button>'
-              + '<span style="color:var(--muted);font-size:11px;margin-left:6px">Free &middot; 305MB download</span></div>'
-          ) +
-          '<input type="hidden" id="tts-kokoro-model" value="' + escapeHtml(data.model || 'kokoro-v1-q8') + '">' +
-        '</div>' +
+        '<input type="hidden" id="tts-provider-select" value="' + escapeHtml(data.provider || 'browser') + '">' +
       '</div>' +
       '<div id="tts-cost-info" style="display:' + (isCloud ? 'block' : 'none') + '">' +
         '<div id="tts-cost-estimate" style="background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin:10px 0;font-size:12px;line-height:1.5">' +
@@ -1348,11 +1405,9 @@ function ttsSettingsProviderChanged() {
   const provider = document.getElementById('tts-provider-select').value;
   const cloudSettings = document.getElementById('tts-cloud-settings');
   const costInfo = document.getElementById('tts-cost-info');
-  const kokoroSettings = document.getElementById('tts-kokoro-settings');
   const isCloud = provider === 'openai' || provider === 'elevenlabs';
   cloudSettings.style.display = isCloud ? 'block' : 'none';
   costInfo.style.display = isCloud ? 'block' : 'none';
-  if (kokoroSettings) kokoroSettings.style.display = provider === 'kokoro' ? 'block' : 'none';
 
   // Reset consent checkbox when changing providers
   const consent = document.getElementById('tts-consent');
@@ -1369,15 +1424,6 @@ function ttsSettingsProviderChanged() {
     var firstVoice = data.voices[provider][0];
     if (voiceHidden) voiceHidden.value = firstVoice ? firstVoice.id : '';
     voiceBtn.firstChild.textContent = firstVoice ? firstVoice.label : 'No voices';
-  }
-
-  // Update kokoro voice picker button
-  var kokoroBtn = document.getElementById('tts-kokoro-voice-btn');
-  var kokoroHidden = document.getElementById('tts-kokoro-voice');
-  if (kokoroBtn && data.voices && data.voices.kokoro) {
-    var firstKokoro = data.voices.kokoro[0];
-    if (kokoroHidden) kokoroHidden.value = firstKokoro ? firstKokoro.id : '';
-    kokoroBtn.firstChild.textContent = firstKokoro ? firstKokoro.label : 'No voices';
   }
 
   // Rebuild model button group
@@ -1398,28 +1444,11 @@ function ttsSettingsProviderChanged() {
   if (costEl) costEl.innerHTML = ttsGetCostHtml(provider, modelHidden ? modelHidden.value : '');
 }
 
-function ttsUpgradeKokoroQuality() {
-  var hidden = document.getElementById('tts-kokoro-model');
-  if (hidden) hidden.value = 'kokoro-v1-q4';
-  var container = document.getElementById('tts-kokoro-quality');
-  if (container) {
-    var label = container.querySelector('label');
-    container.innerHTML = '';
-    if (label) container.appendChild(label);
-    container.insertAdjacentHTML('beforeend',
-      '<div style="font-size:12px;color:#22c55e">&#10003; High quality — will download on next listen</div>'
-      + '<input type="hidden" id="tts-kokoro-model" value="kokoro-v1-q4">');
-  }
-}
-
 function saveTTSSettings() {
   const provider = document.getElementById('tts-provider-select').value;
   const config = { provider };
 
-  if (provider === 'kokoro') {
-    config.voice = document.getElementById('tts-kokoro-voice').value;
-    config.model = document.getElementById('tts-kokoro-model').value;
-  } else if (provider !== 'browser') {
+  if (provider !== 'browser') {
     const consent = document.getElementById('tts-consent');
     if (!consent || !consent.checked) {
       // Briefly highlight the consent checkbox

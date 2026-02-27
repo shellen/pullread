@@ -152,33 +152,52 @@ class PrPlayer extends HTMLElement {
   _initProgressDrag() {
     var wrap = this.querySelector('#audio-progress-wrap');
     if (!wrap) return;
+    var self = this;
 
-    function seekFromEvent(e) {
-      if (!ttsPlaying && ttsCurrentIndex < 0) return;
+    function pctFromEvent(e) {
       var rect = wrap.getBoundingClientRect();
       var clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      var pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-      ttsSeek(pct);
+      return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
     }
 
-    function onMove(e) { seekFromEvent(e); }
+    function visualUpdate(pct) {
+      var fill = wrap.querySelector('.audio-progress-fill');
+      if (fill) fill.style.width = (pct * 100) + '%';
+    }
+
+    var dragPct = 0;
+
+    function onMove(e) {
+      e.preventDefault();
+      dragPct = pctFromEvent(e);
+      visualUpdate(dragPct);
+    }
+
     function onEnd() {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onEnd);
       document.removeEventListener('touchmove', onMove);
       document.removeEventListener('touchend', onEnd);
+      self._dragging = false;
+      ttsSeek(dragPct);
     }
 
     wrap.addEventListener('mousedown', function(e) {
+      if (!ttsPlaying && ttsCurrentIndex < 0) return;
       e.preventDefault();
-      seekFromEvent(e);
+      self._dragging = true;
+      dragPct = pctFromEvent(e);
+      visualUpdate(dragPct);
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onEnd);
     });
 
     wrap.addEventListener('touchstart', function(e) {
+      if (!ttsPlaying && ttsCurrentIndex < 0) return;
       e.preventDefault();
-      seekFromEvent(e);
+      self._dragging = true;
+      dragPct = pctFromEvent(e);
+      visualUpdate(dragPct);
       document.addEventListener('touchmove', onMove, { passive: false });
       document.addEventListener('touchend', onEnd);
     }, { passive: false });

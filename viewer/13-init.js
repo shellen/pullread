@@ -283,13 +283,10 @@ async function init() {
       migrateAnnotationsIfNeeded();
       loadSyncStatus();
 
-      // Preload Kokoro TTS model if it's the selected provider
+      // Load TTS provider setting
       fetch('/api/tts-settings').then(function(r) { return r.ok ? r.json() : null; }).then(function(cfg) {
         if (!cfg) return;
         ttsProvider = cfg.provider || 'browser';
-        if (cfg.provider === 'kokoro') {
-          fetch('/api/kokoro-preload', { method: 'POST' }).catch(function() {});
-        }
       }).catch(function() {});
 
       // Show dashboard instead of auto-loading first article

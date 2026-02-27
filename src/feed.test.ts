@@ -130,6 +130,32 @@ describe('parseFeed - Atom', () => {
     expect(entries[0].contentHtml!.length).toBeGreaterThan(50);
     expect(entries[0].contentHtml!.length).toBeLessThan(200);
   });
+
+  test('extracts contentHtml from CDATA-wrapped Atom content', () => {
+    const feed = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>sippey.com</title>
+  <entry>
+    <title>Noah Kalina interviews Scott Rogowsky</title>
+    <link rel="alternate" type="text/html" href="https://noahkalina.substack.com/p/newsletter-193" />
+    <id>https://sippey.com/links/2026/02/26/noah-kalina.html</id>
+    <updated>2026-02-26T21:28:00-08:00</updated>
+    <content type="html"><![CDATA[
+      <p>Scott Rogowsky was the host of HQ Trivia.</p>
+      <blockquote><p>Long quote from the linked article goes here to make this substantial enough.</p></blockquote>
+      <p>Click through, read the whole thing.</p>
+    ]]></content>
+  </entry>
+</feed>`;
+    const entries = parseFeed(feed);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].url).toBe('https://noahkalina.substack.com/p/newsletter-193');
+    expect(entries[0].domain).toBe('noahkalina.substack.com');
+    expect(entries[0].contentHtml).toBeDefined();
+    expect(entries[0].contentHtml).toContain('Scott Rogowsky');
+    expect(entries[0].contentHtml).toContain('<blockquote>');
+    expect(entries[0].annotation).toContain('Scott Rogowsky');
+  });
 });
 
 describe('parseFeed - RSS', () => {

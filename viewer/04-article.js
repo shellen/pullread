@@ -393,9 +393,14 @@ function renderArticle(text, filename) {
     html += '<a class="pub-identity" href="' + escapeHtml(sourceHref) + '" target="_blank" rel="noopener" title="Visit ' + escapeHtml(meta.domain) + '">';
     html += faviconHtml;
     html += '<div>';
-    if (pubName) html += '<span class="pub-name">' + escapeHtml(pubName) + '</span>';
-    if (pubDomain) html += '<span class="pub-domain">' + escapeHtml(pubDomain) + '</span>';
-    if (!pubName && !pubDomain) html += '<span class="pub-domain">' + escapeHtml(meta.domain) + '</span>';
+    if (pubName && pubDomain) {
+      html += '<span class="pub-name">' + escapeHtml(pubDomain) + '</span>';
+      html += '<span class="pub-domain">via ' + escapeHtml(pubName) + '</span>';
+    } else if (pubName) {
+      html += '<span class="pub-name">' + escapeHtml(pubName) + '</span>';
+    } else {
+      html += '<span class="pub-domain">' + escapeHtml(pubDomain || meta.domain) + '</span>';
+    }
     html += '</div></a>';
     html += '<div class="pub-tags" id="header-tags"></div>';
     html += '</div>';

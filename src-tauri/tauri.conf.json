@@ -4,7 +4,7 @@
   "version": "0.4.0",
   "identifier": "com.pullread.desktop",
   "build": {
-    "beforeBuildCommand": "bun run scripts/bundle-kokoro.ts && bun run scripts/embed-viewer.ts && bash scripts/download-kokoro-model.sh && mkdir -p src-tauri/resources/kokoro-model && cp -R dist/kokoro-model/* src-tauri/resources/kokoro-model/",
+    "beforeBuildCommand": "bun run scripts/embed-viewer.ts",
     "beforeDevCommand": "",
     "frontendDist": "../viewer-dist"
   },
@@ -29,9 +29,7 @@
       "binaries/pullread-cli"
     ],
     "resources": [
-      "resources/kokoro.web.js",
-      "resources/ort-wasm",
-      "resources/kokoro-model"
+      "resources/ort-wasm"
     ],
     "macOS": {
       "minimumSystemVersion": "13.0"

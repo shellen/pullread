@@ -87,14 +87,6 @@ jobs:
       - name: Prepare sidecar
         run: bash scripts/prepare-sidecar.sh ${{ matrix.target }}
 
-      - name: Download Kokoro TTS model
-        run: bash scripts/download-kokoro-model.sh
-
-      - name: Copy Kokoro model to Tauri resources
-        run: |
-          mkdir -p src-tauri/resources/kokoro-model
-          cp -R dist/kokoro-model/* src-tauri/resources/kokoro-model/
-
       - name: Import Apple certificate
         if: startsWith(matrix.platform, 'macos')
         env:
