@@ -10,6 +10,7 @@ let ttsGenerating = false;
 let ttsProgressTimer = null;
 let _ttsChunkSession = null; // { id, totalChunks, currentChunk, elapsedTime }
 var _ttsNextPrefetch = null;  // { filename, sessionId, totalChunks, currentChunk, done }
+var _browserTTSState = null;  // { text, estimatedSeconds, startTime, seekOffset, voice, lang }
 // Migrate old boolean to tri-state; 'off' | 'podcasts' | 'everything'
 var autoplayMode = localStorage.getItem('pr-autoplay-mode') || (localStorage.getItem('pr-podcast-autoplay') === '1' ? 'podcasts' : 'off');
 
@@ -166,8 +167,8 @@ async function addToTTSQueue(filename) {
   }
   ttsQueue.push(item);
   renderAudioPlayer();
-  // Auto-play if this is the first item in the queue
-  if (ttsQueue.length === 1) playTTSItem(0);
+  // Auto-play if nothing is currently playing
+  if (!ttsPlaying && !ttsGenerating) playTTSItem(ttsQueue.length - 1);
 }
 
 function renderAudioPlayer() {
@@ -252,6 +253,7 @@ async function playTTSItem(index) {
   ttsCurrentIndex = index;
   if (index < 0 || index >= ttsQueue.length) return;
 
+  playCueSound();
   const item = ttsQueue[index];
   ttsPlaying = true;
   renderAudioPlayer();
@@ -342,25 +344,50 @@ async function playBrowserTTS(filename) {
   if (!match && sysVoices.length > 0) match = sysVoices[0];
 
   if (match) utterance.voice = match;
-  ttsSynthUtterance = utterance;
 
   // Estimate total duration (browser TTS doesn't give real progress)
   const estimatedWords = plainText.split(/\s+/).length;
-  const estimatedSeconds = estimatedWords / (150 * ttsSpeed); // ~150 wpm base
-  let startTime = Date.now();
+  const estimatedSeconds = estimatedWords / (180 * ttsSpeed); // ~180 wpm base
+
+  _browserTTSState = {
+    text: plainText,
+    estimatedSeconds: estimatedSeconds,
+    startTime: null,
+    seekOffset: 0,
+    voice: match,
+    lang: utterance.lang,
+  };
+
+  _startBrowserUtterance(plainText, 0);
+}
+
+function _startBrowserUtterance(text, seekOffset) {
+  var synth = window.speechSynthesis;
+  var state = _browserTTSState;
+  if (!state) return;
+
+  clearInterval(ttsProgressTimer);
+  synth.cancel();
+
+  var utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = ttsSpeed;
+  utterance.lang = state.lang;
+  if (state.voice) utterance.voice = state.voice;
+  ttsSynthUtterance = utterance;
+  state.seekOffset = seekOffset;
 
   utterance.onstart = function() {
-    playCueSound();
     stopListenLoading();
     ttsPlaying = true;
-    startTime = Date.now();
+    state.startTime = Date.now();
     renderAudioPlayer();
-    document.getElementById('tts-time-total').textContent = formatTime(estimatedSeconds);
-    ttsProgressTimer = setInterval(() => {
-      const elapsed = (Date.now() - startTime) / 1000;
-      const pct = Math.min(100, (elapsed / estimatedSeconds) * 100);
+    document.getElementById('tts-time-total').textContent = formatTime(state.estimatedSeconds);
+    ttsProgressTimer = setInterval(function() {
+      var elapsed = (Date.now() - state.startTime) / 1000;
+      var baseTime = seekOffset * state.estimatedSeconds;
+      var pct = Math.min(100, ((baseTime + elapsed) / state.estimatedSeconds) * 100);
       document.getElementById('tts-progress').style.width = pct + '%';
-      document.getElementById('tts-time-current').textContent = formatTime(elapsed);
+      document.getElementById('tts-time-current').textContent = formatTime(baseTime + elapsed);
     }, 200);
   };
 
@@ -368,10 +395,11 @@ async function playBrowserTTS(filename) {
     clearInterval(ttsProgressTimer);
     ttsPlaying = false;
     ttsSynthUtterance = null;
+    _browserTTSState = null;
     document.getElementById('tts-progress').style.width = '100%';
     renderAudioPlayer();
     if (ttsCurrentIndex + 1 < ttsQueue.length) {
-      setTimeout(() => playTTSItem(ttsCurrentIndex + 1), 500);
+      setTimeout(function() { playTTSItem(ttsCurrentIndex + 1); }, 500);
     } else {
       autoplayNext(ttsQueue[ttsCurrentIndex] ? ttsQueue[ttsCurrentIndex].filename : '');
     }
@@ -381,6 +409,7 @@ async function playBrowserTTS(filename) {
     clearInterval(ttsProgressTimer);
     ttsPlaying = false;
     ttsSynthUtterance = null;
+    _browserTTSState = null;
     renderAudioPlayer();
   };
 
@@ -430,6 +459,7 @@ async function playCloudTTS(filename) {
       currentChunk: 0,
       elapsedTime: 0,
       estimatedTotalDuration: 0,
+      chunkDurations: [],
     };
 
     ttsPlaying = true;
@@ -455,7 +485,6 @@ async function playCloudTTSCached(filename) {
     });
 
     audio.addEventListener('playing', function() {
-      playCueSound();
       stopListenLoading();
       ttsPlaying = true;
       renderAudioPlayer();
@@ -518,11 +547,9 @@ async function playPodcastAudio(item) {
       }
     });
 
-    var _cuePlayed = false;
     audio.addEventListener('playing', function() {
       if (ttsAudio !== audio) return;
       stopListenLoading();
-      if (!_cuePlayed) { _cuePlayed = true; playCueSound(); }
       ttsPlaying = true;
       renderAudioPlayer();
     });
@@ -714,8 +741,15 @@ async function ttsPlayNextChunk(index, seekPct) {
       if (session !== _ttsChunkSession) return;
       var chunkDuration = audio.duration;
 
-      if (index === 0 && !seekPct) {
-        session.estimatedTotalDuration = chunkDuration * session.totalChunks;
+      // Refine total duration estimate using actual chunk durations
+      if (!seekPct) {
+        if (session.chunkDurations.length > 0) {
+          var actualAvg = session.elapsedTime / session.chunkDurations.length;
+          var remaining = session.totalChunks - session.chunkDurations.length;
+          session.estimatedTotalDuration = session.elapsedTime + (actualAvg * remaining);
+        } else {
+          session.estimatedTotalDuration = chunkDuration * session.totalChunks;
+        }
         document.getElementById('tts-time-total').textContent = '~' + formatTime(session.estimatedTotalDuration);
       }
 
@@ -727,7 +761,6 @@ async function ttsPlayNextChunk(index, seekPct) {
 
     audio.addEventListener('playing', function() {
       if (session !== _ttsChunkSession) return;
-      if (index === 0) playCueSound();
       stopListenLoading();
       ttsPlaying = true;
       renderAudioPlayer();
@@ -753,6 +786,7 @@ async function ttsPlayNextChunk(index, seekPct) {
 
     audio.addEventListener('ended', function() {
       if (session !== _ttsChunkSession) return;
+      session.chunkDurations.push(audio.duration || 0);
       session.elapsedTime += audio.duration || 0;
       // Show loading words only if next chunk isn't pre-warmed on the server yet
       var nextReady = _ttsChunkBuffer.get(index + 1) === 'ready';
@@ -792,6 +826,7 @@ function stopTTS() {
   _ttsChunkSession = null;
   _ttsChunkBuffer.clear();
   _ttsNextPrefetch = null;
+  _browserTTSState = null;
   if (ttsAudio) {
     ttsAudio.pause();
     ttsAudio.src = '';
@@ -898,12 +933,19 @@ function skipTime(seconds) {
     seekToChunkPosition(pct);
     return;
   }
+  if (_browserTTSState && _browserTTSState.startTime) {
+    var elapsed = (Date.now() - _browserTTSState.startTime) / 1000;
+    var baseOffset = _browserTTSState.seekOffset || 0;
+    var currentPct = baseOffset + (elapsed / _browserTTSState.estimatedSeconds) * (1 - baseOffset);
+    var deltaPct = seconds / _browserTTSState.estimatedSeconds;
+    ttsSeek(Math.max(0, Math.min(1, currentPct + deltaPct)));
+    return;
+  }
   if (ttsAudio && ttsAudio.duration) {
     var newTime = ttsAudio.currentTime + seconds;
     ttsAudio.currentTime = Math.max(0, Math.min(newTime, ttsAudio.duration));
     return;
   }
-  // Browser TTS doesn't support seeking
 }
 
 function seekToChunkPosition(pct) {
@@ -916,9 +958,12 @@ function seekToChunkPosition(pct) {
   if (targetChunk >= session.totalChunks) targetChunk = session.totalChunks - 1;
   var seekPct = targetChunkFloat - targetChunk;
 
-  // Estimate elapsed time up to target chunk
-  var avgChunkDuration = session.estimatedTotalDuration / session.totalChunks;
-  session.elapsedTime = targetChunk * avgChunkDuration;
+  // Estimate elapsed time up to target chunk using actual durations where available
+  var elapsed = 0;
+  for (var i = 0; i < targetChunk; i++) {
+    elapsed += session.chunkDurations[i] || (session.estimatedTotalDuration / session.totalChunks);
+  }
+  session.elapsedTime = elapsed;
 
   // Stop current audio and play from target chunk
   if (ttsAudio) {
@@ -934,10 +979,18 @@ function ttsSeek(pct) {
     seekToChunkPosition(pct);
     return;
   }
+  if (_browserTTSState) {
+    var text = _browserTTSState.text;
+    var charOffset = Math.floor(pct * text.length);
+    // Snap to nearest word boundary
+    while (charOffset > 0 && text[charOffset] !== ' ') charOffset--;
+    if (charOffset > 0) charOffset++; // skip past the space
+    _startBrowserUtterance(text.slice(charOffset), pct);
+    return;
+  }
   if (ttsAudio && ttsAudio.duration) {
     ttsAudio.currentTime = pct * ttsAudio.duration;
   }
-  // Browser TTS doesn't support seeking
 }
 
 function ttsToggleSpeedSlider() {

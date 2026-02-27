@@ -530,6 +530,23 @@ function navigateArticle(direction) {
   let next;
   if (direction > 0) {
     next = cidx < displayFiles.length - 1 ? cidx + 1 : 0;
+
+    // When all items from the current source are read, advance to next source's first unread
+    var currentSource = displayFiles[cidx] && (displayFiles[cidx].domain || displayFiles[cidx].feed);
+    if (currentSource) {
+      var hasUnreadInSource = displayFiles.some(function(f) {
+        return (f.domain || f.feed) === currentSource && !readArticles.has(f.filename);
+      });
+      if (!hasUnreadInSource) {
+        for (var si = cidx + 1; si < displayFiles.length; si++) {
+          var f = displayFiles[si];
+          if ((f.domain || f.feed) !== currentSource && !readArticles.has(f.filename)) {
+            next = si;
+            break;
+          }
+        }
+      }
+    }
   } else {
     next = cidx > 0 ? cidx - 1 : displayFiles.length - 1;
   }
