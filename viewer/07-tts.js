@@ -6,6 +6,7 @@ let ttsSynthUtterance = null; // SpeechSynthesisUtterance for browser TTS
 let ttsPlaying = false;
 let ttsSpeed = 1.0;
 let ttsProvider = 'browser';
+var ttsVoiceLabel = '';
 let ttsGenerating = false;
 let ttsProgressTimer = null;
 let _ttsChunkSession = null; // { id, totalChunks, currentChunk, elapsedTime }
@@ -139,7 +140,7 @@ function playNextFromArticle(filename) {
     renderAudioPlayer();
     return;
   }
-  var newItem = { filename: filename, title: file.title, image: file.image || '', domain: file.domain || '' };
+  var newItem = { filename: filename, title: file.title, image: file.image || '', domain: file.domain || '', feed: file.feed || '' };
   if (file.enclosureUrl && file.enclosureType && file.enclosureType.startsWith('audio/')) {
     newItem.enclosureUrl = file.enclosureUrl;
   }
@@ -172,7 +173,7 @@ async function addToTTSQueue(filename) {
     } catch {}
   }
 
-  var item = { filename, title: file.title, image: file.image || '', domain: file.domain || '' };
+  var item = { filename, title: file.title, image: file.image || '', domain: file.domain || '', feed: file.feed || '' };
   if (file.enclosureUrl && file.enclosureType && file.enclosureType.startsWith('audio/')) {
     item.enclosureUrl = file.enclosureUrl;
   }
@@ -294,8 +295,25 @@ async function loadTTSSettings() {
     if (res.ok) {
       const data = await res.json();
       ttsProvider = data.provider || 'browser';
+      ttsVoiceLabel = '';
+      if (data.voice && data.voices && data.voices[data.provider]) {
+        var v = data.voices[data.provider];
+        for (var i = 0; i < v.length; i++) {
+          if (v[i].id === data.voice) { ttsVoiceLabel = v[i].label; break; }
+        }
+      }
     }
   } catch { ttsProvider = 'browser'; }
+}
+
+function ttsCurrentVoiceInfo() {
+  if (ttsProvider === 'browser') {
+    var name = (_browserTTSState && _browserTTSState.voice)
+      ? _browserTTSState.voice.name : (localStorage.getItem('pr-tts-browser-voice') || 'Default');
+    return { provider: 'Browser', voice: name };
+  }
+  var labels = { openai: 'OpenAI', elevenlabs: 'ElevenLabs', kokoro: 'Kokoro' };
+  return { provider: labels[ttsProvider] || ttsProvider, voice: ttsVoiceLabel || 'Default' };
 }
 
 async function playBrowserTTS(filename, domain) {
