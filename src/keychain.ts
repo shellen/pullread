@@ -21,6 +21,21 @@ export function saveToKeychain(account: string, value: string): boolean {
   }
 }
 
+/** Delete a value from macOS Keychain. Returns true on success. */
+export function deleteFromKeychain(account: string): boolean {
+  if (process.platform !== 'darwin') return false;
+  try {
+    execFileSync('security', [
+      'delete-generic-password',
+      '-s', SERVICE,
+      '-a', account,
+    ], { stdio: ['pipe', 'pipe', 'pipe'] });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Load a value from macOS Keychain. Returns null if not found. */
 export function loadFromKeychain(account: string): string | null {
   if (process.platform !== 'darwin') return null;

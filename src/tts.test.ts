@@ -1,7 +1,7 @@
 // ABOUTME: Tests for TTS module utilities
 // ABOUTME: Validates markdown stripping for TTS input
 
-jest.mock('./keychain', () => ({ saveToKeychain: jest.fn(), loadFromKeychain: jest.fn() }));
+jest.mock('./keychain', () => ({ saveToKeychain: jest.fn(), loadFromKeychain: jest.fn(), deleteFromKeychain: jest.fn() }));
 
 import { stripMarkdown } from './tts';
 

@@ -14,6 +14,7 @@ import { APP_ICON } from './app-icon';
 import { fetchAndExtract } from './extractor';
 import { generateMarkdown, writeArticle, ArticleData, downloadFavicon, resolveFilePath, listMarkdownFiles, listEpubFiles, migrateToDateFolders, exportNotebook, removeExportedNotebook } from './writer';
 import { loadTTSConfig, saveTTSConfig, generateSpeech, getAudioContentType, getCachedAudioPath, createTtsSession, generateSessionChunk, TTS_VOICES, TTS_MODELS } from './tts';
+import { deleteFromKeychain } from './keychain';
 import { listSiteLogins, removeSiteLogin, saveSiteLoginCookies } from './cookies';
 
 interface FileMeta {
@@ -1318,6 +1319,14 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
                 if (!validSet.has(p)) continue; // skip unknown providers
                 const key = p as import('./summarizer').Provider;
                 const existing = current.providers[key] || {};
+                if (config.deleteKey) {
+                  deleteFromKeychain(`llm-${p}`);
+                  newSettings.providers[key] = {
+                    apiKey: '',
+                    model: config.model || existing.model || getDefaultModel(p)
+                  };
+                  continue;
+                }
                 newSettings.providers[key] = {
                   // Only update apiKey if a non-empty value was sent
                   apiKey: config.apiKey || existing.apiKey || '',
@@ -1765,6 +1774,11 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
             const existing = loadTTSConfig();
             if (existing.apiKey) body.apiKey = existing.apiKey;
             delete body.preserveKey;
+          }
+          if (body.deleteKey) {
+            deleteFromKeychain('tts-api-key');
+            delete body.apiKey;
+            delete body.deleteKey;
           }
           saveTTSConfig(body);
           sendJson(res, { ok: true });
