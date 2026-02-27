@@ -109,6 +109,22 @@ function renderHub() {
     forYouHtml += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
   }
 
+  // Your Topics — top machine tags by frequency
+  var topTopics = data.sortedTags.filter(function(t) { return !blockedTags.has(t[0]); }).slice(0, 15);
+  if (topTopics.length > 0) {
+    forYouHtml += '<div class="dash-section">';
+    forYouHtml += '<div class="dash-section-header">';
+    forYouHtml += '<span class="dash-section-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-tag"/></svg> Your Topics</span>';
+    forYouHtml += '</div>';
+    forYouHtml += '<div class="your-topics">';
+    for (var ti = 0; ti < topTopics.length; ti++) {
+      var tagName = topTopics[ti][0];
+      var tagCount = topTopics[ti][1];
+      forYouHtml += '<button class="tag-pill" onclick="document.getElementById(\'search\').value=\'tag:\\x22' + escapeJsStr(tagName) + '\\x22\';filterFiles()">' + escapeHtml(tagName) + ' <span class="tag-count">' + tagCount + '</span></button>';
+    }
+    forYouHtml += '</div></div>';
+  }
+
   // Quick actions at bottom of For You
   forYouHtml += '<div class="dash-actions">';
   forYouHtml += '<button onclick="dashGenerateReview(1)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Daily Review</button>';
@@ -620,8 +636,13 @@ function renderArticle(text, filename) {
     html += '</div>';
   }
 
+  html += '<div id="related-reading"></div>';
+
   content.innerHTML = html;
   document.title = (meta && meta.title) || filename || 'PullRead';
+
+  // Populate related reading asynchronously
+  populateRelatedReading(filename);
 
   // Hide broken images instead of showing broken-image icons
   content.querySelectorAll('.content-wrap img, .article-hero img').forEach(function(img) {
@@ -837,6 +858,33 @@ document.getElementById('content-scroll').addEventListener('scroll', function() 
   updateTocActive();
   saveScrollPosition();
 });
+
+// ---- Related Reading ----
+function populateRelatedReading(filename) {
+  var container = document.getElementById('related-reading');
+  if (!container) return;
+  var results = findRelatedArticles(filename, 5);
+  if (results.length === 0) { container.style.display = 'none'; return; }
+
+  var html = '<div class="related-reading">';
+  html += '<h3 class="related-heading">Related Reading</h3>';
+  html += '<div class="related-cards">';
+  for (var i = 0; i < results.length; i++) {
+    var r = results[i];
+    var file = allFiles.find(function(f) { return f.filename === r.filename; });
+    if (!file) continue;
+    html += '<a href="#" class="related-card" onclick="event.preventDefault();jumpToArticle(\'' + escapeJsStr(r.filename) + '\')">';
+    html += '<span class="related-card-title">' + escapeHtml(file.title || r.filename) + '</span>';
+    if (file.domain) html += '<span class="related-card-domain">' + escapeHtml(file.domain) + '</span>';
+    html += '<span class="related-card-tags">';
+    for (var j = 0; j < r.sharedTags.length; j++) {
+      html += '<span class="tag-pill tag-pill-sm">' + escapeHtml(r.sharedTags[j]) + '</span>';
+    }
+    html += '</span></a>';
+  }
+  html += '</div></div>';
+  container.innerHTML = html;
+}
 
 // ---- Read Time & Word Count ----
 function calculateReadStats(text) {
