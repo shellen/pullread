@@ -447,6 +447,8 @@ async function loadFile(index) {
   _sidebarView = 'home'; syncSidebarTabs();
   var prevActive = activeFile;
   activeFile = file.filename;
+  _activeDrawerSource = file.feed || null;
+  updateDrawerActiveState();
   if (_markAsReadDelayTimer) { console.debug('[PR] loadFile clearing markAsRead timer (switching to', file.filename + ')'); clearTimeout(_markAsReadDelayTimer); }
   var fileToMark = file.filename;
   _markAsReadDelayTimer = setTimeout(function() {

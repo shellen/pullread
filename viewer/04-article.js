@@ -359,6 +359,8 @@ function goHome() {
   if (_markAsReadDelayTimer) { console.debug('[PR] goHome clearing markAsRead timer'); clearTimeout(_markAsReadDelayTimer); _markAsReadDelayTimer = null; }
   _sidebarView = 'home'; syncSidebarTabs();
   activeFile = null;
+  _activeDrawerSource = null;
+  updateDrawerActiveState();
   document.title = 'PullRead';
   renderFileList();
   var toc = document.getElementById('toc-container');

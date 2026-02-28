@@ -284,3 +284,44 @@ test.describe('Sharing', () => {
     expect(onclick).not.toContain('sms:&body=');
   });
 });
+
+test.describe('Source highlighting', () => {
+  test('clicking article highlights matching source in drawer', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.file-item');
+
+    // Click the "Test Article One" item (from "Test Feed")
+    const articleItem = page.locator('.file-item', { hasText: 'Test Article One' });
+    await articleItem.click();
+    await page.waitForSelector('#content', { state: 'visible' });
+
+    // Open the Sources drawer
+    await page.click('.sidebar-nav-item[data-nav="sources"]');
+    await page.waitForSelector('#drawer-content .drawer-item');
+
+    // The drawer item for "Test Feed" should have .active class
+    const activeItem = page.locator('#drawer-content .drawer-item.active');
+    await expect(activeItem).toBeVisible();
+    const sourceName = await activeItem.getAttribute('data-source');
+    expect(sourceName).toBe('Test Feed');
+  });
+
+  test('going home clears source highlight in drawer', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.file-item');
+
+    // Click an article
+    await page.click('.file-item');
+    await page.waitForSelector('#content', { state: 'visible' });
+
+    // Go home
+    await page.click('.sidebar-tab[data-tab="home"]');
+    await page.waitForSelector('#dashboard');
+
+    // Open drawer — no item should be active
+    await page.click('.sidebar-nav-item[data-nav="sources"]');
+    await page.waitForSelector('#drawer-content .drawer-item');
+    const activeItems = await page.locator('#drawer-content .drawer-item.active').count();
+    expect(activeItems).toBe(0);
+  });
+});
