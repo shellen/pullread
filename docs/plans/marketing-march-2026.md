@@ -58,7 +58,7 @@
 
 | Feature | What it does | Benefit |
 |---------|-------------|---------|
-| **Multi-provider AI summaries** | Summarize with Claude, GPT, Gemini, Apple Intelligence, or OpenRouter | Choose your preferred model — or compare them |
+| **Multi-provider AI summaries** | Summarize with Claude, GPT, Gemini, Apple Intelligence (on-device), or OpenRouter | Choose your preferred model — or compare them. Apple Intelligence runs entirely on your Mac: private, free, zero-latency. |
 | **Summary provenance** | Every summary tagged with provider + model badge | You always know what generated the summary |
 | **Chunked summarization** | Long articles split intelligently for cloud providers | Even 10,000-word essays get reliable summaries |
 | **Auto-tagging** | LLM extracts entities and topics as machine tags | Discover connections you didn't know existed |
@@ -84,6 +84,7 @@
 | **Tag cloud & connections** | Ontological clusters of articles sharing machine tags | See how your reading connects across sources |
 | **Source browser** | Domain groupings with article counts, favicon, search/filter | Understand your reading diet at a glance |
 | **Knowledge graph** (planned) | Force-directed visualization of article-tag relationships; entity extraction with typed entities | Visual map of everything you know |
+| **Trust scores** (planned) | AI-powered source reliability signals, cross-referencing claims across your archive, bias detection, and provenance tracking | Read critically — know when to trust, when to dig deeper, and when a source has a track record of accuracy |
 
 ### Platform & Data Ownership
 
@@ -106,7 +107,7 @@
 
 | Product | Positioning | PullRead's Advantage |
 |---------|------------|---------------------|
-| **Readwise Reader** | Cloud-first read-later + highlights, $8/mo subscription | PullRead is local-first, free, no subscription, no vendor lock-in. Your data is plain Markdown, not trapped in a database. |
+| **Readwise Reader** | Cloud-first read-later + highlights, $8/mo subscription | PullRead is local-first, free, no subscription, no vendor lock-in. Your data is plain Markdown, not trapped in a database. On-device AI via Apple Intelligence means summaries never leave your machine. |
 | **Pocket** (shut down) | Mass-market read-later, shut down by Mozilla in 2025 | Another read-later graveyard. PullRead's local-first Markdown model means your archive can't be shut down. Pocket refugees need a new home. |
 | **Instapaper** | Classic read-later, simple and clean | PullRead uses Instapaper as an input source and adds summarization, tagging, knowledge connections, and permanent local storage. |
 | **Omnivore** (shut down) | Open-source read-later, acquired by ElevenLabs | PullRead fills the gap Omnivore left — local-first, open source, with the same read-later-plus-highlights model. Many Omnivore refugees need a new home. |
@@ -129,9 +130,11 @@
 Pocket and Omnivore both shut down, proving that cloud-only read-later services are a single point of failure. No other remaining tool combines all of:
 1. **Local-first Markdown** — your data is files, not rows in someone else's database (or a database that gets shut down)
 2. **Multi-source ingestion** — RSS, bookmarks, podcasts, YouTube, EPUBs, tweets
-3. **AI across providers** — summarize with Claude, GPT, Gemini, or Apple Intelligence
+3. **AI across providers** — summarize with Claude, GPT, Gemini, or Apple Intelligence on-device
 4. **Annotations that travel** — highlights and notes stored as portable sidecars
 5. **Knowledge connections** — auto-tagging, topic clusters, related reading, knowledge graph
+6. **Trust signals** (coming) — source reliability scoring, claim cross-referencing, and bias detection to help readers think critically
+7. **On-device AI via Apple Intelligence** — private summarization and tagging that never leaves your Mac, leveraging Apple's resident models
 
 ---
 
@@ -144,9 +147,10 @@ Position PullRead as **the trusted place to gain insights on what you read, lear
 ### Narrative Pillars
 
 1. **Own Your Reading** — Local-first, plain Markdown, no subscription, no lock-in. Your reading archive outlives any company.
-2. **Read Smarter** — AI summaries, auto-tagging, and knowledge connections turn passive reading into active learning.
-3. **One Archive, Every Source** — Articles, podcasts, videos, books, tweets — all searchable, all connected, all yours.
-4. **Integrate, Don't Replace** — Works with Obsidian, Logseq, Dropbox, iCloud. PullRead is the input layer, not another silo.
+2. **Read Intentionally** — No algorithmic feed. No engagement tricks. You choose what deserves your attention — PullRead helps you go deep on it instead of skimming past it.
+3. **Read Smarter** — AI summaries, auto-tagging, trust signals, and knowledge connections turn passive reading into active learning.
+4. **One Archive, Every Source** — Articles, podcasts, videos, books, tweets — all searchable, all connected, all yours.
+5. **Integrate, Don't Replace** — Works with Obsidian, Logseq, Dropbox, iCloud. PullRead is the input layer, not another silo.
 
 ### Target Audiences
 
@@ -156,6 +160,8 @@ Position PullRead as **the trusted place to gain insights on what you read, lear
 | **RSS enthusiasts** | Power users who still believe in RSS, fed up with algorithmic feeds | "RSS + extraction + AI summaries + permanent Markdown archive. The reader Google Reader should have become." |
 | **Pocket & Omnivore refugees** | Users displaced by Pocket and Omnivore shutdowns | "Local-first, open source, highlights + notes. Your reading archive can't be shut down when it's plain files on your machine." |
 | **Writers & researchers** | Journalists, academics, analysts who read heavily for work | "Highlight, annotate, and synthesize across hundreds of sources. Export your research as clean Markdown." |
+| **Feed-fatigued readers** | People burned out on algorithmic feeds (Twitter/X, Facebook, Reddit trending, Apple News) who want to read with intention | "Stop scrolling, start reading. PullRead has no algorithm, no engagement metrics, no infinite feed. You pick what matters — AI helps you go deep on it." |
+| **News-skeptical readers** | Readers who want to trust but verify, concerned about misinformation and source quality | "Coming soon: trust scores that surface source reliability, cross-reference claims, and flag bias — so you can read critically, not just passively." |
 | **Privacy-conscious readers** | Users who don't want their reading habits in the cloud | "All data stays on your machine. No account required. No tracking. No cloud dependency." |
 
 ### Channel Strategy
@@ -191,6 +197,9 @@ Position PullRead as **the trusted place to gain insights on what you read, lear
 | "AI Summaries Compared: Claude vs GPT vs Gemini on 100 Articles" | Data blog post | SEO + demonstrates multi-provider value |
 | "How I Read 500 Articles a Month Without Losing Track" | Personal workflow post | Relatable story for power readers |
 | "The Case for Owning Your Reading Data" | Opinion/manifesto | Brand philosophy, shareable |
+| "Your Feed is Not Your Friend: Intentional Reading in 2026" | Opinion piece | Tap into feed fatigue; position PullRead as the antidote to algorithmic scrolling |
+| "Trust Scores: How AI Can Help You Read the News Critically" | Vision post | Announce the trust scores roadmap; establish PullRead as forward-thinking on misinformation |
+| "Why On-Device AI Changes Everything for Reading Apps" | Technical blog | Highlight Apple Intelligence advantage — private, fast, no API costs |
 
 ### Launch Moments (March 2026)
 
@@ -214,7 +223,7 @@ Position PullRead as **the trusted place to gain insights on what you read, lear
 
 ### Positioning Statement
 
-> **PullRead is the reading layer for people who think for a living.** It pulls articles, podcasts, videos, and books from everywhere you read, saves them as permanent Markdown files, and helps you highlight, summarize, and connect ideas — all locally, all yours. No subscription. No lock-in. No cloud dependency. Just your reading, turned into knowledge.
+> **PullRead is the reading layer for people who think for a living.** It pulls articles, podcasts, videos, and books from everywhere you read, saves them as permanent Markdown files, and helps you highlight, summarize, and connect ideas — all locally, all yours. No algorithmic feed deciding what you see. No subscription. No lock-in. On-device AI that never sends your reading data anywhere. Trust signals that help you read critically. Just your reading, turned into knowledge.
 
 ---
 
@@ -222,8 +231,10 @@ Position PullRead as **the trusted place to gain insights on what you read, lear
 
 1. **Free and open source** — no $8/month subscription like Readwise Reader
 2. **Local-first Markdown** — not a proprietary database; your files work everywhere
-3. **Multi-provider AI** — choose between 5 AI providers, not locked to one
-4. **Reading + knowledge** — not just save-and-forget; highlights, notes, connections, and synthesis
-5. **No account required** — install and use; no sign-up, no tracking, no cloud
-6. **Obsidian-native** — output works as a vault; annotations as portable sidecars
-7. **Pocket & Omnivore successor** — fills the gap left by both shutdowns with a local-first model that can't be acquired or discontinued
+3. **Multi-provider AI + on-device** — choose between 5 AI providers; Apple Intelligence runs entirely on your Mac with zero cost, zero latency, and total privacy
+4. **Intentional reading, not algorithmic feeds** — no engagement tricks, no infinite scroll, no recommendation algorithm deciding what you see
+5. **Reading + knowledge** — not just save-and-forget; highlights, notes, connections, and synthesis
+6. **Trust scores** (coming) — source reliability, claim cross-referencing, and bias detection so you can read the news critically
+7. **No account required** — install and use; no sign-up, no tracking, no cloud
+8. **Obsidian-native** — output works as a vault; annotations as portable sidecars
+9. **Pocket & Omnivore successor** — fills the gap left by both shutdowns with a local-first model that can't be acquired or discontinued
