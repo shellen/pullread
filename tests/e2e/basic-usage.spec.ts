@@ -180,8 +180,8 @@ test.describe('Sharing', () => {
     await page.goto('/');
     await page.waitForSelector('.file-item');
 
-    // Load an article
-    await page.click('.file-item');
+    // Load a real article (not a review, which has no URL/share button)
+    await page.locator('.file-item', { hasText: 'Test Article One' }).click();
     await page.waitForSelector('#content', { state: 'visible' });
 
     // Click the Share button in the toolbar
@@ -210,8 +210,8 @@ test.describe('Sharing', () => {
     await page.goto('/');
     await page.waitForSelector('.file-item');
 
-    // Load an article
-    await page.click('.file-item');
+    // Load a real article (not a review, which has no URL/share button)
+    await page.locator('.file-item', { hasText: 'Test Article One' }).click();
     await page.waitForSelector('#content', { state: 'visible' });
 
     // Open share dropdown and click Copy Link
@@ -267,8 +267,8 @@ test.describe('Sharing', () => {
     await page.goto('/');
     await page.waitForSelector('.file-item');
 
-    // Load an article
-    await page.click('.file-item');
+    // Load a real article (not a review, which has no URL/share button)
+    await page.locator('.file-item', { hasText: 'Test Article One' }).click();
     await page.waitForSelector('#content', { state: 'visible' });
 
     // Open share dropdown
