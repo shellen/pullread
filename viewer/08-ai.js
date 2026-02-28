@@ -57,7 +57,7 @@ async function reprocessCurrentArticle(btn) {
     var res = await fetch('/api/reprocess', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: activeFile })
+      body: JSON.stringify({ name: activeFile, force: true })
     });
     var data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Reprocess failed');
@@ -86,7 +86,7 @@ async function reprocessFromMenu() {
     var res = await fetch('/api/reprocess', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: activeFile })
+      body: JSON.stringify({ name: activeFile, force: true })
     });
     var data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Reprocess failed');

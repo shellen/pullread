@@ -255,7 +255,7 @@ function parseRssFeed(rss: any): FeedEntry[] {
     let contentHtml: string | undefined;
     if (contentEncodedStr.trim().length > 50) {
       contentHtml = contentEncodedStr.trim();
-    } else if (rawDescription.length > 50 && /<(p|div|h[1-6]|article|blockquote|ul|ol|figure)\b/i.test(rawDescription)) {
+    } else if (rawDescription.length > 50) {
       contentHtml = rawDescription;
     }
 

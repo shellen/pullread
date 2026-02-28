@@ -1335,7 +1335,7 @@ describe('parseFeed - RSS description as contentHtml fallback', () => {
     expect(entries[0].contentHtml).not.toContain('HTML description');
   });
 
-  test('does not use description without HTML tags as contentHtml even if long', () => {
+  test('uses long plain-text description as contentHtml (link blog commentary)', () => {
     const longPlainText = 'This is a long plain text description without any HTML tags. '.repeat(5);
     const feed = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
@@ -1350,7 +1350,8 @@ describe('parseFeed - RSS description as contentHtml fallback', () => {
   </channel>
 </rss>`;
     const entries = parseFeed(feed);
-    expect(entries[0].contentHtml).toBeUndefined();
+    expect(entries[0].contentHtml).toBeDefined();
+    expect(entries[0].contentHtml).toContain('long plain text description');
     expect(entries[0].annotation).toBeDefined();
   });
 });
