@@ -1224,8 +1224,8 @@
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
-    width: 32px;
-    height: 32px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     border: 1px solid var(--border);
     background: var(--bg);
@@ -1239,12 +1239,12 @@
     transition: opacity 0.15s, color 0.15s;
     opacity: 0;
     pointer-events: none;
-    font-size: 14px;
+    font-size: 18px;
   }
-  .dash-cards-wrap:hover .dash-chevron.visible { opacity: 1; pointer-events: auto; }
+  .dash-chevron.visible { opacity: 1; pointer-events: auto; }
   .dash-chevron:hover { color: var(--fg); }
-  .dash-chevron.left { left: -12px; }
-  .dash-chevron.right { right: -12px; }
+  .dash-chevron.left { left: -18px; }
+  .dash-chevron.right { right: -18px; }
   .dash-card {
     flex: 0 0 280px;
     scroll-snap-align: start;
@@ -3449,10 +3449,10 @@
   .yt-embed { position: relative; width: 100%; padding-bottom: 56.25%; height: 0; overflow: hidden; margin: 1em 0; border-radius: 8px; }
   .yt-embed iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; border-radius: 8px; }
 
-  /* xkcd comic strip */
-  .xkcd-comic { text-align: center; margin: 1.5em 0; }
-  .xkcd-comic img { max-width: 100%; height: auto; border-radius: 4px; }
-  .xkcd-caption { margin-top: 12px; padding: 12px 16px; font-size: 14px; color: var(--muted); font-style: italic; background: var(--code-bg); border-radius: 6px; line-height: 1.5; }
+  /* Feed-sourced image content */
+  .feed-image { text-align: center; margin: 1.5em 0; }
+  .feed-image img { max-width: 100%; height: auto; border-radius: 4px; }
+  .feed-image-caption { margin-top: 12px; padding: 12px 16px; font-size: 14px; color: var(--muted); font-style: italic; background: var(--code-bg); border-radius: 6px; line-height: 1.5; }
 
   /* Direct video embed */
   .video-embed { margin: 1em 0; }

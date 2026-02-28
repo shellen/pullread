@@ -123,6 +123,7 @@ url: https://xkcd.com/927/
 bookmarked: 2026-02-27T04:00:00Z
 domain: xkcd.com
 feed: xkcd
+source: feed
 ---
 
 # Standards
@@ -130,6 +131,22 @@ feed: xkcd
 ![Standards](https://imgs.xkcd.com/comics/standards.png "Fortunately, the charging one has been solved now that we've all standardized on mini-USB. Or is it micro-USB? Shit.")
 
 Permanent link to this comic: https://xkcd.com/927/
+`,
+  },
+  {
+    filename: '2026-02-27-test-feed-image.md',
+    content: `---
+title: "Saturn Photo of the Day"
+url: https://apod.example.com/2026/02/27
+bookmarked: 2026-02-27T05:00:00Z
+domain: apod.example.com
+feed: Astronomy Picture of the Day
+source: feed
+---
+
+# Saturn Photo of the Day
+
+![Saturn rings](https://apod.example.com/images/saturn.jpg "The rings of Saturn as seen from Cassini")
 `,
   },
 ];

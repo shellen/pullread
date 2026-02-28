@@ -326,8 +326,8 @@ test.describe('Source highlighting', () => {
   });
 });
 
-test.describe('xkcd rendering', () => {
-  test('xkcd article shows comic image with caption', async ({ page }) => {
+test.describe('Feed image rendering', () => {
+  test('xkcd article shows feed image with caption', async ({ page }) => {
     await page.goto('/');
     await page.waitForSelector('.file-item');
 
@@ -336,17 +336,73 @@ test.describe('xkcd rendering', () => {
     await xkcdItem.click();
     await page.waitForSelector('#content', { state: 'visible' });
 
-    // Comic container should render
-    const comic = page.locator('.xkcd-comic');
-    await expect(comic).toBeVisible();
+    // Feed image container should render
+    const feedImage = page.locator('.feed-image');
+    await expect(feedImage).toBeVisible();
 
     // Image should have the correct src
-    const img = comic.locator('img');
+    const img = feedImage.locator('img');
     await expect(img).toHaveAttribute('src', 'https://imgs.xkcd.com/comics/standards.png');
 
     // Caption should show the hover text
-    const caption = page.locator('.xkcd-caption');
+    const caption = page.locator('.feed-image-caption');
     await expect(caption).toBeVisible();
     await expect(caption).toContainText('mini-USB');
+  });
+
+  test('generic feed image renders without xkcd-specific logic', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.file-item');
+
+    // Click the astronomy feed-image fixture
+    const apodItem = page.locator('.file-item', { hasText: 'Saturn Photo' });
+    await apodItem.click();
+    await page.waitForSelector('#content', { state: 'visible' });
+
+    // Feed image container should render
+    const feedImage = page.locator('.feed-image');
+    await expect(feedImage).toBeVisible();
+
+    const img = feedImage.locator('img');
+    await expect(img).toHaveAttribute('src', 'https://apod.example.com/images/saturn.jpg');
+
+    const caption = page.locator('.feed-image-caption');
+    await expect(caption).toBeVisible();
+    await expect(caption).toContainText('rings of Saturn');
+  });
+});
+
+test.describe('Dashboard chevron accessibility', () => {
+  test('chevron buttons meet WCAG 2.5.5 touch target size', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.dash-chevron');
+
+    // Check that chevron dimensions are at least 44x44px
+    const size = await page.evaluate(() => {
+      const chevron = document.querySelector('.dash-chevron');
+      if (!chevron) return null;
+      const rect = chevron.getBoundingClientRect();
+      return { width: rect.width, height: rect.height };
+    });
+    expect(size).not.toBeNull();
+    expect(size!.width).toBeGreaterThanOrEqual(44);
+    expect(size!.height).toBeGreaterThanOrEqual(44);
+  });
+
+  test('visible chevrons show without hover', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.dash-chevron');
+
+    // Add .visible class to a chevron (simulating scrollable content)
+    await page.evaluate(() => {
+      const chevron = document.querySelector('.dash-chevron');
+      if (chevron) chevron.classList.add('visible');
+    });
+
+    // Wait for the CSS opacity transition to complete (0.15s)
+    await page.waitForFunction(() => {
+      const chevron = document.querySelector('.dash-chevron.visible');
+      return chevron ? getComputedStyle(chevron).opacity === '1' : false;
+    }, { timeout: 3000 });
   });
 });

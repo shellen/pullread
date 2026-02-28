@@ -156,6 +156,43 @@ describe('parseFeed - Atom', () => {
     expect(entries[0].contentHtml).toContain('<blockquote>');
     expect(entries[0].annotation).toContain('Scott Rogowsky');
   });
+
+  test('falls back to summary when content is absent', () => {
+    const feed = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>xkcd</title>
+  <entry>
+    <title>Standards</title>
+    <link href="https://xkcd.com/927/" rel="alternate"/>
+    <id>https://xkcd.com/927/</id>
+    <updated>2024-08-01T00:00:00Z</updated>
+    <summary type="html">&lt;img src="https://imgs.xkcd.com/comics/standards.png" title="Hover text" alt="Standards" /&gt;</summary>
+  </entry>
+</feed>`;
+    const entries = parseFeed(feed);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].contentHtml).toBeDefined();
+    expect(entries[0].contentHtml).toContain('imgs.xkcd.com');
+  });
+
+  test('prefers content over summary when both present', () => {
+    const feed = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Test Feed</title>
+  <entry>
+    <title>Both Fields</title>
+    <link href="https://example.com/both"/>
+    <id>urn:uuid:both-1</id>
+    <updated>2024-08-01T00:00:00Z</updated>
+    <content type="html">&lt;p&gt;This is the full content from the content element which should always win.&lt;/p&gt;</content>
+    <summary type="html">&lt;p&gt;This is just the summary.&lt;/p&gt;</summary>
+  </entry>
+</feed>`;
+    const entries = parseFeed(feed);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].contentHtml).toContain('full content from the content element');
+    expect(entries[0].contentHtml).not.toContain('just the summary');
+  });
 });
 
 describe('parseFeed - RSS', () => {

@@ -181,8 +181,12 @@ function parseAtomFeed(feed: any): FeedEntry[] {
 
     let annotation: string | undefined;
     let contentHtml: string | undefined;
-    const rawHtml = typeof entry.content === 'string' ? entry.content.trim()
+    let rawHtml = typeof entry.content === 'string' ? entry.content.trim()
       : entry.content?.['__cdata']?.trim() || entry.content?.['#text']?.trim() || undefined;
+    if (!rawHtml) {
+      rawHtml = typeof entry.summary === 'string' ? entry.summary.trim()
+        : entry.summary?.['__cdata']?.trim() || entry.summary?.['#text']?.trim() || undefined;
+    }
     if (rawHtml) {
       annotation = extractTextFromHtml(rawHtml);
       if (rawHtml.length > 50) contentHtml = rawHtml;

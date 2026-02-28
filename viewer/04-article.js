@@ -499,8 +499,9 @@ function renderArticle(text, filename) {
     // Determine publication name from feed
     if (meta.feed) {
       pubName = meta.feed;
-      // If pub name IS the domain exactly, show only once as the name
-      if (pubName.toLowerCase() === meta.domain.toLowerCase()) {
+      // If feed name matches the domain, this is an original post — show feed name only.
+      // When they differ, the article is linked from elsewhere — "via" is appropriate.
+      if (feedMatchesDomain(pubName, meta.domain)) {
         pubDomain = '';
       }
     }
@@ -631,17 +632,23 @@ function renderArticle(text, filename) {
     }
   }
 
-  // xkcd comic: display image prominently with hover-text caption
-  var isXkcd = meta && meta.domain && /xkcd\.com/.test(meta.domain);
-  if (isXkcd && body) {
-    var comicMatch = body.match(/!\[([^\]]*)\]\((https:\/\/imgs\.xkcd\.com\/[^")\s]+)\s*"([^"]*)"\)/);
-    if (comicMatch) {
-      html += '<div class="xkcd-comic"><img src="' + escapeHtml(comicMatch[2]) + '" alt="' + escapeHtml(comicMatch[1]) + '">';
-      if (comicMatch[3]) {
-        html += '<div class="xkcd-caption">' + escapeHtml(comicMatch[3]) + '</div>';
+  // Feed-sourced image content: display prominently with optional caption
+  var isFeedImage = meta && meta.source === 'feed';
+  if (isFeedImage && body) {
+    var imgMatch = body.match(/!\[([^\]]*)\]\((\S+?)(?:\s+"([^"]*)")?\)/);
+    if (imgMatch) {
+      var textOnly = body.replace(imgMatch[0], '')
+        .replace(/^\s*#[^\n]*\n?/, '')
+        .replace(/https?:\/\/\S+/g, '')
+        .replace(/Permanent link[^\n]*/gi, '').trim();
+      if (textOnly.length < 100) {
+        html += '<div class="feed-image"><img src="' + escapeHtml(imgMatch[2]) + '" alt="' + escapeHtml(imgMatch[1]) + '">';
+        if (imgMatch[3]) {
+          html += '<div class="feed-image-caption">' + escapeHtml(imgMatch[3]) + '</div>';
+        }
+        html += '</div>';
+        body = body.replace(imgMatch[0], '');
       }
-      html += '</div>';
-      body = body.replace(comicMatch[0], '');
     }
   }
 
