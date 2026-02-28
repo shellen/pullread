@@ -890,12 +890,12 @@ function openSourcesDrawer() {
     }
   }
 
-  // Show footer with "Add source" button
+  // Show footer with "Manage Sources" button
   if (footerEl) {
     footerEl.style.display = '';
     footerEl.innerHTML = '<button onclick="closeDrawer();showSettingsPage(\'settings-feeds\')">'
-      + '<svg aria-hidden="true"><use href="#i-plus"/></svg>'
-      + 'Add source'
+      + '<svg aria-hidden="true"><use href="#i-gear"/></svg>'
+      + 'Manage Sources'
       + '</button>';
   }
 

@@ -4762,6 +4762,16 @@
     margin-left: 16px;
   }
 
+  .feed-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .feed-row:last-child { border-bottom: none; }
+
   .pill-group {
     display: flex;
     gap: 0;
