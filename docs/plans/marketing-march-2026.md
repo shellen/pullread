@@ -107,7 +107,7 @@
 | Product | Positioning | PullRead's Advantage |
 |---------|------------|---------------------|
 | **Readwise Reader** | Cloud-first read-later + highlights, $8/mo subscription | PullRead is local-first, free, no subscription, no vendor lock-in. Your data is plain Markdown, not trapped in a database. |
-| **Pocket (Mozilla)** | Mass-market read-later with recommendations | PullRead gives you AI summaries, highlights, notes, TTS, and full data ownership. Pocket's data lives on their servers. |
+| **Pocket** (shut down) | Mass-market read-later, shut down by Mozilla in 2025 | Another read-later graveyard. PullRead's local-first Markdown model means your archive can't be shut down. Pocket refugees need a new home. |
 | **Instapaper** | Classic read-later, simple and clean | PullRead uses Instapaper as an input source and adds summarization, tagging, knowledge connections, and permanent local storage. |
 | **Omnivore** (shut down) | Open-source read-later, acquired by ElevenLabs | PullRead fills the gap Omnivore left — local-first, open source, with the same read-later-plus-highlights model. Many Omnivore refugees need a new home. |
 | **Matter** | Newsletter + read-later with social features | PullRead focuses on personal knowledge over social features. No algorithmic feed — you choose what you read. |
@@ -126,8 +126,8 @@
 
 **"The reading layer for your knowledge stack."**
 
-No other tool combines all of:
-1. **Local-first Markdown** — your data is files, not rows in someone else's database
+Pocket and Omnivore both shut down, proving that cloud-only read-later services are a single point of failure. No other remaining tool combines all of:
+1. **Local-first Markdown** — your data is files, not rows in someone else's database (or a database that gets shut down)
 2. **Multi-source ingestion** — RSS, bookmarks, podcasts, YouTube, EPUBs, tweets
 3. **AI across providers** — summarize with Claude, GPT, Gemini, or Apple Intelligence
 4. **Annotations that travel** — highlights and notes stored as portable sidecars
@@ -154,7 +154,7 @@ Position PullRead as **the trusted place to gain insights on what you read, lear
 |---------|---------|-------------|
 | **PKM practitioners** | Obsidian/Logseq users building a second brain | "PullRead fills the reading gap in your knowledge stack. Output goes straight into your vault." |
 | **RSS enthusiasts** | Power users who still believe in RSS, fed up with algorithmic feeds | "RSS + extraction + AI summaries + permanent Markdown archive. The reader Google Reader should have become." |
-| **Omnivore refugees** | Users displaced by the Omnivore shutdown | "Local-first, open source, highlights + notes. Everything Omnivore was, with AI and no shutdown risk." |
+| **Pocket & Omnivore refugees** | Users displaced by Pocket and Omnivore shutdowns | "Local-first, open source, highlights + notes. Your reading archive can't be shut down when it's plain files on your machine." |
 | **Writers & researchers** | Journalists, academics, analysts who read heavily for work | "Highlight, annotate, and synthesize across hundreds of sources. Export your research as clean Markdown." |
 | **Privacy-conscious readers** | Users who don't want their reading habits in the cloud | "All data stays on your machine. No account required. No tracking. No cloud dependency." |
 
@@ -178,7 +178,7 @@ Position PullRead as **the trusted place to gain insights on what you read, lear
 | **r/selfhosted** | Position as self-hosted read-later alternative to Readwise | Week 2 |
 | **r/rss** | "I built an RSS reader that saves articles as Markdown with AI summaries" | Week 2 |
 | **PKM community** | Reach out to PKM YouTubers/bloggers (Nicole van der Hoeven, Danny Hatcher, Tiago Forte ecosystem) for reviews | Week 2-4 |
-| **Omnivore migration** | Create migration guide, post in Omnivore community channels | Week 1 |
+| **Pocket & Omnivore migration** | Create migration guide, post in Pocket/Omnivore community channels and r/pocket | Week 1 |
 | **Mastodon / Bluesky** | Weekly posts showing features, workflow screenshots, reading stats | Ongoing |
 
 #### Content Marketing
@@ -187,7 +187,7 @@ Position PullRead as **the trusted place to gain insights on what you read, lear
 |--------------|--------|---------|
 | "Why I Switched to Local-First Reading" | Blog post | SEO + philosophy alignment with target audience |
 | "PullRead + Obsidian: The Complete Reading Workflow" | Tutorial + video | Capture PKM audience search intent |
-| "From Omnivore to PullRead: Migration Guide" | Tutorial | Capture displaced users |
+| "From Pocket/Omnivore to PullRead: Migration Guide" | Tutorial | Capture displaced users from both shutdowns |
 | "AI Summaries Compared: Claude vs GPT vs Gemini on 100 Articles" | Data blog post | SEO + demonstrates multi-provider value |
 | "How I Read 500 Articles a Month Without Losing Track" | Personal workflow post | Relatable story for power readers |
 | "The Case for Owning Your Reading Data" | Opinion/manifesto | Brand philosophy, shareable |
@@ -226,4 +226,4 @@ Position PullRead as **the trusted place to gain insights on what you read, lear
 4. **Reading + knowledge** — not just save-and-forget; highlights, notes, connections, and synthesis
 5. **No account required** — install and use; no sign-up, no tracking, no cloud
 6. **Obsidian-native** — output works as a vault; annotations as portable sidecars
-7. **Omnivore successor** — fills the gap left by Omnivore's shutdown with a local-first model that can't be acquired away
+7. **Pocket & Omnivore successor** — fills the gap left by both shutdowns with a local-first model that can't be acquired or discontinued
