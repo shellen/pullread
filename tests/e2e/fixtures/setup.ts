@@ -151,13 +151,56 @@ source: feed
   },
 ];
 
+// Link blog fixture: external URL with curator commentary (Sippey.com style)
+const LINK_BLOG_ARTICLES = [
+  {
+    filename: '2026-02-25-sippey-link-blog-post.md',
+    content: `---
+title: "Trump Has No Plan for the Iranian People"
+url: https://www.theatlantic.com/ideas/2026/02/trump-has-no-plan-iranian-people/686194/
+bookmarked: 2026-02-25T14:30:00Z
+domain: theatlantic.com
+feed: sippey.com
+author: "Michael Sippey"
+source: feed
+---
+
+Anne Applebaum on the lack of a U.S. strategy for Iran.
+
+> For decades, American presidents from both parties have oscillated between coercion and engagement with Iran, never fully committing to either approach. Trump now faces the same dilemma, but with fewer tools at his disposal.
+
+The commentary here is the point — this is a link blog entry where the curator's take matters more than the linked article. PullRead should preserve this content as-is and never replace it with extracted Atlantic content.
+`,
+  },
+  {
+    filename: '2026-02-25-sippey-original-post.md',
+    content: `---
+title: "token body energy anxiety"
+url: https://sippey.com/2026/02/25/token-body-energy-anxiety.html
+bookmarked: 2026-02-25T09:00:00Z
+domain: sippey.com
+feed: sippey.com
+author: "Michael Sippey"
+source: feed
+---
+
+Three things rattling around in my brain this morning. First, Sam Altman is living rent free in my head, comparing the energy use of a transformer to the energy use of a human. From the purely thermodynamic perspective, he has a point — but thermodynamics is not the whole story.
+
+Second, the body keeps the score. I have been carrying tension in my shoulders for weeks now, and it is only getting worse. The news cycle is relentless.
+
+Third, everyone I talk to is anxious. Not the clinical kind necessarily, but the ambient kind — the feeling that the ground is shifting beneath you and you cannot quite find your footing.
+`,
+  },
+];
+
 // Create temp directory and write fixture articles
 mkdirSync(ARTICLE_DIR, { recursive: true });
-for (const article of ARTICLES) {
+const allFixtures = [...ARTICLES, ...LINK_BLOG_ARTICLES];
+for (const article of allFixtures) {
   writeFileSync(join(ARTICLE_DIR, article.filename), article.content);
 }
 
-console.log(`[e2e-setup] Created ${ARTICLES.length} fixture articles in ${TEMP_DIR}`);
+console.log(`[e2e-setup] Created ${allFixtures.length} fixture articles in ${TEMP_DIR}`);
 
 // Start the real viewer server pointing at our temp article directory
 startViewer(TEMP_DIR, PORT, false);

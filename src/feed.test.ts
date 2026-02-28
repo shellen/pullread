@@ -1427,3 +1427,66 @@ describe('parseFeed - Substack RSS feeds', () => {
     expect(entries[0].contentHtml).toContain('Subscribe');
   });
 });
+
+describe('parseFeed - Atom link blog (Sippey.com style)', () => {
+  test('preserves commentary content for entries linking to external URLs', () => {
+    const feed = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>sippey.com</title>
+  <link href="https://sippey.com" rel="alternate" type="text/html"/>
+  <entry>
+    <title>Trump Has No Plan for the Iranian People</title>
+    <link href="https://www.theatlantic.com/ideas/2026/02/trump-has-no-plan-iranian-people/686194/" rel="alternate" type="text/html"/>
+    <id>tag:sippey.com,2026-02-26:1</id>
+    <updated>2026-02-26T14:30:00Z</updated>
+    <content type="html"><![CDATA[
+        <p>Anne Applebaum on the lack of a U.S. strategy for Iran.</p>
+<blockquote><p>For decades, American presidents from both parties have oscillated between coercion and engagement with Iran.</p></blockquote>
+    ]]></content>
+  </entry>
+  <entry>
+    <title>token body energy anxiety</title>
+    <link href="https://sippey.com/2026/02/25/token-body-energy-anxiety.html" rel="alternate" type="text/html"/>
+    <id>tag:sippey.com,2026-02-25:1</id>
+    <updated>2026-02-25T09:00:00Z</updated>
+    <content type="html"><![CDATA[
+        <p>Three things rattling around in my brain this morning. First, Sam Altman is living rent free in my head.</p>
+    ]]></content>
+  </entry>
+</feed>`;
+    const entries = parseFeed(feed);
+    expect(entries).toHaveLength(2);
+
+    // Link blog entry: URL is theatlantic.com, content is Sippey's commentary
+    expect(entries[0].title).toBe('Trump Has No Plan for the Iranian People');
+    expect(entries[0].url).toBe('https://www.theatlantic.com/ideas/2026/02/trump-has-no-plan-iranian-people/686194/');
+    expect(entries[0].domain).toBe('theatlantic.com');
+    expect(entries[0].contentHtml).toBeDefined();
+    expect(entries[0].contentHtml).toContain('Anne Applebaum');
+    expect(entries[0].contentHtml).toContain('oscillated between coercion');
+
+    // Original post: URL is sippey.com
+    expect(entries[1].url).toContain('sippey.com');
+    expect(entries[1].contentHtml).toBeDefined();
+    expect(entries[1].contentHtml).toContain('Sam Altman is living rent free');
+  });
+
+  test('resolves rel="related" link when available (Atom link blogs)', () => {
+    const feed = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Link Blog</title>
+  <entry>
+    <title>Interesting Article</title>
+    <link href="https://linkblog.example.com/2026/02/interesting" rel="alternate" type="text/html"/>
+    <link href="https://nytimes.com/interesting-article" rel="related" type="text/html"/>
+    <id>tag:linkblog.example.com,2026:1</id>
+    <updated>2026-02-26T10:00:00Z</updated>
+    <content type="html"><![CDATA[<p>The NYT nails it on this piece about technology regulation.</p>]]></content>
+  </entry>
+</feed>`;
+    const entries = parseFeed(feed);
+    // When rel="related" exists, it should be preferred as the entry URL
+    expect(entries[0].url).toBe('https://nytimes.com/interesting-article');
+    expect(entries[0].contentHtml).toContain('NYT nails it');
+  });
+});

@@ -406,3 +406,69 @@ test.describe('Dashboard chevron accessibility', () => {
     }, { timeout: 3000 });
   });
 });
+
+test.describe('Link blog articles (Sippey.com style)', () => {
+  test('link blog entry appears in sidebar with correct metadata', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.file-item');
+
+    // The link blog fixture should appear in the sidebar
+    const sippeyItem = page.locator('.file-item', { hasText: 'Trump Has No Plan' });
+    await expect(sippeyItem).toBeVisible();
+
+    // Should show the feed name (not the linked article's domain)
+    const itemText = await sippeyItem.textContent();
+    expect(itemText).toContain('sippey.com');
+  });
+
+  test('link blog entry renders commentary not extracted content', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.file-item');
+
+    // Click the link blog article
+    await page.locator('.file-item', { hasText: 'Trump Has No Plan' }).click();
+    await page.waitForSelector('#content', { state: 'visible' });
+
+    // The curator's commentary should be visible
+    const content = page.locator('#content');
+    await expect(content).toContainText('Anne Applebaum on the lack of a U.S. strategy');
+    await expect(content).toContainText('commentary here is the point');
+
+    // The blockquote from the curator should render
+    const blockquote = content.locator('blockquote');
+    await expect(blockquote).toBeVisible();
+    await expect(blockquote).toContainText('oscillated between coercion and engagement');
+  });
+
+  test('feed-sourced link blog shows "Read full article" link', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.file-item');
+
+    await page.locator('.file-item', { hasText: 'Trump Has No Plan' }).click();
+    await page.waitForSelector('#content', { state: 'visible' });
+
+    // source: feed articles should show the feed-extract prompt with link to source
+    const prompt = page.locator('.feed-extract-prompt');
+    await expect(prompt).toBeVisible();
+
+    const sourceLink = prompt.locator('a');
+    await expect(sourceLink).toContainText('theatlantic.com');
+    const href = await sourceLink.getAttribute('href');
+    expect(href).toContain('theatlantic.com');
+  });
+
+  test('original blog post renders full content without extract prompt', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.file-item');
+
+    // Click the original Sippey post (URL is sippey.com, same domain as feed)
+    await page.locator('.file-item', { hasText: 'token body energy anxiety' }).click();
+    await page.waitForSelector('#content', { state: 'visible' });
+
+    // Full content should render
+    const content = page.locator('#content');
+    await expect(content).toContainText('Sam Altman is living rent free');
+    await expect(content).toContainText('body keeps the score');
+    await expect(content).toContainText('everyone I talk to is anxious');
+  });
+});
