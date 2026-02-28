@@ -48,7 +48,9 @@ turndown.addRule('linkedImage', {
     const img = findImgInside(node);
     const alt = img?.getAttribute?.('alt') || '';
     const src = simplifySubstackUrl(img?.getAttribute?.('src') || '');
-    return `\n\n![${alt}](${src})\n\n`;
+    const title = img?.getAttribute?.('title') || '';
+    const titlePart = title ? ` "${title.replace(/"/g, '\\"')}"` : '';
+    return `\n\n![${alt}](${src}${titlePart})\n\n`;
   }
 });
 

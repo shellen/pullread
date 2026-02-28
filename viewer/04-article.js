@@ -586,6 +586,20 @@ function renderArticle(text, filename) {
     }
   }
 
+  // xkcd comic: display image prominently with hover-text caption
+  var isXkcd = meta && meta.domain && /xkcd\.com/.test(meta.domain);
+  if (isXkcd && body) {
+    var comicMatch = body.match(/!\[([^\]]*)\]\((https:\/\/imgs\.xkcd\.com\/[^")\s]+)\s*"([^"]*)"\)/);
+    if (comicMatch) {
+      html += '<div class="xkcd-comic"><img src="' + escapeHtml(comicMatch[2]) + '" alt="' + escapeHtml(comicMatch[1]) + '">';
+      if (comicMatch[3]) {
+        html += '<div class="xkcd-caption">' + escapeHtml(comicMatch[3]) + '</div>';
+      }
+      html += '</div>';
+      body = body.replace(comicMatch[0], '');
+    }
+  }
+
   // Podcast: show podcast info banner (audio plays through unified bottom bar)
   if (isPodcast) {
     html += '<div class="podcast-player">';

@@ -115,6 +115,23 @@ enclosure_duration: "0:30"
 This is a test podcast episode with an audio enclosure for testing podcast playback.
 `,
   },
+  {
+    filename: '2026-02-27-test-xkcd-comic.md',
+    content: `---
+title: "Standards"
+url: https://xkcd.com/927/
+bookmarked: 2026-02-27T04:00:00Z
+domain: xkcd.com
+feed: xkcd
+---
+
+# Standards
+
+![Standards](https://imgs.xkcd.com/comics/standards.png "Fortunately, the charging one has been solved now that we've all standardized on mini-USB. Or is it micro-USB? Shit.")
+
+Permanent link to this comic: https://xkcd.com/927/
+`,
+  },
 ];
 
 // Create temp directory and write fixture articles

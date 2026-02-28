@@ -325,3 +325,28 @@ test.describe('Source highlighting', () => {
     expect(activeItems).toBe(0);
   });
 });
+
+test.describe('xkcd rendering', () => {
+  test('xkcd article shows comic image with caption', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.file-item');
+
+    // Click the xkcd fixture article
+    const xkcdItem = page.locator('.file-item', { hasText: 'Standards' });
+    await xkcdItem.click();
+    await page.waitForSelector('#content', { state: 'visible' });
+
+    // Comic container should render
+    const comic = page.locator('.xkcd-comic');
+    await expect(comic).toBeVisible();
+
+    // Image should have the correct src
+    const img = comic.locator('img');
+    await expect(img).toHaveAttribute('src', 'https://imgs.xkcd.com/comics/standards.png');
+
+    // Caption should show the hover text
+    const caption = page.locator('.xkcd-caption');
+    await expect(caption).toBeVisible();
+    await expect(caption).toContainText('mini-USB');
+  });
+});

@@ -330,6 +330,25 @@ describe('htmlToMarkdown', () => {
     expect(result).not.toContain('.ad');
     expect(result).toContain('Content here.');
   });
+
+  test('preserves img title attribute in linked images', () => {
+    const html = '<a href="https://xkcd.com/1234/"><img src="https://imgs.xkcd.com/comics/test.png" alt="Test Comic" title="The punchline goes here"></a>';
+    const result = htmlToMarkdown(html, 'https://xkcd.com/1234/');
+    expect(result).toContain('![Test Comic](https://imgs.xkcd.com/comics/test.png "The punchline goes here")');
+  });
+
+  test('handles img with no title attribute in linked images', () => {
+    const html = '<a href="https://example.com"><img src="https://example.com/photo.jpg" alt="Photo"></a>';
+    const result = htmlToMarkdown(html, 'https://example.com');
+    expect(result).toContain('![Photo](https://example.com/photo.jpg)');
+    expect(result).not.toContain('""');
+  });
+
+  test('escapes quotes in img title attribute', () => {
+    const html = '<a href="https://xkcd.com/1234/"><img src="https://imgs.xkcd.com/comics/test.png" alt="Comic" title=\'He said "hello" to them\'></a>';
+    const result = htmlToMarkdown(html, 'https://xkcd.com/1234/');
+    expect(result).toContain('![Comic](https://imgs.xkcd.com/comics/test.png "He said \\"hello\\" to them")');
+  });
 });
 
 describe('simplifySubstackUrl', () => {
