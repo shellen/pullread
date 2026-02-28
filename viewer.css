@@ -1380,6 +1380,9 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+  .dash-review-generating { opacity: 0.6; animation: pulse 1.5s ease-in-out infinite; cursor: default; }
+  .dash-review-generating:hover { box-shadow: none; transform: none; }
+  @keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 0.3; } }
   .dash-empty-hint {
     text-align: center;
     color: var(--muted);

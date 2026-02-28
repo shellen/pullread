@@ -1,5 +1,6 @@
 // ABOUTME: Hub landing page (merged Home + Explore) and article rendering.
 // ABOUTME: renderHub() builds the tabbed hub; loadFile() renders individual articles.
+var _reviewGenInFlight = false;
 function renderHub() {
   var dash = document.getElementById('dashboard');
   if (!dash) return;
@@ -68,7 +69,16 @@ function renderHub() {
 
   // Reviews
   var reviews = allFiles.filter(function(f) { return f.feed === 'weekly-review' || f.feed === 'daily-review' || f.domain === 'pullread'; }).slice(0, 3);
-  if (reviews.length > 0) {
+  var todayStr = new Date().toISOString().slice(0, 10);
+  var hasDaily = allFiles.some(function(f) { return f.filename && f.filename.indexOf('_daily-review-' + todayStr) >= 0; });
+  var threeDaysAgo = new Date(); threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+  var hasWeekly = allFiles.some(function(f) {
+    return f.feed === 'weekly-review' && f.bookmarked && new Date(f.bookmarked) >= threeDaysAgo;
+  });
+  var _missingDaily = !hasDaily;
+  var _missingWeekly = !hasWeekly;
+
+  if (reviews.length > 0 || (serverMode && (_missingDaily || _missingWeekly))) {
     forYouHtml += '<div class="dash-section">';
     forYouHtml += '<div class="dash-section-header"><span class="dash-section-title"><svg viewBox="0 0 512 512"><use href="#i-wand"/></svg> Reviews</span></div>';
     forYouHtml += '<div class="dash-cards" style="overflow:visible;flex-wrap:wrap">';
@@ -81,6 +91,18 @@ function renderHub() {
       forYouHtml += '<div class="dash-review-title">' + escapeHtml(rf.title) + '</div>';
       forYouHtml += '<div class="dash-review-meta">' + typeLabel + ' Review' + (rdate ? ' &middot; ' + rdate : '') + '</div>';
       if (rf.excerpt) forYouHtml += '<div class="dash-review-excerpt">' + escapeHtml(rf.excerpt) + '</div>';
+      forYouHtml += '</div>';
+    }
+    if (serverMode && _missingDaily) {
+      forYouHtml += '<div class="dash-review-card dash-review-generating" id="daily-review-placeholder">';
+      forYouHtml += '<div class="dash-review-title">Generating Daily Review\u2026</div>';
+      forYouHtml += '<div class="dash-review-meta">Daily Review</div>';
+      forYouHtml += '</div>';
+    }
+    if (serverMode && _missingWeekly) {
+      forYouHtml += '<div class="dash-review-card dash-review-generating" id="weekly-review-placeholder">';
+      forYouHtml += '<div class="dash-review-title">Generating Weekly Review\u2026</div>';
+      forYouHtml += '<div class="dash-review-meta">Weekly Review</div>';
       forYouHtml += '</div>';
     }
     forYouHtml += '</div></div>';
@@ -163,6 +185,29 @@ function renderHub() {
 
   // Async: load suggested feeds
   loadSuggestedFeedsSection();
+
+  // Background review generation
+  if (serverMode && !_reviewGenInFlight && (_missingDaily || _missingWeekly)) {
+    _reviewGenInFlight = true;
+    var jobs = [];
+    if (_missingDaily) jobs.push({ days: 1, id: 'daily-review-placeholder' });
+    if (_missingWeekly) jobs.push({ days: 7, id: 'weekly-review-placeholder' });
+    var promises = jobs.map(function(job) {
+      return fetch('/api/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ days: job.days })
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        var el = document.getElementById(job.id);
+        if (el) el.remove();
+        if (!data.error) refreshArticleList(true);
+      }).catch(function() {
+        var el = document.getElementById(job.id);
+        if (el) el.remove();
+      });
+    });
+    Promise.allSettled(promises).then(function() { _reviewGenInFlight = false; });
+  }
 }
 
 function loadSuggestedFeedsSection() {
