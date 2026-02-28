@@ -26,1112 +26,1251 @@
 
 <!-- Additional SEO -->
 <meta name="author" content="A Little Drive">
-<meta name="theme-color" content="#2a9d8f">
+<meta name="theme-color" content="#b45535">
 <meta name="apple-mobile-web-app-title" content="Pull Read">
 <link rel="canonical" href="https://pullread.com/">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700;800&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Work+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared.css">
 <style>
-  :root {
-    --teal: #2a9d8f;
-    --teal-dark: #21867a;
-    --teal-subtle: #f0faf8;
-    --orange: #e76f51;
-    --fg: #111111;
-    --body: #374151;
-    --muted: #6b7280;
-    --light: #9ca3af;
-    --bg: #fafaf9;
-    --white: #ffffff;
-    --border: #e5e7eb;
-    --border-light: #f3f4f6;
-    --code-bg: #f9fafb;
+  /* ── Hero ────────────────────────────────────────────── */
+
+  .hero {
+    padding: clamp(120px, 16vw, 180px) clamp(16px, 4vw, 40px) 64px;
+    text-align: center;
+    max-width: 780px;
+    margin: 0 auto;
   }
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  .hero h1 {
+    font-family: var(--font-display);
+    font-size: clamp(48px, 8vw, 80px);
+    font-weight: 400;
+    line-height: 1.02;
+    letter-spacing: -0.035em;
+    margin-bottom: 20px;
+  }
 
-  body {
-    font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-    color: var(--fg);
-    background: var(--bg);
+  .hero h1 em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .hero .subtitle {
+    font-size: clamp(17px, 2.2vw, 20px);
+    color: var(--ink-secondary);
+    max-width: 480px;
+    margin: 0 auto 36px;
     line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
   }
 
-  /* ── Nav ── */
-  nav {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 100;
-    background: rgba(250, 250, 249, 0.8);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border-bottom: 1px solid rgba(0,0,0,0.06);
-    padding: 0 32px;
-    height: 60px;
+  .hero-meta {
+    margin-top: 18px;
+    font-size: 13px;
+    color: var(--ink-muted);
+  }
+
+  .hero-meta a {
+    color: var(--ink-muted);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .hero-meta a:hover { color: var(--ink-secondary); }
+
+  /* ── Showcase ────────────────────────────────────────── */
+
+  .showcase {
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 0 clamp(16px, 4vw, 40px) 80px;
+  }
+
+  .app-frame {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: 0 16px 64px rgba(28, 25, 23, 0.10), 0 2px 8px rgba(28, 25, 23, 0.04);
+  }
+
+  .app-chrome {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    background: var(--paper-warm);
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .app-chrome span {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--border);
+  }
+
+  /* ── Mock app (3-column reader) ─────────────────────── */
+
+  .mock-app {
+    display: grid;
+    grid-template-columns: 220px 200px 1fr;
+    min-height: 440px;
+    font-size: 12.5px;
+  }
+
+  /* Sidebar (article list) */
+  .mock-sidebar {
+    background: var(--paper-warm);
+    border-right: 1px solid var(--border-light);
+    padding: 0 6px 10px;
+    overflow: hidden;
+  }
+
+  .mock-sidebar-header {
+    display: flex;
+    align-items: center;
+    padding: 10px 6px 6px;
+    gap: 6px;
+  }
+
+  .mock-sidebar-header .brand {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--ink);
+    flex: 1;
+  }
+
+  .mock-sidebar-header .icons {
+    display: flex;
+    gap: 5px;
+    opacity: 0.3;
+    font-size: 12px;
+  }
+
+  .mock-search {
+    margin: 0 4px 6px;
+    padding: 6px 8px;
+    background: rgba(0,0,0,0.03);
+    border-radius: 6px;
+    font-size: 11px;
+    color: var(--ink-muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .mock-tabs {
+    display: flex;
+    gap: 2px;
+    margin: 0 4px 6px;
+    font-size: 10.5px;
+    font-weight: 500;
+  }
+
+  .mock-tabs span {
+    padding: 3px 8px;
+    border-radius: 5px;
+    color: var(--ink-muted);
+  }
+
+  .mock-tabs span.active {
+    background: rgba(0,0,0,0.06);
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .mock-tabs .count {
+    font-size: 9px;
+    color: var(--ink-muted);
+    margin-left: 2px;
+    opacity: 0.6;
+  }
+
+  .mock-item {
+    padding: 7px 10px;
+    border-radius: 6px;
+    margin-bottom: 1px;
+    line-height: 1.35;
+    color: var(--ink-secondary);
+  }
+
+  .mock-item.active {
+    background: rgba(0,0,0,0.06);
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .mock-item .item-meta {
+    font-size: 10px;
+    color: var(--ink-muted);
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    margin-top: 1px;
+  }
+
+  .mock-item .dot {
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background: var(--ink-muted);
+  }
+
+  .source-pip {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    vertical-align: -1px;
+    margin-right: 3px;
+    font-size: 7px;
+    font-weight: 700;
+    color: white;
+    text-align: center;
+    line-height: 10px;
+  }
+
+  /* Sources drawer (middle column) */
+  .mock-sources {
+    background: var(--paper);
+    border-right: 1px solid var(--border-light);
+    padding: 10px 8px;
+    overflow: hidden;
+  }
+
+  .mock-sources-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink);
+    padding: 0 6px 8px;
     display: flex;
     align-items: center;
     justify-content: space-between;
   }
 
-  .nav-brand {
+  .mock-sources-title .close-x {
+    opacity: 0.3;
+    font-size: 13px;
+    cursor: default;
+  }
+
+  .source-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 7px;
+    padding: 5px 6px;
+    border-radius: 5px;
+    font-size: 11.5px;
+    color: var(--ink-secondary);
+  }
+
+  .source-row:hover {
+    background: rgba(0,0,0,0.03);
+  }
+
+  .source-row .source-icon {
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
     font-weight: 700;
-    font-size: 17px;
-    color: var(--fg);
-    text-decoration: none;
-    letter-spacing: -0.02em;
+    color: white;
+    flex-shrink: 0;
   }
 
-  .nav-brand svg { flex-shrink: 0; }
+  .source-row .source-count {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--ink-muted);
+    opacity: 0.6;
+  }
 
-  .nav-links {
+  /* Reading pane */
+  .mock-reading {
+    padding: 28px 32px;
+    overflow: hidden;
+  }
+
+  .mock-source-bar {
+    font-size: 10.5px;
+    color: var(--ink-muted);
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-light);
+    line-height: 1.5;
+  }
+
+  .mock-source-bar strong {
+    color: var(--ink-secondary);
+    font-weight: 600;
+  }
+
+  .mock-tags {
     display: flex;
-    align-items: center;
-    gap: 12px;
-    list-style: none;
+    gap: 4px;
+    margin-bottom: 16px;
   }
 
-  .nav-links a {
-    color: var(--muted);
-    text-decoration: none;
-    font-size: 14px;
+  .mock-tag {
+    padding: 2px 8px;
+    background: var(--paper-warm);
+    border-radius: 4px;
+    font-size: 10px;
+    color: var(--ink-muted);
     font-weight: 500;
-    transition: color 0.15s;
-    padding: 6px 14px;
-    border-radius: 8px;
   }
 
-  .nav-links a:hover { color: var(--fg); }
+  .mock-reading h2 {
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 400;
+    line-height: 1.2;
+    margin-bottom: 6px;
+    color: var(--ink);
+  }
 
-  .btn {
-    display: inline-flex;
+  .mock-reading .byline {
+    font-size: 11px;
+    color: var(--ink-muted);
+    margin-bottom: 16px;
+  }
+
+  .mock-summary {
+    background: var(--paper-warm);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 16px;
+  }
+
+  .mock-summary-badges {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+
+  .mock-summary-badges .badge {
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+
+  .badge-light { background: rgba(0,0,0,0.05); color: var(--ink-muted); }
+  .badge-provider { background: rgba(180, 85, 53, 0.1); color: var(--accent); }
+
+  .mock-summary p {
+    font-size: 12px;
+    color: var(--ink-secondary);
+    line-height: 1.55;
+  }
+
+  .mock-body-text {
+    font-family: 'Georgia', serif;
+    font-size: 13.5px;
+    line-height: 1.75;
+    color: var(--ink-secondary);
+    margin-bottom: 12px;
+  }
+
+  .mock-body-text .highlight {
+    background: rgba(255, 235, 59, 0.3);
+    border-radius: 2px;
+    padding: 1px 0;
+  }
+
+  .mock-body-text a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .mock-now-playing {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--paper-warm);
+    border-top: 1px solid var(--border-light);
+    padding: 8px 14px;
+    display: flex;
     align-items: center;
     gap: 8px;
-    padding: 10px 22px;
-    border-radius: 10px;
+    font-size: 11px;
+    color: var(--ink-secondary);
+  }
+
+  .mock-now-playing .play-btn {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .mock-now-playing .play-btn svg {
+    width: 10px;
+    height: 10px;
+    color: white;
+    margin-left: 1px;
+  }
+
+  .mock-now-playing .track-info {
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .mock-now-playing .track-title {
     font-weight: 600;
-    font-size: 15px;
-    font-family: inherit;
-    text-decoration: none;
-    transition: all 0.2s ease;
-    border: none;
-    cursor: pointer;
-    letter-spacing: -0.01em;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
-  .btn-primary {
-    background: var(--fg);
-    color: var(--white);
+  .mock-now-playing .track-time {
+    font-size: 10px;
+    color: var(--ink-muted);
   }
 
-  .btn-primary:hover {
-    background: #333;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  .mock-reading-wrapper {
+    position: relative;
+    min-height: 440px;
   }
 
-  .btn-ghost {
-    background: transparent;
-    color: var(--muted);
-    padding: 10px 18px;
-  }
+  /* ── Trust bar ──────────────────────────────────────── */
 
-  .btn-ghost:hover {
-    color: var(--fg);
-    background: rgba(0,0,0,0.04);
-  }
-
-  .btn-teal {
-    background: var(--teal);
-    color: var(--white);
-  }
-
-  .btn-teal:hover {
-    background: var(--teal-dark);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 16px rgba(42, 157, 143, 0.3);
-  }
-
-  .btn-outline {
-    background: var(--white);
-    color: var(--fg);
-    border: 1px solid var(--border);
-  }
-
-  .btn-outline:hover {
-    border-color: #d1d5db;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-  }
-
-  .btn-sm {
-    padding: 8px 18px;
-    font-size: 14px;
-    border-radius: 8px;
-  }
-
-  /* ── Hero ── */
-  .hero {
-    padding: 160px 32px 100px;
-    text-align: center;
-    max-width: 860px;
+  .trust {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    max-width: 800px;
     margin: 0 auto;
+    padding: 0 clamp(16px, 4vw, 40px) 80px;
   }
 
-  .hero-badge {
+  .trust-chip {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 14px;
-    background: var(--teal-subtle);
-    color: var(--teal);
-    border-radius: 20px;
+    padding: 8px 16px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 24px;
     font-size: 13px;
-    font-weight: 600;
-    margin-bottom: 32px;
-    letter-spacing: 0.01em;
+    font-weight: 500;
+    color: var(--ink-secondary);
   }
 
-  .hero h1 {
-    font-size: clamp(42px, 7vw, 72px);
-    font-weight: 800;
-    line-height: 1.05;
-    letter-spacing: -0.04em;
-    margin-bottom: 24px;
-    color: var(--fg);
+  .trust-chip .chip-icon {
+    font-size: 15px;
+    opacity: 0.7;
   }
 
-  .hero p {
-    font-size: 20px;
-    color: var(--muted);
-    max-width: 520px;
-    margin: 0 auto 40px;
-    line-height: 1.6;
-    font-weight: 400;
-  }
+  /* ── Creator strip ──────────────────────────────────── */
 
-  .hero-buttons {
+  .creator-strip {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 0 clamp(16px, 4vw, 40px) 48px;
     display: flex;
-    gap: 12px;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .creator-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: flex;
+    align-items: center;
     justify-content: center;
-    flex-wrap: wrap;
+    color: white;
+    font-weight: 700;
+    font-size: 18px;
+    flex-shrink: 0;
   }
 
-  .hero-note {
-    margin-top: 20px;
-    font-size: 13px;
-    color: var(--light);
+  .creator-text {
+    font-size: 14px;
+    color: var(--ink-secondary);
+    line-height: 1.55;
+  }
+
+  .creator-text a {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .creator-text a:hover { color: var(--accent); }
+
+  /* ── Divider ────────────────────────────────────────── */
+
+  .divider {
+    max-width: 1060px;
+    margin: 0 auto;
+    border: none;
+    border-top: 1px solid var(--border-light);
+  }
+
+  /* ── Features grid ──────────────────────────────────── */
+
+  .features {
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 80px clamp(16px, 4vw, 40px);
+  }
+
+  .features-header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .features-header h2 {
+    font-family: var(--font-display);
+    font-size: clamp(30px, 4vw, 42px);
     font-weight: 400;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    margin-bottom: 12px;
   }
 
-  /* ── Sections ── */
-  section { padding: 100px 32px; }
+  .features-header p {
+    font-size: 17px;
+    color: var(--ink-secondary);
+    max-width: 500px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
 
-  .container {
-    max-width: 1100px;
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+  }
+
+  .feature-card {
+    background: var(--card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    padding: 24px;
+    transition: box-shadow 0.25s ease, transform 0.25s ease;
+  }
+
+  .feature-card:hover {
+    box-shadow: 0 8px 24px rgba(28, 25, 23, 0.06);
+    transform: translateY(-2px);
+  }
+
+  .feature-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: var(--accent-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 14px;
+    color: var(--accent);
+  }
+
+  .feature-card h3 {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 5px;
+    letter-spacing: -0.01em;
+  }
+
+  .feature-card p {
+    font-size: 13.5px;
+    color: var(--ink-secondary);
+    line-height: 1.55;
+  }
+
+  /* ── AI section ─────────────────────────────────────── */
+
+  .ai-section {
+    background: var(--ink);
+    color: white;
+    padding: 80px clamp(16px, 4vw, 40px);
+  }
+
+  .ai-inner {
+    max-width: 1060px;
     margin: 0 auto;
   }
 
-  .section-label {
-    font-size: 13px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--teal);
-    margin-bottom: 14px;
+  .ai-header {
+    margin-bottom: 48px;
   }
 
-  .section-title {
-    font-size: clamp(30px, 4vw, 44px);
-    font-weight: 800;
-    letter-spacing: -0.035em;
-    line-height: 1.1;
-    margin-bottom: 16px;
-    color: var(--fg);
-  }
-
-  .section-subtitle {
-    font-size: 18px;
-    color: var(--muted);
-    max-width: 540px;
-    line-height: 1.65;
+  .ai-header h2 {
+    font-family: var(--font-display);
+    font-size: clamp(30px, 4vw, 42px);
     font-weight: 400;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    margin-bottom: 12px;
   }
 
-  .section-alt {
-    background: var(--white);
-    border-top: 1px solid var(--border-light);
-    border-bottom: 1px solid var(--border-light);
+  .ai-header p {
+    font-size: 17px;
+    color: rgba(255,255,255,0.55);
+    max-width: 500px;
+    line-height: 1.6;
   }
 
-  /* ── How it works ── */
-  .steps {
+  .ai-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 48px;
-    margin-top: 56px;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
   }
 
-  .step { text-align: center; }
-
-  .step-num {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
-    background: var(--teal-subtle);
-    color: var(--teal);
-    font-weight: 700;
-    font-size: 18px;
-    margin-bottom: 20px;
+  .ai-card {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: var(--radius);
+    padding: 28px;
   }
 
-  .step h3 {
+  .ai-card h3 {
     font-size: 18px;
     font-weight: 700;
     margin-bottom: 8px;
     letter-spacing: -0.02em;
   }
 
-  .step p {
-    font-size: 15px;
-    color: var(--muted);
-    line-height: 1.6;
-  }
-
-  /* ── Features grid ── */
-  .features-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 20px;
-    margin-top: 56px;
-  }
-
-  .feature-card {
-    background: var(--white);
-    border: 1px solid var(--border-light);
-    border-radius: 14px;
-    padding: 28px;
-    transition: box-shadow 0.25s ease, transform 0.25s ease;
-  }
-
-  .feature-card:hover {
-    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
-    transform: translateY(-2px);
-  }
-
-  .feature-icon {
-    width: 42px;
-    height: 42px;
-    border-radius: 11px;
-    background: var(--teal-subtle);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 16px;
-    color: var(--teal);
-  }
-
-  .feature-card h3 {
-    font-size: 16px;
-    font-weight: 700;
-    margin-bottom: 6px;
-    letter-spacing: -0.01em;
-  }
-
-  .feature-card p {
-    font-size: 14px;
-    color: var(--muted);
-    line-height: 1.6;
-  }
-
-  /* ── AI showcase ── */
-  .ai-section {
-    background: var(--fg);
-    color: var(--white);
-    border-top: none;
-    border-bottom: none;
-  }
-
-  .ai-section .section-label { color: rgba(42, 157, 143, 0.9); }
-  .ai-section .section-title { color: var(--white); }
-  .ai-section .section-subtitle { color: rgba(255,255,255,0.6); }
-
-  .ai-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
-    margin-top: 48px;
-  }
-
-  .ai-card {
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 14px;
-    padding: 32px;
-  }
-
-  .ai-card h3 {
-    font-size: 20px;
-    font-weight: 700;
-    margin-bottom: 10px;
-    letter-spacing: -0.02em;
-  }
-
   .ai-card p {
-    font-size: 15px;
-    color: rgba(255,255,255,0.55);
+    font-size: 14px;
+    color: rgba(255,255,255,0.5);
     line-height: 1.6;
-    margin-bottom: 20px;
+    margin-bottom: 18px;
   }
 
-  /* Badge preview */
   .badge-row {
     display: flex;
-    gap: 6px;
+    gap: 5px;
     flex-wrap: wrap;
+    margin-bottom: 7px;
   }
 
-  .badge {
+  .badge-row:last-child { margin-bottom: 0; }
+
+  .ai-badge {
     display: inline-flex;
     align-items: center;
-    padding: 3px 10px;
-    border-radius: 6px;
-    font-size: 12px;
+    padding: 2px 9px;
+    border-radius: 5px;
+    font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.01em;
   }
 
-  .badge-gray { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.5); }
-  .badge-amber { background: rgba(217, 119, 6, 0.15); color: #f59e0b; }
-  .badge-green { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
-  .badge-blue { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
-  .badge-indigo { background: rgba(99, 102, 241, 0.15); color: #818cf8; }
-  .badge-purple { background: rgba(168, 85, 247, 0.15); color: #a855f7; }
+  .ai-badge-gray { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.5); }
+  .ai-badge-amber { background: rgba(217, 119, 6, 0.15); color: #f59e0b; }
+  .ai-badge-green { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+  .ai-badge-blue { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+  .ai-badge-indigo { background: rgba(168, 85, 247, 0.15); color: #a855f7; }
+  .ai-badge-purple { background: rgba(168, 85, 247, 0.15); color: #c084fc; }
 
-  /* Search operators demo */
   .search-demo {
     background: rgba(255,255,255,0.06);
     border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 10px;
-    padding: 12px 16px;
+    border-radius: 8px;
+    padding: 10px 14px;
     font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-    font-size: 14px;
-    color: rgba(255,255,255,0.7);
+    font-size: 13px;
+    color: rgba(255,255,255,0.65);
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 14px;
+    gap: 8px;
+    margin-bottom: 12px;
   }
 
   .search-demo svg { flex-shrink: 0; opacity: 0.4; }
 
   .op-tags {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     flex-wrap: wrap;
   }
 
   .op-tag {
-    padding: 5px 12px;
+    padding: 4px 10px;
     background: rgba(255,255,255,0.06);
     border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 6px;
-    font-size: 13px;
-    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-    color: rgba(255,255,255,0.55);
-  }
-
-  /* ── TTS section ── */
-  .tts-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-    margin-top: 48px;
-  }
-
-  .tts-card {
-    background: var(--white);
-    border: 1px solid var(--border-light);
-    border-radius: 14px;
-    padding: 24px;
-    text-align: center;
-  }
-
-  .tts-card .tts-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 14px;
-    font-size: 22px;
-  }
-
-  .tts-card h3 {
-    font-size: 15px;
-    font-weight: 700;
-    margin-bottom: 4px;
-    letter-spacing: -0.01em;
-  }
-
-  .tts-card p {
-    font-size: 13px;
-    color: var(--muted);
-    line-height: 1.5;
-  }
-
-  .tts-card .tts-price {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--teal);
-    margin-top: 8px;
-  }
-
-  /* ── Reader preview ── */
-  .reader-section { text-align: center; }
-
-  .reader-preview {
-    margin-top: 56px;
-    background: var(--white);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    overflow: hidden;
-    box-shadow: 0 12px 48px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04);
-    max-width: 960px;
-    margin-left: auto;
-    margin-right: auto;
-  }
-
-  .reader-chrome {
-    display: none;
-  }
-
-  .reader-body {
-    display: grid;
-    grid-template-columns: 260px 1fr;
-    min-height: 400px;
-  }
-
-  .reader-sidebar {
-    background: #f9f9f8;
-    border-right: 1px solid var(--border-light);
-    padding: 0 8px 12px;
-  }
-
-  .reader-sidebar-header {
-    display: flex;
-    align-items: center;
-    padding: 12px 4px 8px;
-    gap: 8px;
-  }
-  .reader-sidebar-header .reader-brand {
-    font-family: 'Work Sans', sans-serif;
-    font-weight: 600;
-    font-size: 14px;
-    color: var(--fg);
-    flex: 1;
-  }
-  .reader-sidebar-header .reader-header-icons {
-    display: flex;
-    gap: 6px;
-    opacity: 0.35;
-  }
-  .reader-sidebar-header .reader-header-icons span {
-    font-size: 13px;
-  }
-
-  .reader-sidebar-search {
-    margin: 0 4px 8px;
-    padding: 7px 10px;
-    background: rgba(0,0,0,0.03);
-    border: none;
-    border-radius: 7px;
-    font-size: 12px;
-    color: var(--light);
-    font-family: inherit;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .reader-sidebar-item {
-    padding: 9px 12px;
-    font-size: 12.5px;
-    color: var(--muted);
-    border-radius: 7px;
-    font-family: 'Work Sans', sans-serif;
-    margin-bottom: 1px;
-    line-height: 1.4;
-  }
-
-  .reader-sidebar-item.active {
-    background: rgba(0,0,0,0.06);
-    color: var(--fg);
-    font-weight: 600;
-  }
-
-  .reader-sidebar-item:not(.active):hover {
-    background: rgba(0,0,0,0.03);
-  }
-
-  .reader-sidebar-item .meta {
-    font-size: 11px;
-    color: var(--light);
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    margin-top: 2px;
-  }
-
-  .reader-sidebar-item .meta .dot-sep {
-    width: 2px;
-    height: 2px;
-    border-radius: 50%;
-    background: var(--light);
-    display: inline-block;
-  }
-
-  .reader-sidebar-item .summary-dot {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: var(--muted);
-    opacity: 0.5;
-    display: inline-block;
-    margin-left: 4px;
-  }
-
-  .reader-sidebar-nav {
-    display: flex;
-    gap: 2px;
-    margin: 0 4px 6px;
-    font-size: 11px;
-    font-weight: 500;
-  }
-
-  .reader-sidebar-nav span {
-    padding: 4px 10px;
     border-radius: 5px;
-    color: var(--muted);
-    cursor: default;
-  }
-
-  .reader-sidebar-nav span.active {
-    background: rgba(0,0,0,0.06);
-    color: var(--fg);
-    font-weight: 600;
-  }
-
-  .reader-sidebar-nav .nav-count {
-    font-size: 10px;
-    color: var(--light);
-    margin-left: 3px;
-  }
-
-  .reader-sidebar-item .favicon {
-    width: 14px;
-    height: 14px;
-    border-radius: 3px;
-    background: #808080;
-    display: inline-block;
-    vertical-align: -2px;
-    margin-right: 4px;
-  }
-
-  .reader-sidebar-item .favicon.teal { background: var(--teal); }
-  .reader-sidebar-item .favicon.orange { background: var(--orange); }
-  .reader-sidebar-item .favicon.blue { background: #2563eb; }
-  .reader-sidebar-item .favicon.purple { background: #7c3aed; }
-
-  .reader-content {
-    padding: 36px 44px;
-    text-align: left;
-  }
-
-  .reader-content h2 {
-    font-family: 'Source Serif 4', Georgia, serif;
-    font-size: 26px;
-    font-weight: 600;
-    margin-bottom: 6px;
-    color: var(--fg);
-    line-height: 1.25;
-  }
-
-  .reader-content .byline {
     font-size: 12px;
-    color: var(--light);
-    margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    color: rgba(255,255,255,0.5);
   }
 
-  .reader-content .byline .dot-sep {
-    width: 3px;
-    height: 3px;
-    border-radius: 50%;
-    background: var(--light);
-    display: inline-block;
+  /* ── Markdown section ───────────────────────────────── */
+
+  .markdown-section {
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 80px clamp(16px, 4vw, 40px);
   }
 
-  /* Summary card in reader preview */
-  .reader-summary {
-    background: rgba(0,0,0,0.025);
-    border: 1px solid rgba(0,0,0,0.06);
-    border-radius: 8px;
-    padding: 12px 14px;
-    margin-bottom: 20px;
+  .markdown-header {
+    margin-bottom: 48px;
   }
 
-  .reader-summary-badges {
-    display: flex;
-    gap: 5px;
-    margin-bottom: 8px;
+  .markdown-header h2 {
+    font-family: var(--font-display);
+    font-size: clamp(30px, 4vw, 42px);
+    font-weight: 400;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    margin-bottom: 12px;
   }
 
-  .reader-summary-badges .badge {
-    font-size: 10px;
-    padding: 2px 7px;
-    border-radius: 4px;
+  .markdown-header p {
+    font-size: 17px;
+    color: var(--ink-secondary);
+    max-width: 500px;
+    line-height: 1.6;
   }
 
-  .badge-gray-light { background: rgba(0,0,0,0.06); color: var(--muted); }
-  .badge-amber-light { background: rgba(217, 119, 6, 0.08); color: #b45309; }
-
-  .reader-summary p {
-    font-size: 13px;
-    color: var(--muted);
-    line-height: 1.55;
-  }
-
-  .reader-content .mock-paragraph {
-    font-family: 'Source Serif 4', Georgia, serif;
-    font-size: 15.5px;
-    line-height: 1.75;
-    color: var(--body);
-    margin-bottom: 16px;
-  }
-
-  .reader-content .highlight {
-    background: rgba(255, 235, 59, 0.3);
-    border-radius: 2px;
-    padding: 1px 0;
-  }
-
-  .mock-text {
-    height: 11px;
-    background: #f0f0ee;
-    border-radius: 4px;
-    margin-bottom: 10px;
-  }
-
-  .mock-text:nth-child(odd) { width: 100%; }
-  .mock-text:nth-child(even) { width: 88%; }
-  .mock-text:last-child { width: 55%; }
-
-  /* ── Markdown preview ── */
-  .markdown-split {
+  .markdown-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 24px;
-    margin-top: 56px;
     align-items: start;
   }
 
-  .markdown-block {
-    background: var(--white);
+  .markdown-text h3 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    letter-spacing: -0.01em;
+  }
+
+  .markdown-text p {
+    font-size: 15px;
+    color: var(--ink-secondary);
+    line-height: 1.65;
+    margin-bottom: 12px;
+  }
+
+  .markdown-text code {
+    font-size: 13px;
+    background: rgba(0,0,0,0.05);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  .code-block {
+    background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: var(--radius);
     overflow: hidden;
   }
 
-  .markdown-block-header {
-    background: var(--code-bg);
-    padding: 10px 16px;
+  .code-block-header {
+    background: var(--paper-warm);
+    padding: 8px 14px;
     font-size: 11px;
     font-weight: 600;
-    color: var(--light);
+    color: var(--ink-muted);
     border-bottom: 1px solid var(--border-light);
     text-transform: uppercase;
     letter-spacing: 0.06em;
   }
 
-  .markdown-block pre {
-    padding: 20px;
-    font-size: 13px;
+  .code-block pre {
+    padding: 18px;
+    font-size: 12.5px;
     line-height: 1.65;
     font-family: 'SF Mono', 'Fira Code', monospace;
     overflow-x: auto;
-    color: var(--muted);
+    color: var(--ink-muted);
   }
 
-  .markdown-block pre .key { color: var(--teal); }
-  .markdown-block pre .val { color: var(--orange); }
-  .markdown-block pre .heading { color: var(--fg); font-weight: 600; }
+  .code-block pre .key { color: var(--accent); }
+  .code-block pre .val { color: #2c5530; }
+  .code-block pre .heading { color: var(--ink); font-weight: 600; }
 
-  /* ── Services ── */
-  .service-logos {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 40px;
-    justify-content: center;
-  }
+  /* ── Sources section ────────────────────────────────── */
 
-  .service-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 18px;
-    background: var(--white);
-    border: 1px solid var(--border);
-    border-radius: 24px;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--muted);
-    transition: border-color 0.15s, color 0.15s;
-  }
-
-  .service-tag:hover {
-    border-color: var(--teal);
-    color: var(--teal);
-  }
-
-  /* ── CTA ── */
-  .cta {
+  .sources-section {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 clamp(16px, 4vw, 40px) 80px;
     text-align: center;
-    padding: 120px 32px;
   }
 
-  .cta h2 {
-    font-size: clamp(30px, 4vw, 44px);
-    font-weight: 800;
-    letter-spacing: -0.035em;
-    margin-bottom: 16px;
+  .sources-header {
+    margin-bottom: 32px;
   }
 
-  .cta p {
-    font-size: 18px;
-    color: var(--muted);
-    margin-bottom: 36px;
-    max-width: 440px;
-    margin-left: auto;
-    margin-right: auto;
+  .sources-header h2 {
+    font-family: var(--font-display);
+    font-size: clamp(28px, 3.5vw, 38px);
+    font-weight: 400;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    margin-bottom: 10px;
+  }
+
+  .sources-header p {
+    font-size: 16px;
+    color: var(--ink-secondary);
     line-height: 1.6;
   }
 
-  .cta-buttons {
+  .source-pills {
     display: flex;
-    gap: 12px;
-    justify-content: center;
     flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
   }
 
-  /* ── Footer ── */
-  footer {
-    border-top: 1px solid var(--border-light);
-    padding: 36px 32px;
-    display: flex;
+  .source-pill {
+    display: inline-flex;
     align-items: center;
-    justify-content: space-between;
-    max-width: 1100px;
-    margin: 0 auto;
+    gap: 6px;
+    padding: 8px 16px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--ink-secondary);
+    transition: border-color 0.15s, color 0.15s;
+  }
+
+  .source-pill:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* ── CTA section ────────────────────────────────────── */
+
+  .cta {
+    text-align: center;
+    padding: 100px clamp(16px, 4vw, 40px) 120px;
+  }
+
+  .cta h2 {
+    font-family: var(--font-display);
+    font-size: clamp(30px, 4.5vw, 48px);
+    font-weight: 400;
+    letter-spacing: -0.035em;
+    line-height: 1.08;
+    margin-bottom: 28px;
+  }
+
+  .cta-note {
+    margin-top: 16px;
     font-size: 13px;
-    color: var(--light);
+    color: var(--ink-muted);
   }
 
-  footer a {
-    color: var(--muted);
-    text-decoration: none;
-    transition: color 0.15s;
-  }
+  /* ── Responsive (page-specific) ─────────────────────── */
 
-  footer a:hover { color: var(--fg); }
-
-  .footer-links {
-    display: flex;
-    gap: 20px;
-    list-style: none;
-  }
-
-  /* ── Scroll animations ── */
-  .reveal {
-    opacity: 0;
-    transform: translateY(20px);
-    transition: opacity 0.6s ease, transform 0.6s ease;
-  }
-
-  .reveal.visible {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  /* ── Responsive ── */
-  @media (max-width: 768px) {
-    nav { padding: 0 20px; }
-    .nav-links { display: none; }
-
-    .hero {
-      padding: 120px 20px 60px;
-    }
-
-    .hero h1 { font-size: 38px; }
-
-    section { padding: 64px 20px; }
-
-    .steps {
+  @media (max-width: 900px) {
+    .mock-app {
       grid-template-columns: 1fr;
-      gap: 32px;
     }
+    .mock-sidebar { display: block; }
+    .mock-sources { display: none; }
+    .mock-reading-wrapper { display: none; }
 
     .features-grid {
-      grid-template-columns: 1fr;
-      gap: 12px;
+      grid-template-columns: 1fr 1fr;
     }
 
     .ai-grid {
       grid-template-columns: 1fr;
     }
 
-    .tts-grid {
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-
-    .reader-body {
+    .markdown-grid {
       grid-template-columns: 1fr;
     }
 
-    .reader-sidebar { display: none; }
-
-    .markdown-split {
-      grid-template-columns: 1fr;
-      gap: 12px;
-    }
-
-    footer {
+    .creator-strip {
       flex-direction: column;
-      gap: 12px;
       text-align: center;
     }
   }
 
   @media (max-width: 480px) {
-    .hero-buttons {
-      flex-direction: column;
-      align-items: center;
+    .features-grid {
+      grid-template-columns: 1fr;
     }
 
-    .tts-grid {
-      grid-template-columns: 1fr;
+    .trust {
+      gap: 6px;
+    }
+
+    .trust-chip {
+      font-size: 12px;
+      padding: 6px 12px;
     }
   }
 </style>
 </head>
 <body>
 
+<!-- Skip link -->
+<a href="#main" class="skip-link">Skip to content</a>
+
 <!-- Nav -->
 <nav>
-  <a href="#" class="nav-brand">
-    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-      <rect x="1" y="1" width="26" height="26" rx="6" fill="#2a9d8f"/>
-      <rect x="5" y="5" width="18" height="20" rx="2" fill="#fff"/>
-      <rect x="8" y="10" width="12" height="2" rx="1" fill="#444"/>
-      <rect x="8" y="14" width="12" height="2" rx="1" fill="#444"/>
-      <rect x="8" y="18" width="8" height="2" rx="1" fill="#444"/>
-      <path d="M17 3v6l2-1.5L21 9V3z" fill="#e76f51"/>
-    </svg>
-    Pull Read
+  <a href="/" class="nav-brand">
+    <div class="nav-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+      </svg>
+    </div>
+    <span class="nav-wordmark">Pull Read</span>
   </a>
   <ul class="nav-links">
-    <li><a href="#features">Features</a></li>
-    <li><a href="#intelligence">Intelligence</a></li>
-    <li><a href="#reader">Reader</a></li>
-    <li><a href="/releases">Releases</a></li>
-    <li><a href="/faq">FAQ</a></li>
-    <li><a href="https://github.com/shellen/pullread/releases/download/latest/PullRead.dmg" class="btn btn-sm btn-teal">Download</a></li>
+    <li class="hide-m"><a href="#features">Features</a></li>
+    <li class="hide-m"><a href="#intelligence">Intelligence</a></li>
+    <li class="hide-m"><a href="/releases">Releases</a></li>
+    <li class="hide-m"><a href="/faq">FAQ</a></li>
+    <li><a href="https://github.com/nicholasgasior/gopher-eyern/releases/download/latest/PullRead.dmg" class="btn btn-sm btn-accent">
+      <svg class="dl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download</a></li>
   </ul>
 </nav>
 
 <!-- Hero -->
+<main id="main">
 <section class="hero">
-  <div class="hero-badge">
-    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 1v12M1 7h12"/></svg>
-    Version 0.4.0
-  </div>
-  <h1>Keep what<br>you read.</h1>
-  <p>Save articles from your bookmarks as clean Markdown. Read, highlight, summarize, and listen&mdash;all yours, all local.</p>
-  <div class="hero-buttons">
-    <a href="https://github.com/shellen/pullread/releases/download/latest/PullRead.dmg" class="btn btn-primary">
-      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12V2M4 8l4 4 4-4M2 14h12"/></svg>
-      Download for macOS
-    </a>
-  </div>
-  <p class="hero-note">Self-contained menu bar app. No dependencies. <a href="https://github.com/shellen/pullread/releases/download/latest/PullRead_Intel.dmg" style="color: var(--light);">Need a build for your Intel Mac?</a></p>
+  <h1>Keep what you <em>read.</em></h1>
+  <p class="subtitle">A reading app that saves articles as local Markdown files. Highlight, summarize, listen, and own everything you read.</p>
+  <a href="https://github.com/shellen/pullread/releases/download/latest/PullRead.dmg" class="btn btn-dark">
+    <svg class="dl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Download for macOS
+  </a>
+  <p class="hero-meta">Free &amp; open source &middot; macOS 13+ &middot; <a href="https://github.com/shellen/pullread">GitHub</a></p>
 </section>
 
-<!-- How it works -->
-<section class="section-alt" id="how">
-  <div class="container">
-    <div class="reveal" style="text-align: center;">
-      <div class="section-label">How it works</div>
-      <h2 class="section-title">Three steps to your reading archive</h2>
+<!-- Showcase -->
+<div class="showcase reveal">
+  <div class="app-frame">
+    <div class="app-chrome">
+      <span></span><span></span><span></span>
     </div>
-    <div class="steps reveal">
-      <div class="step">
-        <div class="step-num">1</div>
-        <h3>Connect your feeds</h3>
-        <p>Add RSS feeds from Instapaper, Pinboard, Raindrop, or any source. Paste a blog URL and Pull Read auto-discovers the feed.</p>
+    <div class="mock-app">
+
+      <!-- Sidebar: article list -->
+      <div class="mock-sidebar">
+        <div class="mock-sidebar-header">
+          <span class="brand">Pull Read</span>
+          <div class="icons">&#x2699; &#x2630;</div>
+        </div>
+        <div class="mock-search">
+          <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="4.5" cy="4.5" r="3.5"/><path d="M7 7l2.5 2.5"/></svg>
+          Search articles...
+        </div>
+        <div class="mock-tabs">
+          <span class="active">All <span class="count">842</span></span>
+          <span>Sources <span class="count">24</span></span>
+          <span>Tags <span class="count">67</span></span>
+        </div>
+        <div class="mock-item active">
+          <span class="source-pip" style="background:#ff6600;">k</span>How Do You Know What You Know?
+          <div class="item-meta"><span>4h ago</span><span class="dot"></span><span>kottke.org</span></div>
+        </div>
+        <div class="mock-item">
+          <span class="source-pip" style="background:#4a6fa5;">4</span>The Internet Archive Just Got Bigger
+          <div class="item-meta"><span>6h ago</span><span class="dot"></span><span>404media.co</span></div>
+        </div>
+        <div class="mock-item">
+          <span class="source-pip" style="background:#2c5530;">C</span>Walking and Thinking in Yakushima
+          <div class="item-meta"><span>1d ago</span><span class="dot"></span><span>craigmod.com</span></div>
+        </div>
+        <div class="mock-item">
+          <span class="source-pip" style="background:#27ae60;">L</span>New Downtown Mural Honors Watsonville's Farmworkers
+          <div class="item-meta"><span>1d ago</span><span class="dot"></span><span>lookoutlocal.com</span></div>
+        </div>
+        <div class="mock-item">
+          <span class="source-pip" style="background:#8e44ad;">H</span>Why Every Museum Is Starting to Look the Same
+          <div class="item-meta"><span>2d ago</span><span class="dot"></span><span>hyperallergic.com</span></div>
+        </div>
+        <div class="mock-item">
+          <span class="source-pip" style="background:#c0392b;">B</span>The Hidden Costs of Streaming Music
+          <div class="item-meta"><span>2d ago</span><span class="dot"></span><span>thebaffler.com</span></div>
+        </div>
+        <div class="mock-item">
+          <span class="source-pip" style="background:#5a8a7a;">B</span>A Beginner's Guide to Birdwatching in the East Bay
+          <div class="item-meta"><span>3d ago</span><span class="dot"></span><span>berkeleyside.org</span></div>
+        </div>
+        <div class="mock-item">
+          <span class="source-pip" style="background:#4a6fa5;">4</span>Behind the Blog: Using Your Brain
+          <div class="item-meta"><span>3d ago</span><span class="dot"></span><span>404media.co</span></div>
+        </div>
       </div>
-      <div class="step">
-        <div class="step-num">2</div>
-        <h3>Pull Read syncs</h3>
-        <p>Articles are fetched, cleaned with Mozilla's Readability, and saved as Markdown with rich metadata in YAML frontmatter.</p>
+
+      <!-- Sources drawer -->
+      <div class="mock-sources">
+        <div class="mock-sources-title">
+          Sources <span class="close-x">&times;</span>
+        </div>
+        <div class="source-row">
+          <div class="source-icon" style="background:#6b5b8a; font-size:11px;">&#x1F399;</div>
+          <span>Podcasts</span>
+          <span class="source-count">1365</span>
+        </div>
+        <div class="source-row">
+          <div class="source-icon" style="background:#ff6600;">k</div>
+          <span>kottke.org</span>
+          <span class="source-count">42</span>
+        </div>
+        <div class="source-row">
+          <div class="source-icon" style="background:#4a6fa5;">4</div>
+          <span>404 Media</span>
+          <span class="source-count">28</span>
+        </div>
+        <div class="source-row">
+          <div class="source-icon" style="background:#2c5530;">C</div>
+          <span>Craig Mod</span>
+          <span class="source-count">15</span>
+        </div>
+        <div class="source-row">
+          <div class="source-icon" style="background:#27ae60;">L</div>
+          <span>Lookout Santa Cruz</span>
+          <span class="source-count">20</span>
+        </div>
+        <div class="source-row">
+          <div class="source-icon" style="background:#8e44ad;">H</div>
+          <span>Hyperallergic</span>
+          <span class="source-count">22</span>
+        </div>
+        <div class="source-row">
+          <div class="source-icon" style="background:#27ae60;">B</div>
+          <span>BrooklynVegan</span>
+          <span class="source-count">28</span>
+        </div>
+        <div class="source-row">
+          <div class="source-icon" style="background:#2980b9;">T</div>
+          <span>The Markup</span>
+          <span class="source-count">18</span>
+        </div>
+        <div class="source-row">
+          <div class="source-icon" style="background:#5a8a7a;">B</div>
+          <span>Berkeleyside</span>
+          <span class="source-count">11</span>
+        </div>
+        <div class="source-row">
+          <div class="source-icon" style="background:#e74c3c;">L</div>
+          <span>Longreads</span>
+          <span class="source-count">33</span>
+        </div>
+        <div class="source-row">
+          <div class="source-icon" style="background:#4a4a4a;">D</div>
+          <span>Daring Fireball</span>
+          <span class="source-count">45</span>
+        </div>
+        <div class="source-row">
+          <div class="source-icon" style="background:#2ecc71;">L</div>
+          <span>Lifehacker</span>
+          <span class="source-count">114</span>
+        </div>
+        <div class="source-row">
+          <div class="source-icon" style="background:#e67e22;">S</div>
+          <span>Stereogum</span>
+          <span class="source-count">58</span>
+        </div>
       </div>
-      <div class="step">
-        <div class="step-num">3</div>
-        <h3>Read and annotate</h3>
-        <p>Browse in the built-in reader with highlights, notes, AI summaries, and text-to-speech. Or open files in Obsidian or any editor.</p>
+
+      <!-- Reading pane -->
+      <div class="mock-reading-wrapper">
+        <div class="mock-reading">
+          <div class="mock-source-bar">
+            <strong>kottke.org</strong> / via kottke.org &mdash; Jason Kottke's blog about interesting things on the internet and beyond
+          </div>
+          <div class="mock-tags">
+            <span class="mock-tag">internet</span>
+            <span class="mock-tag">culture</span>
+            <span class="mock-tag">curiosity</span>
+          </div>
+          <h2>How Do You Know What You Know?</h2>
+          <div class="byline">4h ago</div>
+          <div class="mock-summary">
+            <div class="mock-summary-badges">
+              <span class="badge badge-light">Summary</span>
+              <span class="badge badge-provider">ANTHROPIC</span>
+            </div>
+            <p>A reflection on how we acquire knowledge in the internet age, where information flows so freely that we rarely stop to examine the sources of our beliefs and understanding.</p>
+          </div>
+          <p class="mock-body-text">
+            We spend hours each day absorbing information from screens, but how often do we pause to consider where our knowledge actually comes from? <span class="highlight">The internet has made information abundant, but it hasn't made us better at evaluating what we consume.</span> There's an old epistemological question that feels freshly urgent.
+          </p>
+          <p class="mock-body-text">
+            The philosopher <a href="#">Timothy Williamson</a> argues that knowledge is more fundamental than belief — that we don't build knowledge from beliefs, but rather beliefs are what's left when knowledge breaks down. In a media landscape where every assertion competes for attention, this framing offers something useful.
+          </p>
+        </div>
+        <div class="mock-now-playing">
+          <div class="play-btn">
+            <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+          </div>
+          <div class="track-info">
+            <div class="track-title">How Do You Know What You Know?</div>
+            <div class="track-time">3:42 / 8:15</div>
+          </div>
+        </div>
       </div>
+
     </div>
   </div>
-</section>
+</div>
+
+<!-- Trust bar -->
+<div class="trust reveal">
+  <span class="trust-chip"><span class="chip-icon">&#x1F4C1;</span> Local Markdown files</span>
+  <span class="trust-chip"><span class="chip-icon">&#x1F4D6;</span> Focused reading experience</span>
+  <span class="trust-chip"><span class="chip-icon">&#x2728;</span> Summaries &amp; reviews</span>
+  <span class="trust-chip"><span class="chip-icon">&#x1F58D;</span> Highlights &amp; annotations</span>
+  <span class="trust-chip"><span class="chip-icon">&#x1F3A7;</span> Podcasts YouTube EPUBs</span>
+</div>
+
+<!-- Creator strip -->
+<div class="creator-strip reveal">
+  <div class="creator-avatar">JS</div>
+  <div class="creator-text">
+    Built by <a href="https://shellen.com">Jason Shellen</a> — previously at Google (Reader, Blogger), co-creator of the Atom format, and product at Pinterest and Slack.
+  </div>
+</div>
+
+<hr class="divider">
 
 <!-- Features -->
-<section id="features">
-  <div class="container">
-    <div class="reveal">
-      <div class="section-label">Features</div>
-      <h2 class="section-title">Everything you need to<br>archive what you read</h2>
-      <p class="section-subtitle">Articles, podcasts, YouTube videos, PDFs, and tweets — each with a specialized extractor.</p>
+<section class="features" id="features">
+  <div class="features-header reveal">
+    <h2>Everything you need to<br>keep what you read</h2>
+    <p>Articles, podcasts, YouTube, EPUBs — each with a specialized extractor.</p>
+  </div>
+
+  <div class="features-grid reveal">
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h12M3 7h12M3 11h8"/></svg>
+      </div>
+      <h3>Clean extraction</h3>
+      <p>Mozilla's Readability strips ads, nav, and clutter. What's left is the article, saved as beautiful Markdown.</p>
     </div>
 
-    <div class="features-grid reveal">
-      <div class="feature-card">
-        <div class="feature-icon">
-          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h12M4 8h12M4 12h8"/></svg>
-        </div>
-        <h3>Clean extraction</h3>
-        <p>Mozilla's Readability strips ads, nav, and clutter. What's left is the article, saved as beautiful Markdown.</p>
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="9 1 11.5 6 17 6.5 13 10.5 14 16 9 13 4 16 5 10.5 1 6.5 6.5 6"/></svg>
       </div>
+      <h3>Highlights &amp; notes</h3>
+      <p>Select text to highlight in four colors. Add inline annotations, article-level notes, and tags to organize your thinking.</p>
+    </div>
 
-      <div class="feature-card">
-        <div class="feature-icon">
-          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="10 2 12.5 7 18 7.5 14 11.5 15 17 10 14 5 17 6 11.5 2 7.5 7.5 7"/></svg>
-        </div>
-        <h3>Highlights &amp; notes</h3>
-        <p>Select text to highlight in four colors. Add inline annotations, article-level notes, and tags to organize your thinking.</p>
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="7"/><path d="M9 5v4l3 3"/></svg>
       </div>
+      <h3>Summaries</h3>
+      <p>Summarize with Claude, GPT, Gemini, OpenRouter, or Apple Intelligence. On supported Macs, Apple Intelligence runs privately on-device.</p>
+    </div>
 
-      <div class="feature-card">
-        <div class="feature-icon">
-          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8"/><path d="M10 6v4l3 3"/></svg>
-        </div>
-        <h3>AI summaries</h3>
-        <p>Summarize articles with Claude, GPT, Gemini, OpenRouter, or Apple Intelligence. Shown with provider and model badges.</p>
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="7"/><path d="M5 9h8M9 5v8"/></svg>
       </div>
+      <h3>Search operators</h3>
+      <p>Filter with <code>is:favorite</code>, <code>tag:design</code>, <code>has:summary</code>, AND/OR logic, and pinned filters for quick access.</p>
+    </div>
 
-      <div class="feature-card">
-        <div class="feature-icon">
-          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8"/><path d="M6 10h8M10 6v8"/></svg>
-        </div>
-        <h3>Search operators</h3>
-        <p>Filter with <code style="font-size:12px;background:rgba(0,0,0,.05);padding:1px 4px;border-radius:3px">is:favorite</code>, <code style="font-size:12px;background:rgba(0,0,0,.05);padding:1px 4px;border-radius:3px">tag:design</code>, <code style="font-size:12px;background:rgba(0,0,0,.05);padding:1px 4px;border-radius:3px">has:summary</code>, AND/OR logic, and pinned filters for quick access.</p>
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a6.5 6.5 0 0113 0"/><path d="M5 9a3.5 3.5 0 017 0"/><circle cx="8.5" cy="9" r="1"/><path d="M8.5 10v4.5M6.5 14.5h4"/></svg>
       </div>
+      <h3>Text-to-speech</h3>
+      <p>Listen to articles via browser TTS, OpenAI, or ElevenLabs. Consent gates and cost estimates for paid providers.</p>
+    </div>
 
-      <div class="feature-card">
-        <div class="feature-icon">
-          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10a7 7 0 0114 0"/><path d="M6 10a4 4 0 018 0"/><circle cx="10" cy="10" r="1"/><path d="M10 11v5M8 16h4"/></svg>
-        </div>
-        <h3>Text-to-speech</h3>
-        <p>Listen to articles via browser TTS, OpenAI, or ElevenLabs. Consent gates and cost estimates for paid providers.</p>
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="16" height="12" rx="2"/><polygon points="7 7 7 11 11 9"/></svg>
       </div>
+      <h3>YouTube transcripts</h3>
+      <p>Save videos with full transcripts when available. Search your video notes alongside articles.</p>
+    </div>
 
-      <div class="feature-card">
-        <div class="feature-icon">
-          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="16" height="12" rx="2"/><polygon points="8 8 8 12 12 10"/></svg>
-        </div>
-        <h3>YouTube transcripts</h3>
-        <p>Save videos with full transcripts when available. Search your video notes alongside articles.</p>
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2v5l3-2 3 2V2M2 16V4a2 2 0 012-2h5"/><path d="M2 16l6.5-3.5 7.5 3.5"/></svg>
       </div>
+      <h3>Dashboard &amp; Explore</h3>
+      <p>Card-based homepage with continue reading, weekly reviews, and favorites. Browse sources and explore tags.</p>
+    </div>
 
-      <div class="feature-card">
-        <div class="feature-icon">
-          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v6l3-2 3 2V3M3 18V5a2 2 0 012-2h6"/><path d="M3 18l7-4 8 4"/></svg>
-        </div>
-        <h3>Dashboard &amp; Explore</h3>
-        <p>Card-based homepage with continue reading, weekly reviews, and favorites. Browse sources sorted by recent, A&ndash;Z, or article count. Explore tags and connections.</p>
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7A6 6 0 004 7c0 6.5-2.5 8-2.5 8h15S14 13.5 14 7"/><path d="M7 15a2 2 0 004 0"/></svg>
       </div>
+      <h3>Menu bar app</h3>
+      <p>Native macOS menu bar app with sync, notifications, scheduled reviews, and automatic updates. Self-contained binary.</p>
+    </div>
 
-      <div class="feature-card">
-        <div class="feature-icon">
-          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M8 17a2 2 0 004 0"/></svg>
-        </div>
-        <h3>Menu bar app</h3>
-        <p>Native macOS menu bar app with sync, notifications, scheduled reviews, and automatic updates. Self-contained binary, no dependencies.</p>
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 1H5a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V3a2 2 0 00-2-2z"/><path d="M7 11l2 2 4-4"/></svg>
       </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">
-          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V4a2 2 0 00-2-2z"/><path d="M8 12l2 2 4-4"/></svg>
-        </div>
-        <h3>Export &amp; share</h3>
-        <p>Export articles as Markdown with optional highlights, notes, summary, and tags. Share or archive however you want.</p>
-      </div>
+      <h3>Export &amp; share</h3>
+      <p>Export articles as Markdown with optional highlights, notes, summary, and tags. Share or archive however you want.</p>
     </div>
   </div>
 </section>
 
 <!-- AI & Intelligence -->
 <section class="ai-section" id="intelligence">
-  <div class="container">
-    <div class="reveal">
-      <div class="section-label">Intelligence</div>
-      <h2 class="section-title">AI that works<br>for your reading</h2>
-      <p class="section-subtitle">Five providers, searchable summaries, and smart filtering — all optional, all on demand.</p>
+  <div class="ai-inner">
+    <div class="ai-header reveal">
+      <h2>AI that works<br>for your reading</h2>
+      <p>Five providers, searchable summaries, and smart filtering — all optional, all on demand.</p>
     </div>
 
     <div class="ai-grid reveal">
       <div class="ai-card">
         <h3>Summaries with provenance</h3>
         <p>Every summary shows which model generated it. Provider and model badges are saved to the file so you always know the source.</p>
-        <div style="margin-bottom:12px;">
-          <div class="badge-row" style="margin-bottom:8px;">
-            <span class="badge badge-gray">Summary</span>
-            <span class="badge badge-amber">Anthropic</span>
-            <span class="badge badge-gray">claude-sonnet-4-5-20250929</span>
-          </div>
-          <div class="badge-row" style="margin-bottom:8px;">
-            <span class="badge badge-gray">Summary</span>
-            <span class="badge badge-green">OpenAI</span>
-            <span class="badge badge-gray">gpt-4o</span>
-          </div>
-          <div class="badge-row" style="margin-bottom:8px;">
-            <span class="badge badge-gray">Summary</span>
-            <span class="badge badge-blue">Gemini</span>
-            <span class="badge badge-gray">gemini-2.5-flash</span>
-          </div>
-          <div class="badge-row" style="margin-bottom:8px;">
-            <span class="badge badge-gray">Summary</span>
-            <span class="badge badge-indigo">Apple Intelligence</span>
-          </div>
-          <div class="badge-row">
-            <span class="badge badge-gray">Summary</span>
-            <span class="badge badge-purple">OpenRouter</span>
-            <span class="badge badge-gray">deepseek/deepseek-r1</span>
-          </div>
+        <div class="badge-row">
+          <span class="ai-badge ai-badge-gray">Summary</span>
+          <span class="ai-badge ai-badge-indigo">Apple Intelligence</span>
+          <span class="ai-badge ai-badge-gray">on-device</span>
+        </div>
+        <div class="badge-row">
+          <span class="ai-badge ai-badge-gray">Summary</span>
+          <span class="ai-badge ai-badge-amber">Anthropic</span>
+          <span class="ai-badge ai-badge-gray">claude-haiku-4-5-20251001</span>
+        </div>
+        <div class="badge-row">
+          <span class="ai-badge ai-badge-gray">Summary</span>
+          <span class="ai-badge ai-badge-green">OpenAI</span>
+          <span class="ai-badge ai-badge-gray">gpt-5-nano</span>
+        </div>
+        <div class="badge-row">
+          <span class="ai-badge ai-badge-gray">Summary</span>
+          <span class="ai-badge ai-badge-blue">Gemini</span>
+          <span class="ai-badge ai-badge-gray">gemini-2.5-flash</span>
+        </div>
+        <div class="badge-row">
+          <span class="ai-badge ai-badge-gray">Summary</span>
+          <span class="ai-badge ai-badge-purple">OpenRouter</span>
+          <span class="ai-badge ai-badge-gray">deepseek/deepseek-r1</span>
         </div>
       </div>
 
@@ -1139,7 +1278,7 @@
         <h3>Search operators</h3>
         <p>Power-user filtering with structured operators, AND/OR groups, and quoted phrases.</p>
         <div class="search-demo">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg>
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6" cy="6" r="4.5"/><path d="M9.5 9.5l3 3"/></svg>
           is:favorite tag:design has:summary
         </div>
         <div class="op-tags">
@@ -1157,238 +1296,88 @@
   </div>
 </section>
 
-<!-- TTS -->
-<section id="tts">
-  <div class="container" style="text-align: center;">
-    <div class="reveal">
-      <div class="section-label">Text-to-speech</div>
-      <h2 class="section-title">Listen to your articles</h2>
-      <p class="section-subtitle" style="margin: 0 auto;">Four providers ranging from free built-in voices to studio-quality AI narration. Cost estimates and consent gates keep you in control.</p>
-    </div>
-
-    <div class="tts-grid reveal">
-      <div class="tts-card">
-        <div class="tts-icon" style="background: #f0fdf4; color: #16a34a;">
-          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M8 8v8M16 6v12M4 11v2M20 10v4"/></svg>
-        </div>
-        <h3>Browser</h3>
-        <p>Built-in Web Speech API with system voices</p>
-        <div class="tts-price">Free</div>
-      </div>
-      <div class="tts-card">
-        <div class="tts-icon" style="background: #f0fdf4; color: #16a34a;">
-          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M8 8v8M16 6v12M4 11v2M20 10v4"/></svg>
-        </div>
-        <h3>OpenAI</h3>
-        <p>High-quality TTS with natural-sounding voices</p>
-        <div class="tts-price">~$0.015 / 1K chars</div>
-      </div>
-      <div class="tts-card">
-        <div class="tts-icon" style="background: #eff6ff; color: #2563eb;">
-          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M8 8v8M16 6v12M4 11v2M20 10v4"/></svg>
-        </div>
-        <h3>ElevenLabs</h3>
-        <p>Premium studio-quality voice clones</p>
-        <div class="tts-price">~$0.30 / 1K chars</div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- Reader -->
-<section class="section-alt reader-section" id="reader">
-  <div class="container">
-    <div class="reveal" style="text-align: center;">
-      <div class="section-label">Built-in reader</div>
-      <h2 class="section-title">A reading experience you'll enjoy</h2>
-      <p class="section-subtitle" style="margin: 0 auto;">Four themes. Multiple reading fonts with Work Sans app chrome. Google Reader keyboard shortcuts. Highlights in four colors. Sortable sources, notes, tags, and voice recording.</p>
-    </div>
-
-    <div class="reader-preview reveal">
-      <div class="reader-body">
-        <div class="reader-sidebar">
-          <div class="reader-sidebar-header">
-            <span class="reader-brand">PullRead</span>
-            <div class="reader-header-icons">
-              <span>&#x2699;</span>
-              <span>&#x2630;</span>
-            </div>
-          </div>
-          <div class="reader-sidebar-search">
-            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="5" r="4"/><path d="M8 8l3 3"/></svg>
-            Search articles...
-          </div>
-          <div class="reader-sidebar-nav">
-            <span class="active">All<span class="nav-count">842</span></span>
-            <span>Sources<span class="nav-count">24</span></span>
-            <span>Tags<span class="nav-count">67</span></span>
-          </div>
-          <div class="reader-sidebar-item">
-            <span class="favicon teal"></span>How to Write Better Code
-            <div class="meta">
-              <span>Feb 8</span>
-              <span class="dot-sep"></span>
-              <span>blog.example.com</span>
-            </div>
-          </div>
-          <div class="reader-sidebar-item active">
-            <span class="favicon orange"></span>The Case for Local-First
-            <div class="meta">
-              <span>Feb 7</span>
-              <span class="dot-sep"></span>
-              <span>inkandswitch.com</span>
-              <span class="summary-dot"></span>
-            </div>
-          </div>
-          <div class="reader-sidebar-item">
-            <span class="favicon blue"></span>Understanding WebAssembly
-            <div class="meta">
-              <span>Feb 6</span>
-              <span class="dot-sep"></span>
-              <span>hacks.mozilla.org</span>
-              <span class="summary-dot"></span>
-            </div>
-          </div>
-          <div class="reader-sidebar-item">
-            <span class="favicon"></span>Why RSS Still Matters
-            <div class="meta">
-              <span>Feb 5</span>
-              <span class="dot-sep"></span>
-              <span>atthispoint.net</span>
-            </div>
-          </div>
-          <div class="reader-sidebar-item">
-            <span class="favicon purple"></span>Building CLI Tools in Bun
-            <div class="meta">
-              <span>Feb 4</span>
-              <span class="dot-sep"></span>
-              <span>bun.sh</span>
-            </div>
-          </div>
-        </div>
-        <div class="reader-content">
-          <h2>The Case for Local-First</h2>
-          <div class="byline">
-            Martin Kleppmann
-            <span class="dot-sep"></span>
-            inkandswitch.com
-            <span class="dot-sep"></span>
-            Feb 7, 2026
-          </div>
-          <div class="reader-summary">
-            <div class="reader-summary-badges">
-              <span class="badge badge-gray-light">Summary</span>
-              <span class="badge badge-amber-light">Anthropic</span>
-              <span class="badge badge-gray-light">claude-sonnet-4-5-20250929</span>
-            </div>
-            <p>Explores why local-first software — keeping data on the device while enabling collaboration — offers better ownership, speed, and privacy than cloud-only apps.</p>
-          </div>
-          <div class="mock-paragraph">
-            Cloud apps have become the default, but they come with trade-offs that most people accept without question: latency, lock-in, and the assumption that your data lives on someone else's server.
-          </div>
-          <div class="mock-paragraph">
-            <span class="highlight">Local-first software keeps your data on your device while still enabling collaboration.</span> The idea is simple: you shouldn't need a server to use your own files.
-          </div>
-          <div class="mock-text"></div>
-          <div class="mock-text"></div>
-          <div class="mock-text"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
 <!-- Markdown format -->
-<section id="format">
-  <div class="container">
-    <div class="reveal">
-      <div class="section-label">Your data, your format</div>
-      <h2 class="section-title">Plain Markdown with<br>rich metadata</h2>
-      <p class="section-subtitle">Every article is a <code style="font-size:14px;background:rgba(0,0,0,.05);padding:2px 6px;border-radius:4px">.md</code> file with YAML frontmatter. Open them in Obsidian, Logseq, VS Code, or any text editor.</p>
-    </div>
+<section class="markdown-section" id="format">
+  <div class="markdown-header reveal">
+    <h2>Plain Markdown with<br>rich metadata</h2>
+    <p>Every article is a <code>.md</code> file with YAML frontmatter. Open them in Obsidian, Logseq, VS Code, or any text editor.</p>
+  </div>
 
-    <div class="markdown-split reveal">
-      <div class="markdown-block">
-        <div class="markdown-block-header">Article file</div>
-        <pre><span class="key">---</span>
-<span class="key">title:</span> <span class="val">"The Case for Local-First"</span>
-<span class="key">url:</span> https://inkandswitch.com/local-first
-<span class="key">bookmarked:</span> 2026-02-07T14:30:00Z
-<span class="key">domain:</span> inkandswitch.com
-<span class="key">author:</span> <span class="val">"Martin Kleppmann"</span>
-<span class="key">feed:</span> instapaper
-<span class="key">summary:</span> <span class="val">"Explores the benefits of..."</span>
+  <div class="markdown-grid reveal">
+    <div class="markdown-text">
+      <h3>Your data, your format</h3>
+      <p>Articles are saved as date-prefixed, slugified Markdown files with YAML frontmatter containing title, URL, author, domain, tags, and summary metadata.</p>
+      <p>The <code>.notes/</code> directory stores highlights and annotations as JSON. TTS audio is cached locally. Everything stays on your machine.</p>
+    </div>
+    <div class="code-block">
+      <div class="code-block-header">article.md</div>
+      <pre><span class="key">---</span>
+<span class="key">title:</span> <span class="val">"How Do You Know What You Know?"</span>
+<span class="key">url:</span> https://kottke.org/26/02/how-do-you-know
+<span class="key">bookmarked:</span> 2026-02-27T10:15:00Z
+<span class="key">domain:</span> kottke.org
+<span class="key">author:</span> <span class="val">"Jason Kottke"</span>
+<span class="key">feed:</span> kottke.org
+<span class="key">tags:</span> [internet, culture, curiosity]
+<span class="key">summary:</span> <span class="val">"A reflection on knowledge..."</span>
 <span class="key">summaryProvider:</span> anthropic
-<span class="key">summaryModel:</span> claude-sonnet-4-5-20250929
+<span class="key">summaryModel:</span> claude-haiku-4-5-20251001
 <span class="key">---</span>
 
-Cloud apps have become the default,
-but they come with trade-offs...
-</pre>
-      </div>
-      <div class="markdown-block">
-        <div class="markdown-block-header">File structure</div>
-        <pre>~/Dropbox/Articles/
-<span class="val">  2026-02-08-how-to-write-better-code.md</span>
-<span class="val">  2026-02-07-the-case-for-local-first.md</span>
-<span class="val">  2026-02-06-understanding-webassembly.md</span>
-<span class="val">  2026-02-05-why-rss-still-matters.md</span>
-<span class="val">  2026-02-04-building-cli-tools-in-bun.md</span>
-<span class="val">  .notes/</span>
-<span class="val">    highlights-and-annotations.json</span>
-<span class="val">  .tts-cache/</span>
-<span class="val">    the-case-for-local-first.mp3</span>
+<span class="heading"># How Do You Know What You Know?</span>
 
-Date-prefixed, slugified filenames.
-Compatible with Obsidian, VS Code,
-or any tool that reads Markdown.
-</pre>
-      </div>
+We spend hours each day absorbing
+information from screens, but how often
+do we pause to consider where our
+knowledge actually comes from?</pre>
     </div>
   </div>
 </section>
 
-<!-- Services -->
-<section class="section-alt">
-  <div class="container" style="text-align: center;">
-    <div class="reveal">
-      <div class="section-label">Integrations</div>
-      <h2 class="section-title">Connect your favorite services</h2>
-      <p class="section-subtitle" style="margin: 0 auto;">Pull Read works with any service that offers an RSS feed, plus direct bookmark import from browsers.</p>
-    </div>
-    <div class="service-logos reveal">
-      <span class="service-tag">Instapaper</span>
-      <span class="service-tag">Pinboard</span>
-      <span class="service-tag">Raindrop.io</span>
-      <span class="service-tag">Omnivore</span>
-      <span class="service-tag">Feedbin</span>
-      <span class="service-tag">Hacker News</span>
-      <span class="service-tag">YouTube</span>
-      <span class="service-tag">Any RSS Feed</span>
-      <span class="service-tag">Browser Bookmarks</span>
-    </div>
+<hr class="divider">
+
+<!-- Sources / Integrations -->
+<div class="sources-section reveal">
+  <div class="sources-header">
+    <h2>Connect your sources</h2>
+    <p>Pull Read works with any service that offers an RSS feed, plus direct import from bookmark services.</p>
   </div>
-</section>
+  <div class="source-pills">
+    <span class="source-pill">Instapaper</span>
+    <span class="source-pill">Pocket</span>
+    <span class="source-pill">Pinboard</span>
+    <span class="source-pill">Raindrop.io</span>
+    <span class="source-pill">Feedbin</span>
+    <span class="source-pill">Blogs</span>
+    <span class="source-pill">Substack</span>
+    <span class="source-pill">Ghost</span>
+    <span class="source-pill">Buttondown</span>
+    <span class="source-pill">Beehiiv</span>
+    <span class="source-pill">Mastodon</span>
+    <span class="source-pill">Hacker News</span>
+    <span class="source-pill">YouTube</span>
+    <span class="source-pill">Podcasts</span>
+    <span class="source-pill">Any RSS / Atom / JSON Feed</span>
+  </div>
+</div>
 
 <!-- CTA -->
-<section class="cta" id="download">
-  <div class="reveal">
-    <h2>Start keeping<br>what you read.</h2>
-    <p>Built for readers who care about owning their data.</p>
-    <div class="cta-buttons">
-      <a href="https://github.com/shellen/pullread/releases/download/latest/PullRead.dmg" class="btn btn-teal">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12V2M4 8l4 4 4-4M2 14h12"/></svg>
-        Download for macOS
-      </a>
-    </div>
-    <p style="margin-top: 16px; font-size: 13px;"><a href="https://github.com/shellen/pullread/releases/download/latest/PullRead_Intel.dmg" style="color: var(--light);">Need a build for your Intel Mac?</a></p>
-  </div>
+<section class="cta reveal" id="download">
+  <h2>Start keeping<br>what you read.</h2>
+  <a href="https://github.com/shellen/pullread/releases/download/latest/PullRead.dmg" class="btn btn-dark">
+    <svg class="dl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Download for macOS
+  </a>
+  <p class="cta-note">Free &amp; open source &middot; macOS 13+ &middot; Apple Silicon &amp; Intel</p>
 </section>
+</main>
 
 <!-- Footer -->
 <footer>
-  <a href="https://alittledrive.com" style="font-weight: 600; letter-spacing: -0.01em;">A Little Drive</a>
-  <ul class="footer-links">
+  <div class="f-left">
+    <a href="https://alittledrive.com" style="font-weight: 600; letter-spacing: -0.01em;">A Little Drive</a>
+  </div>
+  <ul class="f-links">
     <li><a href="/privacy">Privacy</a></li>
     <li><a href="/terms">Terms</a></li>
     <li><a href="/releases">Releases</a></li>
@@ -1402,7 +1391,7 @@ const revealEls = document.querySelectorAll('.reveal');
 const observer = new IntersectionObserver((entries) => {
   entries.forEach(entry => {
     if (entry.isIntersecting) {
-      entry.target.classList.add('visible');
+      entry.target.classList.add('vis');
       observer.unobserve(entry.target);
     }
   });
