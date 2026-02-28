@@ -269,9 +269,10 @@ function parseRssFeed(rss: any): FeedEntry[] {
       };
     }
 
-    // RSS author: <dc:creator> or <author> (often an email address)
+    // RSS author: <dc:creator> or <author> (often an email address, sometimes CDATA)
     const rawAuthor = item['dc:creator'] || item.author || '';
-    const authorStr = typeof rawAuthor === 'string' ? rawAuthor.trim() : '';
+    const authorStr = typeof rawAuthor === 'string' ? rawAuthor.trim()
+      : rawAuthor?.__cdata?.trim() || rawAuthor?.['#text']?.trim() || '';
     // Strip email format like "email (Name)" → "Name"
     const authorName = authorStr.includes('@')
       ? (authorStr.match(/\(([^)]+)\)/)?.[1] || '').trim()

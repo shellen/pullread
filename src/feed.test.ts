@@ -1355,3 +1355,75 @@ describe('parseFeed - RSS description as contentHtml fallback', () => {
     expect(entries[0].annotation).toBeDefined();
   });
 });
+
+describe('parseFeed - Substack RSS feeds', () => {
+  test('extracts full article from content:encoded with short description', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
+  <channel>
+    <title><![CDATA[Test Newsletter]]></title>
+    <generator>Substack</generator>
+    <item>
+      <title><![CDATA[How To Build Great Products]]></title>
+      <description><![CDATA[Community Wisdom 175]]></description>
+      <link>https://newsletter.example.com/p/how-to-build-great-products</link>
+      <guid isPermaLink="false">https://newsletter.example.com/p/how-to-build-great-products</guid>
+      <dc:creator><![CDATA[Test Author]]></dc:creator>
+      <pubDate>Fri, 28 Feb 2026 12:00:00 GMT</pubDate>
+      <content:encoded><![CDATA[<p>This is the full article body from Substack with multiple paragraphs of content.</p><p>Substack stores the real content in content:encoded while description is just a teaser.</p>]]></content:encoded>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].title).toBe('How To Build Great Products');
+    expect(entries[0].contentHtml).toBeDefined();
+    expect(entries[0].contentHtml).toContain('full article body from Substack');
+    expect(entries[0].annotation).toBe('Community Wisdom 175');
+    expect(entries[0].author).toBe('Test Author');
+  });
+
+  test('extracts content:encoded even with very short description', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0">
+  <channel>
+    <title><![CDATA[Kelly's Newsletter]]></title>
+    <generator>Substack</generator>
+    <item>
+      <title><![CDATA[Photos From My Trip]]></title>
+      <description><![CDATA[Eric Dane ❤️]]></description>
+      <link>https://kelly.substack.com/p/photos-from-my-trip</link>
+      <dc:creator><![CDATA[Kelly Oxford]]></dc:creator>
+      <pubDate>Wed, 26 Feb 2026 18:00:00 GMT</pubDate>
+      <content:encoded><![CDATA[<div class="captioned-image-container"><figure><img src="https://cdn.substack.com/image/fetch/photo.jpg" alt="A photo from the trip"/></figure></div><p>Here are the photos I promised from last week's adventure. We started early in the morning and the light was incredible.</p>]]></content:encoded>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].contentHtml).toBeDefined();
+    expect(entries[0].contentHtml).toContain('captioned-image-container');
+    expect(entries[0].contentHtml).toContain('photos I promised');
+  });
+
+  test('handles paywall preview in content:encoded', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0">
+  <channel>
+    <title><![CDATA[Premium Newsletter]]></title>
+    <generator>Substack</generator>
+    <item>
+      <title><![CDATA[Deep Dive: Engineering at Scale]]></title>
+      <description><![CDATA[Notes from the summit and workshop on the future of development.]]></description>
+      <link>https://premium.substack.com/p/deep-dive-engineering</link>
+      <dc:creator><![CDATA[Premium Author]]></dc:creator>
+      <pubDate>Mon, 24 Feb 2026 10:00:00 GMT</pubDate>
+      <content:encoded><![CDATA[<p>Two weeks ago, I hosted the annual summit in San Francisco.</p><p>This post is for paid subscribers only. <a href="https://premium.substack.com/subscribe">Subscribe</a> to read the rest.</p>]]></content:encoded>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].contentHtml).toBeDefined();
+    expect(entries[0].contentHtml).toContain('annual summit');
+    expect(entries[0].contentHtml).toContain('Subscribe');
+  });
+});
