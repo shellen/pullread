@@ -4928,6 +4928,165 @@
     cursor: pointer;
   }
 
+  /* Manage Sources view */
+  .content-wrap.manage-sources-view {
+    font-family: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .manage-sources-view .card,
+  .manage-sources-view .input-field,
+  .manage-sources-view .callout,
+  .manage-sources-view .btn-primary { /* inherit settings-view patterns via shared classes */ }
+
+  .sources-header {
+    padding: 20px 24px 0;
+  }
+  .sources-header h1 {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--fg);
+    letter-spacing: -0.3px;
+    margin: 0;
+  }
+  .sources-desc {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 4px 0 0;
+  }
+  .sources-content {
+    padding: 16px 24px 24px;
+  }
+  .sources-add-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .sources-add-row .input-field {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 12.5px;
+    background: var(--bg);
+    color: var(--fg);
+    outline: none;
+  }
+  .sources-add-row .input-field:focus { border-color: var(--link); }
+  .sources-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--fg);
+  }
+  .sources-filter {
+    max-width: 200px;
+    font-size: 12px !important;
+    padding: 4px 8px !important;
+  }
+  .sources-feed-list {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .sources-discover-header {
+    margin-top: 32px;
+    margin-bottom: 16px;
+  }
+  .sources-discover-header h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--fg);
+    margin: 0;
+  }
+  .bundle-cards {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+  .bundle-card {
+    flex: 0 0 240px;
+    scroll-snap-align: start;
+    background: var(--sidebar-bg, var(--bg));
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .bundle-card-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--fg);
+  }
+  .bundle-card-desc {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+  .bundle-card-count {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .bundle-card-feeds {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 4px 0;
+  }
+  .bundle-feed-pill {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--fg);
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 150ms ease;
+    white-space: nowrap;
+  }
+  .bundle-feed-pill:hover:not(.subscribed) {
+    border-color: var(--link);
+    color: var(--link);
+  }
+  .bundle-feed-pill.subscribed {
+    opacity: 0.5;
+    cursor: default;
+    pointer-events: none;
+  }
+  .bundle-add-all {
+    margin-top: auto;
+    font-size: 12px;
+    padding: 6px 14px;
+  }
+  .bundle-all-added {
+    margin-top: auto;
+    font-size: 12px;
+    color: #22c55e;
+    font-weight: 500;
+  }
+  .sources-picks-header {
+    margin-top: 24px;
+    margin-bottom: 8px;
+  }
+  .sources-picks-header h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--fg);
+    margin: 0;
+  }
+  .sources-picks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
   .explore-stats {
     display: flex;
     gap: 24px;

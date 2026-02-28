@@ -304,7 +304,6 @@ document.addEventListener('click', function(e) {
 var _settingsActiveTab = 'general';
 var _settingsTabMap = {
   'settings-sync': 'general',
-  'settings-feeds': 'general',
   'settings-viewer-mode': 'general',
   'settings-sharing': 'general',
   'settings-voice': 'reading',
@@ -424,6 +423,7 @@ function showSettingsPage(scrollToSection) {
   const empty = document.getElementById('empty-state');
   empty.style.display = 'none';
   content.style.display = 'block';
+  content.classList.remove('manage-sources-view');
   content.classList.add('settings-view');
   document.title = 'Settings \u2014 PullRead';
   document.getElementById('margin-notes').innerHTML = '';
@@ -493,12 +493,6 @@ function showSettingsPage(scrollToSection) {
   html += '</div>';
   html += '</div>';
 
-  // -- Sources card (loaded async with feed list) --
-  html += '<div class="card" id="settings-feeds">';
-  html += '<div class="card-title">Sources</div>';
-  html += '<div class="card-desc">Manage your feeds, newsletters, and bookmark services.</div>';
-  html += '<p style="color:var(--muted);font-size:13px">Loading sources\u2026</p>';
-  html += '</div>';
 
   // -- Sharing card --
   var mastodonInstance = localStorage.getItem('pr-mastodon-instance') || '';
@@ -701,82 +695,6 @@ function showSettingsPage(scrollToSection) {
 
       sec.innerHTML = h;
       sec._configData = cfg;
-
-      // Populate Sources card with feed list
-      var feedSec = document.getElementById('settings-feeds');
-      if (feedSec) {
-        var feeds = cfg.feeds || {};
-        var feedNames = Object.keys(feeds);
-        var fh = '<div class="card-title">Sources</div>';
-        fh += '<div class="card-desc">Manage your feeds, newsletters, and bookmark services.</div>';
-
-        // Add feed input
-        fh += '<div style="display:flex;gap:8px;margin-bottom:12px">';
-        fh += '<input type="text" id="sp-new-feed" placeholder="Paste feed URL or web address\u2026" class="input-field" style="flex:1" onkeydown="if(event.key===\'Enter\')settingsAddFeed()">';
-        fh += '<button class="btn-primary" onclick="settingsAddFeed()" id="sp-add-feed-btn" style="font-size:13px;padding:6px 14px;white-space:nowrap">Add</button>';
-        fh += '<button onclick="settingsImportOPML()" style="font-size:13px;padding:6px 14px;white-space:nowrap;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit">Import OPML</button>';
-        fh += '</div>';
-
-        if (feedNames.length > 0) {
-          // Search filter for large feed lists
-          if (feedNames.length > 8) {
-            fh += '<div style="margin-bottom:8px"><input type="text" placeholder="Filter sources\u2026" class="input-field" style="width:100%" oninput="settingsFilterFeeds(this.value)"></div>';
-          }
-
-          var initialShow = 10;
-          fh += '<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">';
-          for (var fi = 0; fi < feedNames.length; fi++) {
-            var fn = feedNames[fi];
-            var hidden = fi >= initialShow ? ' feed-row-hidden' : '';
-            var hiddenStyle = fi >= initialShow ? ' style="display:none"' : '';
-            fh += '<div class="feed-row' + hidden + '" id="feed-row-' + fi + '" data-feed-name="' + escapeHtml(fn.toLowerCase()) + '" data-feed-url="' + escapeHtml(feeds[fn].toLowerCase()) + '"' + hiddenStyle + '>';
-            fh += '<div style="flex:1;min-width:0">';
-            fh += '<div style="font-weight:500;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(fn) + '</div>';
-            fh += '<div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(feeds[fn]) + '</div>';
-            fh += '</div>';
-            fh += '<div style="display:flex;gap:4px;flex-shrink:0">';
-            fh += '<button onclick="settingsEditFeed(' + fi + ')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:12px;padding:2px 6px" title="Edit"><svg class="icon icon-sm"><use href="#i-pen"/></svg></button>';
-            fh += '<button onclick="settingsRemoveFeed(\'' + escapeHtml(fn.replace(/'/g, "\\'")) + '\')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:2px 6px" title="Remove">&times;</button>';
-            fh += '</div></div>';
-          }
-          fh += '</div>';
-          if (feedNames.length > initialShow) {
-            fh += '<button id="feed-expand-toggle" data-expanded="0" onclick="toggleFeedList()" style="display:block;width:100%;margin-top:6px;padding:6px;text-align:center;font-size:12px;color:var(--link);background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit">Show ' + (feedNames.length - initialShow) + ' more feeds</button>';
-          }
-        } else {
-          fh += '<p style="color:var(--muted);font-size:13px">No feeds configured. Paste a feed URL above to get started.</p>';
-        }
-
-        fh += '<div style="font-size:11px;color:var(--muted);margin-top:10px;line-height:1.6">'
-          + 'Paste a bookmark feed URL from Instapaper, Pinboard, Raindrop, or Pocket. '
-          + 'You can also subscribe to newsletters and blogs \u2014 just paste the web address.'
-          + '</div>';
-
-        feedSec.innerHTML = fh;
-        feedSec._configData = cfg;
-
-        // Load feed status to show errors
-        fetch('/api/feed-status').then(function(r) { return r.json(); }).then(function(status) {
-          for (var sn in status) {
-            if (!status[sn].ok) {
-              var rows = document.querySelectorAll('.feed-row');
-              for (var ri = 0; ri < rows.length; ri++) {
-                if (rows[ri].getAttribute('data-feed-name') === sn.toLowerCase()) {
-                  var nameDiv = rows[ri].querySelector('div:first-child');
-                  if (nameDiv) {
-                    var idx = rows[ri].id.replace('feed-row-', '');
-                    nameDiv.innerHTML += '<div style="font-size:11px;color:#dc2626;display:flex;align-items:center;gap:4px;margin-top:2px">'
-                      + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(status[sn].error || 'Sync failed') + '</span>'
-                      + '<button onclick="settingsRetryFeed(\'' + escapeHtml(sn.replace(/'/g, "\\'")) + '\',\'' + escapeHtml((cfg.feeds[sn] || '').replace(/'/g, "\\'")) + '\',' + idx + ')" style="flex-shrink:0;font-size:10px;padding:2px 8px;background:none;border:1px solid #dc2626;border-radius:4px;color:#dc2626;cursor:pointer;font-family:inherit">Retry</button>'
-                      + '</div>';
-                  }
-                  break;
-                }
-              }
-            }
-          }
-        }).catch(function() {});
-      }
     }).catch(function() {
       var sec = document.getElementById('settings-sync');
       if (sec) {

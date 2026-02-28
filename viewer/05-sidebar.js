@@ -893,7 +893,7 @@ function openSourcesDrawer() {
   // Show footer with "Manage Sources" button
   if (footerEl) {
     footerEl.style.display = '';
-    footerEl.innerHTML = '<button onclick="closeDrawer();showSettingsPage(\'settings-feeds\')">'
+    footerEl.innerHTML = '<button onclick="closeDrawer();showManageSourcesPage()">'
       + '<svg aria-hidden="true"><use href="#i-gear"/></svg>'
       + 'Manage Sources'
       + '</button>';
