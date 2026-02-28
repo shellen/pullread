@@ -1185,6 +1185,97 @@ describe('parseFeed - thumbnail extraction', () => {
     const entries = parseFeed(feed);
     expect(entries[0].thumbnail).toBe('https://example.com/full.jpg');
   });
+
+  test('falls back to channel-level itunes:image in RSS', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>NPR News Hour</title>
+    <itunes:image href="https://podcast.com/show-art.jpg"/>
+    <item>
+      <title>Episode Without Art</title>
+      <link>https://podcast.com/ep1</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <enclosure url="https://cdn.example.com/ep1.mp3" type="audio/mpeg"/>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].thumbnail).toBe('https://podcast.com/show-art.jpg');
+  });
+
+  test('falls back to channel-level image url in RSS', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Blog Feed</title>
+    <image>
+      <url>https://blog.com/logo.png</url>
+      <title>Blog</title>
+      <link>https://blog.com</link>
+    </image>
+    <item>
+      <title>Post Without Image</title>
+      <link>https://blog.com/post1</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].thumbnail).toBe('https://blog.com/logo.png');
+  });
+
+  test('per-item artwork takes precedence over channel artwork in RSS', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>Podcast With Both</title>
+    <itunes:image href="https://podcast.com/show-art.jpg"/>
+    <item>
+      <title>Episode With Own Art</title>
+      <link>https://podcast.com/ep1</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <itunes:image href="https://podcast.com/ep1-art.jpg"/>
+      <enclosure url="https://cdn.example.com/ep1.mp3" type="audio/mpeg"/>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].thumbnail).toBe('https://podcast.com/ep1-art.jpg');
+  });
+
+  test('falls back to feed-level image in Atom', () => {
+    const feed = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">
+  <title>Atom Feed With Logo</title>
+  <icon>https://example.com/feed-icon.png</icon>
+  <entry>
+    <title>Entry Without Image</title>
+    <link href="https://example.com/atom-entry"/>
+    <id>urn:uuid:feed-img-1</id>
+    <updated>2024-01-29T12:00:00Z</updated>
+  </entry>
+</feed>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].thumbnail).toBe('https://example.com/feed-icon.png');
+  });
+
+  test('per-entry artwork takes precedence over feed-level image in Atom', () => {
+    const feed = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">
+  <title>Atom Feed With Logo</title>
+  <icon>https://example.com/feed-icon.png</icon>
+  <entry>
+    <title>Entry With Own Image</title>
+    <link href="https://example.com/atom-entry"/>
+    <id>urn:uuid:feed-img-2</id>
+    <updated>2024-01-29T12:00:00Z</updated>
+    <media:content url="https://example.com/entry-hero.jpg" medium="image"/>
+  </entry>
+</feed>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].thumbnail).toBe('https://example.com/entry-hero.jpg');
+  });
 });
 
 describe('parseFeed - RSS description as contentHtml fallback', () => {

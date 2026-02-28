@@ -174,6 +174,7 @@ function parseAtomFeed(feed: any): FeedEntry[] {
 
   // Feed-level author (Atom allows <author> on <feed> as default for entries)
   const feedAuthor = extractAtomAuthorName(feed.author);
+  const feedImage = feed.logo || feed.icon || undefined;
 
   return entries.map((entry: any) => {
     const url = resolveAtomLink(entry.link);
@@ -197,6 +198,7 @@ function parseAtomFeed(feed: any): FeedEntry[] {
 
     const thumbnail = extractMediaUrl(entry['media:content'])
       || extractMediaUrl(entry['media:thumbnail'])
+      || feedImage
       || undefined;
 
     return {
@@ -218,6 +220,8 @@ function parseRssFeed(rss: any): FeedEntry[] {
   if (!channel || !channel.item) {
     return [];
   }
+
+  const channelImage = channel['itunes:image']?.['@_href'] || channel?.image?.url || undefined;
 
   const items = Array.isArray(channel.item) ? channel.item : [channel.item];
 
@@ -278,6 +282,7 @@ function parseRssFeed(rss: any): FeedEntry[] {
     const thumbnail = extractMediaUrl(item['media:content'])
       || extractMediaUrl(item['media:thumbnail'])
       || item['itunes:image']?.['@_href']
+      || channelImage
       || undefined;
 
     return [{
