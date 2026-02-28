@@ -262,4 +262,25 @@ test.describe('Sharing', () => {
     await expect(hlToolbar).toBeVisible({ timeout: 3000 });
     await expect(hlToolbar.locator('.hl-share-btn')).toBeVisible();
   });
+
+  test('messages button uses correct sms: URL format', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.file-item');
+
+    // Load an article
+    await page.click('.file-item');
+    await page.waitForSelector('#content', { state: 'visible' });
+
+    // Open share dropdown
+    await page.click('.toolbar-action-btn[aria-label="Share article"]');
+    await page.waitForSelector('.share-dropdown-panel');
+
+    // Get the Messages button's onclick attribute
+    const messagesBtn = page.locator('.share-dropdown-panel button', { hasText: 'Messages' });
+    const onclick = await messagesBtn.getAttribute('onclick');
+
+    // Must use sms:?body= (RFC 5724), not sms:&body=
+    expect(onclick, 'Messages button must use sms:?body= format').toContain('sms:?body=');
+    expect(onclick).not.toContain('sms:&body=');
+  });
 });

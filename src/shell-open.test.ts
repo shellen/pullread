@@ -26,12 +26,12 @@ describe('Tauri shell open URL validation', () => {
       expect(re.test('mailto:?subject=Test&body=Hello')).toBe(true);
     });
 
-    test('sms with body only', () => {
-      expect(re.test('sms:&body=Check this out')).toBe(true);
+    test('sms with body only (? separator)', () => {
+      expect(re.test('sms:?body=Check this out')).toBe(true);
     });
 
     test('sms with phone number', () => {
-      expect(re.test('sms:+15551234567&body=Hello')).toBe(true);
+      expect(re.test('sms:+15551234567?body=Hello')).toBe(true);
     });
 
     test('tel with phone number', () => {

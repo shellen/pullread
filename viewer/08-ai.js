@@ -244,7 +244,7 @@ function toggleShareDropdown(e) {
     <hr>
     <div class="share-group-label">Send</div>
     <button onclick="prOpenExternal('mailto:?subject=${encodedTitle}&body=${encodedText}')"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-envelope"/></svg> Email</button>
-    <button onclick="prOpenExternal('sms:&body=${encodedText}')"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-comment"/></svg> Messages</button>
+    <button onclick="prOpenExternal('sms:?body=${encodedText}')"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-comment"/></svg> Messages</button>
   `;
 
   e.target.closest('.share-dropdown').appendChild(panel);
@@ -676,7 +676,7 @@ function showQuoteSharePanel(quote, title, url) {
   html += '<hr>';
   html += '<div class="share-group-label">Send</div>';
   html += '<button onclick="prOpenExternal(\'mailto:?subject=' + encodeURIComponent(title) + '&body=' + encodedText + '\')"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-envelope"/></svg> Email</button>';
-  html += '<button onclick="prOpenExternal(\'sms:&body=' + encodedText + '\')"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-comment"/></svg> Messages</button>';
+  html += '<button onclick="prOpenExternal(\'sms:?body=' + encodedText + '\')"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-comment"/></svg> Messages</button>';
 
   panel.innerHTML = html;
   panel.setAttribute('data-clipboard-text', clipboardText);
