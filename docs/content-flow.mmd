@@ -1,0 +1,121 @@
+%% ABOUTME: Content acquisition flow diagram for PullRead
+%% ABOUTME: Shows decision paths for feeds, links, and manual actions
+
+flowchart TD
+    subgraph ENTRY["Entry Points"]
+        RSS["RSS / Atom / JSON Feed sync"]
+        INBOX["Inbox item\n(deep link, share, bookmarklet)"]
+        IMPORT["Bookmark import\n(HTML file)"]
+        MANUAL["User clicks\n'Re-fetch from source'"]
+        BULK["'Reimport All'\nfrom Settings"]
+    end
+
+    subgraph PARSE["Feed Parsing  (feed.ts)"]
+        FETCH_FEED["fetchFeed(url)"]
+        CE{"content:encoded\n> 50 chars?"}
+        DESC{"description\n> 50 chars?"}
+        HAS_CONTENT["contentHtml = RSS content\n(source of truth)"]
+        NO_CONTENT["contentHtml = undefined\n(needs extraction)"]
+    end
+
+    subgraph SYNC["Sync Pipeline  (index.ts)"]
+        ENCLOSURE{"Has enclosure?\n(podcast/media)"}
+        CONTENT_CHECK{"entry.contentHtml\nexists?"}
+        HTML_TO_MD["htmlToMarkdown()\nTurndown, no Readability\nsource: 'feed'"]
+        EXTRACT["fetchAndExtract(url)\nReadability + Turndown\nsource: 'extracted'"]
+        SHORT{"Markdown\n< 200 chars?"}
+        RETRY["Retry once\nafter 3s delay"]
+        STILL_SHORT{"Still\n< 200 chars?"}
+        MARK_FAILED["Mark failed\n(no file written)"]
+        WRITE["writeArticle()\nMarkdown + frontmatter"]
+    end
+
+    subgraph POST["Post-Sync Repair  (index.ts)"]
+        SCAN["Scan ALL articles"]
+        REPAIR_CHECK{"source != 'feed'\nAND body < 200 chars?"}
+        REPROCESS_AUTO["reprocessFile()\n(no force)"]
+        SKIP_FEED["Skip\n(feed content is authoritative)"]
+    end
+
+    subgraph VIEW["Viewer Auto-Repair  (sidebar)"]
+        OPEN_ARTICLE["User opens article"]
+        VIEW_CHECK{"source != 'feed'\nAND body < 200 chars?"}
+        REPROCESS_VIEW["reprocessFile()\n(no force)"]
+        SKIP_FEED_VIEW["Skip"]
+    end
+
+    subgraph USER_ACTIONS["User-Initiated Actions  (viewer)"]
+        FETCH_FULL["'Fetch full content'\nbutton on feed articles"]
+        REFETCH["'Re-fetch from source'\nmenu on any article"]
+        REIMPORT["'Reimport All'\nbulk operation"]
+    end
+
+    subgraph REPROCESS["reprocessFile()  (viewer.ts)"]
+        FORCE_CHECK{"source == 'feed'\nAND force != true?"}
+        SKIP_PROTECTED["Return: skipped\n(feed content preserved)"]
+        DO_EXTRACT["fetchAndExtract(url)\nReadability extraction\nsource: 'extracted'"]
+    end
+
+    %% Entry to parsing
+    RSS --> FETCH_FEED
+    FETCH_FEED --> CE
+    CE -->|Yes| HAS_CONTENT
+    CE -->|No| DESC
+    DESC -->|Yes| HAS_CONTENT
+    DESC -->|No| NO_CONTENT
+
+    %% Sync pipeline
+    HAS_CONTENT --> CONTENT_CHECK
+    NO_CONTENT --> CONTENT_CHECK
+    RSS -.->|each entry| ENCLOSURE
+    ENCLOSURE -->|Yes| WRITE
+    ENCLOSURE -->|No| CONTENT_CHECK
+    CONTENT_CHECK -->|Yes| HTML_TO_MD
+    CONTENT_CHECK -->|No| EXTRACT
+    HTML_TO_MD --> WRITE
+    EXTRACT --> SHORT
+    SHORT -->|No| WRITE
+    SHORT -->|Yes| RETRY
+    RETRY --> STILL_SHORT
+    STILL_SHORT -->|Yes| MARK_FAILED
+    STILL_SHORT -->|No| WRITE
+
+    %% Post-sync repair
+    WRITE --> SCAN
+    SCAN --> REPAIR_CHECK
+    REPAIR_CHECK -->|Yes| REPROCESS_AUTO
+    REPAIR_CHECK -->|No / feed| SKIP_FEED
+    REPROCESS_AUTO --> FORCE_CHECK
+
+    %% Viewer auto-repair
+    OPEN_ARTICLE --> VIEW_CHECK
+    VIEW_CHECK -->|Yes| REPROCESS_VIEW
+    VIEW_CHECK -->|No / feed| SKIP_FEED_VIEW
+    REPROCESS_VIEW --> FORCE_CHECK
+
+    %% User actions
+    FETCH_FULL -->|force: true| DO_EXTRACT
+    REFETCH -->|force: true| DO_EXTRACT
+    REIMPORT -->|no force| FORCE_CHECK
+
+    %% Inbox / Import (always extract)
+    INBOX --> EXTRACT
+    IMPORT --> EXTRACT
+
+    %% reprocessFile logic
+    FORCE_CHECK -->|Yes: skip| SKIP_PROTECTED
+    FORCE_CHECK -->|No: proceed| DO_EXTRACT
+    DO_EXTRACT --> WRITE
+
+    %% Styling
+    classDef entry fill:#f9f0e8,stroke:#c4713b,color:#333
+    classDef decision fill:#fff8e1,stroke:#f9a825,color:#333
+    classDef action fill:#e8f5e9,stroke:#4caf50,color:#333
+    classDef protect fill:#e3f2fd,stroke:#1976d2,color:#333
+    classDef danger fill:#fce4ec,stroke:#d32f2f,color:#333
+
+    class RSS,INBOX,IMPORT,MANUAL,BULK entry
+    class CE,DESC,ENCLOSURE,CONTENT_CHECK,SHORT,STILL_SHORT,REPAIR_CHECK,VIEW_CHECK,FORCE_CHECK decision
+    class HTML_TO_MD,EXTRACT,WRITE,REPROCESS_AUTO,REPROCESS_VIEW,DO_EXTRACT action
+    class SKIP_FEED,SKIP_FEED_VIEW,SKIP_PROTECTED protect
+    class MARK_FAILED danger
