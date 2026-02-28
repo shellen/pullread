@@ -1560,20 +1560,6 @@
   .article-header h1 .title-link:hover {
     color: var(--link);
   }
-  .article-header h1 .title-link .icon-external {
-    width: 0.45em;
-    height: 0.45em;
-    fill: var(--muted);
-    margin-left: 6px;
-    vertical-align: middle;
-    opacity: 0;
-    transition: opacity 0.15s, fill 0.15s;
-  }
-  .article-header h1 .title-link:hover .icon-external {
-    opacity: 1;
-    fill: var(--link);
-  }
-
   /* Publication bar */
   .pub-bar {
     display: flex;

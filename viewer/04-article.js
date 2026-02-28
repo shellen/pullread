@@ -546,7 +546,7 @@ function renderArticle(text, filename) {
   // Title
   if (meta && meta.title) {
     if (meta.url) {
-      html += '<h1><a href="' + escapeHtml(meta.url) + '" target="_blank" rel="noopener" class="title-link">' + escapeHtml(meta.title) + '<svg class="icon icon-external" aria-hidden="true"><use href="#i-external"/></svg></a></h1>';
+      html += '<h1><a href="' + escapeHtml(meta.url) + '" target="_blank" rel="noopener" class="title-link">' + escapeHtml(meta.title) + '</a></h1>';
     } else {
       html += '<h1>' + escapeHtml(meta.title) + '</h1>';
     }
