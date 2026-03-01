@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roadmap — Pull Read</title>
+<meta name="description" content="What's coming next for Pull Read. Platform expansion, deeper AI, and more ways to own what you learn.">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://pullread.com/roadmap">
+<meta property="og:title" content="Roadmap — Pull Read">
+<meta property="og:description" content="What's coming next for Pull Read. Platform expansion, deeper AI, and more ways to own what you learn.">
+<meta property="og:image" content="https://pullread.com/og-image.png">
+<meta property="og:site_name" content="Pull Read">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Work+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared.css">
+<style>
+  .roadmap {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 0 32px 100px;
+  }
+
+  .roadmap-intro {
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--ink-secondary);
+    margin-bottom: 48px;
+  }
+
+  .roadmap-lane {
+    margin-bottom: 48px;
+  }
+
+  .lane-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .lane-badge {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 4px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+
+  .lane-badge-now {
+    background: var(--accent-bg);
+    color: var(--accent);
+  }
+
+  .lane-badge-next {
+    background: #eef4ff;
+    color: #3b6fca;
+  }
+
+  .lane-badge-later {
+    background: var(--border-light);
+    color: var(--ink-muted);
+  }
+
+  .lane-title {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+  }
+
+  .roadmap-card {
+    background: var(--card);
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 12px;
+    transition: box-shadow 0.2s;
+  }
+
+  .roadmap-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+  }
+
+  .roadmap-card h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    letter-spacing: -0.01em;
+  }
+
+  .roadmap-card p {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--ink-secondary);
+    margin: 0;
+  }
+
+  .roadmap-card .card-tags {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+
+  .roadmap-card .card-tag {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--border-light);
+    color: var(--ink-muted);
+  }
+
+  .roadmap-note {
+    font-size: 13px;
+    color: var(--ink-muted);
+    font-style: italic;
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-light);
+  }
+
+  @media (max-width: 640px) {
+    .roadmap { padding: 0 20px 64px; }
+    .roadmap-card { padding: 16px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<a href="#main-content" class="skip-link">Skip to content</a>
+<nav aria-label="Main navigation">
+  <a href="/" class="nav-brand">
+    <div class="nav-logo">
+      <svg fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/></svg>
+    </div>
+    <span class="nav-wordmark">Pull Read</span>
+  </a>
+  <ul class="nav-links" role="list">
+    <li class="hide-m"><a href="/#features">Features</a></li>
+    <li class="hide-m"><a href="/#intelligence">Intelligence</a></li>
+    <li class="hide-m"><a href="/releases">Releases</a></li>
+    <li class="hide-m"><a href="/faq">FAQ</a></li>
+    <li><a href="https://github.com/shellen/pullread/releases/download/latest/PullRead.dmg" class="btn btn-accent btn-sm">
+      <svg class="dl-icon" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 16 16"><path d="M8 2v9M4.5 7.5 8 11l3.5-3.5M2.5 13.5h11"/></svg>
+      Download
+    </a></li>
+  </ul>
+</nav>
+
+<!-- Header -->
+<div class="page-header" id="main-content">
+  <h1>Roadmap</h1>
+  <p>Where Pull Read is headed.</p>
+</div>
+
+<div class="roadmap">
+
+  <p class="roadmap-intro">Pull Read is built in the open. Here's what we're working on, what's coming next, and where we want to go. Priorities can shift based on feedback &mdash; if something here matters to you, <a href="https://github.com/shellen/pullread/discussions">let us know</a>.</p>
+
+  <!-- Now -->
+  <div class="roadmap-lane reveal">
+    <div class="lane-header">
+      <span class="lane-badge lane-badge-now">In progress</span>
+      <h2 class="lane-title">Now</h2>
+    </div>
+
+    <div class="roadmap-card">
+      <h3>Knowledge graph explorer</h3>
+      <p>A visual way to browse connections between your articles by topic, author, and source. See how your reading connects.</p>
+      <div class="card-tags"><span class="card-tag">intelligence</span></div>
+    </div>
+
+    <div class="roadmap-card">
+      <h3>Onboarding tour</h3>
+      <p>A guided setup flow for new users — connect your first feed, learn the keyboard shortcuts, and configure AI in under two minutes.</p>
+      <div class="card-tags"><span class="card-tag">experience</span></div>
+    </div>
+
+    <div class="roadmap-card">
+      <h3>Sidebar redesign</h3>
+      <p>A cleaner, more flexible sidebar with collapsible sections, drag-to-reorder feeds, and faster navigation.</p>
+      <div class="card-tags"><span class="card-tag">experience</span></div>
+    </div>
+  </div>
+
+  <!-- Next -->
+  <div class="roadmap-lane reveal">
+    <div class="lane-header">
+      <span class="lane-badge lane-badge-next">Up next</span>
+      <h2 class="lane-title">Next</h2>
+    </div>
+
+    <div class="roadmap-card">
+      <h3>iOS companion app</h3>
+      <p>Read your library on your phone. Syncs via iCloud Drive or any shared folder. Offline reading with highlights and notes.</p>
+      <div class="card-tags"><span class="card-tag">platform</span></div>
+    </div>
+
+    <div class="roadmap-card">
+      <h3>Obsidian sync</h3>
+      <p>Bidirectional sync between Pull Read annotations and Obsidian notes. Your highlights and tags flow both ways.</p>
+      <div class="card-tags"><span class="card-tag">integrations</span></div>
+    </div>
+
+    <div class="roadmap-card">
+      <h3>More ebook formats</h3>
+      <p>Mobi, PDF, and other document formats join EPUB in your reading library. Same highlights, summaries, and search.</p>
+      <div class="card-tags"><span class="card-tag">content</span></div>
+    </div>
+
+    <div class="roadmap-card">
+      <h3>CJK and internationalization</h3>
+      <p>Full support for Chinese, Japanese, and Korean text rendering, plus localized UI for major languages.</p>
+      <div class="card-tags"><span class="card-tag">global</span></div>
+    </div>
+  </div>
+
+  <!-- Later -->
+  <div class="roadmap-lane reveal">
+    <div class="lane-header">
+      <span class="lane-badge lane-badge-later">Exploring</span>
+      <h2 class="lane-title">Later</h2>
+    </div>
+
+    <div class="roadmap-card">
+      <h3>Windows and Linux</h3>
+      <p>Pull Read is built on Tauri, which supports all desktop platforms. Windows and Linux ports are on the horizon.</p>
+      <div class="card-tags"><span class="card-tag">platform</span></div>
+    </div>
+
+    <div class="roadmap-card">
+      <h3>Web login and cloud sync</h3>
+      <p>Optional account-based sync for people who want their library everywhere without managing shared folders.</p>
+      <div class="card-tags"><span class="card-tag">platform</span></div>
+    </div>
+
+    <div class="roadmap-card">
+      <h3>Audio player upgrades</h3>
+      <p>Playlist queues, variable speed per-feed, sleep timers, and CarPlay integration for listening on the go.</p>
+      <div class="card-tags"><span class="card-tag">audio</span></div>
+    </div>
+  </div>
+
+  <p class="roadmap-note">This roadmap reflects current thinking and may change. Features ship when they're ready, not on a schedule. Last updated February 2026.</p>
+
+</div>
+
+<!-- Footer -->
+<footer aria-label="Site footer">
+  <div class="f-left">
+    <a href="https://alittledrive.com" style="font-weight:600;">A Little Drive</a>
+    <span style="color:var(--ink-faint)">·</span>
+    <span>Made by <a href="https://shellen.com">Jason Shellen</a></span>
+  </div>
+  <ul class="f-links" role="list" aria-label="Footer links">
+    <li><a href="/privacy">Privacy</a></li>
+    <li><a href="/terms">Terms</a></li>
+    <li><a href="/releases">Releases</a></li>
+    <li><a href="/faq">FAQ</a></li>
+    <li><a href="/press">Press</a></li>
+  </ul>
+</footer>
+
+<script>
+const o = new IntersectionObserver(e => {
+  e.forEach(e => { if (e.isIntersecting) { e.target.classList.add('vis'); o.unobserve(e.target); } });
+}, { threshold: 0.08, rootMargin: '0px 0px -24px 0px' });
+document.querySelectorAll('.reveal').forEach(el => o.observe(el));
+</script>
+<script src="/download-gate.js"></script>
+
+</body>
+</html>

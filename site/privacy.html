@@ -8,34 +8,44 @@
 <link rel="canonical" href="https://pullread.com/privacy">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Work+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared.css">
 <style>
-  :root { --fg: #111; --muted: #6b7280; --bg: #fafaf9; --border: #e5e7eb; --teal: #2a9d8f; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Work Sans', -apple-system, sans-serif; color: var(--fg); background: var(--bg); line-height: 1.7; -webkit-font-smoothing: antialiased; }
-  .container { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
-  h1 { font-size: 36px; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 8px; }
-  .updated { font-size: 14px; color: var(--muted); margin-bottom: 40px; }
-  h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 36px 0 12px; }
-  p, ul { font-size: 15px; color: var(--muted); margin-bottom: 16px; }
+  .container { max-width: 680px; margin: 0 auto; padding: 100px clamp(16px, 4vw, 40px) 80px; }
+  h1 { font-family: var(--font-display); font-size: clamp(28px, 4vw, 36px); font-weight: 400; letter-spacing: -0.025em; margin-bottom: 8px; }
+  .updated { font-size: 14px; color: var(--ink-muted); margin-bottom: 40px; }
+  h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; margin: 36px 0 12px; color: var(--ink); }
+  p, ul { font-size: 15px; color: var(--ink-secondary); margin-bottom: 16px; line-height: 1.7; }
   ul { padding-left: 20px; }
   li { margin-bottom: 6px; }
-  a { color: var(--teal); text-decoration: none; }
+  a { color: var(--accent); text-decoration: none; }
   a:hover { text-decoration: underline; }
-  .back { display: inline-block; margin-bottom: 32px; font-size: 14px; font-weight: 500; color: var(--muted); }
-  .back:hover { color: var(--fg); text-decoration: none; }
-  nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(250,250,249,0.8); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid rgba(0,0,0,0.06); padding: 0 32px; height: 60px; display: flex; align-items: center; }
-  .nav-brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; color: var(--fg); text-decoration: none; letter-spacing: -0.02em; }
+  code { background: var(--border-light); padding: 2px 6px; border-radius: 4px; font-size: 13px; font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; }
+  .back { display: inline-block; margin-bottom: 32px; font-size: 14px; font-weight: 500; color: var(--ink-muted); }
+  .back:hover { color: var(--ink); text-decoration: none; }
 </style>
 </head>
 <body>
-<nav>
+<a href="#main-content" class="skip-link">Skip to content</a>
+<nav aria-label="Main navigation">
   <a href="/" class="nav-brand">
-    <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="1" y="1" width="26" height="26" rx="6" fill="#2a9d8f"/><rect x="5" y="5" width="18" height="20" rx="2" fill="#fff"/><rect x="8" y="10" width="12" height="2" rx="1" fill="#444"/><rect x="8" y="14" width="12" height="2" rx="1" fill="#444"/><rect x="8" y="18" width="8" height="2" rx="1" fill="#444"/><path d="M17 3v6l2-1.5L21 9V3z" fill="#e76f51"/></svg>
-    Pull Read
+    <div class="nav-logo">
+      <svg fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/></svg>
+    </div>
+    <span class="nav-wordmark">Pull Read</span>
   </a>
+  <ul class="nav-links" role="list">
+    <li class="hide-m"><a href="/#features">Features</a></li>
+    <li class="hide-m"><a href="/#intelligence">Intelligence</a></li>
+    <li class="hide-m"><a href="/releases">Releases</a></li>
+    <li class="hide-m"><a href="/faq">FAQ</a></li>
+    <li><a href="https://github.com/shellen/pullread/releases/download/latest/PullRead.dmg" class="btn btn-accent btn-sm">
+      <svg class="dl-icon" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 16 16"><path d="M8 2v9M4.5 7.5 8 11l3.5-3.5M2.5 13.5h11"/></svg>
+      Download
+    </a></li>
+  </ul>
 </nav>
-<div class="container">
+<div class="container" id="main-content">
   <a href="/" class="back">&larr; Back to Pull Read</a>
   <h1>Privacy Policy</h1>
   <p class="updated">Effective date: February 19, 2026</p>
@@ -77,28 +87,54 @@
   <h2>7. Analytics and tracking</h2>
   <p>Pull Read does not include any analytics, telemetry, crash reporting, or tracking. We do not collect any usage data.</p>
 
-  <h2>8. Data security</h2>
+  <h2>8. Email collection (pullread.com)</h2>
+  <p>When you download Pull Read or subscribe to product updates on our website, we collect your email address and, for downloads, which platform (Apple Silicon or Intel) you selected.</p>
+  <ul>
+    <li><strong>Purpose &amp; legal basis:</strong> Download delivery (legitimate interest — fulfilling your request) and product update emails (consent — opt-in checkbox, unchecked by default).</li>
+    <li><strong>Data stored:</strong> Email address, source (download or newsletter), platform, and timestamp.</li>
+    <li><strong>Processor &amp; location:</strong> Stored in Cloudflare D1 (encrypted at rest) on Cloudflare's global network. Data may be processed in the United States and other countries where Cloudflare operates. Cloudflare acts as a data processor under their <a href="https://www.cloudflare.com/privacypolicy/">privacy policy</a> and Data Processing Addendum.</li>
+    <li><strong>Retention:</strong> We retain your email until you request deletion or unsubscribe. Unsubscribed records are soft-deleted (marked inactive) and permanently purged within 90 days.</li>
+    <li><strong>No sharing:</strong> We do not sell or share your email with third parties.</li>
+  </ul>
+  <p>You can unsubscribe from product updates at any time via the link included in every email. To request access, correction, portability, or deletion of your data, contact <a href="mailto:support@alittledrive.com">support@alittledrive.com</a>.</p>
+
+  <h2>9. Data security</h2>
   <p>Because Pull Read stores data locally on your device, data security is primarily in your hands. We recommend keeping your operating system and the Software up to date. No method of electronic storage is 100% secure, and we cannot guarantee absolute security of locally stored data.</p>
 
-  <h2>9. Your choices and rights</h2>
+  <h2>10. Your choices and rights</h2>
   <p>Because Pull Read is local-first, you have direct control over your data at all times. You can delete any article, note, highlight, or configuration file directly from your filesystem. Uninstalling the Software and removing <code>~/.config/pullread/</code> removes all traces of Pull Read from your device.</p>
 
-  <h2>9a. California privacy rights</h2>
-  <p>California residents have certain rights regarding their personal information under the California Consumer Privacy Act (CCPA) and California Privacy Rights Act (CPRA), including the right to know what personal information is collected and how it is used, the right to delete personal information, and the right to opt-out of the sale of personal information. Because Pull Read does not collect, store, or transmit personal information to our servers, these rights are inherently satisfied by the Software's local-first design. If you have questions about exercising your rights, please contact us at <a href="mailto:support@alittledrive.com">support@alittledrive.com</a>.</p>
+  <h2>10a. California privacy rights</h2>
+  <p>California residents have certain rights under the California Consumer Privacy Act (CCPA) and California Privacy Rights Act (CPRA), including the right to know what personal information is collected, the right to delete it, and the right to opt out of its sale. The Software itself is local-first and does not transmit personal data to our servers. The only personal information we collect is email addresses submitted through our website (see Section 8). We do not sell personal information. To exercise your rights, contact <a href="mailto:support@alittledrive.com">support@alittledrive.com</a>.</p>
 
-  <h2>10. Children's privacy</h2>
+  <h2>11. Children's privacy</h2>
   <p>Pull Read is not directed at children under 13 years of age. We do not knowingly collect personal information from children under 13. If you are a parent or guardian and believe we may have collected information from your child, please contact us immediately at <a href="mailto:support@alittledrive.com">support@alittledrive.com</a>.</p>
 
-  <h2>11. International users</h2>
-  <p>The Software is intended for users located in the United States. If you access or use the Software from outside the United States, you do so at your own risk and are responsible for compliance with local laws.</p>
+  <h2>12. International users and GDPR</h2>
+  <p>Pull Read is operated from the United States. If you are located in the European Economic Area (EEA), United Kingdom, or Switzerland, you have additional rights under the General Data Protection Regulation (GDPR), including the right to access, rectify, port, or erase your personal data, and the right to lodge a complaint with your local data protection authority. Our lawful bases for processing are consent (newsletter) and legitimate interest (download delivery). To exercise any of these rights, contact <a href="mailto:support@alittledrive.com">support@alittledrive.com</a>. By submitting your email through our website, you acknowledge that your data will be transferred to and processed in the United States.</p>
 
-  <h2>12. Changes to this policy</h2>
+  <h2>13. Changes to this policy</h2>
   <p>We reserve the right to modify this Privacy Policy at any time. If we make changes, we will notify you by updating the "Effective date" at the top of this page. Your continued use of the Software after any modifications indicates your acceptance of the updated Privacy Policy.</p>
 
-  <h2>13. Contact us</h2>
+  <h2>14. Contact us</h2>
   <p>If you have any questions or concerns about this Privacy Policy, please contact us at <a href="mailto:support@alittledrive.com">support@alittledrive.com</a> or by mail at:</p>
   <p>A Little Drive LLC<br>3527 Mt. Diablo Blvd. #217<br>Lafayette, CA 94549</p>
   <p>This Privacy Policy works in conjunction with our <a href="/terms">Terms of Use</a>.</p>
 </div>
+<footer aria-label="Site footer">
+  <div class="f-left">
+    <a href="https://alittledrive.com" style="font-weight:600;">A Little Drive</a>
+    <span style="color:var(--ink-faint)">·</span>
+    <span>Made by <a href="https://shellen.com">Jason Shellen</a></span>
+  </div>
+  <ul class="f-links" role="list" aria-label="Footer links">
+    <li><a href="/privacy">Privacy</a></li>
+    <li><a href="/terms">Terms</a></li>
+    <li><a href="/releases">Releases</a></li>
+    <li><a href="/faq">FAQ</a></li>
+    <li><a href="/press">Press</a></li>
+  </ul>
+</footer>
+<script src="/download-gate.js"></script>
 </body>
 </html>

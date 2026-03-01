@@ -156,8 +156,29 @@ summary: "This is a summary of the article."
     expect(updated).toContain('This is a summary of the article.');
   });
 
-  test('sets source: extracted in reprocessed article', async () => {
+  test('skips source: feed articles by default to preserve feed content', async () => {
     const filePath = join(testDir, 'feed-article.md');
+    writeFileSync(filePath, `---
+title: "Feed Article"
+url: https://example.com/feed-article
+domain: example.com
+bookmarked: 2025-01-15T00:00:00Z
+source: feed
+---
+# Feed content that should be preserved`);
+
+    const result = await reprocessFile(filePath);
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/feed-sourced/i);
+
+    const unchanged = readFileSync(filePath, 'utf-8');
+    expect(unchanged).toContain('source: feed');
+    expect(unchanged).toContain('Feed content that should be preserved');
+    expect(mockFetchAndExtract).not.toHaveBeenCalled();
+  });
+
+  test('allows reprocessing source: feed articles when force is true', async () => {
+    const filePath = join(testDir, 'feed-article-force.md');
     writeFileSync(filePath, `---
 title: "Feed Article"
 url: https://example.com/feed-article
@@ -174,7 +195,7 @@ source: feed
       byline: 'Author',
     });
 
-    const result = await reprocessFile(filePath);
+    const result = await reprocessFile(filePath, { force: true });
     expect(result.ok).toBe(true);
 
     const updated = readFileSync(filePath, 'utf-8');

@@ -1,5 +1,6 @@
 // ABOUTME: Hub landing page (merged Home + Explore) and article rendering.
 // ABOUTME: renderHub() builds the tabbed hub; loadFile() renders individual articles.
+var _reviewGenInFlight = false;
 function renderHub() {
   var dash = document.getElementById('dashboard');
   if (!dash) return;
@@ -7,7 +8,7 @@ function renderHub() {
   var empty = document.getElementById('empty-state');
   var content = document.getElementById('content');
   empty.style.display = '';
-  if (content) content.style.display = 'none';
+  if (content) { content.style.display = 'none'; content.classList.remove('settings-view'); content.classList.remove('manage-sources-view'); }
   var toolbar = document.getElementById('reader-toolbar');
   if (toolbar) toolbar.style.display = 'none';
 
@@ -41,6 +42,9 @@ function renderHub() {
   // For You tab
   var forYouHtml = '';
 
+  // Daily Rundown — topic briefing cards
+  forYouHtml += buildDailyRundownHtml();
+
   // Continue Reading
   var positions = JSON.parse(localStorage.getItem('pr-scroll-positions') || '{}');
   var continueReading = allFiles.filter(function(f) {
@@ -65,7 +69,16 @@ function renderHub() {
 
   // Reviews
   var reviews = allFiles.filter(function(f) { return f.feed === 'weekly-review' || f.feed === 'daily-review' || f.domain === 'pullread'; }).slice(0, 3);
-  if (reviews.length > 0) {
+  var todayStr = new Date().toISOString().slice(0, 10);
+  var hasDaily = allFiles.some(function(f) { return f.filename && f.filename.indexOf('_daily-review-' + todayStr) >= 0; });
+  var threeDaysAgo = new Date(); threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+  var hasWeekly = allFiles.some(function(f) {
+    return f.feed === 'weekly-review' && f.bookmarked && new Date(f.bookmarked) >= threeDaysAgo;
+  });
+  var _missingDaily = !hasDaily;
+  var _missingWeekly = !hasWeekly;
+
+  if (reviews.length > 0 || (serverMode && (_missingDaily || _missingWeekly))) {
     forYouHtml += '<div class="dash-section">';
     forYouHtml += '<div class="dash-section-header"><span class="dash-section-title"><svg viewBox="0 0 512 512"><use href="#i-wand"/></svg> Reviews</span></div>';
     forYouHtml += '<div class="dash-cards" style="overflow:visible;flex-wrap:wrap">';
@@ -78,6 +91,18 @@ function renderHub() {
       forYouHtml += '<div class="dash-review-title">' + escapeHtml(rf.title) + '</div>';
       forYouHtml += '<div class="dash-review-meta">' + typeLabel + ' Review' + (rdate ? ' &middot; ' + rdate : '') + '</div>';
       if (rf.excerpt) forYouHtml += '<div class="dash-review-excerpt">' + escapeHtml(rf.excerpt) + '</div>';
+      forYouHtml += '</div>';
+    }
+    if (serverMode && _missingDaily) {
+      forYouHtml += '<div class="dash-review-card dash-review-generating" id="daily-review-placeholder">';
+      forYouHtml += '<div class="dash-review-title">Generating Daily Review\u2026</div>';
+      forYouHtml += '<div class="dash-review-meta">Daily Review</div>';
+      forYouHtml += '</div>';
+    }
+    if (serverMode && _missingWeekly) {
+      forYouHtml += '<div class="dash-review-card dash-review-generating" id="weekly-review-placeholder">';
+      forYouHtml += '<div class="dash-review-title">Generating Weekly Review\u2026</div>';
+      forYouHtml += '<div class="dash-review-meta">Weekly Review</div>';
       forYouHtml += '</div>';
     }
     forYouHtml += '</div></div>';
@@ -109,6 +134,22 @@ function renderHub() {
     forYouHtml += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
   }
 
+  // Your Topics — top machine tags by frequency
+  var topTopics = data.sortedTags.filter(function(t) { return !blockedTags.has(t[0]); }).slice(0, 15);
+  if (topTopics.length > 0) {
+    forYouHtml += '<div class="dash-section">';
+    forYouHtml += '<div class="dash-section-header">';
+    forYouHtml += '<span class="dash-section-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-tag"/></svg> Your Topics</span>';
+    forYouHtml += '</div>';
+    forYouHtml += '<div class="your-topics">';
+    for (var ti = 0; ti < topTopics.length; ti++) {
+      var tagName = topTopics[ti][0];
+      var tagCount = topTopics[ti][1];
+      forYouHtml += '<button class="tag-pill" onclick="document.getElementById(\'search\').value=\'tag:\\x22' + escapeJsStr(tagName) + '\\x22\';filterFiles()">' + escapeHtml(tagName) + ' <span class="tag-count">' + tagCount + '</span></button>';
+    }
+    forYouHtml += '</div></div>';
+  }
+
   // Quick actions at bottom of For You
   forYouHtml += '<div class="dash-actions">';
   forYouHtml += '<button onclick="dashGenerateReview(1)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Daily Review</button>';
@@ -135,9 +176,38 @@ function renderHub() {
   });
 
   requestAnimationFrame(initDashChevrons);
+  requestAnimationFrame(initRundown);
+
+  // If audio is queued, switch to mini player so controls stay visible in sidebar
+  if (typeof ttsQueue !== 'undefined' && ttsQueue.length > 0) {
+    setPlayerMode('mini');
+  }
 
   // Async: load suggested feeds
   loadSuggestedFeedsSection();
+
+  // Background review generation
+  if (serverMode && !_reviewGenInFlight && (_missingDaily || _missingWeekly)) {
+    _reviewGenInFlight = true;
+    var jobs = [];
+    if (_missingDaily) jobs.push({ days: 1, id: 'daily-review-placeholder' });
+    if (_missingWeekly) jobs.push({ days: 7, id: 'weekly-review-placeholder' });
+    var promises = jobs.map(function(job) {
+      return fetch('/api/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ days: job.days })
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        var el = document.getElementById(job.id);
+        if (el) el.remove();
+        if (!data.error) refreshArticleList(true);
+      }).catch(function() {
+        var el = document.getElementById(job.id);
+        if (el) el.remove();
+      });
+    });
+    Promise.allSettled(promises).then(function() { _reviewGenInFlight = false; });
+  }
 }
 
 function loadSuggestedFeedsSection() {
@@ -201,6 +271,66 @@ function addSuggestedFeed(btn, name, url) {
     btn.textContent = name;
     btn.disabled = false;
   });
+}
+
+function buildDailyRundownHtml() {
+  var clusters = buildDailyRundown(7);
+  if (clusters.length === 0) return '';
+
+  var html = '<div class="rundown">';
+
+  // Progress dots (clickable for desktop nav)
+  html += '<div class="rundown-dots">';
+  for (var di = 0; di < clusters.length; di++) {
+    html += '<span class="rundown-dot' + (di === 0 ? ' active' : '') + '" onclick="rundownGoTo(' + di + ')"></span>';
+  }
+  html += '</div>';
+
+  // Scrollable card track
+  html += '<div class="rundown-track">';
+  for (var ci = 0; ci < clusters.length; ci++) {
+    var c = clusters[ci];
+    // Pick the first article with an OG image for the card background
+    var heroImage = '';
+    for (var ii = 0; ii < c.articles.length; ii++) {
+      if (c.articles[ii].image) { heroImage = c.articles[ii].image; break; }
+    }
+
+    html += '<div class="rundown-card">';
+
+    if (heroImage) {
+      html += '<img class="rundown-card-img" src="' + escapeHtml(heroImage) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<div class=rundown-card-noimg></div>\'">';
+    } else {
+      html += '<div class="rundown-card-noimg"></div>';
+    }
+
+    html += '<div class="rundown-card-body">';
+    html += '<div class="rundown-card-label">' + escapeHtml(c.label) + '</div>';
+    html += '<div class="rundown-card-count">' + c.articles.length + ' article' + (c.articles.length !== 1 ? 's' : '') + '</div>';
+
+    // Up to 3 headlines
+    html += '<div class="rundown-card-headlines">';
+    var headlineCount = Math.min(c.articles.length, 3);
+    for (var hi = 0; hi < headlineCount; hi++) {
+      var a = c.articles[hi];
+      html += '<a onclick="dashLoadArticle(\'' + escapeJsStr(a.filename) + '\')">' + escapeHtml(a.title) + '</a>';
+    }
+    html += '</div>';
+
+    // Tag pills (limit to 5)
+    var maxTags = Math.min(c.tags.length, 5);
+    html += '<div class="rundown-card-tags">';
+    for (var ti = 0; ti < maxTags; ti++) {
+      html += '<span class="tag-pill tag-pill-sm">' + escapeHtml(c.tags[ti]) + '</span>';
+    }
+    html += '</div>';
+    html += '</div>'; // .rundown-card-body
+    html += '</div>'; // .rundown-card
+  }
+  html += '</div>';
+  html += '</div>';
+
+  return html;
 }
 
 function dashCardHtml(f, progressPct) {
@@ -274,6 +404,8 @@ function goHome() {
   if (_markAsReadDelayTimer) { console.debug('[PR] goHome clearing markAsRead timer'); clearTimeout(_markAsReadDelayTimer); _markAsReadDelayTimer = null; }
   _sidebarView = 'home'; syncSidebarTabs();
   activeFile = null;
+  _activeDrawerSource = null;
+  updateDrawerActiveState();
   document.title = 'PullRead';
   renderFileList();
   var toc = document.getElementById('toc-container');
@@ -352,6 +484,7 @@ function renderArticle(text, filename) {
   empty.style.display = 'none';
   content.style.display = 'block';
   content.classList.remove('settings-view');
+  content.classList.remove('manage-sources-view');
 
   let html = '';
 
@@ -367,8 +500,9 @@ function renderArticle(text, filename) {
     // Determine publication name from feed
     if (meta.feed) {
       pubName = meta.feed;
-      // If pub name IS the domain exactly, show only once as the name
-      if (pubName.toLowerCase() === meta.domain.toLowerCase()) {
+      // If feed name matches the domain, this is an original post — show feed name only.
+      // When they differ, the article is linked from elsewhere — "via" is appropriate.
+      if (feedMatchesDomain(pubName, meta.domain)) {
         pubDomain = '';
       }
     }
@@ -412,7 +546,7 @@ function renderArticle(text, filename) {
   // Title
   if (meta && meta.title) {
     if (meta.url) {
-      html += '<h1><a href="' + escapeHtml(meta.url) + '" target="_blank" rel="noopener" class="title-link">' + escapeHtml(meta.title) + '<svg class="icon icon-external" aria-hidden="true"><use href="#i-external"/></svg></a></h1>';
+      html += '<h1><a href="' + escapeHtml(meta.url) + '" target="_blank" rel="noopener" class="title-link">' + escapeHtml(meta.title) + '</a></h1>';
     } else {
       html += '<h1>' + escapeHtml(meta.title) + '</h1>';
     }
@@ -496,6 +630,26 @@ function renderArticle(text, filename) {
     if (ytId) {
       html += '<div class="yt-embed"><iframe src="https://www.youtube.com/embed/' + encodeURIComponent(ytId)
         + '" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy" title="Embedded video"></iframe></div>';
+    }
+  }
+
+  // Feed-sourced image content: display prominently with optional caption
+  var isFeedImage = meta && meta.source === 'feed';
+  if (isFeedImage && body) {
+    var imgMatch = body.match(/!\[([^\]]*)\]\((\S+?)(?:\s+"([^"]*)")?\)/);
+    if (imgMatch) {
+      var textOnly = body.replace(imgMatch[0], '')
+        .replace(/^\s*#[^\n]*\n?/, '')
+        .replace(/https?:\/\/\S+/g, '')
+        .replace(/Permanent link[^\n]*/gi, '').trim();
+      if (textOnly.length < 100) {
+        html += '<div class="feed-image"><img src="' + escapeHtml(imgMatch[2]) + '" alt="' + escapeHtml(imgMatch[1]) + '">';
+        if (imgMatch[3]) {
+          html += '<div class="feed-image-caption">' + escapeHtml(imgMatch[3]) + '</div>';
+        }
+        html += '</div>';
+        body = body.replace(imgMatch[0], '');
+      }
     }
   }
 
@@ -620,8 +774,13 @@ function renderArticle(text, filename) {
     html += '</div>';
   }
 
+  html += '<div id="related-reading"></div>';
+
   content.innerHTML = html;
   document.title = (meta && meta.title) || filename || 'PullRead';
+
+  // Populate related reading asynchronously
+  populateRelatedReading(filename);
 
   // Hide broken images instead of showing broken-image icons
   content.querySelectorAll('.content-wrap img, .article-hero img').forEach(function(img) {
@@ -837,6 +996,34 @@ document.getElementById('content-scroll').addEventListener('scroll', function() 
   updateTocActive();
   saveScrollPosition();
 });
+
+// ---- Related Reading ----
+function populateRelatedReading(filename) {
+  var container = document.getElementById('related-reading');
+  if (!container) return;
+  var results = findRelatedArticles(filename, 5);
+  if (results.length === 0) { container.style.display = 'none'; return; }
+
+  var html = '<div class="related-reading">';
+  html += '<h3 class="related-heading">Related Reading</h3>';
+  html += '<div class="related-cards">';
+  for (var i = 0; i < results.length; i++) {
+    var r = results[i];
+    var file = allFiles.find(function(f) { return f.filename === r.filename; });
+    if (!file) continue;
+    html += '<a href="#" class="related-card" onclick="event.preventDefault();jumpToArticle(\'' + escapeJsStr(r.filename) + '\')">';
+    html += '<span class="related-card-title">' + escapeHtml(file.title || r.filename) + '</span>';
+    if (file.domain) html += '<span class="related-card-domain">' + escapeHtml(file.domain) + '</span>';
+    html += '<span class="related-card-tags">';
+    for (var j = 0; j < r.sharedTags.length; j++) {
+      if (blockedTags.has(r.sharedTags[j])) continue;
+      html += '<span class="tag-pill tag-pill-sm">' + escapeHtml(r.sharedTags[j]) + '</span>';
+    }
+    html += '</span></a>';
+  }
+  html += '</div></div>';
+  container.innerHTML = html;
+}
 
 // ---- Read Time & Word Count ----
 function calculateReadStats(text) {

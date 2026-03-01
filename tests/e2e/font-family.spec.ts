@@ -47,7 +47,7 @@ test.describe('Font family inheritance', () => {
   test('brand displays with correct font', async ({ page }) => {
     const brand = page.locator('.brand');
     const fontFamily = await brand.evaluate(el => getComputedStyle(el).fontFamily);
-    expect(fontFamily).toContain('Work Sans');
+    expect(fontFamily).toContain('Instrument Serif');
   });
 
   test('CSS rule button,input,select,textarea,a has font-family:inherit', async ({ page }) => {

@@ -14,6 +14,7 @@ import { APP_ICON } from './app-icon';
 import { fetchAndExtract } from './extractor';
 import { generateMarkdown, writeArticle, ArticleData, downloadFavicon, resolveFilePath, listMarkdownFiles, listEpubFiles, migrateToDateFolders, exportNotebook, removeExportedNotebook } from './writer';
 import { loadTTSConfig, saveTTSConfig, generateSpeech, getAudioContentType, getCachedAudioPath, createTtsSession, generateSessionChunk, TTS_VOICES, TTS_MODELS } from './tts';
+import { deleteFromKeychain } from './keychain';
 import { listSiteLogins, removeSiteLogin, saveSiteLoginCookies } from './cookies';
 
 interface FileMeta {
@@ -635,7 +636,7 @@ function writeSummaryToFile(filePath: string, summary: string, provider?: string
   writeFileSync(filePath, `${match[1]}${frontmatter}${match[3]}${match[4]}`);
 }
 
-export async function reprocessFile(filePath: string): Promise<{ ok: boolean; title?: string; error?: string }> {
+export async function reprocessFile(filePath: string, options?: { force?: boolean }): Promise<{ ok: boolean; title?: string; error?: string }> {
   try {
     if (!existsSync(filePath)) {
       return { ok: false, error: 'File not found' };
@@ -645,6 +646,10 @@ export async function reprocessFile(filePath: string): Promise<{ ok: boolean; ti
     const meta = parseFrontmatter(existing);
     if (!meta.url) {
       return { ok: false, error: 'Article has no source URL in frontmatter' };
+    }
+
+    if (meta.source === 'feed' && !options?.force) {
+      return { ok: false, error: 'Skipped feed-sourced article' };
     }
 
     const article = await fetchAndExtract(meta.url);
@@ -1318,6 +1323,14 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
                 if (!validSet.has(p)) continue; // skip unknown providers
                 const key = p as import('./summarizer').Provider;
                 const existing = current.providers[key] || {};
+                if (config.deleteKey) {
+                  deleteFromKeychain(`llm-${p}`);
+                  newSettings.providers[key] = {
+                    apiKey: '',
+                    model: config.model || existing.model || getDefaultModel(p)
+                  };
+                  continue;
+                }
                 newSettings.providers[key] = {
                   // Only update apiKey if a non-empty value was sent
                   apiKey: config.apiKey || existing.apiKey || '',
@@ -1660,7 +1673,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
     if (url.pathname === '/api/reprocess' && req.method === 'POST') {
       try {
         const body = JSON.parse(await readBody(req));
-        const { name } = body;
+        const { name, force } = body;
         if (!name || name.includes('..') || name.includes('/')) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'valid name is required' }));
@@ -1668,7 +1681,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         }
 
         const filePath = resolveFilePath(outputPath, name);
-        const result = await reprocessFile(filePath);
+        const result = await reprocessFile(filePath, { force: !!force });
         if (result.ok) {
           sendJson(res, { ok: true, title: result.title });
         } else {
@@ -1715,6 +1728,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
       const total = filesWithUrls.length;
       let succeeded = 0;
       let failed = 0;
+      let skipped = 0;
       let lastDomain = '';
 
       for (let i = 0; i < filesWithUrls.length; i++) {
@@ -1732,13 +1746,16 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         if (result.ok) {
           succeeded++;
           res.write(`data: ${JSON.stringify({ done, total, current: name, ok: true })}\n\n`);
+        } else if (result.error?.includes('feed-sourced')) {
+          skipped++;
+          res.write(`data: ${JSON.stringify({ done, total, current: name, ok: true, skipped: true })}\n\n`);
         } else {
           failed++;
           res.write(`data: ${JSON.stringify({ done, total, current: name, ok: false, error: result.error })}\n\n`);
         }
       }
 
-      res.write(`data: ${JSON.stringify({ complete: true, succeeded, failed })}\n\n`);
+      res.write(`data: ${JSON.stringify({ complete: true, succeeded, failed, skipped })}\n\n`);
       res.end();
       return;
     }
@@ -1765,6 +1782,11 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
             const existing = loadTTSConfig();
             if (existing.apiKey) body.apiKey = existing.apiKey;
             delete body.preserveKey;
+          }
+          if (body.deleteKey) {
+            deleteFromKeychain('tts-api-key');
+            delete body.apiKey;
+            delete body.deleteKey;
           }
           saveTTSConfig(body);
           sendJson(res, { ok: true });

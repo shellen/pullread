@@ -11,6 +11,7 @@ src-tauri/resources/
 
 # Environment
 .env
+.dev.vars
 
 # Feed configuration
 feeds.json

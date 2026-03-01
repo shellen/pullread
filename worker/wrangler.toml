@@ -1,0 +1,11 @@
+# ABOUTME: Cloudflare Worker config for email collection API.
+# ABOUTME: Binds D1 database for subscriber storage.
+
+name = "pullread-emails"
+main = "src/index.ts"
+compatibility_date = "2025-02-28"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "pullread-emails"
+database_id = "9ce92b20-d120-43fb-a9ff-2f7000b0b960"

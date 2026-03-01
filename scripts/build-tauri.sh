@@ -42,30 +42,22 @@ echo ""
 echo "Step 4: Preparing sidecar..."
 bash "$SCRIPT_DIR/prepare-sidecar.sh" "$TARGET_TRIPLE"
 
-# Step 5: Download Kokoro TTS model
-echo ""
-echo "Step 5: Downloading Kokoro TTS model..."
-bash "$SCRIPT_DIR/download-kokoro-model.sh"
-mkdir -p "$ROOT_DIR/src-tauri/resources/kokoro-model"
-cp -R "$ROOT_DIR/dist/kokoro-model/"* "$ROOT_DIR/src-tauri/resources/kokoro-model/"
-echo "  Model staged in src-tauri/resources/kokoro-model/"
-
-# Step 6: Sign sidecar (macOS only, if signing identity available)
+# Step 5: Sign sidecar (macOS only, if signing identity available)
 if [[ "$OSTYPE" == "darwin"* ]] && [ -n "${APPLE_SIGNING_IDENTITY:-}" ]; then
     echo ""
-    echo "Step 6: Code-signing sidecar..."
+    echo "Step 5: Code-signing sidecar..."
     SIDECAR="$ROOT_DIR/src-tauri/binaries/pullread-cli-$TARGET_TRIPLE"
     codesign --force --options runtime --sign "$APPLE_SIGNING_IDENTITY" \
       --entitlements "$ROOT_DIR/src-tauri/entitlements.plist" "$SIDECAR"
     echo "  Signed: $SIDECAR"
 else
     echo ""
-    echo "Step 6: Skipping code signing (no APPLE_SIGNING_IDENTITY set)"
+    echo "Step 5: Skipping code signing (no APPLE_SIGNING_IDENTITY set)"
 fi
 
-# Step 7: Build Tauri app
+# Step 6: Build Tauri app
 echo ""
-echo "Step 7: Building Tauri app..."
+echo "Step 6: Building Tauri app..."
 cd "$ROOT_DIR"
 
 if [ "${RELEASE:-}" = "1" ]; then

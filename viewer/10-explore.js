@@ -148,6 +148,34 @@ function buildTagsTabHtml(data) {
   html += '<button class="tag-pill" onclick="batchAutotagAll(true)" title="Re-tag all articles, replacing existing AI tags"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-refresh"/></svg> Retag All</button>';
   html += '</div></div>';
 
+  // Topic Clusters — groups of articles sharing multiple tags
+  var clusters = buildTopicClusters(2, 3);
+  if (clusters.length > 0) {
+    html += '<div style="margin-bottom:20px">';
+    html += '<h3 style="font-size:14px;font-weight:600;margin:0 0 12px">Topic Clusters</h3>';
+    var clusterLimit = Math.min(clusters.length, 10);
+    for (var ci = 0; ci < clusterLimit; ci++) {
+      var cluster = clusters[ci];
+      html += '<div class="topic-cluster">';
+      html += '<div class="topic-cluster-tags">';
+      for (var cti = 0; cti < cluster.tags.length; cti++) {
+        html += '<span class="tag-pill tag-pill-sm">' + escapeHtml(cluster.tags[cti]) + '</span>';
+      }
+      html += '</div>';
+      html += '<div class="topic-cluster-articles">';
+      var articleLimit = Math.min(cluster.articles.length, 5);
+      for (var cai = 0; cai < articleLimit; cai++) {
+        var cf = cluster.articles[cai];
+        html += '<a href="#" onclick="event.preventDefault();jumpToArticle(\'' + escapeJsStr(cf.filename) + '\')">' + escapeHtml(cf.title) + '</a>';
+      }
+      if (cluster.articles.length > 5) {
+        html += '<span class="topic-cluster-more">+' + (cluster.articles.length - 5) + ' more</span>';
+      }
+      html += '</div></div>';
+    }
+    html += '</div>';
+  }
+
   html += buildTagsHtml(data);
 
   return html;

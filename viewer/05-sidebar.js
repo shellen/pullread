@@ -447,6 +447,8 @@ async function loadFile(index) {
   _sidebarView = 'home'; syncSidebarTabs();
   var prevActive = activeFile;
   activeFile = file.filename;
+  _activeDrawerSource = file.feed || null;
+  updateDrawerActiveState();
   if (_markAsReadDelayTimer) { console.debug('[PR] loadFile clearing markAsRead timer (switching to', file.filename + ')'); clearTimeout(_markAsReadDelayTimer); }
   var fileToMark = file.filename;
   _markAsReadDelayTimer = setTimeout(function() {
@@ -888,12 +890,12 @@ function openSourcesDrawer() {
     }
   }
 
-  // Show footer with "Add source" button
+  // Show footer with "Manage Sources" button
   if (footerEl) {
     footerEl.style.display = '';
-    footerEl.innerHTML = '<button onclick="closeDrawer();showSettingsPage(\'settings-feeds\')">'
-      + '<svg aria-hidden="true"><use href="#i-plus"/></svg>'
-      + 'Add source'
+    footerEl.innerHTML = '<button onclick="closeDrawer();showManageSourcesPage()">'
+      + '<svg aria-hidden="true"><use href="#i-gear"/></svg>'
+      + 'Manage Sources'
       + '</button>';
   }
 

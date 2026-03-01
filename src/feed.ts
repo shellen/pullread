@@ -174,6 +174,7 @@ function parseAtomFeed(feed: any): FeedEntry[] {
 
   // Feed-level author (Atom allows <author> on <feed> as default for entries)
   const feedAuthor = extractAtomAuthorName(feed.author);
+  const feedImage = feed.logo || feed.icon || undefined;
 
   return entries.map((entry: any) => {
     const url = resolveAtomLink(entry.link);
@@ -181,8 +182,12 @@ function parseAtomFeed(feed: any): FeedEntry[] {
 
     let annotation: string | undefined;
     let contentHtml: string | undefined;
-    const rawHtml = typeof entry.content === 'string' ? entry.content.trim()
+    let rawHtml = typeof entry.content === 'string' ? entry.content.trim()
       : entry.content?.['__cdata']?.trim() || entry.content?.['#text']?.trim() || undefined;
+    if (!rawHtml) {
+      rawHtml = typeof entry.summary === 'string' ? entry.summary.trim()
+        : entry.summary?.['__cdata']?.trim() || entry.summary?.['#text']?.trim() || undefined;
+    }
     if (rawHtml) {
       annotation = extractTextFromHtml(rawHtml);
       if (rawHtml.length > 50) contentHtml = rawHtml;
@@ -193,6 +198,7 @@ function parseAtomFeed(feed: any): FeedEntry[] {
 
     const thumbnail = extractMediaUrl(entry['media:content'])
       || extractMediaUrl(entry['media:thumbnail'])
+      || feedImage
       || undefined;
 
     return {
@@ -214,6 +220,8 @@ function parseRssFeed(rss: any): FeedEntry[] {
   if (!channel || !channel.item) {
     return [];
   }
+
+  const channelImage = channel['itunes:image']?.['@_href'] || channel?.image?.url || undefined;
 
   const items = Array.isArray(channel.item) ? channel.item : [channel.item];
 
@@ -247,7 +255,7 @@ function parseRssFeed(rss: any): FeedEntry[] {
     let contentHtml: string | undefined;
     if (contentEncodedStr.trim().length > 50) {
       contentHtml = contentEncodedStr.trim();
-    } else if (rawDescription.length > 50 && /<(p|div|h[1-6]|article|blockquote|ul|ol|figure)\b/i.test(rawDescription)) {
+    } else if (rawDescription.length > 50) {
       contentHtml = rawDescription;
     }
 
@@ -261,9 +269,10 @@ function parseRssFeed(rss: any): FeedEntry[] {
       };
     }
 
-    // RSS author: <dc:creator> or <author> (often an email address)
+    // RSS author: <dc:creator> or <author> (often an email address, sometimes CDATA)
     const rawAuthor = item['dc:creator'] || item.author || '';
-    const authorStr = typeof rawAuthor === 'string' ? rawAuthor.trim() : '';
+    const authorStr = typeof rawAuthor === 'string' ? rawAuthor.trim()
+      : rawAuthor?.__cdata?.trim() || rawAuthor?.['#text']?.trim() || '';
     // Strip email format like "email (Name)" → "Name"
     const authorName = authorStr.includes('@')
       ? (authorStr.match(/\(([^)]+)\)/)?.[1] || '').trim()
@@ -274,6 +283,7 @@ function parseRssFeed(rss: any): FeedEntry[] {
     const thumbnail = extractMediaUrl(item['media:content'])
       || extractMediaUrl(item['media:thumbnail'])
       || item['itunes:image']?.['@_href']
+      || channelImage
       || undefined;
 
     return [{

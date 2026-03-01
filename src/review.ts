@@ -7,7 +7,7 @@ import { homedir } from 'os';
 import { summarizeText } from './summarizer';
 import { listMarkdownFiles, resolveFilePath } from './writer';
 
-interface ArticleMeta {
+export interface ArticleMeta {
   title: string;
   url: string;
   bookmarked: string;
@@ -15,6 +15,13 @@ interface ArticleMeta {
   feed?: string;
   summary?: string;
   excerpt?: string;
+  categories?: string[];
+}
+
+interface ClusterGroup {
+  label: string;
+  slug: string;
+  articles: ArticleMeta[];
 }
 
 function parseFrontmatter(text: string): ArticleMeta | null {
@@ -32,7 +39,70 @@ function parseFrontmatter(text: string): ArticleMeta | null {
   });
 
   if (!meta.title || !meta.bookmarked) return null;
+
+  // Parse categories from YAML array: ["Technology", "Programming"]
+  if (meta.categories && typeof meta.categories === 'string') {
+    try {
+      const parsed = JSON.parse(meta.categories.replace(/'/g, '"'));
+      if (Array.isArray(parsed)) meta.categories = parsed;
+      else delete meta.categories;
+    } catch {
+      delete meta.categories;
+    }
+  }
+
   return meta as ArticleMeta;
+}
+
+function toSlug(s: string): string {
+  return 'cluster-' + s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+export function groupByCategories(articles: ArticleMeta[]): ClusterGroup[] {
+  if (articles.length === 0) return [];
+
+  // Try category-based grouping first
+  const catMap = new Map<string, ArticleMeta[]>();
+  let hasCats = false;
+  for (const a of articles) {
+    if (a.categories && a.categories.length > 0) {
+      hasCats = true;
+      for (const cat of a.categories) {
+        const list = catMap.get(cat) || [];
+        list.push(a);
+        catMap.set(cat, list);
+      }
+    }
+  }
+
+  if (hasCats) {
+    const groups: ClusterGroup[] = [];
+    for (const [label, arts] of catMap) {
+      if (arts.length >= 2) {
+        groups.push({ label, slug: toSlug(label), articles: arts });
+      }
+    }
+    return groups;
+  }
+
+  // Fallback: group by domain
+  const domainMap = new Map<string, ArticleMeta[]>();
+  for (const a of articles) {
+    const list = domainMap.get(a.domain) || [];
+    list.push(a);
+    domainMap.set(a.domain, list);
+  }
+
+  // Single domain = no meaningful clusters
+  if (domainMap.size <= 1) return [];
+
+  const groups: ClusterGroup[] = [];
+  for (const [label, arts] of domainMap) {
+    if (arts.length >= 2) {
+      groups.push({ label, slug: toSlug(label), articles: arts });
+    }
+  }
+  return groups;
 }
 
 export function getRecentArticles(outputPath: string, days: number = 7): ArticleMeta[] {
@@ -84,6 +154,16 @@ export async function generateWeeklyReview(outputPath: string, days: number = 7)
     return entry;
   }).join('\n');
 
+  // Build cluster info for the prompt
+  const clusters = groupByCategories(articles);
+  let clusterHint = '';
+  if (clusters.length > 0) {
+    clusterHint = `\n\nTopic clusters detected (use markdown links like [topic](#${clusters[0].slug}) when mentioning these):\n`;
+    clusterHint += clusters.map(c =>
+      `- ${c.label} (#${c.slug}): ${c.articles.map(a => `"${a.title}"`).join(', ')}`
+    ).join('\n');
+  }
+
   const prompt = `You are a reading digest assistant. Below is a list of ${articles.length} articles bookmarked in the past ${periodLabel}.
 
 Write a thematic ${reviewType} review in two sections:
@@ -95,7 +175,7 @@ Write a thematic ${reviewType} review in two sections:
 Format the output with ## Review and ## Open Questions headers.
 
 Articles:
-${articleList}
+${articleList}${clusterHint}
 
 ${isDaily ? 'Daily' : 'Weekly'} Review:`;
 
@@ -119,6 +199,19 @@ export async function generateAndSaveReview(outputPath: string, days: number = 7
   const fullPath = join(outputPath, filename);
 
   const articles = getRecentArticles(outputPath, days);
+  const clusters = groupByCategories(articles);
+
+  let clusterSection = '';
+  if (clusters.length > 0) {
+    clusterSection = '\n---\n\n## Topic Clusters\n\n';
+    clusterSection += clusters.map(c => {
+      const heading = `### <a id="${c.slug}"></a>${c.label}`;
+      const items = c.articles.map(a => `- [${a.title}](${a.url}) — ${a.domain}`).join('\n');
+      return heading + '\n' + items;
+    }).join('\n\n');
+    clusterSection += '\n';
+  }
+
   const markdown = `---
 title: "${reviewLabel} — ${date}"
 bookmarked: ${new Date().toISOString()}
@@ -137,7 +230,7 @@ ${review}
 ## ${articlesLabel}
 
 ${articles.map(a => `- [${a.title}](${a.url}) — ${a.domain}`).join('\n')}
-`;
+${clusterSection}`;
 
   const dir = dirname(fullPath);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });

@@ -75,7 +75,14 @@ window.prOpenExternal = async function (url) {
       console.warn('Tauri shell open failed, falling back:', e);
     }
   }
-  window.open(url, '_blank');
+  // Protocol URLs (sms:, mailto:, tel:) don't work with window.open
+  if (/^(sms|mailto|tel):/.test(url)) {
+    var a = document.createElement('a');
+    a.href = url;
+    a.click();
+  } else {
+    window.open(url, '_blank');
+  }
 };
 
 /**

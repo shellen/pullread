@@ -156,6 +156,43 @@ describe('parseFeed - Atom', () => {
     expect(entries[0].contentHtml).toContain('<blockquote>');
     expect(entries[0].annotation).toContain('Scott Rogowsky');
   });
+
+  test('falls back to summary when content is absent', () => {
+    const feed = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>xkcd</title>
+  <entry>
+    <title>Standards</title>
+    <link href="https://xkcd.com/927/" rel="alternate"/>
+    <id>https://xkcd.com/927/</id>
+    <updated>2024-08-01T00:00:00Z</updated>
+    <summary type="html">&lt;img src="https://imgs.xkcd.com/comics/standards.png" title="Hover text" alt="Standards" /&gt;</summary>
+  </entry>
+</feed>`;
+    const entries = parseFeed(feed);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].contentHtml).toBeDefined();
+    expect(entries[0].contentHtml).toContain('imgs.xkcd.com');
+  });
+
+  test('prefers content over summary when both present', () => {
+    const feed = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Test Feed</title>
+  <entry>
+    <title>Both Fields</title>
+    <link href="https://example.com/both"/>
+    <id>urn:uuid:both-1</id>
+    <updated>2024-08-01T00:00:00Z</updated>
+    <content type="html">&lt;p&gt;This is the full content from the content element which should always win.&lt;/p&gt;</content>
+    <summary type="html">&lt;p&gt;This is just the summary.&lt;/p&gt;</summary>
+  </entry>
+</feed>`;
+    const entries = parseFeed(feed);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].contentHtml).toContain('full content from the content element');
+    expect(entries[0].contentHtml).not.toContain('just the summary');
+  });
 });
 
 describe('parseFeed - RSS', () => {
@@ -1148,6 +1185,97 @@ describe('parseFeed - thumbnail extraction', () => {
     const entries = parseFeed(feed);
     expect(entries[0].thumbnail).toBe('https://example.com/full.jpg');
   });
+
+  test('falls back to channel-level itunes:image in RSS', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>NPR News Hour</title>
+    <itunes:image href="https://podcast.com/show-art.jpg"/>
+    <item>
+      <title>Episode Without Art</title>
+      <link>https://podcast.com/ep1</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <enclosure url="https://cdn.example.com/ep1.mp3" type="audio/mpeg"/>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].thumbnail).toBe('https://podcast.com/show-art.jpg');
+  });
+
+  test('falls back to channel-level image url in RSS', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Blog Feed</title>
+    <image>
+      <url>https://blog.com/logo.png</url>
+      <title>Blog</title>
+      <link>https://blog.com</link>
+    </image>
+    <item>
+      <title>Post Without Image</title>
+      <link>https://blog.com/post1</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].thumbnail).toBe('https://blog.com/logo.png');
+  });
+
+  test('per-item artwork takes precedence over channel artwork in RSS', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>Podcast With Both</title>
+    <itunes:image href="https://podcast.com/show-art.jpg"/>
+    <item>
+      <title>Episode With Own Art</title>
+      <link>https://podcast.com/ep1</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <itunes:image href="https://podcast.com/ep1-art.jpg"/>
+      <enclosure url="https://cdn.example.com/ep1.mp3" type="audio/mpeg"/>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].thumbnail).toBe('https://podcast.com/ep1-art.jpg');
+  });
+
+  test('falls back to feed-level image in Atom', () => {
+    const feed = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">
+  <title>Atom Feed With Logo</title>
+  <icon>https://example.com/feed-icon.png</icon>
+  <entry>
+    <title>Entry Without Image</title>
+    <link href="https://example.com/atom-entry"/>
+    <id>urn:uuid:feed-img-1</id>
+    <updated>2024-01-29T12:00:00Z</updated>
+  </entry>
+</feed>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].thumbnail).toBe('https://example.com/feed-icon.png');
+  });
+
+  test('per-entry artwork takes precedence over feed-level image in Atom', () => {
+    const feed = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">
+  <title>Atom Feed With Logo</title>
+  <icon>https://example.com/feed-icon.png</icon>
+  <entry>
+    <title>Entry With Own Image</title>
+    <link href="https://example.com/atom-entry"/>
+    <id>urn:uuid:feed-img-2</id>
+    <updated>2024-01-29T12:00:00Z</updated>
+    <media:content url="https://example.com/entry-hero.jpg" medium="image"/>
+  </entry>
+</feed>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].thumbnail).toBe('https://example.com/entry-hero.jpg');
+  });
 });
 
 describe('parseFeed - RSS description as contentHtml fallback', () => {
@@ -1207,7 +1335,7 @@ describe('parseFeed - RSS description as contentHtml fallback', () => {
     expect(entries[0].contentHtml).not.toContain('HTML description');
   });
 
-  test('does not use description without HTML tags as contentHtml even if long', () => {
+  test('uses long plain-text description as contentHtml (link blog commentary)', () => {
     const longPlainText = 'This is a long plain text description without any HTML tags. '.repeat(5);
     const feed = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
@@ -1222,7 +1350,143 @@ describe('parseFeed - RSS description as contentHtml fallback', () => {
   </channel>
 </rss>`;
     const entries = parseFeed(feed);
-    expect(entries[0].contentHtml).toBeUndefined();
+    expect(entries[0].contentHtml).toBeDefined();
+    expect(entries[0].contentHtml).toContain('long plain text description');
     expect(entries[0].annotation).toBeDefined();
+  });
+});
+
+describe('parseFeed - Substack RSS feeds', () => {
+  test('extracts full article from content:encoded with short description', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
+  <channel>
+    <title><![CDATA[Test Newsletter]]></title>
+    <generator>Substack</generator>
+    <item>
+      <title><![CDATA[How To Build Great Products]]></title>
+      <description><![CDATA[Community Wisdom 175]]></description>
+      <link>https://newsletter.example.com/p/how-to-build-great-products</link>
+      <guid isPermaLink="false">https://newsletter.example.com/p/how-to-build-great-products</guid>
+      <dc:creator><![CDATA[Test Author]]></dc:creator>
+      <pubDate>Fri, 28 Feb 2026 12:00:00 GMT</pubDate>
+      <content:encoded><![CDATA[<p>This is the full article body from Substack with multiple paragraphs of content.</p><p>Substack stores the real content in content:encoded while description is just a teaser.</p>]]></content:encoded>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].title).toBe('How To Build Great Products');
+    expect(entries[0].contentHtml).toBeDefined();
+    expect(entries[0].contentHtml).toContain('full article body from Substack');
+    expect(entries[0].annotation).toBe('Community Wisdom 175');
+    expect(entries[0].author).toBe('Test Author');
+  });
+
+  test('extracts content:encoded even with very short description', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0">
+  <channel>
+    <title><![CDATA[Kelly's Newsletter]]></title>
+    <generator>Substack</generator>
+    <item>
+      <title><![CDATA[Photos From My Trip]]></title>
+      <description><![CDATA[Eric Dane ❤️]]></description>
+      <link>https://kelly.substack.com/p/photos-from-my-trip</link>
+      <dc:creator><![CDATA[Kelly Oxford]]></dc:creator>
+      <pubDate>Wed, 26 Feb 2026 18:00:00 GMT</pubDate>
+      <content:encoded><![CDATA[<div class="captioned-image-container"><figure><img src="https://cdn.substack.com/image/fetch/photo.jpg" alt="A photo from the trip"/></figure></div><p>Here are the photos I promised from last week's adventure. We started early in the morning and the light was incredible.</p>]]></content:encoded>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].contentHtml).toBeDefined();
+    expect(entries[0].contentHtml).toContain('captioned-image-container');
+    expect(entries[0].contentHtml).toContain('photos I promised');
+  });
+
+  test('handles paywall preview in content:encoded', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0">
+  <channel>
+    <title><![CDATA[Premium Newsletter]]></title>
+    <generator>Substack</generator>
+    <item>
+      <title><![CDATA[Deep Dive: Engineering at Scale]]></title>
+      <description><![CDATA[Notes from the summit and workshop on the future of development.]]></description>
+      <link>https://premium.substack.com/p/deep-dive-engineering</link>
+      <dc:creator><![CDATA[Premium Author]]></dc:creator>
+      <pubDate>Mon, 24 Feb 2026 10:00:00 GMT</pubDate>
+      <content:encoded><![CDATA[<p>Two weeks ago, I hosted the annual summit in San Francisco.</p><p>This post is for paid subscribers only. <a href="https://premium.substack.com/subscribe">Subscribe</a> to read the rest.</p>]]></content:encoded>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].contentHtml).toBeDefined();
+    expect(entries[0].contentHtml).toContain('annual summit');
+    expect(entries[0].contentHtml).toContain('Subscribe');
+  });
+});
+
+describe('parseFeed - Atom link blog (Sippey.com style)', () => {
+  test('preserves commentary content for entries linking to external URLs', () => {
+    const feed = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>sippey.com</title>
+  <link href="https://sippey.com" rel="alternate" type="text/html"/>
+  <entry>
+    <title>Trump Has No Plan for the Iranian People</title>
+    <link href="https://www.theatlantic.com/ideas/2026/02/trump-has-no-plan-iranian-people/686194/" rel="alternate" type="text/html"/>
+    <id>tag:sippey.com,2026-02-26:1</id>
+    <updated>2026-02-26T14:30:00Z</updated>
+    <content type="html"><![CDATA[
+        <p>Anne Applebaum on the lack of a U.S. strategy for Iran.</p>
+<blockquote><p>For decades, American presidents from both parties have oscillated between coercion and engagement with Iran.</p></blockquote>
+    ]]></content>
+  </entry>
+  <entry>
+    <title>token body energy anxiety</title>
+    <link href="https://sippey.com/2026/02/25/token-body-energy-anxiety.html" rel="alternate" type="text/html"/>
+    <id>tag:sippey.com,2026-02-25:1</id>
+    <updated>2026-02-25T09:00:00Z</updated>
+    <content type="html"><![CDATA[
+        <p>Three things rattling around in my brain this morning. First, Sam Altman is living rent free in my head.</p>
+    ]]></content>
+  </entry>
+</feed>`;
+    const entries = parseFeed(feed);
+    expect(entries).toHaveLength(2);
+
+    // Link blog entry: URL is theatlantic.com, content is Sippey's commentary
+    expect(entries[0].title).toBe('Trump Has No Plan for the Iranian People');
+    expect(entries[0].url).toBe('https://www.theatlantic.com/ideas/2026/02/trump-has-no-plan-iranian-people/686194/');
+    expect(entries[0].domain).toBe('theatlantic.com');
+    expect(entries[0].contentHtml).toBeDefined();
+    expect(entries[0].contentHtml).toContain('Anne Applebaum');
+    expect(entries[0].contentHtml).toContain('oscillated between coercion');
+
+    // Original post: URL is sippey.com
+    expect(entries[1].url).toContain('sippey.com');
+    expect(entries[1].contentHtml).toBeDefined();
+    expect(entries[1].contentHtml).toContain('Sam Altman is living rent free');
+  });
+
+  test('resolves rel="related" link when available (Atom link blogs)', () => {
+    const feed = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Link Blog</title>
+  <entry>
+    <title>Interesting Article</title>
+    <link href="https://linkblog.example.com/2026/02/interesting" rel="alternate" type="text/html"/>
+    <link href="https://nytimes.com/interesting-article" rel="related" type="text/html"/>
+    <id>tag:linkblog.example.com,2026:1</id>
+    <updated>2026-02-26T10:00:00Z</updated>
+    <content type="html"><![CDATA[<p>The NYT nails it on this piece about technology regulation.</p>]]></content>
+  </entry>
+</feed>`;
+    const entries = parseFeed(feed);
+    // When rel="related" exists, it should be preferred as the entry URL
+    expect(entries[0].url).toBe('https://nytimes.com/interesting-article');
+    expect(entries[0].contentHtml).toContain('NYT nails it');
   });
 });

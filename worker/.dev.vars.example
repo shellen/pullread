@@ -1,0 +1,5 @@
+# Copy to .dev.vars and fill in values
+# Used by `wrangler dev` for local development
+# Production secrets are set via `wrangler secret put`
+HMAC_SECRET=your-hmac-secret-here
+ADMIN_KEY=your-admin-key-here

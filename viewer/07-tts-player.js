@@ -70,6 +70,7 @@ class PrPlayer extends HTMLElement {
           '<div class="bottom-bar-artwork" id="bottom-bar-artwork"><svg class="bottom-bar-icon" aria-hidden="true"><use href="#i-volume"/></svg></div>' +
           '<div class="bottom-bar-info">' +
             '<span class="bottom-bar-title" id="audio-now-label">No article queued</span>' +
+            '<span class="bottom-bar-source" id="audio-now-source"></span>' +
             '<span class="bottom-bar-status" id="audio-now-status"></span>' +
           '</div>' +
         '</div>' +
@@ -89,8 +90,8 @@ class PrPlayer extends HTMLElement {
           '<button class="audio-speed-btn" onclick="ttsToggleSpeedSlider()" title="Playback speed" id="tts-speed-btn">1x</button>' +
           '<button class="bottom-bar-queue-btn" onclick="toggleBottomBarQueue()" title="Queue" id="bottom-bar-queue-toggle"><svg><use href="#i-queue"/></svg></button>' +
           '<button class="bottom-bar-settings-btn" onclick="showSettingsPage(\'settings-voice\')" title="Voice settings"><svg><use href="#i-sliders"/></svg></button>' +
-          '<button class="mini-toggle" onclick="setPlayerMode(\'mini\')" title="Minimize to sidebar"><svg class="icon icon-sm"><use href="#i-chevron-left"/></svg></button>' +
-          '<button class="bottom-bar-close-btn" onclick="ttsDismissPlayer()" title="Close player"><svg><use href="#i-xmark"/></svg></button>' +
+          '<button class="mini-toggle" onclick="setPlayerMode(\'mini\')" title="Minimize to sidebar"><svg class="icon icon-sm"><use href="#i-chevron-down"/></svg></button>' +
+          '<button class="bottom-bar-dismiss" onclick="ttsDismissPlayer()" title="Close player"><svg><use href="#i-xmark"/></svg></button>' +
         '</div>' +
       '</div>' +
       '<div class="bottom-bar-queue" id="audio-queue-section" style="display:none">' +
@@ -106,15 +107,17 @@ class PrPlayer extends HTMLElement {
   _renderMini() {
     this.className = 'bottom-bar-mini hidden';
     this.innerHTML =
-      '<div class="mini-player-inner">' +
-        '<button class="mini-player-play" onclick="ttsTogglePlay()" title="Play/Pause" id="tts-play-btn"><svg><use href="#i-play"/></svg></button>' +
-        '<div class="mini-player-info" onclick="bottomBarGoToArticle()">' +
-          '<span class="mini-player-title" id="audio-now-label">No article queued</span>' +
-          '<span class="mini-player-status" id="audio-now-status"></span>' +
+      '<div class="mini-player-inner" onclick="setPlayerMode(\'expanded\')">' +
+        '<div class="mini-player-artwork" id="bottom-bar-artwork">' +
+          '<svg class="bottom-bar-icon" aria-hidden="true"><use href="#i-volume"/></svg>' +
         '</div>' +
-        '<button class="mini-player-expand" onclick="setPlayerMode(\'expanded\')" title="Expand player"><svg class="icon icon-sm"><use href="#i-chevron-right"/></svg></button>' +
+        '<div class="mini-player-info">' +
+          '<span class="mini-player-title" id="audio-now-label">No article queued</span>' +
+          '<span class="mini-player-source" id="audio-now-source"></span>' +
+        '</div>' +
+        '<button class="mini-player-play" onclick="event.stopPropagation();ttsTogglePlay()" title="Play/Pause" id="tts-play-btn"><svg><use href="#i-play"/></svg></button>' +
       '</div>' +
-      '<div class="mini-player-progress-row">' +
+      '<div class="mini-player-progress-edge">' +
         '<div class="audio-progress-wrap" id="audio-progress-wrap">' +
           '<div class="audio-progress"><div class="audio-progress-fill" id="tts-progress"></div></div>' +
         '</div>' +
@@ -150,6 +153,7 @@ class PrPlayer extends HTMLElement {
 
   /** Set up mouse/touch drag on the progress bar for seeking */
   _initProgressDrag() {
+    if (this._mode === 'mini') return;
     var wrap = this.querySelector('#audio-progress-wrap');
     if (!wrap) return;
     var self = this;
@@ -362,7 +366,14 @@ class PrPlayer extends HTMLElement {
     var currentItem = (currentIndex >= 0 && currentIndex < queue.length) ? queue[currentIndex] : null;
     if (label) label.textContent = currentItem ? currentItem.title : 'No article playing';
 
-    // Update artwork (expanded mode only)
+    var sourceEl = this.querySelector('#audio-now-source');
+    if (sourceEl && currentItem) {
+      sourceEl.textContent = currentItem.feed || currentItem.domain || '';
+    } else if (sourceEl) {
+      sourceEl.textContent = '';
+    }
+
+    // Update artwork
     var artworkEl = this.querySelector('#bottom-bar-artwork');
     if (artworkEl) {
       var artSrc = '';
@@ -380,6 +391,16 @@ class PrPlayer extends HTMLElement {
         artworkEl.appendChild(img);
       } else {
         artworkEl.innerHTML = fallbackIcon;
+      }
+      if (currentItem) {
+        if (currentItem.enclosureUrl) {
+          artworkEl.title = 'Podcast audio';
+        } else {
+          var vi = ttsCurrentVoiceInfo();
+          artworkEl.title = vi.voice + ' \u00b7 ' + vi.provider;
+        }
+      } else {
+        artworkEl.title = '';
       }
     }
 
@@ -410,9 +431,12 @@ class PrPlayer extends HTMLElement {
         if (queueToggle) queueToggle.classList.add('active');
         if (queueList) {
           queueList.innerHTML = queue.map(function(item, i) {
+            var source = item.feed || item.domain || '';
             return '<div class="audio-queue-item' + (i === currentIndex ? ' playing' : '') + '" onclick="playTTSItem(' + i + ')">'
               + '<span style="font-size:10px;color:var(--muted);width:14px;text-align:center">' + (i === currentIndex ? '&#9654;' : (i + 1)) + '</span>'
-              + '<span class="queue-title">' + escapeHtml(item.title) + '</span>'
+              + '<div class="queue-item-info"><span class="queue-title">' + escapeHtml(item.title) + '</span>'
+              + (source ? '<span class="queue-source">' + escapeHtml(source) + '</span>' : '')
+              + '</div>'
               + '<button class="queue-remove" onclick="event.stopPropagation();removeTTSQueueItem(' + i + ')" title="Remove">&times;</button>'
               + '</div>';
           }).join('');
