@@ -708,7 +708,7 @@ function syncSidebarTabs() {
   var search = document.getElementById('search');
   if (search) {
     if (_sidebarView === 'notebooks') search.placeholder = 'Search notebooks...';
-    else search.placeholder = 'Search... try is:starred or tag:tech';
+    else search.placeholder = 'Search articles...';
   }
 
   // Pinned filters only apply to articles (home view)

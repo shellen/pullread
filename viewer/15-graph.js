@@ -141,10 +141,32 @@ function buildTopicClusters(minShared, minArticles) {
     .sort(function(a, b) { return b.articles.length - a.articles.length; });
 }
 
+function _dailySeed() {
+  var d = new Date();
+  return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+}
+
+function _seededShuffle(arr, seed) {
+  var a = arr.slice();
+  var s = seed;
+  for (var i = a.length - 1; i > 0; i--) {
+    s = (s * 1103515245 + 12345) & 0x7fffffff;
+    var j = s % (i + 1);
+    var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+  }
+  return a;
+}
+
 function buildDailyRundown(maxTopics) {
   if (maxTopics === undefined) maxTopics = 5;
 
   var clusters = buildTopicClusters(2, 2);
+  var seed = _dailySeed();
+  var now = new Date();
+  var thirtyDaysAgo = new Date(now); thirtyDaysAgo.setDate(now.getDate() - 30);
+  var recentCutoff = thirtyDaysAgo.toISOString();
+  var threeDaysAgo = new Date(now); threeDaysAgo.setDate(now.getDate() - 3);
+  var trendingCutoff = threeDaysAgo.toISOString();
 
   var rundown = [];
   for (var i = 0; i < clusters.length; i++) {
@@ -156,18 +178,53 @@ function buildDailyRundown(maxTopics) {
 
     var articles = unread.map(function(a) {
       var file = allFiles.find(function(f) { return f.filename === a.filename; });
-      return { filename: a.filename, title: a.title, domain: file ? file.domain : '', image: file ? file.image : '' };
+      return { filename: a.filename, title: a.title, domain: file ? file.domain : '', image: file ? file.image : '', bookmarked: file ? file.bookmarked : '' };
     });
 
-    // Label: 2 shortest tags joined — short tags are the recognizable keywords
+    // Sort articles: newest first so hero image and headlines come from fresh content
+    articles.sort(function(a, b) { return (b.bookmarked || '') > (a.bookmarked || '') ? 1 : -1; });
+
+    var newestDate = articles.length > 0 ? (articles[0].bookmarked || '') : '';
+    // Count recent (last 30 days) and trending (last 3 days) articles
+    var recentCount = 0;
+    var trendingCount = 0;
+    for (var ai = 0; ai < articles.length; ai++) {
+      var bk = articles[ai].bookmarked || '';
+      if (bk >= recentCutoff) recentCount++;
+      if (bk >= trendingCutoff) trendingCount++;
+    }
+
+    // Label: 2 shortest tags joined
     var sorted = c.tags.slice().sort(function(a, b) { return a.length - b.length; });
     var label = sorted.slice(0, 2).join(' & ');
 
-    rundown.push({ tags: c.tags, articles: articles, label: label });
+    rundown.push({ tags: c.tags, articles: articles, label: label, _recentCount: recentCount, _trendingCount: trendingCount, _newestDate: newestDate });
   }
 
-  rundown.sort(function(a, b) { return b.articles.length - a.articles.length; });
-  return rundown.slice(0, maxTopics);
+  // Split into tiers
+  var trending = rundown.filter(function(r) { return r._trendingCount > 0; });
+  var recent = rundown.filter(function(r) { return r._trendingCount === 0 && r._recentCount > 0; });
+  var deepCuts = rundown.filter(function(r) { return r._recentCount === 0; });
+
+  // Trending: most trending activity first
+  trending.sort(function(a, b) {
+    if (b._trendingCount !== a._trendingCount) return b._trendingCount - a._trendingCount;
+    return (b._newestDate || '') > (a._newestDate || '') ? 1 : -1;
+  });
+
+  // Recent: newest first
+  recent.sort(function(a, b) { return (b._newestDate || '') > (a._newestDate || '') ? 1 : -1; });
+
+  // Deep cuts: shuffle daily for discovery
+  deepCuts = _seededShuffle(deepCuts, seed);
+
+  // Build result: trending first, then recent, then deep cuts (cap at 1)
+  var result = [];
+  for (var ti = 0; ti < trending.length && result.length < maxTopics; ti++) result.push(trending[ti]);
+  for (var ri = 0; ri < recent.length && result.length < maxTopics; ri++) result.push(recent[ri]);
+  if (deepCuts.length > 0 && result.length < maxTopics) result.push(deepCuts[0]);
+
+  return result.slice(0, maxTopics);
 }
 
 function initRundown() {
@@ -175,18 +232,96 @@ function initRundown() {
   if (!track) return;
 
   var dots = document.querySelectorAll('.rundown-dot');
-  if (dots.length === 0) return;
+  var cardCount = track.children.length;
+  if (cardCount === 0) return;
 
-  track.addEventListener('scroll', function() {
-    var cardWidth = track.firstElementChild ? track.firstElementChild.offsetWidth : 1;
-    var idx = Math.round(track.scrollLeft / cardWidth);
+  var currentIdx = 0;
+
+  function goTo(idx) {
+    if (idx < 0) idx = 0;
+    if (idx >= cardCount) idx = cardCount - 1;
+    currentIdx = idx;
+    var cardWidth = track.firstElementChild.offsetWidth;
+    track.scrollTo({ left: cardWidth * idx, behavior: 'smooth' });
     for (var i = 0; i < dots.length; i++) {
       dots[i].classList.toggle('active', i === idx);
     }
+  }
+
+  // Sync dots on manual scroll (desktop wheel, accessibility)
+  track.addEventListener('scroll', function() {
+    var cardWidth = track.firstElementChild ? track.firstElementChild.offsetWidth : 1;
+    var idx = Math.round(track.scrollLeft / cardWidth);
+    if (idx !== currentIdx) {
+      currentIdx = idx;
+      for (var i = 0; i < dots.length; i++) {
+        dots[i].classList.toggle('active', i === idx);
+      }
+    }
   });
+
+  // Touch swipe handling
+  var startX = 0;
+  var startY = 0;
+  var startTime = 0;
+  var swiping = false;
+
+  track.addEventListener('touchstart', function(e) {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    startTime = Date.now();
+    swiping = false;
+  }, { passive: true });
+
+  track.addEventListener('touchmove', function(e) {
+    var dx = e.touches[0].clientX - startX;
+    var dy = e.touches[0].clientY - startY;
+    // If horizontal movement dominates, this is a swipe
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) {
+      swiping = true;
+    }
+  }, { passive: true });
+
+  track.addEventListener('touchend', function(e) {
+    var endX = e.changedTouches[0].clientX;
+    var dx = endX - startX;
+    var elapsed = Date.now() - startTime;
+
+    if (swiping) {
+      // Velocity-based: fast flick or long drag both work
+      var velocity = Math.abs(dx) / elapsed;
+      if (Math.abs(dx) > 50 || velocity > 0.3) {
+        if (dx < 0) goTo(currentIdx + 1);
+        else goTo(currentIdx - 1);
+      } else {
+        goTo(currentIdx); // snap back
+      }
+      return;
+    }
+
+    // Tap (not a swipe): right half = next, left half = prev
+    // But only if the tap wasn't on an interactive element
+    var target = e.target;
+    if (target.closest('a, button, .tag-pill')) return;
+
+    var rect = track.getBoundingClientRect();
+    var tapX = endX - rect.left;
+    if (tapX > rect.width * 0.5) {
+      goTo(currentIdx + 1);
+    } else {
+      goTo(currentIdx - 1);
+    }
+  });
+
+  // Expose for dot clicks
+  window._rundownGoTo = goTo;
 }
 
 function rundownGoTo(idx) {
+  if (window._rundownGoTo) {
+    window._rundownGoTo(idx);
+    return;
+  }
   var track = document.querySelector('.rundown-track');
   if (!track || !track.firstElementChild) return;
   var cardWidth = track.firstElementChild.offsetWidth;

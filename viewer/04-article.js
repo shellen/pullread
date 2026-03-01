@@ -59,7 +59,8 @@ function renderHub() {
     forYouHtml += '</div>';
     forYouHtml += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards">';
     for (var ci = 0; ci < continueReading.length; ci++) {
-      forYouHtml += dashCardHtml(continueReading[ci], positions[continueReading[ci].filename] ? positions[continueReading[ci].filename].pct : undefined);
+      var crVariant = (ci === 0) ? 'featured' : 'standard';
+      forYouHtml += dashCardHtml(continueReading[ci], positions[continueReading[ci].filename] ? positions[continueReading[ci].filename].pct : undefined, crVariant);
     }
     forYouHtml += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
   }
@@ -127,9 +128,9 @@ function renderHub() {
       forYouHtml += '<button class="dash-view-all" onclick="document.getElementById(\'search\').focus()">View all ' + unreadCount + ' &rsaquo;</button>';
     }
     forYouHtml += '</div>';
-    forYouHtml += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards">';
+    forYouHtml += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards dash-cards-compact">';
     for (var rci = 0; rci < recent.length; rci++) {
-      forYouHtml += dashCardHtml(recent[rci]);
+      forYouHtml += dashCardHtml(recent[rci], undefined, 'compact');
     }
     forYouHtml += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
   }
@@ -296,24 +297,38 @@ function buildDailyRundownHtml() {
       if (c.articles[ii].image) { heroImage = c.articles[ii].image; break; }
     }
 
+    var clusterColor = sourceColor(c.label);
     html += '<div class="rundown-card">';
 
     if (heroImage) {
-      html += '<img class="rundown-card-img" src="' + escapeHtml(heroImage) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<div class=rundown-card-noimg></div>\'">';
+      var imgLoading = ci === 0 ? 'eager' : 'lazy';
+      html += '<img class="rundown-card-img" src="' + escapeHtml(heroImage) + '" alt="" loading="' + imgLoading + '" onerror="this.parentElement.style.setProperty(\'--reel-color\',\'' + clusterColor + '\');this.outerHTML=\'<div class=rundown-card-noimg></div>\'">';
     } else {
-      html += '<div class="rundown-card-noimg"></div>';
+      html += '<div class="rundown-card-noimg" style="background:' + clusterColor + '"><span class="rundown-card-initial">' + escapeHtml(c.label.charAt(0).toUpperCase()) + '</span></div>';
     }
 
     html += '<div class="rundown-card-body">';
     html += '<div class="rundown-card-label">' + escapeHtml(c.label) + '</div>';
     html += '<div class="rundown-card-count">' + c.articles.length + ' article' + (c.articles.length !== 1 ? 's' : '') + '</div>';
 
+    // Most recent article date
+    var newestDate = '';
+    for (var di2 = 0; di2 < c.articles.length; di2++) {
+      var d = c.articles[di2].bookmarked;
+      if (d && d > newestDate) newestDate = d;
+    }
+    if (newestDate) {
+      var dateObj = new Date(newestDate);
+      var formatted = dateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      html += '<div class="rundown-card-date">' + formatted + '</div>';
+    }
+
     // Up to 3 headlines
     html += '<div class="rundown-card-headlines">';
     var headlineCount = Math.min(c.articles.length, 3);
     for (var hi = 0; hi < headlineCount; hi++) {
       var a = c.articles[hi];
-      html += '<a onclick="dashLoadArticle(\'' + escapeJsStr(a.filename) + '\')">' + escapeHtml(a.title) + '</a>';
+      html += '<a role="button" tabindex="0" onclick="dashLoadArticle(\'' + escapeJsStr(a.filename) + '\')" onkeydown="if(event.key===\'Enter\')dashLoadArticle(\'' + escapeJsStr(a.filename) + '\')">' + escapeHtml(a.title) + '</a>';
     }
     html += '</div>';
 
@@ -333,25 +348,34 @@ function buildDailyRundownHtml() {
   return html;
 }
 
-function dashCardHtml(f, progressPct) {
+function dashCardInitialHtml(name, height) {
+  var c = sourceColor(name);
+  var initial = (name || '?').charAt(0).toUpperCase();
+  return '<div class="dash-card-img-placeholder" style="height:' + height + 'px;background:' + c + '"><span class="dash-card-initial">' + initial + '</span></div>';
+}
+
+function dashCardHtml(f, progressPct, variant) {
+  if (!variant) variant = 'standard';
   const onclick = 'dashLoadArticle(\'' + escapeHtml(f.filename) + '\')';
   const domain = f.domain || '';
   const favicon = domain ? '/favicons/' + encodeURIComponent(domain) + '.png' : '';
-  const date = f.bookmarked ? f.bookmarked.slice(0, 10) : '';
+  const feedName = f.feed || f.domain || '';
+  const color = sourceColor(feedName);
+  const imgHeight = variant === 'featured' ? 220 : (variant === 'compact' ? 72 : 160);
 
-  let html = '<div class="dash-card" onclick="' + onclick + '">';
+  let html = '<div class="dash-card dash-card-' + variant + '" role="button" tabindex="0" onclick="' + onclick + '" onkeydown="if(event.key===\'Enter\'){' + onclick + '}">';
 
-  // Image or placeholder
+  // Image or source-colored initial
   if (f.image) {
-    html += '<img class="dash-card-img" src="' + escapeHtml(f.image) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<div class=dash-card-img-placeholder><svg style=width:32px;height:32px;fill:currentColor viewBox=&quot;0 0 448 512&quot;><use href=&quot;#i-book&quot;/></svg></div>\'">';
+    html += '<img class="dash-card-img" src="' + escapeHtml(f.image) + '" alt="" loading="lazy" onerror="this.outerHTML=dashCardInitialHtml(\'' + escapeHtml(feedName).replace(/'/g, "\\'") + '\',' + imgHeight + ')">';
   } else {
-    html += '<div class="dash-card-img-placeholder"><svg style="width:32px;height:32px;fill:currentColor" viewBox="0 0 448 512"><use href="#i-book"/></svg></div>';
+    html += dashCardInitialHtml(feedName, imgHeight);
   }
 
   html += '<div class="dash-card-body">';
 
   // Meta row: favicon, domain, feed badge
-  html += '<div class="dash-card-meta">';
+  html += '<div class="dash-card-meta" style="--source-color:' + color + '">';
   if (favicon) html += '<img src="' + escapeHtml(favicon) + '" alt="" loading="lazy">';
   if (domain) html += '<span>' + escapeHtml(domain) + '</span>';
   if (f.feed && f.feed !== domain) html += '<span class="dash-card-badge">' + escapeHtml(f.feed) + '</span>';

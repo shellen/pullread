@@ -49,7 +49,7 @@
   <div class="main">
     <aside class="sidebar" id="sidebar" aria-label="Navigation">
       <div class="sidebar-header">
-        <span class="brand" onclick="goHome()" role="heading" aria-level="1" title="Home"><div class="brand-icon-box" aria-hidden="true"><svg fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/></svg></div>Pull Read</span>
+        <span class="brand" onclick="goHome()" role="heading" aria-level="1" title="Home"><div class="brand-icon-box" aria-hidden="true"><svg fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="3" y="3" width="15" height="19" rx="2"/><line x1="7" y1="10.5" x2="14" y2="10.5"/><line x1="7" y1="14" x2="12.5" y2="14"/><line x1="7" y1="17.5" x2="11" y2="17.5"/><path d="M14 2v7l2.25-1.75L18.5 9V2z" fill="currentColor" stroke="none"/></svg></div>Pull Read</span>
         <div class="sidebar-header-actions">
           <button class="toolbar-icon-btn" onclick="toggleQuickAdd()" aria-label="Add article by URL" title="Add URL" id="quick-add-btn"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg></button>
           <button class="toolbar-icon-btn" onclick="refreshArticleList()" aria-label="Refresh articles" title="Refresh" id="refresh-btn"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></button>
@@ -62,7 +62,7 @@
       </div>
       <div class="sidebar-search" role="search">
         <label for="search" class="sr-only">Search articles</label>
-        <input type="text" id="search" placeholder="Search... try is:favorite or tag:tech" oninput="filterFiles()" />
+        <input type="text" id="search" placeholder="Search articles..." oninput="filterFiles()" />
         <button class="search-clear" id="search-clear" onclick="clearSearch()" aria-label="Clear search">&times;</button>
         <button class="search-pin" id="search-pin" onclick="pinCurrentSearch()" aria-label="Pin this filter" title="Pin this filter">
           <svg class="icon icon-sm" aria-hidden="true"><use href="#i-pin"/></svg>
@@ -97,6 +97,7 @@
       </div>
       <div class="sidebar-footer">
         <button class="sidebar-footer-btn" onclick="toggleFocusMode()" aria-label="Focus mode" title="Focus mode (f)" id="focus-btn"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-focus"/></svg> Focus</button>
+        <button class="sidebar-footer-btn" onclick="prOpenExternal('mailto:support@alittledrive.com?subject=Pull Read Beta Feedback')" aria-label="Send feedback" title="Send feedback"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-envelope"/></svg> Feedback</button>
         <button class="sidebar-footer-btn" onclick="showSettingsPage()" aria-label="Settings" title="Settings"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-gear"/></svg> Settings</button>
       </div>
     </aside>

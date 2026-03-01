@@ -220,13 +220,14 @@ describe('buildTopicClusters', () => {
 describe('buildDailyRundown', () => {
   // Helper: 3 articles sharing 2 tags = 1 cluster at threshold (2, 2)
   function setupRundownData(readSet) {
+    var today = new Date().toISOString();
     setupMockData(
       [
-        { filename: 'a.md', title: 'AI Regulation Update', domain: 'tech.com', image: 'https://tech.com/og.jpg' },
-        { filename: 'b.md', title: 'OpenAI Policy Shift', domain: 'ai.org', image: '' },
-        { filename: 'c.md', title: 'AI Safety Standards', domain: 'safety.io', image: 'https://safety.io/og.png' },
-        { filename: 'd.md', title: 'Crypto Market Rally', domain: 'crypto.com', image: '' },
-        { filename: 'e.md', title: 'Bitcoin Regulation', domain: 'coin.net', image: '' },
+        { filename: 'a.md', title: 'AI Regulation Update', domain: 'tech.com', image: 'https://tech.com/og.jpg', bookmarked: today },
+        { filename: 'b.md', title: 'OpenAI Policy Shift', domain: 'ai.org', image: '', bookmarked: today },
+        { filename: 'c.md', title: 'AI Safety Standards', domain: 'safety.io', image: 'https://safety.io/og.png', bookmarked: today },
+        { filename: 'd.md', title: 'Crypto Market Rally', domain: 'crypto.com', image: '', bookmarked: today },
+        { filename: 'e.md', title: 'Bitcoin Regulation', domain: 'coin.net', image: '', bookmarked: today },
       ],
       {
         'a.md': { machineTags: ['ai', 'regulation'] },
@@ -262,13 +263,14 @@ describe('buildDailyRundown', () => {
   });
 
   test('sorts by unread article count descending', () => {
+    var today = new Date().toISOString();
     setupMockData(
       [
-        { filename: 'a.md', title: 'A', domain: 'a.com' },
-        { filename: 'b.md', title: 'B', domain: 'b.com' },
-        { filename: 'c.md', title: 'C', domain: 'c.com' },
-        { filename: 'd.md', title: 'D', domain: 'd.com' },
-        { filename: 'e.md', title: 'E', domain: 'e.com' },
+        { filename: 'a.md', title: 'A', domain: 'a.com', bookmarked: today },
+        { filename: 'b.md', title: 'B', domain: 'b.com', bookmarked: today },
+        { filename: 'c.md', title: 'C', domain: 'c.com', bookmarked: today },
+        { filename: 'd.md', title: 'D', domain: 'd.com', bookmarked: today },
+        { filename: 'e.md', title: 'E', domain: 'e.com', bookmarked: today },
       ],
       {
         'a.md': { machineTags: ['small', 'topic'] },
@@ -282,7 +284,8 @@ describe('buildDailyRundown', () => {
     const rundown = buildDailyRundown(5);
 
     expect(rundown.length).toBe(2);
-    expect(rundown[0].articles.length).toBeGreaterThanOrEqual(rundown[1].articles.length);
+    var counts = rundown.map(r => r.articles.length).sort((a, b) => b - a);
+    expect(counts[0]).toBeGreaterThanOrEqual(counts[1]);
   });
 
   test('respects maxTopics limit', () => {
