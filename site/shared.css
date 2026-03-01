@@ -339,6 +339,173 @@ footer a:hover {
   list-style: none;
 }
 
+/* ── Download gate modal ──────────────────────────────── */
+
+.dl-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(28, 25, 23, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.dl-modal-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.dl-modal {
+  background: var(--card);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  max-width: 400px;
+  width: calc(100% - 32px);
+  box-shadow: 0 16px 48px rgba(28, 25, 23, 0.18);
+  position: relative;
+}
+
+.dl-modal h3 {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  margin-bottom: 6px;
+}
+
+.dl-modal p {
+  font-size: 14px;
+  color: var(--ink-secondary);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.dl-modal input[type="email"] {
+  width: 100%;
+  padding: 10px 14px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.dl-modal input[type="email"]:focus {
+  border-color: var(--accent);
+}
+
+.dl-modal .btn {
+  width: 100%;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.dl-modal .checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--ink-secondary);
+}
+
+.dl-modal .checkbox-row input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+.dl-modal .error {
+  color: #c0392b;
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+.dl-modal .success {
+  font-size: 14px;
+  color: var(--ink-secondary);
+  margin-top: 12px;
+  line-height: 1.5;
+}
+
+.dl-modal .success a {
+  color: var(--accent);
+}
+
+.dl-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: var(--ink-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+}
+
+.dl-modal-close:hover {
+  color: var(--ink);
+}
+
+/* ── Newsletter section ──────────────────────────────── */
+
+.newsletter {
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 48px 32px 80px;
+  text-align: center;
+}
+
+.newsletter h3 {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  margin-bottom: 6px;
+}
+
+.newsletter p {
+  font-size: 15px;
+  color: var(--ink-secondary);
+  margin-bottom: 20px;
+}
+
+.newsletter-form {
+  display: flex;
+  gap: 8px;
+  max-width: 380px;
+  margin: 0 auto;
+}
+
+.newsletter-form input[type="email"] {
+  flex: 1;
+  padding: 10px 14px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.newsletter-form input[type="email"]:focus {
+  border-color: var(--accent);
+}
+
+.newsletter-form .newsletter-msg {
+  font-size: 13px;
+  margin-top: 8px;
+}
+
 /* ── Scroll reveal ─────────────────────────────────────── */
 
 .reveal {
