@@ -22,5 +22,8 @@ feeds.json
 # SQLite database
 data/*.db
 
+# Downloaded fonts for image generation
+scripts/fonts/
+
 # OS files
 .DS_Store
