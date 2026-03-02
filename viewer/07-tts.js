@@ -74,8 +74,9 @@ function updateListenButtonState() {
     ? ttsQueue[ttsCurrentIndex].filename : null;
   // Use "Play" label for podcast articles, "Listen" for TTS
   var file = activeFile && allFiles.find(function(f) { return f.filename === activeFile; });
-  var isPodcast = file && file.enclosureUrl && file.enclosureType && file.enclosureType.startsWith('audio/');
-  var idleLabel = isPodcast ? 'Play' : 'Listen';
+  var isPodcast = file && file.enclosureUrl && isMediaEnclosure(file.enclosureType);
+  var isVideo = file && file.enclosureUrl && isVideoEnclosure(file.enclosureType);
+  var idleLabel = isVideo ? 'Watch' : isPodcast ? 'Play' : 'Listen';
   if (playingFile && playingFile === activeFile) {
     btn.classList.add('listen-playing');
     btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> Playing';
@@ -141,8 +142,9 @@ function playNextFromArticle(filename) {
     return;
   }
   var newItem = { filename: filename, title: file.title, image: file.image || '', domain: file.domain || '', feed: file.feed || '' };
-  if (file.enclosureUrl && file.enclosureType && file.enclosureType.startsWith('audio/')) {
+  if (file.enclosureUrl && isMediaEnclosure(file.enclosureType)) {
     newItem.enclosureUrl = file.enclosureUrl;
+    newItem.enclosureType = file.enclosureType;
   }
   var insertAt = ttsCurrentIndex >= 0 ? ttsCurrentIndex + 1 : 0;
   ttsQueue.splice(insertAt, 0, newItem);
@@ -174,8 +176,9 @@ async function addToTTSQueue(filename) {
   }
 
   var item = { filename, title: file.title, image: file.image || '', domain: file.domain || '', feed: file.feed || '' };
-  if (file.enclosureUrl && file.enclosureType && file.enclosureType.startsWith('audio/')) {
+  if (file.enclosureUrl && isMediaEnclosure(file.enclosureType)) {
     item.enclosureUrl = file.enclosureUrl;
+    item.enclosureType = file.enclosureType;
   }
   ttsQueue.push(item);
   renderAudioPlayer();
@@ -271,9 +274,13 @@ async function playTTSItem(index) {
   ttsPlaying = true;
   renderAudioPlayer();
 
-  // Podcast enclosures play as native audio — no TTS synthesis needed
+  // Media enclosures play natively — no TTS synthesis needed
   if (item.enclosureUrl) {
-    await playPodcastAudio(item);
+    if (isVideoEnclosure(item.enclosureType)) {
+      playVideoPopout(item);
+    } else {
+      await playPodcastAudio(item);
+    }
     return;
   }
 
@@ -717,13 +724,66 @@ async function playPodcastAudio(item) {
   }
 }
 
+/** Open a video podcast in a pop-out player window */
+function playVideoPopout(item) {
+  stopListenLoading();
+  ttsPlaying = true;
+  renderAudioPlayer();
+
+  var title = item.title || 'Video';
+  var posterAttr = item.image ? ' poster="' + item.image + '"' : '';
+
+  var html = '<!DOCTYPE html><html><head>'
+    + '<meta charset="UTF-8"><title>' + title.replace(/</g, '&lt;') + ' — Pull Read</title>'
+    + '<style>'
+    + 'body{margin:0;background:#111;display:flex;align-items:center;justify-content:center;height:100vh;font-family:system-ui,sans-serif;color:#fff}'
+    + 'video{max-width:100%;max-height:100%;border-radius:4px}'
+    + '.info{position:fixed;top:12px;left:16px;font-size:13px;opacity:0.7}'
+    + '</style></head><body>'
+    + '<div class="info">' + title.replace(/</g, '&lt;') + '</div>'
+    + '<video controls autoplay' + posterAttr + '>'
+    + '<source src="' + item.enclosureUrl + '">'
+    + '</video>'
+    + '<script>'
+    + 'var v=document.querySelector("video");'
+    + 'v.addEventListener("ended",function(){window.close()});'
+    + 'v.addEventListener("error",function(){document.body.innerHTML="<p style=\\"text-align:center;padding:40px\\">Could not load video</p>"});'
+    + '</scr' + 'ipt>'
+    + '</body></html>';
+
+  var w = window.open('', '_blank', 'width=960,height=640,menubar=no,toolbar=no');
+  if (w) {
+    w.document.write(html);
+    w.document.close();
+    // When popout closes, advance queue
+    var check = setInterval(function() {
+      if (w.closed) {
+        clearInterval(check);
+        ttsPlaying = false;
+        renderAudioPlayer();
+        if (ttsCurrentIndex + 1 < ttsQueue.length) {
+          setTimeout(function() { playTTSItem(ttsCurrentIndex + 1); }, 500);
+        } else {
+          autoplayNext(item.filename);
+        }
+      }
+    }, 500);
+  } else {
+    // Popup blocked — fall back to inline link
+    ttsPlaying = false;
+    renderAudioPlayer();
+    showToast('Pop-up blocked. Opening video in new tab.');
+    window.open(item.enclosureUrl, '_blank');
+  }
+}
+
 /** Auto-play the next item based on autoplayMode setting */
 function autoplayNext(currentFilename) {
   if (autoplayMode === 'off') return;
   var candidates;
   if (autoplayMode === 'podcasts') {
     candidates = allFiles.filter(function(f) {
-      return f.enclosureUrl && f.enclosureType && f.enclosureType.startsWith('audio/');
+      return f.enclosureUrl && isMediaEnclosure(f.enclosureType);
     });
   } else {
     candidates = allFiles;

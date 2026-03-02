@@ -1,3 +1,8 @@
+// Media enclosure type helpers — shared across article, sidebar, and TTS
+function isAudioEnclosure(type) { return !!(type && type.startsWith('audio/')); }
+function isVideoEnclosure(type) { return !!(type && type.startsWith('video/')); }
+function isMediaEnclosure(type) { return isAudioEnclosure(type) || isVideoEnclosure(type); }
+
 // Abbreviate large numbers: 0-99 exact, 100+ → "100+", 1000+ → "1K+", 13000 → "13K+"
 function approxCount(n) {
   if (n < 100) return String(n);

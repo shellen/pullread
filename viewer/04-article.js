@@ -535,7 +535,7 @@ function renderArticle(text, filename) {
 
     // Favicon: for podcasts with artwork, show artwork; otherwise show domain favicon
     var initials = (pubName || meta.domain).replace(/^(the |www\.)/i, '').slice(0, 2).toUpperCase();
-    var hasPodcastArt = meta.thumbnail && meta.enclosure_type && meta.enclosure_type.startsWith('audio/');
+    var hasPodcastArt = meta.thumbnail && isMediaEnclosure(meta.enclosure_type);
     var faviconHtml;
     if (hasPodcastArt) {
       faviconHtml = '<div class="pub-favicon pub-favicon-art">'
@@ -605,8 +605,9 @@ function renderArticle(text, filename) {
   const isFav = articleNotes.isFavorite;
   toolbarActions += '<button onclick="toggleFavoriteFromHeader(this)" class="toolbar-action-btn' + (isFav ? ' active-fav' : '') + '" aria-label="' + (isFav ? 'Remove star' : 'Star article') + '" aria-pressed="' + isFav + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg><span class="toolbar-action-label"> Star</span></button>';
   toolbarActions += '<button onclick="markCurrentAsRead()" class="toolbar-action-btn" aria-label="Mark read"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-eye-slash"/></svg><span class="toolbar-action-label"> Mark read</span></button>';
-  var isPodcast = meta && meta.enclosure_url && meta.enclosure_type && meta.enclosure_type.startsWith('audio/');
-  var listenLabel = isPodcast ? 'Play' : 'Listen';
+  var isPodcast = meta && meta.enclosure_url && isMediaEnclosure(meta.enclosure_type);
+  var isVideo = meta && isVideoEnclosure(meta.enclosure_type);
+  var listenLabel = isVideo ? 'Watch' : isPodcast ? 'Play' : 'Listen';
   toolbarActions += '<div class="play-next-menu" id="play-next-menu">';
   toolbarActions += '<button id="listen-btn" onclick="addCurrentToTTSQueue()" class="toolbar-action-btn" aria-label="' + listenLabel + ' article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg><span class="toolbar-action-label"> ' + listenLabel + '</span></button>';
   toolbarActions += '<button class="play-next-trigger" id="play-next-trigger" onclick="togglePlayNextMenu(event)" aria-label="Queue options" style="display:none"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>';
@@ -677,16 +678,28 @@ function renderArticle(text, filename) {
     }
   }
 
-  // Podcast: show podcast info banner (audio plays through unified bottom bar)
+  // Podcast/video: show info banner (media plays through unified bottom bar or pop-out)
   if (isPodcast) {
-    html += '<div class="podcast-player">';
-    html += '<svg style="width:16px;height:16px;fill:var(--muted);flex-shrink:0"><use href="#i-mic"/></svg>';
-    html += '<span style="font-size:13px;color:var(--fg)">Podcast episode</span>';
+    var bannerIcon = isVideo ? '#i-video' : '#i-mic';
+    var bannerLabel = isVideo ? 'Video episode' : 'Podcast episode';
+    var bannerAction = isVideo ? 'Watch' : 'Play in player';
+    html += '<div class="podcast-player' + (isVideo ? ' video-episode' : '') + '">';
+    html += '<svg style="width:16px;height:16px;fill:var(--muted);flex-shrink:0"><use href="' + bannerIcon + '"/></svg>';
+    html += '<span style="font-size:13px;color:var(--fg)">' + bannerLabel + '</span>';
     if (meta.enclosure_duration) {
       html += '<span class="podcast-duration">' + escapeHtml(meta.enclosure_duration) + '</span>';
     }
-    html += '<button onclick="addCurrentToTTSQueue()" style="margin-left:auto;padding:4px 12px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--link);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">Play in player</button>';
+    html += '<button onclick="addCurrentToTTSQueue()" style="margin-left:auto;padding:4px 12px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--link);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">' + bannerAction + '</button>';
     html += '</div>';
+    // Inline video preview for video episodes
+    if (isVideo && meta.enclosure_url) {
+      var posterHtml = meta.thumbnail ? ' poster="' + escapeHtml(meta.thumbnail) + '"' : '';
+      html += '<div class="video-inline-player">';
+      html += '<video controls preload="metadata"' + posterHtml + '>';
+      html += '<source src="' + escapeHtml(meta.enclosure_url) + '">';
+      html += '</video>';
+      html += '</div>';
+    }
     // Show podcast description in a collapsible section instead of as article body
     if (body && body.trim()) {
       html += '<details class="podcast-description" open><summary>Episode description</summary>';

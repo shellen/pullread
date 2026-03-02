@@ -111,12 +111,13 @@ function renderFileItem(f, i) {
   const isRead = readArticles.has(f.filename);
   const { hasHl, hasNote, isFavorite } = hasAnnotations(f.filename);
   const hasSummary = f.hasSummary;
-  const isPodcast = !!(f.enclosureUrl && f.enclosureType && f.enclosureType.startsWith('audio/'));
+  const isPodcast = !!(f.enclosureUrl && isMediaEnclosure(f.enclosureType));
+  const isVideo = !!(f.enclosureUrl && isVideoEnclosure(f.enclosureType));
   let indicators = '';
   if (hasHl || hasNote || hasSummary || isFavorite || isPodcast) {
     indicators = '<div class="file-item-indicators">'
       + (isFavorite ? '<span class="dot dot-favorite" aria-label="Starred"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-heart"/></svg></span>' : '')
-      + (isPodcast ? '<span class="dot dot-podcast" aria-label="Podcast"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-headphones"/></svg></span>' : '')
+      + (isVideo ? '<span class="dot dot-video" aria-label="Video"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-video"/></svg></span>' : isPodcast ? '<span class="dot dot-podcast" aria-label="Podcast"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-headphones"/></svg></span>' : '')
       + (hasHl ? '<span class="dot dot-highlight" aria-label="Has highlights"></span>' : '')
       + (hasNote ? '<span class="dot dot-note" aria-label="Has annotations"></span>' : '')
       + (hasSummary ? '<span class="dot dot-summary" aria-label="Has summary"></span>' : '')
@@ -198,12 +199,13 @@ function updateSidebarItem(filename) {
   if (!f) return;
   var { hasHl, hasNote, isFavorite } = hasAnnotations(filename);
   var hasSummary = f.hasSummary;
-  var isPodcast = !!(f.enclosureUrl && f.enclosureType && f.enclosureType.startsWith('audio/'));
+  var isPodcast = !!(f.enclosureUrl && isMediaEnclosure(f.enclosureType));
+  var isVideo = !!(f.enclosureUrl && isVideoEnclosure(f.enclosureType));
   var existing = el.querySelector('.file-item-indicators');
   if (hasHl || hasNote || hasSummary || isFavorite || isPodcast) {
     var html = '<div class="file-item-indicators">'
       + (isFavorite ? '<span class="dot dot-favorite" aria-label="Starred"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-heart"/></svg></span>' : '')
-      + (isPodcast ? '<span class="dot dot-podcast" aria-label="Podcast"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-headphones"/></svg></span>' : '')
+      + (isVideo ? '<span class="dot dot-video" aria-label="Video"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-video"/></svg></span>' : isPodcast ? '<span class="dot dot-podcast" aria-label="Podcast"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-headphones"/></svg></span>' : '')
       + (hasHl ? '<span class="dot dot-highlight" aria-label="Has highlights"></span>' : '')
       + (hasNote ? '<span class="dot dot-note" aria-label="Has annotations"></span>' : '')
       + (hasSummary ? '<span class="dot dot-summary" aria-label="Has summary"></span>' : '')
@@ -273,7 +275,7 @@ function magicScore(f, engagement) {
   // Recency: exponential decay (weight 40)
   // Podcasts use 12-hour half-life (decay 1.386), articles use 3-day (decay 0.231)
   var age = f.bookmarked ? (Date.now() - new Date(f.bookmarked).getTime()) / 86400000 : 30;
-  var isPodcast = f.enclosureUrl && f.enclosureType && f.enclosureType.startsWith('audio/');
+  var isPodcast = f.enclosureUrl && isMediaEnclosure(f.enclosureType);
   var decay = isPodcast ? 1.386 : 0.231;
   var recency = Math.exp(-decay * age);
 
@@ -386,8 +388,10 @@ function filterFiles() {
         if (tl === 'is:read') return readArticles.has(f.filename);
         // Operator: is:unread
         if (tl === 'is:unread') return !readArticles.has(f.filename);
-        // Operator: is:podcast / has:audio
-        if (tl === 'is:podcast' || tl === 'has:audio') return !!(f.enclosureUrl && f.enclosureType && f.enclosureType.startsWith('audio/'));
+        // Operator: is:podcast / has:audio / has:video
+        if (tl === 'is:podcast') return !!(f.enclosureUrl && isMediaEnclosure(f.enclosureType));
+        if (tl === 'has:audio') return !!(f.enclosureUrl && isAudioEnclosure(f.enclosureType));
+        if (tl === 'has:video') return !!(f.enclosureUrl && isVideoEnclosure(f.enclosureType));
         // Operator: is:epub / is:book
         if (tl === 'is:epub' || tl === 'is:book') return f.domain === 'epub';
         // Operator: has:summary
@@ -780,10 +784,12 @@ function openSourcesDrawer() {
 
   var entries = Object.entries(domainArticles);
 
-  // Count podcast items
+  // Count podcast and video items
   var podcastCount = 0;
+  var videoCount = 0;
   for (var j = 0; j < allFiles.length; j++) {
-    if (allFiles[j].enclosureUrl && allFiles[j].enclosureType && allFiles[j].enclosureType.startsWith('audio/')) podcastCount++;
+    if (allFiles[j].enclosureUrl && isMediaEnclosure(allFiles[j].enclosureType)) podcastCount++;
+    if (allFiles[j].enclosureUrl && isVideoEnclosure(allFiles[j].enclosureType)) videoCount++;
   }
 
   var sortMode = localStorage.getItem('pr-sources-sort') || 'recent';
@@ -829,15 +835,29 @@ function openSourcesDrawer() {
     if (podcastCount > 0 && (!filterLower || 'podcasts'.indexOf(filterLower) !== -1)) {
       var podUnread = 0;
       for (var pj = 0; pj < allFiles.length; pj++) {
-        if (allFiles[pj].enclosureUrl && allFiles[pj].enclosureType && allFiles[pj].enclosureType.startsWith('audio/') && !readArticles.has(allFiles[pj].filename)) podUnread++;
+        if (allFiles[pj].enclosureUrl && isMediaEnclosure(allFiles[pj].enclosureType) && !readArticles.has(allFiles[pj].filename)) podUnread++;
       }
       var podActive = _activeDrawerSource === '__podcasts__' ? ' active' : '';
       var podDim = podUnread === 0 ? ' dimmed' : '';
-      html += '<div class="drawer-group-label">Media Type</div>';
+      html += '<div class="drawer-group-label">Media</div>';
       html += '<div class="drawer-item' + podActive + podDim + '" data-source="__podcasts__" onclick="filterBySource(\'__podcasts__\')">'
         + '<svg class="drawer-item-icon" aria-hidden="true"><use href="#i-headphones"/></svg>'
         + '<span class="drawer-item-name">Podcasts</span>'
         + '<span class="drawer-item-count">' + podUnread + '</span></div>';
+    }
+
+    // Video row
+    if (videoCount > 0 && (!filterLower || 'videos'.indexOf(filterLower) !== -1)) {
+      var vidUnread = 0;
+      for (var vj = 0; vj < allFiles.length; vj++) {
+        if (allFiles[vj].enclosureUrl && isVideoEnclosure(allFiles[vj].enclosureType) && !readArticles.has(allFiles[vj].filename)) vidUnread++;
+      }
+      var vidActive = _activeDrawerSource === '__videos__' ? ' active' : '';
+      var vidDim = vidUnread === 0 ? ' dimmed' : '';
+      html += '<div class="drawer-item' + vidActive + vidDim + '" data-source="__videos__" onclick="filterBySource(\'__videos__\')">'
+        + '<svg class="drawer-item-icon" aria-hidden="true"><use href="#i-video"/></svg>'
+        + '<span class="drawer-item-name">Videos</span>'
+        + '<span class="drawer-item-count">' + vidUnread + '</span></div>';
     }
 
     // Source rows
@@ -1004,6 +1024,10 @@ function filterBySource(source) {
     if (search) search.value = 'is:podcast';
     showSourceFilterBar('Podcasts');
     _activeDrawerSource = '__podcasts__';
+  } else if (source === '__videos__') {
+    if (search) search.value = 'has:video';
+    showSourceFilterBar('Videos');
+    _activeDrawerSource = '__videos__';
   } else {
     if (search) search.value = 'feed:"' + source + '"';
     showSourceFilterBar(source);
@@ -1041,7 +1065,11 @@ function refreshDrawerCounts() {
       var unread = 0;
       if (src === '__podcasts__') {
         for (var j = 0; j < allFiles.length; j++) {
-          if (allFiles[j].enclosureUrl && allFiles[j].enclosureType && allFiles[j].enclosureType.startsWith('audio/') && !readArticles.has(allFiles[j].filename)) unread++;
+          if (allFiles[j].enclosureUrl && isMediaEnclosure(allFiles[j].enclosureType) && !readArticles.has(allFiles[j].filename)) unread++;
+        }
+      } else if (src === '__videos__') {
+        for (var j = 0; j < allFiles.length; j++) {
+          if (allFiles[j].enclosureUrl && isVideoEnclosure(allFiles[j].enclosureType) && !readArticles.has(allFiles[j].filename)) unread++;
         }
       } else {
         for (var j = 0; j < allFiles.length; j++) {

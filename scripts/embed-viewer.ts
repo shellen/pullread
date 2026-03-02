@@ -123,6 +123,7 @@ const ICON_MAP: Array<{ id: string; file: string; variant?: 'solid' | 'chevron' 
   { id: 'i-squares', file: 'squares-2x2.svg' },
   { id: 'i-stop', file: 'stop.svg' },
   { id: 'i-tags', file: 'tag.svg' },
+  { id: 'i-video', file: 'video-camera.svg' },
   { id: 'i-volume', file: 'speaker-wave.svg' },
   { id: 'i-wand', file: 'sparkles.svg' },
   { id: 'i-xmark', file: 'x-mark.svg' },

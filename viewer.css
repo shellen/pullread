@@ -3538,6 +3538,9 @@
   .podcast-description summary:hover { color: var(--fg); }
   .podcast-description > div { margin-top: 12px; color: var(--fg); }
   .podcast-description > div p { margin: 0.8em 0; }
+  .video-inline-player { margin: 1em 0; border-radius: 8px; overflow: hidden; background: #000; }
+  .video-inline-player video { width: 100%; display: block; max-height: 480px; }
+  .dot-video { color: var(--link); }
 
   /* Review article link list — link-blog style */
   .review-content ul {
