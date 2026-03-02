@@ -70,7 +70,7 @@
   // ── Intercept download links ───────────────────────────
 
   var links = document.querySelectorAll(
-    'a.btn[href*="releases/download/latest/PullRead"]'
+    'a[href*="releases/download/latest/PullRead"]'
   );
 
   links.forEach(function (link) {
