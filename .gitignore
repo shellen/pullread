@@ -13,6 +13,9 @@ src-tauri/resources/
 .env
 .dev.vars
 
+# Wrangler local state
+.wrangler/
+
 # Feed configuration
 feeds.json
 
