@@ -67,6 +67,13 @@
     if (e.key === 'Escape') closeModal();
   });
 
+  // ── Download URLs (single source of truth) ────────────
+
+  var DOWNLOAD_URLS = {
+    apple_silicon: 'https://github.com/shellen/pullread/releases/download/latest/PullRead.dmg',
+    intel: 'https://github.com/shellen/pullread/releases/download/latest/PullRead_Intel.dmg',
+  };
+
   // ── Intercept download links ───────────────────────────
 
   var links = document.querySelectorAll(
@@ -82,6 +89,19 @@
     link.addEventListener('click', function (e) {
       e.preventDefault();
       openModal(platform, href);
+    });
+  });
+
+  // ── Intercept gated download links (no raw URL in HTML) ─
+
+  var gatedLinks = document.querySelectorAll('a[data-gated-download]');
+
+  gatedLinks.forEach(function (link) {
+    var platform = link.getAttribute('data-gated-download');
+    var downloadUrl = DOWNLOAD_URLS[platform] || DOWNLOAD_URLS.apple_silicon;
+    link.addEventListener('click', function (e) {
+      e.preventDefault();
+      openModal(platform, downloadUrl);
     });
   });
 
