@@ -556,6 +556,36 @@ function showSettingsPage(scrollToSection) {
   // ==== ADVANCED TAB ====
   html += '<div class="tab-panel' + (targetTab === 'advanced' ? ' active' : '') + '" data-tab="advanced">';
 
+  // -- Storage & Cache card --
+  html += '<div class="card" id="settings-storage">';
+  html += '<div class="card-title">Storage &amp; Cache</div>';
+  html += '<div class="card-desc">Manage disk space used by video downloads and cached media.</div>';
+  html += '<div id="storage-info" style="font-size:13px;color:var(--muted);margin-bottom:12px">Loading storage info\u2026</div>';
+  html += '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">';
+  html += '<label style="font-size:13px;color:var(--fg)">Video cache limit</label>';
+  html += '<select id="storage-cache-limit" onchange="saveStorageSetting()" style="font-size:13px;padding:4px 8px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;font-family:inherit">';
+  html += '<option value="1073741824">1 GB</option>';
+  html += '<option value="2147483648">2 GB</option>';
+  html += '<option value="5368709120" selected>5 GB</option>';
+  html += '<option value="10737418240">10 GB</option>';
+  html += '<option value="21474836480">20 GB</option>';
+  html += '<option value="0">Unlimited</option>';
+  html += '</select>';
+  html += '</div>';
+  html += '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px">';
+  html += '<label style="font-size:13px;color:var(--fg)">Auto-delete watched episodes after</label>';
+  html += '<select id="storage-auto-delete" onchange="saveStorageSetting()" style="font-size:13px;padding:4px 8px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;font-family:inherit">';
+  html += '<option value="0">Never</option>';
+  html += '<option value="24" selected>24 hours</option>';
+  html += '<option value="72">3 days</option>';
+  html += '<option value="168">1 week</option>';
+  html += '</select>';
+  html += '</div>';
+  html += '<div style="margin-top:12px">';
+  html += '<button onclick="clearVideoCache()" style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit">Clear Video Cache</button>';
+  html += '</div>';
+  html += '</div>';
+
   // -- Backup & Restore card --
   html += '<div class="card" id="settings-backup">';
   html += '<div class="card-title">Backup &amp; Restore</div>';
@@ -707,6 +737,9 @@ function showSettingsPage(scrollToSection) {
   if (window.PR_TAURI) {
     loadSiteLogins();
   }
+
+  // Load Storage info
+  loadStorageInfo();
 
   // Load TTS settings async
   if (serverMode) {
@@ -1428,6 +1461,68 @@ function settingsImportOPML() {
     reader.readAsText(input.files[0]);
   };
   input.click();
+}
+
+// ---- Storage Management ----
+
+async function loadStorageInfo() {
+  var el = document.getElementById('storage-info');
+  if (!el) return;
+
+  try {
+    var res = await fetch('/api/storage-info');
+    if (!res.ok) throw new Error('API unavailable');
+    var data = await res.json();
+    var parts = [];
+    if (data.tts_cache_size != null) parts.push('TTS cache: ' + formatBytes(data.tts_cache_size));
+    if (data.video_cache_size != null) parts.push('Video cache: ' + formatBytes(data.video_cache_size));
+    if (data.favicons_size != null) parts.push('Favicons: ' + formatBytes(data.favicons_size));
+    if (data.total_articles != null) parts.push(data.total_articles + ' articles');
+    el.textContent = parts.length > 0 ? parts.join(' \u00b7 ') : 'No cached media found.';
+
+    // Restore saved settings
+    var limit = localStorage.getItem('pr-video-cache-limit');
+    var autoDelete = localStorage.getItem('pr-video-auto-delete');
+    if (limit != null) {
+      var sel = document.getElementById('storage-cache-limit');
+      if (sel) sel.value = limit;
+    }
+    if (autoDelete != null) {
+      var sel2 = document.getElementById('storage-auto-delete');
+      if (sel2) sel2.value = autoDelete;
+    }
+  } catch {
+    el.textContent = 'Storage info available in desktop app.';
+  }
+}
+
+function saveStorageSetting() {
+  var limit = document.getElementById('storage-cache-limit');
+  var autoDelete = document.getElementById('storage-auto-delete');
+  if (limit) localStorage.setItem('pr-video-cache-limit', limit.value);
+  if (autoDelete) localStorage.setItem('pr-video-auto-delete', autoDelete.value);
+}
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
+  return (bytes / 1073741824).toFixed(1) + ' GB';
+}
+
+async function clearVideoCache() {
+  if (!confirm('Delete all cached video files?')) return;
+  try {
+    var res = await fetch('/api/clear-video-cache', { method: 'POST' });
+    if (res.ok) {
+      showToast('Video cache cleared');
+      loadStorageInfo();
+    } else {
+      showToast('Could not clear cache');
+    }
+  } catch {
+    showToast('Cache clearing available in desktop app');
+  }
 }
 
 function settingsBackup() {

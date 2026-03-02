@@ -1953,6 +1953,48 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
       return;
     }
 
+    // Storage info API — report cached media sizes
+    if (url.pathname === '/api/storage-info' && req.method === 'GET') {
+      const ttsCacheDir = join(outputPath, '.tts-cache');
+      const videoCacheDir = join(outputPath, '.video-cache');
+      const faviconsDir = join(outputPath, 'favicons');
+      const mdFiles = listMarkdownFiles(outputPath);
+
+      function dirSize(dir: string): number {
+        if (!existsSync(dir)) return 0;
+        let total = 0;
+        try {
+          for (const f of readdirSync(dir)) {
+            try { total += statSync(join(dir, f)).size; } catch {}
+          }
+        } catch {}
+        return total;
+      }
+
+      jsonResponse(res, {
+        tts_cache_size: dirSize(ttsCacheDir),
+        video_cache_size: dirSize(videoCacheDir),
+        favicons_size: dirSize(faviconsDir),
+        total_articles: mdFiles.length,
+      });
+      return;
+    }
+
+    // Clear video cache API
+    if (url.pathname === '/api/clear-video-cache' && req.method === 'POST') {
+      const videoCacheDir = join(outputPath, '.video-cache');
+      let cleared = 0;
+      if (existsSync(videoCacheDir)) {
+        try {
+          for (const f of readdirSync(videoCacheDir)) {
+            try { unlinkSync(join(videoCacheDir, f)); cleared++; } catch {}
+          }
+        } catch {}
+      }
+      jsonResponse(res, { cleared });
+      return;
+    }
+
     // Backup API — export all user data as a single JSON download
     if (url.pathname === '/api/backup' && req.method === 'GET') {
       const backupFiles = ['feeds.json', 'settings.json', 'notebooks.json', 'inbox.json'];
