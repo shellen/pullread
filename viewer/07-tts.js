@@ -32,6 +32,19 @@ function playCueSound() {
   try { new Audio('/audio/cue.webm').play(); } catch(e) {}
 }
 
+/** Attach hls.js to a <video> element for HLS streaming. Falls back to native for Safari. */
+function attachHls(videoEl, url) {
+  if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+    var hls = new Hls();
+    hls.loadSource(url);
+    hls.attachMedia(videoEl);
+    videoEl._hls = hls;
+  } else {
+    // Safari handles HLS natively
+    videoEl.src = url;
+  }
+}
+
 // ---- Listen button loading animation ----
 var LISTEN_WORDS = [
   'Reading', 'Processing', 'Generating', 'Preparing', 'Creating',
@@ -724,6 +737,25 @@ async function playPodcastAudio(item) {
   }
 }
 
+var _videoPopoutWindow = null;
+var _videoPopbackData = null;
+
+/** Handle pop-back-in from a video popout window */
+window._videoPopIn = function(currentTime) {
+  _videoPopbackData = { currentTime: currentTime };
+  _videoPopoutWindow = null;
+  renderAudioPlayer();
+  bottomBarGoToArticle();
+  // After navigation, seek the inline video to the same position
+  setTimeout(function() {
+    var v = document.querySelector('.video-inline-player video');
+    if (v && currentTime > 0) {
+      v.currentTime = currentTime;
+      v.play();
+    }
+  }, 300);
+};
+
 /** Open a video podcast in a pop-out player window */
 function playVideoPopout(item) {
   stopListenLoading();
@@ -732,6 +764,14 @@ function playVideoPopout(item) {
 
   var title = item.title || 'Video';
   var posterAttr = item.image ? ' poster="' + item.image + '"' : '';
+  var isHls = isHlsSource(item.enclosureUrl);
+
+  // Build HLS script for the popout (uses parent window's Hls via window.opener)
+  var hlsScript = '';
+  if (isHls) {
+    var safeUrl = item.enclosureUrl.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    hlsScript = 'var H=window.opener&&window.opener.Hls;if(H&&H.isSupported()){var h=new H();h.loadSource("' + safeUrl + '");h.attachMedia(v);}else{v.src="' + safeUrl + '";}';
+  }
 
   var html = '<!DOCTYPE html><html><head>'
     + '<meta charset="UTF-8"><title>' + title.replace(/</g, '&lt;') + ' — Pull Read</title>'
@@ -739,26 +779,44 @@ function playVideoPopout(item) {
     + 'body{margin:0;background:#111;display:flex;align-items:center;justify-content:center;height:100vh;font-family:system-ui,sans-serif;color:#fff}'
     + 'video{max-width:100%;max-height:100%;border-radius:4px}'
     + '.info{position:fixed;top:12px;left:16px;font-size:13px;opacity:0.7}'
+    + '.pop-in{position:fixed;top:12px;right:16px;background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:6px;padding:6px 14px;font-size:13px;cursor:pointer;font-family:inherit;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:background 0.15s}'
+    + '.pop-in:hover{background:rgba(255,255,255,0.25)}'
     + '</style></head><body>'
     + '<div class="info">' + title.replace(/</g, '&lt;') + '</div>'
+    + '<button class="pop-in" onclick="popBackIn()">&#8617; Pop back in</button>'
     + '<video controls autoplay' + posterAttr + '>'
-    + '<source src="' + item.enclosureUrl + '">'
-    + '</video>'
-    + '<script>'
+    + (isHls ? '' : '<source src="' + item.enclosureUrl + '">')
+    + '</video>';
+
+  html += '<scr' + 'ipt>'
+    + 'function popBackIn(){var v=document.querySelector("video");if(window.opener&&window.opener._videoPopIn){window.opener._videoPopIn(v?v.currentTime:0);}window.close();}'
     + 'var v=document.querySelector("video");'
+    + hlsScript
     + 'v.addEventListener("ended",function(){window.close()});'
     + 'v.addEventListener("error",function(){document.body.innerHTML="<p style=\\"text-align:center;padding:40px\\">Could not load video</p>"});'
     + '</scr' + 'ipt>'
     + '</body></html>';
 
-  var w = window.open('', '_blank', 'width=960,height=640,menubar=no,toolbar=no');
+  var blob = new Blob([html], { type: 'text/html' });
+  var blobUrl = URL.createObjectURL(blob);
+  var w = window.open(blobUrl, '_blank', 'width=960,height=640,menubar=no,toolbar=no');
+  URL.revokeObjectURL(blobUrl);
+
   if (w) {
-    w.document.write(html);
-    w.document.close();
+    _videoPopoutWindow = w;
+    renderAudioPlayer();
     // When popout closes, advance queue
     var check = setInterval(function() {
       if (w.closed) {
         clearInterval(check);
+        _videoPopoutWindow = null;
+        // If pop-back-in was used, skip queue advancement
+        if (_videoPopbackData) {
+          _videoPopbackData = null;
+          ttsPlaying = false;
+          renderAudioPlayer();
+          return;
+        }
         ttsPlaying = false;
         renderAudioPlayer();
         if (ttsCurrentIndex + 1 < ttsQueue.length) {
@@ -770,10 +828,185 @@ function playVideoPopout(item) {
     }, 500);
   } else {
     // Popup blocked — fall back to inline link
+    _videoPopoutWindow = null;
     ttsPlaying = false;
     renderAudioPlayer();
     showToast('Pop-up blocked. Opening video in new tab.');
     window.open(item.enclosureUrl, '_blank');
+  }
+}
+
+var _audioPopoutWindow = null;
+
+/** Close the audio popout and bring playback back to the main window */
+function _closeAudioPopout() {
+  if (_audioPopoutWindow && !_audioPopoutWindow.closed) {
+    _audioPopoutWindow.close();
+  }
+  _audioPopoutWindow = null;
+  renderAudioPlayer();
+}
+
+/** Pop out the audio player into a mini player window */
+function popOutAudioPlayer() {
+  if (_audioPopoutWindow && !_audioPopoutWindow.closed) {
+    _audioPopoutWindow.focus();
+    return;
+  }
+
+  var item = (ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length) ? ttsQueue[ttsCurrentIndex] : null;
+  var title = item ? item.title : 'PullRead Player';
+
+  var html = '<!DOCTYPE html><html><head>'
+    + '<meta charset="UTF-8"><title>' + (title || 'PullRead Player').replace(/</g, '&lt;') + '</title>'
+    + '<style>'
+    + ':root{--bg:#1a1a1e;--fg:#e4e4e7;--muted:#71717a;--border:#2e2e33;--link:#60a5fa;--accent:#3b82f6}'
+    + '*{box-sizing:border-box;margin:0;padding:0}'
+    + 'body{background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;user-select:none;-webkit-user-select:none}'
+    + '.top-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border)}'
+    + '.top-bar-title{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px}'
+    + '.pop-in{background:none;border:1px solid var(--border);color:var(--fg);border-radius:5px;padding:4px 10px;font-size:12px;cursor:pointer;font-family:inherit;transition:background 0.15s}'
+    + '.pop-in:hover{background:rgba(255,255,255,0.08)}'
+    + '.now-playing{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:12px;overflow:hidden}'
+    + '.artwork{width:120px;height:120px;border-radius:8px;background:var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0}'
+    + '.artwork img{width:100%;height:100%;object-fit:cover}'
+    + '.artwork svg{width:36px;height:36px;color:var(--muted)}'
+    + '.track-info{text-align:center;max-width:100%}'
+    + '.track-title{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px;display:block}'
+    + '.track-source{font-size:12px;color:var(--muted);margin-top:2px}'
+    + '.progress-section{padding:0 20px 8px}'
+    + '.progress-bar-wrap{width:100%;height:20px;display:flex;align-items:center;cursor:pointer}'
+    + '.progress-bar{width:100%;height:4px;background:var(--border);border-radius:2px;position:relative}'
+    + '.progress-fill{height:100%;background:var(--accent);border-radius:2px;width:0;transition:width 0.2s linear}'
+    + '.progress-times{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:2px}'
+    + '.controls{display:flex;align-items:center;justify-content:center;gap:16px;padding:8px 20px 16px}'
+    + '.ctrl-btn{background:none;border:none;color:var(--fg);cursor:pointer;padding:6px;border-radius:50%;transition:background 0.15s;display:flex;align-items:center;justify-content:center}'
+    + '.ctrl-btn:hover{background:rgba(255,255,255,0.08)}'
+    + '.ctrl-btn svg{width:20px;height:20px;fill:currentColor}'
+    + '.play-btn{width:48px;height:48px;border-radius:50%;background:var(--fg);color:var(--bg);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform 0.1s}'
+    + '.play-btn:active{transform:scale(0.95)}'
+    + '.play-btn svg{width:22px;height:22px;fill:currentColor}'
+    + '.speed-btn{background:none;border:1px solid var(--border);color:var(--fg);border-radius:5px;padding:4px 8px;font-size:12px;cursor:pointer;font-family:inherit;min-width:36px;transition:background 0.15s}'
+    + '.speed-btn:hover{background:rgba(255,255,255,0.08)}'
+    + '.queue-section{flex:1;border-top:1px solid var(--border);overflow-y:auto;min-height:0}'
+    + '.queue-header{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;font-size:12px;color:var(--muted);position:sticky;top:0;background:var(--bg);z-index:1}'
+    + '.queue-item{display:flex;align-items:center;gap:8px;padding:6px 16px;cursor:pointer;transition:background 0.1s;font-size:13px}'
+    + '.queue-item:hover{background:rgba(255,255,255,0.04)}'
+    + '.queue-item.active{background:rgba(59,130,246,0.1)}'
+    + '.queue-num{width:16px;text-align:center;font-size:10px;color:var(--muted);flex-shrink:0}'
+    + '.queue-info{flex:1;min-width:0}'
+    + '.queue-info span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+    + '.queue-info .q-source{font-size:11px;color:var(--muted)}'
+    + '.queue-remove{background:none;border:none;color:var(--muted);cursor:pointer;padding:4px;font-size:16px;line-height:1;opacity:0;transition:opacity 0.15s}'
+    + '.queue-item:hover .queue-remove{opacity:1}'
+    + '</style></head><body>'
+    + '<div class="top-bar">'
+    + '<span class="top-bar-title">PullRead</span>'
+    + '<button class="pop-in" onclick="popBackIn()">&#8617; Pop back in</button>'
+    + '</div>'
+    + '<div class="now-playing">'
+    + '<div class="artwork" id="pp-artwork"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.68-.57-1.93-1.42A6.98 6.98 0 012.25 12c0-.65.09-1.28.25-1.88A2.01 2.01 0 014.51 8.7H6.75z"/></svg></div>'
+    + '<div class="track-info">'
+    + '<span class="track-title" id="pp-title">No track</span>'
+    + '<span class="track-source" id="pp-source"></span>'
+    + '</div>'
+    + '</div>'
+    + '<div class="progress-section">'
+    + '<div class="progress-bar-wrap" id="pp-progress-wrap"><div class="progress-bar"><div class="progress-fill" id="pp-progress"></div></div></div>'
+    + '<div class="progress-times"><span id="pp-time-cur">0:00</span><span id="pp-time-tot">0:00</span></div>'
+    + '</div>'
+    + '<div class="controls">'
+    + '<button class="speed-btn" id="pp-speed" onclick="cycleSpeed()">1x</button>'
+    + '<button class="ctrl-btn" onclick="skip(-15)" title="Rewind 15s"><svg viewBox="0 0 24 24"><path d="M9.195 18.44c1.25.714 2.805-.189 2.805-1.629v-2.34l6.945 3.968c1.25.715 2.805-.188 2.805-1.628V7.19c0-1.44-1.555-2.343-2.805-1.628L12 9.53V7.19c0-1.44-1.555-2.343-2.805-1.628l-7.108 4.061c-1.26.72-1.26 2.536 0 3.256l7.108 4.061z"/></svg></button>'
+    + '<button class="play-btn" id="pp-play" onclick="toggle()"><svg viewBox="0 0 24 24"><path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"/></svg></button>'
+    + '<button class="ctrl-btn" onclick="skip(15)" title="Forward 15s"><svg viewBox="0 0 24 24"><path d="M5.055 7.19c0-1.44 1.555-2.343 2.805-1.628L12 9.53V7.19c0-1.44 1.555-2.343 2.805-1.628l7.108 4.062c1.26.72 1.26 2.535 0 3.255l-7.108 4.062c-1.25.714-2.805-.19-2.805-1.629v-2.34l-6.945 3.968C3.805 18.152 2.25 17.249 2.25 15.81V7.19z"/></svg></button>'
+    + '<button class="ctrl-btn" style="visibility:hidden;width:36px"></button>'
+    + '</div>'
+    + '<div class="queue-section" id="pp-queue"></div>'
+    + '<scr' + 'ipt>'
+    + 'var O=window.opener;'
+    + 'function popBackIn(){if(O&&O._closeAudioPopout)O._closeAudioPopout();else window.close();}'
+    + 'function toggle(){if(O&&O.ttsTogglePlay)O.ttsTogglePlay();}'
+    + 'function skip(s){if(O&&O.skipTime)O.skipTime(s);}'
+    + 'function cycleSpeed(){if(O&&O.ttsCycleSpeed)O.ttsCycleSpeed();}'
+    + 'function fmtTime(s){if(!s||!isFinite(s))return"0:00";s=Math.floor(s);var m=Math.floor(s/60),sec=s%60;return m+":"+(sec<10?"0":"")+sec;}'
+    + 'function updateUI(){'
+    + 'if(!O||O.closed){return;}'
+    + 'var q=O.ttsQueue||[],ci=O.ttsCurrentIndex,playing=O.ttsPlaying,spd=O.ttsSpeed;'
+    + 'var item=(ci>=0&&ci<q.length)?q[ci]:null;'
+    + 'var titleEl=document.getElementById("pp-title");'
+    + 'var sourceEl=document.getElementById("pp-source");'
+    + 'var artEl=document.getElementById("pp-artwork");'
+    + 'var progEl=document.getElementById("pp-progress");'
+    + 'var curEl=document.getElementById("pp-time-cur");'
+    + 'var totEl=document.getElementById("pp-time-tot");'
+    + 'var playBtn=document.getElementById("pp-play");'
+    + 'var speedBtn=document.getElementById("pp-speed");'
+    + 'if(titleEl)titleEl.textContent=item?item.title:"No track";'
+    + 'if(sourceEl)sourceEl.textContent=item?(item.feed||item.domain||""):"";'
+    + 'document.title=item?(item.title+" — PullRead"):"PullRead Player";'
+    // Artwork
+    + 'if(artEl&&item){'
+    + 'var src=item.image||(item.domain?"/favicons/"+encodeURIComponent(item.domain)+".png":"");'
+    + 'if(src&&!artEl.querySelector("img[src=\\""+CSS.escape(src)+"\\"]")){'
+    + 'var img=new Image();img.src=src;img.alt="";img.onerror=function(){artEl.innerHTML=\'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.68-.57-1.93-1.42A6.98 6.98 0 012.25 12c0-.65.09-1.28.25-1.88A2.01 2.01 0 014.51 8.7H6.75z"/></svg>\';};'
+    + 'artEl.innerHTML="";artEl.appendChild(img);'
+    + '}else if(!src){artEl.innerHTML=\'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.68-.57-1.93-1.42A6.98 6.98 0 012.25 12c0-.65.09-1.28.25-1.88A2.01 2.01 0 014.51 8.7H6.75z"/></svg>\';}'
+    + '}'
+    // Progress
+    + 'var audio=O.ttsAudio;'
+    + 'if(audio&&audio.duration){'
+    + 'var pct=(audio.currentTime/audio.duration)*100;'
+    + 'if(progEl)progEl.style.width=pct+"%";'
+    + 'if(curEl)curEl.textContent=fmtTime(audio.currentTime);'
+    + 'if(totEl)totEl.textContent=fmtTime(audio.duration);'
+    + '}else{if(progEl)progEl.style.width="0";if(curEl)curEl.textContent="0:00";if(totEl)totEl.textContent="0:00";}'
+    // Play button
+    + 'if(playBtn)playBtn.innerHTML=playing?\'<svg viewBox="0 0 24 24"><path d="M6.75 5.25h3v13.5h-3V5.25zm7.5 0h3v13.5h-3V5.25z"/></svg>\':\'<svg viewBox="0 0 24 24"><path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"/></svg>\';'
+    + 'if(speedBtn)speedBtn.textContent=spd+"x";'
+    // Queue
+    + 'var qEl=document.getElementById("pp-queue");'
+    + 'if(qEl&&q.length>0){'
+    + 'var h=\'<div class="queue-header"><span>Queue (\'+(q.length)+\')</span></div>\';'
+    + 'for(var i=0;i<q.length;i++){'
+    + 'var it=q[i],src2=it.feed||it.domain||"";'
+    + 'h+=\'<div class="queue-item\'+(i===ci?" active":"")+\'" onclick="if(O&&O.playTTSItem)O.playTTSItem(\'+i+\')">\';'
+    + 'h+=\'<span class="queue-num">\'+(i===ci?"&#9654;":(i+1))+\'</span>\';'
+    + 'h+=\'<div class="queue-info"><span>\'+escHtml(it.title)+\'</span>\'+(src2?\'<span class="q-source">\'+escHtml(src2)+\'</span>\':"")+\'</div>\';'
+    + 'h+=\'<button class="queue-remove" onclick="event.stopPropagation();if(O&&O.removeTTSQueueItem)O.removeTTSQueueItem(\'+i+\')">&times;</button>\';'
+    + 'h+=\'</div>\';'
+    + '}'
+    + 'qEl.innerHTML=h;'
+    + '}'
+    + 'requestAnimationFrame(updateUI);'
+    + '}'
+    + 'function escHtml(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}'
+    // Progress bar drag-to-seek
+    + 'var ppWrap=document.getElementById("pp-progress-wrap");'
+    + 'if(ppWrap){'
+    + 'function seekFromEvent(e){var r=ppWrap.getBoundingClientRect();var pct=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));if(O&&O.ttsSeek)O.ttsSeek(pct);var fill=document.getElementById("pp-progress");if(fill)fill.style.width=(pct*100)+"%";}'
+    + 'ppWrap.addEventListener("mousedown",function(e){e.preventDefault();seekFromEvent(e);function onMove(ev){seekFromEvent(ev);}function onUp(){document.removeEventListener("mousemove",onMove);document.removeEventListener("mouseup",onUp);}document.addEventListener("mousemove",onMove);document.addEventListener("mouseup",onUp);});'
+    + '}'
+    + 'requestAnimationFrame(updateUI);'
+    + '</scr' + 'ipt></body></html>';
+
+  var blob = new Blob([html], { type: 'text/html' });
+  var blobUrl = URL.createObjectURL(blob);
+  var w = window.open(blobUrl, '_blank', 'width=340,height=560,menubar=no,toolbar=no');
+  URL.revokeObjectURL(blobUrl);
+
+  if (w) {
+    _audioPopoutWindow = w;
+    renderAudioPlayer();
+    var check = setInterval(function() {
+      if (w.closed) {
+        clearInterval(check);
+        _audioPopoutWindow = null;
+        renderAudioPlayer();
+      }
+    }, 500);
+  } else {
+    showToast('Pop-up blocked by browser.');
   }
 }
 

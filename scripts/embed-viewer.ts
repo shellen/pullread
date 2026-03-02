@@ -168,7 +168,17 @@ const css = readFileSync(cssPath, 'utf-8');
 // Read JS modules from viewer/ directory in sorted order (01-state.js, 02-utils.js, etc.)
 const jsFiles = readdirSync(jsDir).filter(f => f.endsWith('.js') && !f.endsWith('.test.js')).sort();
 const jsModules = jsFiles.map(f => readFileSync(join(jsDir, f), 'utf-8'));
-const js = jsModules.join('\n');
+
+// Bundle hls.js light build for HLS streaming support (Safari handles natively)
+const hlsPath = join(rootDir, 'node_modules', 'hls.js', 'dist', 'hls.light.min.js');
+const hlsJs = existsSync(hlsPath) ? readFileSync(hlsPath, 'utf-8') : '';
+if (hlsJs) {
+  console.log(`  HLS: ${hlsJs.length} bytes (hls.light.min.js)`);
+} else {
+  console.warn('  Warning: hls.js light build not found (run bun install)');
+}
+
+const js = (hlsJs ? hlsJs + '\n' : '') + jsModules.join('\n');
 
 // Generate font @font-face CSS and prepend to the main CSS
 const fontCss = generateFontCSS();

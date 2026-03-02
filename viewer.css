@@ -2228,6 +2228,19 @@
   }
   .mini-toggle:hover { background: var(--sidebar-hover); color: var(--fg); }
   .mini-toggle svg { width: 14px; height: 14px; fill: currentColor; }
+  .bottom-bar-popout-btn {
+    border: none;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .bottom-bar-popout-btn:hover { background: var(--sidebar-hover); color: var(--fg); }
+  .bottom-bar-popout-btn svg { width: 14px; height: 14px; }
   .bottom-bar-inner {
     display: flex;
     align-items: center;
@@ -3539,7 +3552,11 @@
   .podcast-description > div { margin-top: 12px; color: var(--fg); }
   .podcast-description > div p { margin: 0.8em 0; }
   .video-inline-player { margin: 1em 0; border-radius: 8px; overflow: hidden; background: #000; }
+  .video-inline-player:has(+ .video-controls) { border-radius: 8px 8px 0 0; margin-bottom: 0; }
   .video-inline-player video { width: 100%; display: block; max-height: 480px; }
+  .video-controls { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--code-bg); border-radius: 0 0 8px 8px; margin-bottom: 1em; }
+  .video-controls-btn { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border: 1px solid var(--border); border-radius: 6px; background: none; color: var(--link); font-size: 12px; cursor: pointer; font-family: inherit; white-space: nowrap; }
+  .video-controls-btn:hover { background: var(--hover-bg); }
   .dot-video { color: var(--link); }
 
   /* Review article link list — link-blog style */

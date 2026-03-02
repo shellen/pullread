@@ -678,31 +678,37 @@ function renderArticle(text, filename) {
     }
   }
 
-  // Podcast/video: show info banner (media plays through unified bottom bar or pop-out)
+  // Podcast/video episode layout
   if (isPodcast) {
-    var bannerIcon = isVideo ? '#i-video' : '#i-mic';
-    var bannerLabel = isVideo ? 'Video episode' : 'Podcast episode';
-    var bannerAction = isVideo ? 'Watch' : 'Play in player';
-    html += '<div class="podcast-player' + (isVideo ? ' video-episode' : '') + '">';
-    html += '<svg style="width:16px;height:16px;fill:var(--muted);flex-shrink:0"><use href="' + bannerIcon + '"/></svg>';
-    html += '<span style="font-size:13px;color:var(--fg)">' + bannerLabel + '</span>';
-    if (meta.enclosure_duration) {
-      html += '<span class="podcast-duration">' + escapeHtml(meta.enclosure_duration) + '</span>';
-    }
-    html += '<button onclick="addCurrentToTTSQueue()" style="margin-left:auto;padding:4px 12px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--link);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">' + bannerAction + '</button>';
-    // Audio podcast that also has a video version (from server FileMeta)
-    var fileInfo = activeFile && allFiles.find(function(af) { return af.filename === activeFile; });
-    if (!isVideo && fileInfo && fileInfo.videoEnclosureUrl) {
-      html += '<button onclick="openVideoVersion()" style="padding:4px 12px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--link);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">Watch video</button>';
-    }
-    html += '</div>';
-    // Inline video preview for video episodes
     if (isVideo && meta.enclosure_url) {
+      // Video episodes: inline player first, controls row below
       var posterHtml = meta.thumbnail ? ' poster="' + escapeHtml(meta.thumbnail) + '"' : '';
       html += '<div class="video-inline-player">';
       html += '<video controls preload="metadata"' + posterHtml + '>';
       html += '<source src="' + escapeHtml(meta.enclosure_url) + '">';
       html += '</video>';
+      html += '</div>';
+      html += '<div class="video-controls">';
+      html += '<button onclick="addCurrentToTTSQueue()" class="video-controls-btn"><svg style="width:14px;height:14px"><use href="#i-play"/></svg> Play</button>';
+      html += '<button onclick="popOutCurrentVideo()" class="video-controls-btn"><svg style="width:14px;height:14px"><use href="#i-external"/></svg> Pop out</button>';
+      if (meta.enclosure_duration) {
+        html += '<span class="podcast-duration" style="margin-left:auto">' + escapeHtml(meta.enclosure_duration) + '</span>';
+      }
+      html += '</div>';
+    } else {
+      // Audio podcasts: banner with icon, label, duration, play button
+      html += '<div class="podcast-player">';
+      html += '<svg style="width:16px;height:16px;fill:var(--muted);flex-shrink:0"><use href="#i-mic"/></svg>';
+      html += '<span style="font-size:13px;color:var(--fg)">Podcast episode</span>';
+      if (meta.enclosure_duration) {
+        html += '<span class="podcast-duration">' + escapeHtml(meta.enclosure_duration) + '</span>';
+      }
+      html += '<button onclick="addCurrentToTTSQueue()" style="margin-left:auto;padding:4px 12px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--link);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">Play in player</button>';
+      // Audio podcast that also has a video version
+      var fileInfo = activeFile && allFiles.find(function(af) { return af.filename === activeFile; });
+      if (fileInfo && fileInfo.videoEnclosureUrl) {
+        html += '<button onclick="openVideoVersion()" style="padding:4px 12px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--link);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">Watch video</button>';
+      }
       html += '</div>';
     }
     // Show podcast description in a collapsible section instead of as article body
@@ -820,6 +826,12 @@ function renderArticle(text, filename) {
 
   content.innerHTML = html;
   document.title = (meta && meta.title) || filename || 'PullRead';
+
+  // Attach HLS.js to inline video player if source is an HLS stream
+  var inlineVideo = content.querySelector('.video-inline-player video');
+  if (inlineVideo && meta && isHlsSource(meta.enclosure_url)) {
+    attachHls(inlineVideo, meta.enclosure_url);
+  }
 
   // Populate related reading asynchronously
   populateRelatedReading(filename);
@@ -1018,6 +1030,19 @@ function localizeReviewLinks(container) {
     ext.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-external"/></svg>';
     ext.onclick = function(e) { e.stopPropagation(); };
     a.parentElement.appendChild(ext);
+  });
+}
+
+// Open the current video episode in a pop-out player window
+function popOutCurrentVideo() {
+  var file = activeFile && allFiles.find(function(f) { return f.filename === activeFile; });
+  if (!file || !file.enclosureUrl || !isVideoEnclosure(file.enclosureType)) return;
+  playVideoPopout({
+    title: file.title || 'Video',
+    enclosureUrl: file.enclosureUrl,
+    enclosureType: file.enclosureType,
+    image: file.image || '',
+    filename: activeFile,
   });
 }
 

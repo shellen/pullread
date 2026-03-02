@@ -22,6 +22,7 @@
     "@mozilla/readability": "^0.6.0",
     "fast-xml-parser": "^5.3.3",
     "heroicons": "^2.2.0",
+    "hls.js": "^1.6.15",
     "linkedom": "^0.18.12",
     "turndown": "^7.2.2",
     "unpdf": "^1.4.0"

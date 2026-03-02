@@ -66,6 +66,13 @@ function extractMediaUrl(media: any): string | undefined {
   return undefined;
 }
 
+/** Check if a MIME type represents video content (including HLS streams) */
+function isVideoMimeType(type: string): boolean {
+  if (!type) return false;
+  const lower = type.toLowerCase();
+  return lower.startsWith('video/') || lower === 'application/x-mpegurl' || lower === 'application/vnd.apple.mpegurl';
+}
+
 /**
  * Extract video enclosure from podcast:alternateEnclosure or media:content.
  * Returns an Enclosure if a video rendition is found, undefined otherwise.
@@ -77,7 +84,7 @@ function extractVideoEnclosure(item: any): Enclosure | undefined {
     const alts = Array.isArray(altEnc) ? altEnc : [altEnc];
     for (const alt of alts) {
       const type = alt['@_type'] || '';
-      if (type.startsWith('video/')) {
+      if (isVideoMimeType(type)) {
         // Source URL can be in podcast:source child or @_url
         const source = alt['podcast:source'];
         const url = source?.['@_uri'] || source?.['@_url'] || alt['@_url'] || '';
@@ -100,7 +107,7 @@ function extractVideoEnclosure(item: any): Enclosure | undefined {
     for (const m of items) {
       const type = m['@_type'] || '';
       const medium = m['@_medium'] || '';
-      if (type.startsWith('video/') || medium === 'video') {
+      if (isVideoMimeType(type) || medium === 'video') {
         return {
           url: m['@_url'] || '',
           type: type || 'video/mp4',
@@ -353,7 +360,7 @@ function parseRssFeed(rss: any): FeedEntry[] {
     let videoEnclosure = extractVideoEnclosure(item);
 
     // If the primary enclosure is already video, promote it and clear videoEnclosure
-    if (enclosure && enclosure.type?.startsWith('video/')) {
+    if (enclosure && isVideoMimeType(enclosure.type)) {
       videoEnclosure = undefined; // primary IS the video
     }
 

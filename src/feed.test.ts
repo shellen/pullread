@@ -1649,4 +1649,84 @@ describe('parseFeed - video podcast support', () => {
     expect(entries[0].enclosure!.type).toBe('audio/mpeg');
     expect(entries[0].videoEnclosure).toBeUndefined();
   });
+
+  test('recognizes HLS application/x-mpegURL as video in alternateEnclosure', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:podcast="https://podcastindex.org/namespace/1.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>HLS Video Show</title>
+    <item>
+      <title>HLS Episode</title>
+      <link>https://podcast.com/hls-ep</link>
+      <pubDate>Mon, 05 Feb 2024 12:00:00 GMT</pubDate>
+      <enclosure url="https://cdn.example.com/hls-ep.mp3" type="audio/mpeg"/>
+      <podcast:alternateEnclosure type="application/x-mpegURL">
+        <podcast:source uri="https://cdn.example.com/hls-ep/master.m3u8"/>
+      </podcast:alternateEnclosure>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].enclosure!.type).toBe('audio/mpeg');
+    expect(entries[0].videoEnclosure).toBeDefined();
+    expect(entries[0].videoEnclosure!.url).toBe('https://cdn.example.com/hls-ep/master.m3u8');
+    expect(entries[0].videoEnclosure!.type).toBe('application/x-mpegURL');
+  });
+
+  test('recognizes HLS application/vnd.apple.mpegurl as video in alternateEnclosure', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:podcast="https://podcastindex.org/namespace/1.0">
+  <channel>
+    <title>Apple HLS Show</title>
+    <item>
+      <title>Apple HLS Episode</title>
+      <link>https://podcast.com/apple-hls</link>
+      <pubDate>Tue, 06 Feb 2024 12:00:00 GMT</pubDate>
+      <enclosure url="https://cdn.example.com/apple-hls.mp3" type="audio/mpeg"/>
+      <podcast:alternateEnclosure type="application/vnd.apple.mpegurl" url="https://cdn.example.com/apple-hls/stream.m3u8"/>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].videoEnclosure).toBeDefined();
+    expect(entries[0].videoEnclosure!.url).toBe('https://cdn.example.com/apple-hls/stream.m3u8');
+    expect(entries[0].videoEnclosure!.type).toBe('application/vnd.apple.mpegurl');
+  });
+
+  test('recognizes HLS type in media:content', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <title>Media HLS Show</title>
+    <item>
+      <title>Media HLS Episode</title>
+      <link>https://podcast.com/media-hls</link>
+      <pubDate>Wed, 07 Feb 2024 12:00:00 GMT</pubDate>
+      <enclosure url="https://cdn.example.com/media-hls.mp3" type="audio/mpeg"/>
+      <media:content url="https://cdn.example.com/media-hls/stream.m3u8" type="application/x-mpegURL"/>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].videoEnclosure).toBeDefined();
+    expect(entries[0].videoEnclosure!.url).toBe('https://cdn.example.com/media-hls/stream.m3u8');
+  });
+
+  test('HLS primary enclosure is not duplicated as videoEnclosure', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>HLS Primary Show</title>
+    <item>
+      <title>HLS Only Episode</title>
+      <link>https://podcast.com/hls-only</link>
+      <pubDate>Thu, 08 Feb 2024 12:00:00 GMT</pubDate>
+      <enclosure url="https://cdn.example.com/stream.m3u8" type="application/x-mpegURL"/>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].enclosure!.type).toBe('application/x-mpegURL');
+    expect(entries[0].videoEnclosure).toBeUndefined();
+  });
 });
