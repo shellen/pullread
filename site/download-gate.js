@@ -144,8 +144,8 @@
         });
       }
 
-      // Trigger download
-      var downloadUrl = result.download_url || currentDownloadUrl;
+      // Trigger download (prefer the platform-specific URL the user clicked)
+      var downloadUrl = currentDownloadUrl || result.download_url;
       var a = document.createElement('a');
       a.href = downloadUrl;
       a.download = '';
