@@ -204,6 +204,47 @@ describe('generateMarkdown', () => {
     expect(md).not.toContain('source:');
   });
 
+  test('includes video enclosure fields when present', () => {
+    const md = generateMarkdown({
+      title: 'Video Podcast Episode',
+      url: 'https://podcast.com/ep1',
+      bookmarkedAt: '2024-01-29T12:00:00Z',
+      domain: 'podcast.com',
+      content: 'Episode with video',
+      enclosure: {
+        url: 'https://cdn.example.com/ep1.mp3',
+        type: 'audio/mpeg',
+        duration: '00:30:00'
+      },
+      videoEnclosure: {
+        url: 'https://cdn.example.com/ep1.mp4',
+        type: 'video/mp4',
+      }
+    });
+
+    expect(md).toContain('enclosure_url: https://cdn.example.com/ep1.mp3');
+    expect(md).toContain('enclosure_type: audio/mpeg');
+    expect(md).toContain('video_enclosure_url: https://cdn.example.com/ep1.mp4');
+    expect(md).toContain('video_enclosure_type: video/mp4');
+  });
+
+  test('omits video enclosure fields when absent', () => {
+    const md = generateMarkdown({
+      title: 'Audio Only Episode',
+      url: 'https://podcast.com/ep2',
+      bookmarkedAt: '2024-01-29T12:00:00Z',
+      domain: 'podcast.com',
+      content: 'Audio only episode',
+      enclosure: {
+        url: 'https://cdn.example.com/ep2.mp3',
+        type: 'audio/mpeg',
+      }
+    });
+
+    expect(md).toContain('enclosure_url: https://cdn.example.com/ep2.mp3');
+    expect(md).not.toContain('video_enclosure');
+  });
+
   test('omits enclosure_duration when not provided', () => {
     const md = generateMarkdown({
       title: 'Podcast Episode',

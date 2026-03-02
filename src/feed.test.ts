@@ -1490,3 +1490,163 @@ describe('parseFeed - Atom link blog (Sippey.com style)', () => {
     expect(entries[0].contentHtml).toContain('NYT nails it');
   });
 });
+
+describe('parseFeed - video podcast support', () => {
+  test('extracts video enclosure from podcast:alternateEnclosure', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"
+     xmlns:podcast="https://podcastindex.org/namespace/1.0">
+  <channel>
+    <title>Video Show</title>
+    <item>
+      <title>Episode With Video Alt</title>
+      <link>https://podcast.com/ep1</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <enclosure url="https://cdn.example.com/ep1.mp3" type="audio/mpeg" length="5000000"/>
+      <itunes:duration>00:30:00</itunes:duration>
+      <podcast:alternateEnclosure type="video/mp4" length="50000000">
+        <podcast:source uri="https://cdn.example.com/ep1.mp4"/>
+      </podcast:alternateEnclosure>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries).toHaveLength(1);
+    // Primary enclosure should be audio
+    expect(entries[0].enclosure).toBeDefined();
+    expect(entries[0].enclosure!.type).toBe('audio/mpeg');
+    // Video enclosure should be separate
+    expect(entries[0].videoEnclosure).toBeDefined();
+    expect(entries[0].videoEnclosure!.url).toBe('https://cdn.example.com/ep1.mp4');
+    expect(entries[0].videoEnclosure!.type).toBe('video/mp4');
+  });
+
+  test('extracts video enclosure from media:content with medium="video"', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"
+     xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <title>Media Video Show</title>
+    <item>
+      <title>Episode With Media Video</title>
+      <link>https://podcast.com/ep2</link>
+      <pubDate>Tue, 30 Jan 2024 12:00:00 GMT</pubDate>
+      <enclosure url="https://cdn.example.com/ep2.mp3" type="audio/mpeg"/>
+      <media:content url="https://cdn.example.com/ep2.mp4" type="video/mp4" medium="video" fileSize="80000000"/>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].enclosure!.type).toBe('audio/mpeg');
+    expect(entries[0].videoEnclosure).toBeDefined();
+    expect(entries[0].videoEnclosure!.url).toBe('https://cdn.example.com/ep2.mp4');
+    expect(entries[0].videoEnclosure!.type).toBe('video/mp4');
+  });
+
+  test('clears videoEnclosure when primary enclosure is already video', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>Video-Only Podcast</title>
+    <item>
+      <title>Video Episode</title>
+      <link>https://podcast.com/ep3</link>
+      <pubDate>Wed, 31 Jan 2024 12:00:00 GMT</pubDate>
+      <enclosure url="https://cdn.example.com/ep3.mp4" type="video/mp4" length="100000000"/>
+      <itunes:duration>01:00:00</itunes:duration>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].enclosure).toBeDefined();
+    expect(entries[0].enclosure!.type).toBe('video/mp4');
+    expect(entries[0].enclosure!.url).toBe('https://cdn.example.com/ep3.mp4');
+    // No separate videoEnclosure since primary IS video
+    expect(entries[0].videoEnclosure).toBeUndefined();
+  });
+
+  test('JSON Feed separates audio and video attachments', () => {
+    const feed = JSON.stringify({
+      version: 'https://jsonfeed.org/version/1.1',
+      title: 'JSON Video Podcast',
+      items: [{
+        id: 'ep1',
+        title: 'Episode With Both',
+        url: 'https://podcast.com/ep1',
+        date_published: '2024-01-29T12:00:00Z',
+        attachments: [
+          { url: 'https://cdn.example.com/ep1.mp3', mime_type: 'audio/mpeg', duration_in_seconds: 1800 },
+          { url: 'https://cdn.example.com/ep1.mp4', mime_type: 'video/mp4', size_in_bytes: 50000000 }
+        ]
+      }]
+    });
+    const entries = parseFeed(feed);
+    expect(entries[0].enclosure!.url).toBe('https://cdn.example.com/ep1.mp3');
+    expect(entries[0].enclosure!.type).toBe('audio/mpeg');
+    expect(entries[0].videoEnclosure).toBeDefined();
+    expect(entries[0].videoEnclosure!.url).toBe('https://cdn.example.com/ep1.mp4');
+    expect(entries[0].videoEnclosure!.type).toBe('video/mp4');
+  });
+
+  test('JSON Feed promotes video-only attachment to primary enclosure', () => {
+    const feed = JSON.stringify({
+      version: 'https://jsonfeed.org/version/1.1',
+      title: 'Video-Only JSON Podcast',
+      items: [{
+        id: 'ep1',
+        title: 'Video Only',
+        url: 'https://podcast.com/ep1',
+        date_published: '2024-01-29T12:00:00Z',
+        attachments: [
+          { url: 'https://cdn.example.com/ep1.mp4', mime_type: 'video/mp4', size_in_bytes: 50000000 }
+        ]
+      }]
+    });
+    const entries = parseFeed(feed);
+    expect(entries[0].enclosure).toBeDefined();
+    expect(entries[0].enclosure!.url).toBe('https://cdn.example.com/ep1.mp4');
+    expect(entries[0].enclosure!.type).toBe('video/mp4');
+    // Promoted to primary, so no separate videoEnclosure
+    expect(entries[0].videoEnclosure).toBeUndefined();
+  });
+
+  test('handles podcast:alternateEnclosure with @_url attribute', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:podcast="https://podcastindex.org/namespace/1.0">
+  <channel>
+    <title>Alt URL Show</title>
+    <item>
+      <title>Alt URL Episode</title>
+      <link>https://podcast.com/ep4</link>
+      <pubDate>Thu, 01 Feb 2024 12:00:00 GMT</pubDate>
+      <enclosure url="https://cdn.example.com/ep4.mp3" type="audio/mpeg"/>
+      <podcast:alternateEnclosure type="video/mp4" url="https://cdn.example.com/ep4.mp4"/>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].videoEnclosure).toBeDefined();
+    expect(entries[0].videoEnclosure!.url).toBe('https://cdn.example.com/ep4.mp4');
+  });
+
+  test('ignores non-video alternateEnclosure types', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:podcast="https://podcastindex.org/namespace/1.0">
+  <channel>
+    <title>Audio Alt Show</title>
+    <item>
+      <title>Audio Alt Episode</title>
+      <link>https://podcast.com/ep5</link>
+      <pubDate>Fri, 02 Feb 2024 12:00:00 GMT</pubDate>
+      <enclosure url="https://cdn.example.com/ep5.mp3" type="audio/mpeg"/>
+      <podcast:alternateEnclosure type="audio/flac">
+        <podcast:source uri="https://cdn.example.com/ep5.flac"/>
+      </podcast:alternateEnclosure>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].enclosure!.type).toBe('audio/mpeg');
+    expect(entries[0].videoEnclosure).toBeUndefined();
+  });
+});
