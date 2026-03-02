@@ -690,6 +690,11 @@ function renderArticle(text, filename) {
       html += '<span class="podcast-duration">' + escapeHtml(meta.enclosure_duration) + '</span>';
     }
     html += '<button onclick="addCurrentToTTSQueue()" style="margin-left:auto;padding:4px 12px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--link);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">' + bannerAction + '</button>';
+    // Audio podcast that also has a video version (from server FileMeta)
+    var fileInfo = activeFile && allFiles.find(function(af) { return af.filename === activeFile; });
+    if (!isVideo && fileInfo && fileInfo.videoEnclosureUrl) {
+      html += '<button onclick="openVideoVersion()" style="padding:4px 12px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--link);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">Watch video</button>';
+    }
     html += '</div>';
     // Inline video preview for video episodes
     if (isVideo && meta.enclosure_url) {
@@ -1013,6 +1018,19 @@ function localizeReviewLinks(container) {
     ext.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-external"/></svg>';
     ext.onclick = function(e) { e.stopPropagation(); };
     a.parentElement.appendChild(ext);
+  });
+}
+
+// Open the video version of a podcast that has both audio and video enclosures
+function openVideoVersion() {
+  var file = activeFile && allFiles.find(function(f) { return f.filename === activeFile; });
+  if (!file || !file.videoEnclosureUrl) return;
+  playVideoPopout({
+    title: file.title || 'Video',
+    enclosureUrl: file.videoEnclosureUrl,
+    enclosureType: file.videoEnclosureType || 'video/mp4',
+    image: file.image || '',
+    filename: activeFile,
   });
 }
 

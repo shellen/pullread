@@ -14,6 +14,7 @@ export interface ArticleData {
   feed?: string;
   annotation?: string;
   enclosure?: Enclosure;
+  videoEnclosure?: Enclosure;
   author?: string;
   excerpt?: string;
   thumbnail?: string;
@@ -86,6 +87,11 @@ domain: ${data.domain}`;
     if (data.enclosure.duration) {
       frontmatter += `\nenclosure_duration: "${data.enclosure.duration}"`;
     }
+  }
+
+  if (data.videoEnclosure) {
+    frontmatter += `\nvideo_enclosure_url: ${data.videoEnclosure.url}`;
+    frontmatter += `\nvideo_enclosure_type: ${data.videoEnclosure.type}`;
   }
 
   if (data.source) {

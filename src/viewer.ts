@@ -34,6 +34,8 @@ interface FileMeta {
   enclosureUrl: string;
   enclosureType: string;
   enclosureDuration: string;
+  videoEnclosureUrl: string;
+  videoEnclosureType: string;
   categories: string[];
 }
 
@@ -492,6 +494,8 @@ function listFiles(outputPath: string): FileMeta[] {
         enclosureUrl: meta.enclosure_url || '',
         enclosureType: meta.enclosure_type || '',
         enclosureDuration: meta.enclosure_duration || '',
+        videoEnclosureUrl: meta.video_enclosure_url || '',
+        videoEnclosureType: meta.video_enclosure_type || '',
         categories,
       });
     } catch {
@@ -528,6 +532,8 @@ function listFiles(outputPath: string): FileMeta[] {
         enclosureUrl: '',
         enclosureType: '',
         enclosureDuration: '',
+        videoEnclosureUrl: '',
+        videoEnclosureType: '',
         categories: [],
       });
     } catch (err) {

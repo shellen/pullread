@@ -268,6 +268,7 @@ async function syncFeed(
         feed: feedName,
         annotation: entry.annotation,
         enclosure: entry.enclosure,
+        videoEnclosure: entry.videoEnclosure,
         author,
         excerpt,
         thumbnail,

@@ -20,6 +20,7 @@ export interface FeedEntry {
   annotation?: string;
   contentHtml?: string;
   enclosure?: Enclosure;
+  videoEnclosure?: Enclosure;
   author?: string;
   categories?: string[];
   thumbnail?: string;
@@ -65,6 +66,54 @@ function extractMediaUrl(media: any): string | undefined {
   return undefined;
 }
 
+/**
+ * Extract video enclosure from podcast:alternateEnclosure or media:content.
+ * Returns an Enclosure if a video rendition is found, undefined otherwise.
+ */
+function extractVideoEnclosure(item: any): Enclosure | undefined {
+  // podcast:alternateEnclosure (Podcasting 2.0 spec)
+  const altEnc = item['podcast:alternateEnclosure'];
+  if (altEnc) {
+    const alts = Array.isArray(altEnc) ? altEnc : [altEnc];
+    for (const alt of alts) {
+      const type = alt['@_type'] || '';
+      if (type.startsWith('video/')) {
+        // Source URL can be in podcast:source child or @_url
+        const source = alt['podcast:source'];
+        const url = source?.['@_uri'] || source?.['@_url'] || alt['@_url'] || '';
+        if (url) {
+          return {
+            url,
+            type,
+            length: alt['@_length'] ? parseInt(alt['@_length'], 10) : undefined,
+            duration: alt['@_duration'] || item['itunes:duration'] || undefined,
+          };
+        }
+      }
+    }
+  }
+
+  // media:content with medium="video" or video MIME type
+  const media = item['media:content'];
+  if (media) {
+    const items = Array.isArray(media) ? media : [media];
+    for (const m of items) {
+      const type = m['@_type'] || '';
+      const medium = m['@_medium'] || '';
+      if (type.startsWith('video/') || medium === 'video') {
+        return {
+          url: m['@_url'] || '',
+          type: type || 'video/mp4',
+          length: m['@_fileSize'] ? parseInt(m['@_fileSize'], 10) : undefined,
+          duration: m['@_duration'] ? formatDuration(parseInt(m['@_duration'], 10)) : undefined,
+        };
+      }
+    }
+  }
+
+  return undefined;
+}
+
 function extractCategories(raw: any): string[] | undefined {
   if (!raw) return undefined;
   const items = Array.isArray(raw) ? raw : [raw];
@@ -99,14 +148,27 @@ function parseJsonFeed(text: string): FeedEntry[] {
     }
 
     let enclosure: Enclosure | undefined;
+    let videoEnclosure: Enclosure | undefined;
     if (Array.isArray(item.attachments) && item.attachments.length > 0) {
-      const att = item.attachments[0];
-      enclosure = {
-        url: att.url,
-        type: att.mime_type,
-        length: att.size_in_bytes || undefined,
-        duration: att.duration_in_seconds ? formatDuration(att.duration_in_seconds) : undefined
-      };
+      for (const att of item.attachments) {
+        const mime = att.mime_type || '';
+        const enc: Enclosure = {
+          url: att.url,
+          type: mime,
+          length: att.size_in_bytes || undefined,
+          duration: att.duration_in_seconds ? formatDuration(att.duration_in_seconds) : undefined
+        };
+        if (!enclosure && (mime.startsWith('audio/') || !mime.startsWith('video/'))) {
+          enclosure = enc;
+        } else if (!videoEnclosure && mime.startsWith('video/')) {
+          videoEnclosure = enc;
+        }
+      }
+      // If only a video attachment exists, use it as primary enclosure
+      if (!enclosure && videoEnclosure) {
+        enclosure = videoEnclosure;
+        videoEnclosure = undefined;
+      }
     }
 
     // JSON Feed author: item.author.name (v1.0) or item.authors[0].name (v1.1)
@@ -127,6 +189,7 @@ function parseJsonFeed(text: string): FeedEntry[] {
       annotation: annotation || undefined,
       contentHtml: contentHtml || undefined,
       enclosure,
+      videoEnclosure,
       author: jsonAuthorStr || undefined,
       categories: categories?.length ? categories : undefined,
       thumbnail
@@ -286,6 +349,14 @@ function parseRssFeed(rss: any): FeedEntry[] {
       || channelImage
       || undefined;
 
+    // Check for a separate video rendition (podcast:alternateEnclosure or media:content)
+    let videoEnclosure = extractVideoEnclosure(item);
+
+    // If the primary enclosure is already video, promote it and clear videoEnclosure
+    if (enclosure && enclosure.type?.startsWith('video/')) {
+      videoEnclosure = undefined; // primary IS the video
+    }
+
     return [{
       title: extractTitle(item.title),
       url,
@@ -294,6 +365,7 @@ function parseRssFeed(rss: any): FeedEntry[] {
       annotation: description || undefined,
       contentHtml: contentHtml || undefined,
       enclosure,
+      videoEnclosure,
       author: authorName || undefined,
       categories,
       thumbnail
