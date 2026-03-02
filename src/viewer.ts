@@ -1971,12 +1971,13 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         return total;
       }
 
-      jsonResponse(res, {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify({
         tts_cache_size: dirSize(ttsCacheDir),
         video_cache_size: dirSize(videoCacheDir),
         favicons_size: dirSize(faviconsDir),
         total_articles: mdFiles.length,
-      });
+      }));
       return;
     }
 
@@ -1991,7 +1992,8 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
           }
         } catch {}
       }
-      jsonResponse(res, { cleared });
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify({ cleared }));
       return;
     }
 
