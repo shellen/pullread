@@ -1,25 +1,40 @@
 // ABOUTME: Automatic machine tagging of articles using LLM providers
 // ABOUTME: Extracts topic, entity, and theme tags for relational mapping between articles
 
-import { readFileSync } from 'fs';
-import { basename } from 'path';
-import { summarizeText, loadLLMConfig, LLMConfig, Provider, getDefaultModel } from './summarizer';
+import { readFileSync, writeFileSync } from 'fs';
+import { basename, join } from 'path';
+import { homedir } from 'os';
+import { execFile, ExecFileOptions } from 'child_process';
+import { summarizeText, loadLLMConfig, LLMConfig, Provider, getDefaultModel, ensureAppleBinary } from './summarizer';
 import { listMarkdownFiles, resolveFilePath } from './writer';
 import { loadAnnotation, saveAnnotation, allNotes } from './annotations';
 
-const AUTOTAG_PROMPT = `Extract 3-8 machine tags from this article for relational mapping. Tags should help identify connections between articles. Include:
+const AUTOTAG_PROMPT = `Extract 3-8 machine tags from this article for relational mapping, and classify the article into an editorial section. Tags should help identify connections between articles. Include:
 - Main topics (e.g., "artificialintelligence", "climatechange", "economics")
 - Key entities mentioned prominently — people, companies, technologies, places
 - Themes (e.g., "regulation", "opensource", "privacy", "fundraising")
 
-Return ONLY a valid JSON array of lowercase tag strings with no spaces or dashes. No explanation, no markdown formatting — just the raw JSON array.
-Example: ["artificialintelligence","openai","regulation","samaltman","safety"]
+Return ONLY a valid JSON object with two fields:
+- "tags": array of lowercase tag strings with no spaces or dashes
+- "section": one of "tech", "news", "science", "health", "business", "culture", "sports", "food", "lifestyle", "environment", "education", "opinion"
+
+No explanation, no markdown formatting — just the raw JSON object.
+Example: {"tags": ["artificialintelligence","openai","regulation","samaltman","safety"], "section": "tech"}
 For non-English articles, use English tags where a clear English equivalent exists, but keep proper nouns and culturally specific terms in their original language.`;
 
 interface AutotagResult {
   machineTags: string[];
+  section?: string;
   model: string;
 }
+
+const VALID_SECTIONS = ['tech', 'news', 'science', 'health', 'business', 'culture', 'sports', 'food', 'lifestyle', 'environment', 'education', 'opinion'];
+
+// Apple Intelligence has a 4096-token context window.
+// The autotag prompt is ~150 tokens, response ~100 tokens, leaving ~3800 for article.
+// URLs and code tokenize at ~2 tokens/word, so use conservative limit.
+const APPLE_AUTOTAG_WORD_LIMIT = 1200;
+const CLOUD_AUTOTAG_WORD_LIMIT = 4000;
 
 
 /**
@@ -29,11 +44,8 @@ interface AutotagResult {
 export async function autotagText(articleText: string, config?: LLMConfig): Promise<AutotagResult> {
   const llmConfig = config || loadLLMConfig() || { provider: 'apple' as Provider, apiKey: '' };
 
-  // We call summarizeText with a custom prompt by prepending the autotag prompt
-  // to the article text, which works because summarizeText passes the full text
-  // to the LLM. Instead, we'll use the same provider functions directly.
-  // For simplicity, we construct a prompt that includes our instruction + article text.
-  const trimmed = articleText.split(/\s+/).slice(0, 4000).join(' ');
+  const wordLimit = llmConfig.provider === 'apple' ? APPLE_AUTOTAG_WORD_LIMIT : CLOUD_AUTOTAG_WORD_LIMIT;
+  const trimmed = articleText.split(/\s+/).slice(0, wordLimit).join(' ');
   const prompt = `${AUTOTAG_PROMPT}\n\n---\n\n${trimmed}`;
 
   // Use summarizeText which handles all provider routing
@@ -43,46 +55,58 @@ export async function autotagText(articleText: string, config?: LLMConfig): Prom
     // We still use the same model; the prompt determines the output format
   });
 
-  const machineTags = parseTagsFromResponse(result.summary);
-  return { machineTags, model: result.model };
+  const { machineTags, section } = parseAutotagResponse(result.summary);
+  return { machineTags, section, model: result.model };
 }
 
 /**
- * Parse a JSON array of tags from the LLM response.
- * Handles common formatting issues like markdown code blocks.
+ * Parse tags and optional section from the LLM response.
+ * Handles both object format {tags, section} and legacy array format.
  */
-function parseTagsFromResponse(response: string): string[] {
+function parseAutotagResponse(response: string): { machineTags: string[]; section?: string } {
   let text = response.trim();
-
-  // Strip markdown code block if present
   text = text.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
   text = text.trim();
 
+  const normalizeTags = (arr: unknown[]): string[] =>
+    arr
+      .filter((t: unknown): t is string => typeof t === 'string')
+      .map(t => t.toLowerCase().trim().replace(/[\s\-]+/g, ''))
+      .filter(t => t.length > 0 && t.length <= 50);
+
+  const validateSection = (s: unknown): string | undefined =>
+    typeof s === 'string' && VALID_SECTIONS.includes(s.toLowerCase()) ? s.toLowerCase() : undefined;
+
   try {
     const parsed = JSON.parse(text);
+    if (parsed && !Array.isArray(parsed) && typeof parsed === 'object' && Array.isArray(parsed.tags)) {
+      return { machineTags: normalizeTags(parsed.tags), section: validateSection(parsed.section) };
+    }
     if (Array.isArray(parsed)) {
-      return parsed
-        .filter((t: unknown): t is string => typeof t === 'string')
-        .map(t => t.toLowerCase().trim().replace(/[\s\-]+/g, ''))
-        .filter(t => t.length > 0 && t.length <= 50);
+      return { machineTags: normalizeTags(parsed) };
     }
   } catch {
-    // Try to extract array-like content from the response
+    const objMatch = text.match(/\{[\s\S]*\}/);
+    if (objMatch) {
+      try {
+        const parsed = JSON.parse(objMatch[0]);
+        if (parsed && Array.isArray(parsed.tags)) {
+          return { machineTags: normalizeTags(parsed.tags), section: validateSection(parsed.section) };
+        }
+      } catch {}
+    }
     const arrayMatch = text.match(/\[[\s\S]*?\]/);
     if (arrayMatch) {
       try {
         const parsed = JSON.parse(arrayMatch[0]);
         if (Array.isArray(parsed)) {
-          return parsed
-            .filter((t: unknown): t is string => typeof t === 'string')
-            .map(t => t.toLowerCase().trim().replace(/[\s\-]+/g, ''))
-            .filter(t => t.length > 0 && t.length <= 50);
+          return { machineTags: normalizeTags(parsed) };
         }
       } catch {}
     }
   }
 
-  return [];
+  return { machineTags: [] };
 }
 
 /**
@@ -96,9 +120,11 @@ export function hasMachineTags(filename: string): boolean {
 /**
  * Save machine tags for an article. Preserves existing user data.
  */
-export function saveMachineTags(filename: string, machineTags: string[]): void {
+export function saveMachineTags(filename: string, machineTags: string[], section?: string): void {
   const existing = loadAnnotation(filename);
-  saveAnnotation(filename, { ...existing, machineTags });
+  const update = { ...existing, machineTags };
+  if (section) update.section = section;
+  saveAnnotation(filename, update);
 }
 
 /**
@@ -121,6 +147,112 @@ export function migrateDashedTags(): number {
   return migrated;
 }
 
+// Compiled Swift binary for batch autotagging via JSONL.
+// Reads JSONL input (one {"id","prompt"} per line), processes each with an independent
+// LanguageModelSession, and writes JSONL output ({"id","response"} or {"id","error"}).
+const BATCH_AUTOTAG_SWIFT = `import Foundation
+import FoundationModels
+
+@main struct Run {
+    static func main() async throws {
+        let inputPath = CommandLine.arguments[1]
+        let lines = try String(contentsOfFile: inputPath, encoding: .utf8)
+            .components(separatedBy: "\\n")
+            .filter { !$0.isEmpty }
+
+        for line in lines {
+            guard let data = line.data(using: .utf8),
+                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: String],
+                  let id = obj["id"],
+                  let prompt = obj["prompt"] else { continue }
+
+            do {
+                let session = LanguageModelSession()
+                let response = try await session.respond(to: prompt)
+                let result = try JSONSerialization.data(withJSONObject: ["id": id, "response": response.content])
+                print(String(data: result, encoding: .utf8)!)
+            } catch {
+                let result = try JSONSerialization.data(withJSONObject: ["id": id, "error": error.localizedDescription])
+                print(String(data: result, encoding: .utf8)!)
+            }
+            fflush(stdout)
+        }
+    }
+}
+`;
+
+export interface BatchArticle {
+  filename: string;
+  body: string;
+  title: string;
+}
+
+// Process all articles in a single compiled Swift binary invocation.
+// Returns { tagged, failed } on success, or null if the binary can't be compiled
+// (caller should fall back to sequential processing).
+export async function autotagBatchApple(
+  articles: BatchArticle[],
+  llmConfig: LLMConfig
+): Promise<{ tagged: number; failed: number } | null> {
+  const binary = ensureAppleBinary(BATCH_AUTOTAG_SWIFT, '.apple-batch-autotag');
+  if (!binary) return null;
+
+  const configDir = join(homedir(), '.config', 'pullread');
+  const inputPath = join(configDir, '.autotag-batch-input.jsonl');
+
+  // Build JSONL input — truncate to fit Apple's 4096-token context window
+  const jsonlLines = articles.map(article => {
+    const trimmed = article.body.split(/\s+/).slice(0, APPLE_AUTOTAG_WORD_LIMIT).join(' ');
+    const prompt = `${AUTOTAG_PROMPT}\n\n---\n\n${trimmed}`;
+    return JSON.stringify({ id: article.filename, prompt });
+  });
+  writeFileSync(inputPath, jsonlLines.join('\n') + '\n');
+
+  let tagged = 0;
+  let failed = 0;
+
+  try {
+    const timeout = articles.length * 15_000 + 60_000;
+    const output = await new Promise<string>((resolve, reject) => {
+      execFile(binary, [inputPath], {
+        encoding: 'utf-8',
+        timeout,
+        maxBuffer: 50 * 1024 * 1024,
+      } as ExecFileOptions, (err, stdout) => {
+        if (err) reject(err);
+        else resolve(stdout as string);
+      });
+    });
+
+    const outputLines = output.trim().split('\n').filter(l => l.trim());
+    for (const line of outputLines) {
+      try {
+        const obj = JSON.parse(line);
+        if (obj.error) {
+          console.log(`  ${obj.id}: failed: ${obj.error}`);
+          failed++;
+          continue;
+        }
+        const { machineTags, section } = parseAutotagResponse(obj.response);
+        if (machineTags.length > 0) {
+          saveMachineTags(obj.id, machineTags, section);
+          console.log(`  ${obj.id}: [${machineTags.join(', ')}]${section ? ` (${section})` : ''}`);
+          tagged++;
+        } else {
+          failed++;
+        }
+      } catch {
+        failed++;
+      }
+    }
+  } catch (err: any) {
+    console.log(`  Batch processing failed: ${err.message}`);
+    failed = articles.length;
+  }
+
+  return { tagged, failed };
+}
+
 /**
  * Batch auto-tag all articles in the output directory that don't already have machine tags.
  */
@@ -139,15 +271,13 @@ export async function autotagBatch(
     .map(f => basename(f))
     .filter(f => !f.startsWith('_'));
 
-  let tagged = 0;
   let skipped = 0;
-  let failed = 0;
-
   const activeModel = llmConfig.model || getDefaultModel(llmConfig.provider);
   console.log(`  Using ${llmConfig.provider} / ${activeModel}`);
 
+  // Collect articles to process
+  const articles: BatchArticle[] = [];
   for (const file of files) {
-    // Skip if already has machine tags (unless force mode)
     if (!force && hasMachineTags(file)) {
       skipped++;
       continue;
@@ -156,7 +286,6 @@ export async function autotagBatch(
     const filePath = resolveFilePath(outputPath, file);
     const content = readFileSync(filePath, 'utf-8');
 
-    // Get article body (strip frontmatter)
     const match = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
     const body = match ? match[1] : content;
 
@@ -167,14 +296,31 @@ export async function autotagBatch(
 
     const titleMatch = content.match(/^title: "?(.*?)"?\s*$/m);
     const title = titleMatch ? titleMatch[1].slice(0, 50) : file;
+    articles.push({ filename: file, body, title });
+  }
 
+  // Apple provider: batch all articles in a single binary invocation
+  if (llmConfig.provider === 'apple') {
+    const batchResult = await autotagBatchApple(articles, llmConfig);
+    if (batchResult) {
+      return { tagged: batchResult.tagged, skipped, failed: batchResult.failed };
+    }
+    // Binary compilation failed — fall through to sequential processing
+    console.log('  Binary compilation failed, falling back to sequential processing');
+  }
+
+  // Sequential processing for cloud providers (or Apple fallback)
+  let tagged = 0;
+  let failed = 0;
+
+  for (const article of articles) {
     try {
-      process.stdout.write(`  ${title}...`);
-      const result = await autotagText(body, llmConfig);
+      process.stdout.write(`  ${article.title}...`);
+      const result = await autotagText(article.body, llmConfig);
 
       if (result.machineTags.length > 0) {
-        saveMachineTags(file, result.machineTags);
-        console.log(` [${result.machineTags.join(', ')}]`);
+        saveMachineTags(article.filename, result.machineTags, result.section);
+        console.log(` [${result.machineTags.join(', ')}]${result.section ? ` (${result.section})` : ''}`);
         tagged++;
       } else {
         console.log(' no tags extracted');

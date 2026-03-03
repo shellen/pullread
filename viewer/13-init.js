@@ -279,6 +279,15 @@ async function init() {
       scheduleNavCounts();
       renderPinnedFilters();
 
+      // Build bookmark feed names from config
+      fetch('/api/config').then(function(r) { return r.ok ? r.json() : null; }).then(function(cfg) {
+        if (!cfg || !cfg.feeds) return;
+        _bookmarkFeedNames = new Set();
+        for (var name in cfg.feeds) {
+          if (isBookmarkServiceUrl(cfg.feeds[name])) _bookmarkFeedNames.add(name);
+        }
+      }).catch(function() {});
+
       // Run one-time migration and load sync status in background
       migrateAnnotationsIfNeeded();
       loadSyncStatus();

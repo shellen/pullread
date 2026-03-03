@@ -357,27 +357,185 @@ async function callOpenRouter(apiKey: string, model: string, articleText: string
   return { summary, model };
 }
 
-// Low-level helper: run a prompt through Apple Intelligence via Foundation Models
+// Compiled Swift binary for single-prompt Apple Intelligence calls.
+// Uses @main entry point required by swiftc (the interpreter handles top-level await differently).
+const SUMMARIZE_SWIFT = `import Foundation
+import FoundationModels
+
+@main struct Run {
+    static func main() async throws {
+        let path = CommandLine.arguments[1]
+        let prompt = try String(contentsOfFile: path, encoding: .utf8)
+        let session = LanguageModelSession()
+        let response = try await session.respond(to: prompt)
+        print(response.content)
+    }
+}
+`;
+
+// Compiled Swift binary for multi-turn RLM summarization of long articles.
+// Reads article from file, splits into sections, progressively builds notes
+// via multi-turn LanguageModelSession, then synthesizes a final summary.
+const RLM_SWIFT = `import Foundation
+import FoundationModels
+
+@main struct Run {
+    static func main() async throws {
+        let articlePath = CommandLine.arguments[1]
+        let fullText = try String(contentsOfFile: articlePath, encoding: .utf8)
+
+        let paragraphs = fullText.components(separatedBy: "\\n\\n")
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        let totalWords = fullText.split(separator: " ").count
+        let headings = paragraphs.filter { $0.hasPrefix("#") }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+        var sections: [String] = []
+        var current: [String] = []
+        var wc = 0
+        for para in paragraphs {
+            let w = para.split(separator: " ").count
+            if wc + w > 600 && !current.isEmpty {
+                sections.append(current.joined(separator: "\\n\\n"))
+                current = []
+                wc = 0
+            }
+            current.append(para)
+            wc += w
+        }
+        if !current.isEmpty { sections.append(current.joined(separator: "\\n\\n")) }
+
+        var session = LanguageModelSession()
+        var turns = 0
+        let maxTurns = 2
+        var notes = ""
+
+        let headingList = headings.isEmpty ? "None" : headings.prefix(10).joined(separator: " | ")
+        let opening = String(paragraphs.first?.prefix(300) ?? "")
+        let overview = "Summarize a \\(totalWords)-word article (\\(sections.count) sections).\\n"
+            + "Headings: \\(headingList)\\n"
+            + "Opening: \\(opening)\\n"
+            + "I will feed sections one at a time. Respond with brief bullet-point notes of key facts."
+
+        let r1 = try await session.respond(to: overview)
+        notes = r1.content
+        turns = 1
+
+        for (i, section) in sections.enumerated() {
+            if turns >= maxTurns {
+                session = LanguageModelSession()
+                let trimmedNotes = notes.count > 1500 ? String(notes.suffix(1500)) : notes
+                let resume = "Article summarization in progress. Notes so far:\\n"
+                    + trimmedNotes
+                    + "\\nMore sections follow. Update notes with key facts."
+                let rr = try await session.respond(to: resume)
+                notes = rr.content
+                turns = 1
+            }
+            let prompt = "Section \\(i + 1)/\\(sections.count):\\n\\n"
+                + section
+                + "\\n\\nUpdate notes with key points."
+            let r = try await session.respond(to: prompt)
+            notes = r.content
+            turns += 1
+        }
+
+        let finalSession = LanguageModelSession()
+        let trimmedFinalNotes = notes.count > 2000 ? String(notes.suffix(2000)) : notes
+        let finalPrompt = "Notes from reading an article:\\n\\n"
+            + trimmedFinalNotes
+            + "\\n\\nWrite a 2-3 sentence summary. State the main points directly."
+            + " Do not use phrases like \\"This article discusses\\"."
+        let result = try await finalSession.respond(to: finalPrompt)
+        print(result.content)
+    }
+}
+`;
+
+// Compile a Swift script to a binary, caching by source content.
+// Returns the binary path on success, null on compilation failure.
+export function ensureAppleBinary(scriptContent: string, binaryName: string): string | null {
+  const configDir = join(homedir(), '.config', 'pullread');
+  const swiftPath = join(configDir, binaryName + '.swift');
+  const binaryPath = join(configDir, binaryName);
+
+  // Cache hit: binary exists and source matches
+  if (existsSync(binaryPath) && existsSync(swiftPath)) {
+    try {
+      const cached = readFileSync(swiftPath, 'utf-8');
+      if (cached === scriptContent) return binaryPath;
+    } catch {}
+  }
+
+  // Write source and compile
+  try {
+    writeFileSync(swiftPath, scriptContent);
+    execFileSync('swiftc', ['-parse-as-library', swiftPath, '-o', binaryPath], {
+      timeout: 120_000,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    return binaryPath;
+  } catch {
+    return null;
+  }
+}
+
+// Interpret Apple Intelligence error stderr and throw descriptive errors
+function throwAppleError(stderr: string, fallbackMessage: string): never {
+  if (stderr.includes('exceededContextWindowSize')) {
+    throw new Error('Apple Intelligence context window exceeded (4096 token limit). Try a shorter article or switch to a cloud provider.');
+  }
+  if (stderr.includes('No such module')) {
+    try {
+      const ver = execFileSync('sw_vers', ['-productVersion'], { encoding: 'utf-8' }).trim();
+      const major = parseInt(ver.split('.')[0], 10);
+      if (major >= 26) {
+        throw new Error('Apple Intelligence failed — FoundationModels not found. Ensure Xcode command line tools are installed: xcode-select --install');
+      }
+    } catch (verErr: any) {
+      if (verErr.message?.includes('FoundationModels')) throw verErr;
+    }
+    throw new Error('Apple Intelligence requires macOS 26 (Tahoe) with Xcode command line tools installed.');
+  }
+  if (stderr.includes('not eligible') || stderr.includes('not available')) {
+    throw new Error('Apple Intelligence is not available on this Mac. Requires Apple Silicon with macOS 26.');
+  }
+  throw new Error(`Apple Intelligence error: ${stderr.slice(0, 200) || fallbackMessage}`);
+}
+
+// Low-level helper: run a prompt through Apple Intelligence via Foundation Models.
+// Tries compiled binary first for speed, falls back to swift interpreter.
 function runApplePrompt(prompt: string): string {
   const configDir = join(homedir(), '.config', 'pullread');
   const tmpPrompt = join(configDir, '.apple-prompt.txt');
-  const swiftScript = join(configDir, '.apple-summarize.swift');
 
   writeFileSync(tmpPrompt, prompt);
 
-  const scriptContent = [
-    'import Foundation',
-    'import FoundationModels',
-    '',
-    'let path = CommandLine.arguments[1]',
-    'let prompt = try String(contentsOfFile: path, encoding: .utf8)',
-    'let session = LanguageModelSession()',
-    'let response = try await session.respond(to: prompt)',
-    'print(response.content)',
-  ].join('\n');
-  writeFileSync(swiftScript, scriptContent);
-
   try {
+    const binary = ensureAppleBinary(SUMMARIZE_SWIFT, '.apple-summarize');
+    if (binary) {
+      const result = execFileSync(binary, [tmpPrompt], {
+        encoding: 'utf-8',
+        timeout: 90_000,
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+      return result.trim();
+    }
+
+    // Fallback: write interpreter script and run with swift
+    const swiftScript = join(configDir, '.apple-summarize-interp.swift');
+    const scriptContent = [
+      'import Foundation',
+      'import FoundationModels',
+      '',
+      'let path = CommandLine.arguments[1]',
+      'let prompt = try String(contentsOfFile: path, encoding: .utf8)',
+      'let session = LanguageModelSession()',
+      'let response = try await session.respond(to: prompt)',
+      'print(response.content)',
+    ].join('\n');
+    writeFileSync(swiftScript, scriptContent);
+
     const result = execFileSync('swift', [swiftScript, tmpPrompt], {
       encoding: 'utf-8',
       timeout: 90_000,
@@ -386,25 +544,7 @@ function runApplePrompt(prompt: string): string {
     return result.trim();
   } catch (err: any) {
     const stderr = err.stderr || '';
-    if (stderr.includes('exceededContextWindowSize')) {
-      throw new Error('Apple Intelligence context window exceeded (4096 token limit). Try a shorter article or switch to a cloud provider.');
-    }
-    if (stderr.includes('No such module')) {
-      try {
-        const ver = execFileSync('sw_vers', ['-productVersion'], { encoding: 'utf-8' }).trim();
-        const major = parseInt(ver.split('.')[0], 10);
-        if (major >= 26) {
-          throw new Error('Apple Intelligence failed — FoundationModels not found. Ensure Xcode command line tools are installed: xcode-select --install');
-        }
-      } catch (verErr: any) {
-        if (verErr.message?.includes('FoundationModels')) throw verErr;
-      }
-      throw new Error('Apple Intelligence requires macOS 26 (Tahoe) with Xcode command line tools installed.');
-    }
-    if (stderr.includes('not eligible') || stderr.includes('not available')) {
-      throw new Error('Apple Intelligence is not available on this Mac. Requires Apple Silicon with macOS 26.');
-    }
-    throw new Error(`Apple Intelligence error: ${stderr.slice(0, 200) || err.message}`);
+    return throwAppleError(stderr, err.message);
   } finally {
     try { unlinkSync(tmpPrompt); } catch {}
   }
@@ -414,131 +554,112 @@ function runApplePrompt(prompt: string): string {
 // Each turn needs room for prompt overhead + response, so sections must be small.
 const APPLE_SECTION_WORD_LIMIT = 600;
 
-// RLM-inspired multi-turn summarization for long articles.
-// Instead of map-reduce (N separate processes, each losing context), this runs
-// ONE Swift process using LanguageModelSession's multi-turn conversation.
-// The model progressively reads the article section by section, maintaining
-// running notes. Sessions are recycled every few turns to avoid context overflow.
-// A final clean session synthesizes the summary from accumulated notes.
+// Multi-turn summarization for long articles.
+// Tries compiled binary first, falls back to swift interpreter.
 function runAppleRLM(articleText: string): string {
   const configDir = join(homedir(), '.config', 'pullread');
   const tmpArticle = join(configDir, '.apple-article.txt');
-  const swiftScript = join(configDir, '.apple-rlm.swift');
 
   writeFileSync(tmpArticle, articleText);
 
-  const sectionLimit = APPLE_SECTION_WORD_LIMIT;
-  const scriptContent = [
-    'import Foundation',
-    'import FoundationModels',
-    '',
-    'let articlePath = CommandLine.arguments[1]',
-    'let fullText = try String(contentsOfFile: articlePath, encoding: .utf8)',
-    '',
-    '// Split into paragraphs and analyze structure',
-    'let paragraphs = fullText.components(separatedBy: "\\n\\n")',
-    '    .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }',
-    'let totalWords = fullText.split(separator: " ").count',
-    'let headings = paragraphs.filter { $0.hasPrefix("#") }',
-    '    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }',
-    '',
-    `// Build sections of ~${sectionLimit} words on paragraph boundaries (4096-token context limit)`,
-    'var sections: [String] = []',
-    'var current: [String] = []',
-    'var wc = 0',
-    'for para in paragraphs {',
-    '    let w = para.split(separator: " ").count',
-    `    if wc + w > ${sectionLimit} && !current.isEmpty {`,
-    '        sections.append(current.joined(separator: "\\n\\n"))',
-    '        current = []',
-    '        wc = 0',
-    '    }',
-    '    current.append(para)',
-    '    wc += w',
-    '}',
-    'if !current.isEmpty { sections.append(current.joined(separator: "\\n\\n")) }',
-    '',
-    '// Multi-turn conversation: progressive reading with session recycling',
-    '// Each new session gets a fresh 4096-token context window',
-    'var session = LanguageModelSession()',
-    'var turns = 0',
-    'let maxTurns = 2',
-    'var notes = ""',
-    '',
-    '// Phase 1: Structural overview (keep within context limit)',
-    'let headingList = headings.isEmpty ? "None" : headings.prefix(10).joined(separator: " | ")',
-    'let opening = String(paragraphs.first?.prefix(300) ?? "")',
-    'let overview = "Summarize a \\(totalWords)-word article (\\(sections.count) sections).\\n"',
-    '    + "Headings: \\(headingList)\\n"',
-    '    + "Opening: \\(opening)\\n"',
-    '    + "I will feed sections one at a time. Respond with brief bullet-point notes of key facts."',
-    '',
-    'let r1 = try await session.respond(to: overview)',
-    'notes = r1.content',
-    'turns = 1',
-    '',
-    '// Phase 2: Feed each section, recycling sessions to prevent context overflow',
-    'for (i, section) in sections.enumerated() {',
-    '    if turns >= maxTurns {',
-    '        session = LanguageModelSession()',
-    '        // Trim notes to keep within context limit',
-    '        let trimmedNotes = notes.count > 1500 ? String(notes.suffix(1500)) : notes',
-    '        let resume = "Article summarization in progress. Notes so far:\\n"',
-    '            + trimmedNotes',
-    '            + "\\nMore sections follow. Update notes with key facts."',
-    '        let rr = try await session.respond(to: resume)',
-    '        notes = rr.content',
-    '        turns = 1',
-    '    }',
-    '    let prompt = "Section \\(i + 1)/\\(sections.count):\\n\\n"',
-    '        + section',
-    '        + "\\n\\nUpdate notes with key points."',
-    '    let r = try await session.respond(to: prompt)',
-    '    notes = r.content',
-    '    turns += 1',
-    '}',
-    '',
-    '// Phase 3: Final summary in a clean session with just the accumulated notes',
-    'let finalSession = LanguageModelSession()',
-    'let trimmedFinalNotes = notes.count > 2000 ? String(notes.suffix(2000)) : notes',
-    'let finalPrompt = "Notes from reading an article:\\n\\n"',
-    '    + trimmedFinalNotes',
-    '    + "\\n\\nWrite a 2-3 sentence summary. State the main points directly."',
-    '    + " Do not use phrases like \\"This article discusses\\"."',
-    'let result = try await finalSession.respond(to: finalPrompt)',
-    'print(result.content)',
-  ].join('\n');
-
-  writeFileSync(swiftScript, scriptContent);
-
   try {
+    const binary = ensureAppleBinary(RLM_SWIFT, '.apple-rlm');
+    if (binary) {
+      const result = execFileSync(binary, [tmpArticle], {
+        encoding: 'utf-8',
+        timeout: 180_000,
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+      return result.trim();
+    }
+
+    // Fallback: write interpreter script and run with swift
+    const swiftScript = join(configDir, '.apple-rlm-interp.swift');
+    const sectionLimit = APPLE_SECTION_WORD_LIMIT;
+    const scriptContent = [
+      'import Foundation',
+      'import FoundationModels',
+      '',
+      'let articlePath = CommandLine.arguments[1]',
+      'let fullText = try String(contentsOfFile: articlePath, encoding: .utf8)',
+      '',
+      'let paragraphs = fullText.components(separatedBy: "\\n\\n")',
+      '    .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }',
+      'let totalWords = fullText.split(separator: " ").count',
+      'let headings = paragraphs.filter { $0.hasPrefix("#") }',
+      '    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }',
+      '',
+      'var sections: [String] = []',
+      'var current: [String] = []',
+      'var wc = 0',
+      'for para in paragraphs {',
+      '    let w = para.split(separator: " ").count',
+      `    if wc + w > ${sectionLimit} && !current.isEmpty {`,
+      '        sections.append(current.joined(separator: "\\n\\n"))',
+      '        current = []',
+      '        wc = 0',
+      '    }',
+      '    current.append(para)',
+      '    wc += w',
+      '}',
+      'if !current.isEmpty { sections.append(current.joined(separator: "\\n\\n")) }',
+      '',
+      'var session = LanguageModelSession()',
+      'var turns = 0',
+      'let maxTurns = 2',
+      'var notes = ""',
+      '',
+      'let headingList = headings.isEmpty ? "None" : headings.prefix(10).joined(separator: " | ")',
+      'let opening = String(paragraphs.first?.prefix(300) ?? "")',
+      'let overview = "Summarize a \\(totalWords)-word article (\\(sections.count) sections).\\n"',
+      '    + "Headings: \\(headingList)\\n"',
+      '    + "Opening: \\(opening)\\n"',
+      '    + "I will feed sections one at a time. Respond with brief bullet-point notes of key facts."',
+      '',
+      'let r1 = try await session.respond(to: overview)',
+      'notes = r1.content',
+      'turns = 1',
+      '',
+      'for (i, section) in sections.enumerated() {',
+      '    if turns >= maxTurns {',
+      '        session = LanguageModelSession()',
+      '        let trimmedNotes = notes.count > 1500 ? String(notes.suffix(1500)) : notes',
+      '        let resume = "Article summarization in progress. Notes so far:\\n"',
+      '            + trimmedNotes',
+      '            + "\\nMore sections follow. Update notes with key facts."',
+      '        let rr = try await session.respond(to: resume)',
+      '        notes = rr.content',
+      '        turns = 1',
+      '    }',
+      '    let prompt = "Section \\(i + 1)/\\(sections.count):\\n\\n"',
+      '        + section',
+      '        + "\\n\\nUpdate notes with key points."',
+      '    let r = try await session.respond(to: prompt)',
+      '    notes = r.content',
+      '    turns += 1',
+      '}',
+      '',
+      'let finalSession = LanguageModelSession()',
+      'let trimmedFinalNotes = notes.count > 2000 ? String(notes.suffix(2000)) : notes',
+      'let finalPrompt = "Notes from reading an article:\\n\\n"',
+      '    + trimmedFinalNotes',
+      '    + "\\n\\nWrite a 2-3 sentence summary. State the main points directly."',
+      '    + " Do not use phrases like \\"This article discusses\\"."',
+      'let result = try await finalSession.respond(to: finalPrompt)',
+      'print(result.content)',
+    ].join('\n');
+
+    writeFileSync(swiftScript, scriptContent);
+
     const result = execFileSync('swift', [swiftScript, tmpArticle], {
       encoding: 'utf-8',
-      timeout: 180_000, // 3 minutes for multi-turn conversation
+      timeout: 180_000,
       stdio: ['pipe', 'pipe', 'pipe']
     });
     return result.trim();
   } catch (err: any) {
     const stderr = err.stderr || '';
-    if (stderr.includes('exceededContextWindowSize')) {
-      throw new Error('Apple Intelligence context window exceeded (4096 token limit). Try a shorter article or switch to a cloud provider.');
-    }
-    if (stderr.includes('No such module')) {
-      try {
-        const ver = execFileSync('sw_vers', ['-productVersion'], { encoding: 'utf-8' }).trim();
-        const major = parseInt(ver.split('.')[0], 10);
-        if (major >= 26) {
-          throw new Error('Apple Intelligence failed — FoundationModels not found. Ensure Xcode command line tools are installed: xcode-select --install');
-        }
-      } catch (verErr: any) {
-        if (verErr.message?.includes('FoundationModels')) throw verErr;
-      }
-      throw new Error('Apple Intelligence requires macOS 26 (Tahoe) with Xcode command line tools installed.');
-    }
-    if (stderr.includes('not eligible') || stderr.includes('not available')) {
-      throw new Error('Apple Intelligence is not available on this Mac. Requires Apple Silicon with macOS 26.');
-    }
-    throw new Error(`Apple Intelligence error: ${stderr.slice(0, 200) || err.message}`);
+    return throwAppleError(stderr, err.message);
   } finally {
     try { unlinkSync(tmpArticle); } catch {}
   }

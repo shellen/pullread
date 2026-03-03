@@ -566,7 +566,7 @@
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 4px 8px;
+    padding: 4px 8px 12px;
   }
   .drawer-item {
     display: flex;
@@ -1197,6 +1197,36 @@
     color: var(--muted);
     font-size: 13px;
   }
+  .section-rundown {
+    margin: 16px 0;
+  }
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 0 0 8px;
+    padding: 0 4px;
+  }
+  .section-title {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 400;
+    margin: 0;
+  }
+  .section-count {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .section-group { margin-bottom: 16px; }
+  .section-group.collapsed .section-body { display: none; }
+  .section-group.collapsed .section-chevron { transform: rotate(-90deg); }
+  .section-collapse { cursor: pointer; user-select: none; }
+  .section-chevron {
+    color: var(--muted);
+    transition: transform 0.15s ease;
+    margin-left: auto;
+  }
+  .section-body { padding: 4px 0 8px; }
   .dash-view-all {
     font-size: 12px;
     color: var(--link);
@@ -1414,6 +1444,8 @@
   /* Compact cards wrap instead of horizontal scroll */
   .dash-cards-compact {
     flex-wrap: wrap;
+    gap: 20px 16px;
+    overflow-x: visible;
   }
 
   /* Source-colored initial letter placeholder */
@@ -1811,6 +1843,8 @@
   }
   .article-meta .author:hover { text-decoration: underline; }
   .article-meta .sep { color: var(--border); font-size: 10px; }
+  .comments-link { color: var(--muted); text-decoration: none; cursor: pointer; }
+  .comments-link:hover { color: var(--link); }
   .article-hero {
     margin: 16px 0 20px;
   }
@@ -2228,6 +2262,19 @@
   }
   .mini-toggle:hover { background: var(--sidebar-hover); color: var(--fg); }
   .mini-toggle svg { width: 14px; height: 14px; fill: currentColor; }
+  .bottom-bar-popout-btn {
+    border: none;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .bottom-bar-popout-btn:hover { background: var(--sidebar-hover); color: var(--fg); }
+  .bottom-bar-popout-btn svg { width: 14px; height: 14px; }
   .bottom-bar-inner {
     display: flex;
     align-items: center;
@@ -3518,7 +3565,8 @@
 
   /* YouTube video embed */
   .yt-embed { position: relative; width: 100%; padding-bottom: 56.25%; height: 0; overflow: hidden; margin: 1em 0; border-radius: 8px; }
-  .yt-embed iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; border-radius: 8px; }
+  .yt-embed iframe, .yt-embed > div { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; border-radius: 8px; }
+  .yt-embed.yt-vertical { width: 360px; max-width: 100%; padding-bottom: 0; height: 640px; max-height: 80vh; margin-left: auto; margin-right: auto; }
 
   /* Feed-sourced image content */
   .feed-image { text-align: center; margin: 1.5em 0; }
@@ -3538,6 +3586,13 @@
   .podcast-description summary:hover { color: var(--fg); }
   .podcast-description > div { margin-top: 12px; color: var(--fg); }
   .podcast-description > div p { margin: 0.8em 0; }
+  .video-inline-player { margin: 1em 0; border-radius: 8px; overflow: hidden; background: #000; }
+  .video-inline-player:has(+ .video-controls) { border-radius: 8px 8px 0 0; margin-bottom: 0; }
+  .video-inline-player video { width: 100%; display: block; max-height: 480px; }
+  .video-controls { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--code-bg); border-radius: 0 0 8px 8px; margin-bottom: 1em; }
+  .video-controls-btn { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border: 1px solid var(--border); border-radius: 6px; background: none; color: var(--link); font-size: 12px; cursor: pointer; font-family: inherit; white-space: nowrap; }
+  .video-controls-btn:hover { background: var(--hover-bg); }
+  .dot-video { color: var(--link); }
 
   /* Review article link list — link-blog style */
   .review-content ul {
@@ -4649,6 +4704,18 @@
     font-size: 12px;
     color: var(--muted);
   }
+  .section-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: var(--bg-offset);
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
 
   /* Explore stats bar */
   /* Settings page */
@@ -4910,6 +4977,92 @@
   .pill-group .pill.unavailable {
     opacity: 0.4;
     cursor: default;
+  }
+
+  /* Magic Mixer */
+  .mixer-slider-row {
+    margin: 10px 0;
+  }
+  .mixer-slider-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: var(--fg);
+    margin-bottom: 4px;
+  }
+  .mixer-slider-value {
+    font-size: 12px;
+    color: var(--muted);
+    min-width: 24px;
+    text-align: right;
+  }
+  .mixer-slider-desc {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .mixer-range {
+    width: 100%;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: color-mix(in srgb, var(--fg) 12%, transparent);
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+  }
+  .mixer-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--link);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  }
+  .mixer-range::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--link);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  }
+  .mixer-section-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 16px 0 8px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  .mixer-tag-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 6px 0;
+  }
+  .mixer-tag-name {
+    font-size: 13px;
+    color: var(--fg);
+    min-width: 100px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mixer-tag-range {
+    flex: 1;
+  }
+  .mixer-tag-label {
+    font-size: 11px;
+    color: var(--muted);
+    min-width: 52px;
+    text-align: right;
   }
 
   .settings-view .input-field {

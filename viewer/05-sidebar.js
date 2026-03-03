@@ -14,16 +14,18 @@ function renderFileList() {
   if (magicSort) {
     if (displayFiles === filteredFiles) displayFiles = filteredFiles.slice();
     var engagement = computeSourceEngagement();
+    var mc = getMixerConfig();
     displayFiles.sort(function(a, b) {
-      return magicScore(b, engagement) - magicScore(a, engagement);
+      return magicScore(b, engagement, mc) - magicScore(a, engagement, mc);
     });
-    // Source diversity: max 3 articles per source in top positions, extras pushed down
+    // Source diversity cap from mixer config
+    var diversityCap = mc.diversity || 3;
     var sourceCounts = {};
     var top = [], overflow = [];
     for (var di = 0; di < displayFiles.length; di++) {
       var key = displayFiles[di].feed || displayFiles[di].domain || 'unknown';
       sourceCounts[key] = (sourceCounts[key] || 0) + 1;
-      if (sourceCounts[key] <= 3) top.push(displayFiles[di]);
+      if (sourceCounts[key] <= diversityCap) top.push(displayFiles[di]);
       else overflow.push(displayFiles[di]);
     }
     displayFiles = top.concat(overflow);
@@ -111,12 +113,13 @@ function renderFileItem(f, i) {
   const isRead = readArticles.has(f.filename);
   const { hasHl, hasNote, isFavorite } = hasAnnotations(f.filename);
   const hasSummary = f.hasSummary;
-  const isPodcast = !!(f.enclosureUrl && f.enclosureType && f.enclosureType.startsWith('audio/'));
+  const isPodcast = !!(f.enclosureUrl && isMediaEnclosure(f.enclosureType));
+  const isVideo = !!(f.enclosureUrl && isVideoEnclosure(f.enclosureType));
   let indicators = '';
   if (hasHl || hasNote || hasSummary || isFavorite || isPodcast) {
     indicators = '<div class="file-item-indicators">'
       + (isFavorite ? '<span class="dot dot-favorite" aria-label="Starred"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-heart"/></svg></span>' : '')
-      + (isPodcast ? '<span class="dot dot-podcast" aria-label="Podcast"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-headphones"/></svg></span>' : '')
+      + (isVideo ? '<span class="dot dot-video" aria-label="Video"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-video"/></svg></span>' : isPodcast ? '<span class="dot dot-podcast" aria-label="Podcast"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-headphones"/></svg></span>' : '')
       + (hasHl ? '<span class="dot dot-highlight" aria-label="Has highlights"></span>' : '')
       + (hasNote ? '<span class="dot dot-note" aria-label="Has annotations"></span>' : '')
       + (hasSummary ? '<span class="dot dot-summary" aria-label="Has summary"></span>' : '')
@@ -198,12 +201,13 @@ function updateSidebarItem(filename) {
   if (!f) return;
   var { hasHl, hasNote, isFavorite } = hasAnnotations(filename);
   var hasSummary = f.hasSummary;
-  var isPodcast = !!(f.enclosureUrl && f.enclosureType && f.enclosureType.startsWith('audio/'));
+  var isPodcast = !!(f.enclosureUrl && isMediaEnclosure(f.enclosureType));
+  var isVideo = !!(f.enclosureUrl && isVideoEnclosure(f.enclosureType));
   var existing = el.querySelector('.file-item-indicators');
   if (hasHl || hasNote || hasSummary || isFavorite || isPodcast) {
     var html = '<div class="file-item-indicators">'
       + (isFavorite ? '<span class="dot dot-favorite" aria-label="Starred"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-heart"/></svg></span>' : '')
-      + (isPodcast ? '<span class="dot dot-podcast" aria-label="Podcast"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-headphones"/></svg></span>' : '')
+      + (isVideo ? '<span class="dot dot-video" aria-label="Video"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-video"/></svg></span>' : isPodcast ? '<span class="dot dot-podcast" aria-label="Podcast"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-headphones"/></svg></span>' : '')
       + (hasHl ? '<span class="dot dot-highlight" aria-label="Has highlights"></span>' : '')
       + (hasNote ? '<span class="dot dot-note" aria-label="Has annotations"></span>' : '')
       + (hasSummary ? '<span class="dot dot-summary" aria-label="Has summary"></span>' : '')
@@ -243,6 +247,35 @@ function toggleMagicSort() {
   renderFileList();
 }
 
+// Magic Mixer presets and config
+var MIXER_PRESETS = {
+  balanced:     { recency: 4, source: 4, unread: 2, signals: 1, diversity: 3 },
+  whats_new:    { recency: 6, source: 2, unread: 2, signals: 1, diversity: 2 },
+  deep_reading: { recency: 2, source: 5, unread: 1, signals: 3, diversity: 4 },
+  discovery:    { recency: 3, source: 2, unread: 3, signals: 3, diversity: 2 }
+};
+
+function getMixerConfig() {
+  try {
+    var raw = localStorage.getItem('pr-magic-mixer');
+    if (raw) {
+      var config = JSON.parse(raw);
+      // Migrate old 0-100 scale configs to 0-10
+      var w = config.weights;
+      if (w && (w.recency > 10 || w.source > 10 || w.unread > 10 || w.signals > 10)) {
+        w.recency = Math.round(w.recency / 10);
+        w.source = Math.round(w.source / 10);
+        w.unread = Math.round(w.unread / 10);
+        w.signals = Math.round(w.signals / 10);
+        config.preset = 'custom';
+        localStorage.setItem('pr-magic-mixer', JSON.stringify(config));
+      }
+      return config;
+    }
+  } catch(e) {}
+  return { preset: 'balanced', weights: { recency: 4, source: 4, unread: 2, signals: 1 }, diversity: 3, tagBoosts: {} };
+}
+
 function computeSourceEngagement() {
   var stats = {};
   for (var i = 0; i < allFiles.length; i++) {
@@ -269,29 +302,50 @@ function computeSourceEngagement() {
   return engagement;
 }
 
-function magicScore(f, engagement) {
-  // Recency: exponential decay (weight 40)
-  // Podcasts use 12-hour half-life (decay 1.386), articles use 3-day (decay 0.231)
+function magicScore(f, engagement, mixerConfig) {
+  var w = mixerConfig.weights;
+  var sum = w.recency + w.source + w.unread + w.signals;
+  if (sum === 0) { w = { recency: 25, source: 25, unread: 25, signals: 25 }; sum = 100; }
+  var wR = w.recency / sum, wS = w.source / sum, wU = w.unread / sum, wSig = w.signals / sum;
+
+  // Recency: exponential decay
   var age = f.bookmarked ? (Date.now() - new Date(f.bookmarked).getTime()) / 86400000 : 30;
-  var isPodcast = f.enclosureUrl && f.enclosureType && f.enclosureType.startsWith('audio/');
+  var isPodcast = f.enclosureUrl && isMediaEnclosure(f.enclosureType);
   var decay = isPodcast ? 1.386 : 0.231;
   var recency = Math.exp(-decay * age);
 
-  // Source engagement (weight 35)
+  // Source engagement
   var key = f.feed || f.domain || 'unknown';
   var source = engagement[key] || 0;
 
-  // Unread boost (weight 15)
+  // Unread boost
   var unread = readArticles.has(f.filename) ? 0 : 1;
 
-  // Article signals (weight 10)
+  // Article signals
   var signals = 0;
   var notes = allNotesIndex[f.filename];
   if (notes && notes.isFavorite) signals += 0.3;
   if (allHighlightsIndex[f.filename] && allHighlightsIndex[f.filename].length) signals += 0.2;
   if (notes && (notes.articleNote || (notes.annotations && notes.annotations.length))) signals += 0.15;
 
-  return 40 * recency + 35 * source + 15 * unread + 10 * Math.min(signals, 1);
+  var rawScore = 100 * (wR * recency + wS * source + wU * unread + wSig * Math.min(signals, 1));
+
+  // Tag boost multiplier — match against machineTags from AI auto-tagging
+  var boosts = mixerConfig.tagBoosts;
+  if (boosts && Object.keys(boosts).length > 0) {
+    var articleTags = (notes && notes.machineTags) || [];
+    var bestBoost = 0;
+    for (var ci = 0; ci < articleTags.length; ci++) {
+      var b = boosts[articleTags[ci]];
+      if (b !== undefined && Math.abs(b) > Math.abs(bestBoost)) bestBoost = b;
+    }
+    if (bestBoost !== 0) {
+      var multipliers = { '-2': 0.25, '-1': 0.5, '1': 1.5, '2': 2 };
+      rawScore *= (multipliers[String(bestBoost)] || 1);
+    }
+  }
+
+  return rawScore;
 }
 
 // Debounced localStorage write for read articles
@@ -386,8 +440,12 @@ function filterFiles() {
         if (tl === 'is:read') return readArticles.has(f.filename);
         // Operator: is:unread
         if (tl === 'is:unread') return !readArticles.has(f.filename);
-        // Operator: is:podcast / has:audio
-        if (tl === 'is:podcast' || tl === 'has:audio') return !!(f.enclosureUrl && f.enclosureType && f.enclosureType.startsWith('audio/'));
+        // Operator: is:podcast / has:audio / has:video
+        if (tl === 'is:podcast') return !!(f.enclosureUrl && isMediaEnclosure(f.enclosureType));
+        if (tl === 'has:audio') return !!(f.enclosureUrl && isAudioEnclosure(f.enclosureType));
+        if (tl === 'has:video') return !!(f.enclosureUrl && isVideoEnclosure(f.enclosureType));
+        // Operator: is:bookmark
+        if (tl === 'is:bookmark') return isBookmarkArticle(f);
         // Operator: is:epub / is:book
         if (tl === 'is:epub' || tl === 'is:book') return f.domain === 'epub';
         // Operator: has:summary
@@ -446,6 +504,16 @@ async function loadFile(index) {
   if (_breakSessionStart === 0) _breakSessionStart = Date.now();
   _sidebarView = 'home'; syncSidebarTabs();
   var prevActive = activeFile;
+
+  // Auto-popout YouTube if playing inline and navigating away
+  if (_ytPlayer && ttsPlaying && ttsQueue[ttsCurrentIndex]) {
+    var ytItem = ttsQueue[ttsCurrentIndex];
+    var ytTime = 0;
+    try { ytTime = _ytPlayer.getCurrentTime(); } catch(e) {}
+    _ytCleanup();
+    playYouTubePopout(ytItem, ytTime);
+  }
+
   activeFile = file.filename;
   _activeDrawerSource = file.feed || null;
   updateDrawerActiveState();
@@ -780,10 +848,14 @@ function openSourcesDrawer() {
 
   var entries = Object.entries(domainArticles);
 
-  // Count podcast items
+  // Count podcast, video, and bookmark items
   var podcastCount = 0;
+  var videoCount = 0;
+  var bookmarkCount = 0;
   for (var j = 0; j < allFiles.length; j++) {
-    if (allFiles[j].enclosureUrl && allFiles[j].enclosureType && allFiles[j].enclosureType.startsWith('audio/')) podcastCount++;
+    if (allFiles[j].enclosureUrl && isMediaEnclosure(allFiles[j].enclosureType)) podcastCount++;
+    if (allFiles[j].enclosureUrl && isVideoEnclosure(allFiles[j].enclosureType)) videoCount++;
+    if (isBookmarkArticle(allFiles[j])) bookmarkCount++;
   }
 
   var sortMode = localStorage.getItem('pr-sources-sort') || 'recent';
@@ -825,19 +897,53 @@ function openSourcesDrawer() {
 
     var filterLower = _drawerFilter.toLowerCase();
 
+    // Media group label (shown if any media type has articles)
+    var hasMedia = podcastCount > 0 || videoCount > 0 || bookmarkCount > 0;
+    var mediaLabelShown = false;
+
     // Podcast row
     if (podcastCount > 0 && (!filterLower || 'podcasts'.indexOf(filterLower) !== -1)) {
       var podUnread = 0;
       for (var pj = 0; pj < allFiles.length; pj++) {
-        if (allFiles[pj].enclosureUrl && allFiles[pj].enclosureType && allFiles[pj].enclosureType.startsWith('audio/') && !readArticles.has(allFiles[pj].filename)) podUnread++;
+        if (allFiles[pj].enclosureUrl && isMediaEnclosure(allFiles[pj].enclosureType) && !readArticles.has(allFiles[pj].filename)) podUnread++;
       }
       var podActive = _activeDrawerSource === '__podcasts__' ? ' active' : '';
       var podDim = podUnread === 0 ? ' dimmed' : '';
-      html += '<div class="drawer-group-label">Media Type</div>';
+      if (!mediaLabelShown) { html += '<div class="drawer-group-label">Media</div>'; mediaLabelShown = true; }
       html += '<div class="drawer-item' + podActive + podDim + '" data-source="__podcasts__" onclick="filterBySource(\'__podcasts__\')">'
         + '<svg class="drawer-item-icon" aria-hidden="true"><use href="#i-headphones"/></svg>'
         + '<span class="drawer-item-name">Podcasts</span>'
         + '<span class="drawer-item-count">' + podUnread + '</span></div>';
+    }
+
+    // Video row
+    if (videoCount > 0 && (!filterLower || 'videos'.indexOf(filterLower) !== -1)) {
+      var vidUnread = 0;
+      for (var vj = 0; vj < allFiles.length; vj++) {
+        if (allFiles[vj].enclosureUrl && isVideoEnclosure(allFiles[vj].enclosureType) && !readArticles.has(allFiles[vj].filename)) vidUnread++;
+      }
+      var vidActive = _activeDrawerSource === '__videos__' ? ' active' : '';
+      var vidDim = vidUnread === 0 ? ' dimmed' : '';
+      if (!mediaLabelShown) { html += '<div class="drawer-group-label">Media</div>'; mediaLabelShown = true; }
+      html += '<div class="drawer-item' + vidActive + vidDim + '" data-source="__videos__" onclick="filterBySource(\'__videos__\')">'
+        + '<svg class="drawer-item-icon" aria-hidden="true"><use href="#i-video"/></svg>'
+        + '<span class="drawer-item-name">Videos</span>'
+        + '<span class="drawer-item-count">' + vidUnread + '</span></div>';
+    }
+
+    // Bookmarks row
+    if (bookmarkCount > 0 && (!filterLower || 'bookmarks'.indexOf(filterLower) !== -1)) {
+      var bkUnread = 0;
+      for (var bj = 0; bj < allFiles.length; bj++) {
+        if (isBookmarkArticle(allFiles[bj]) && !readArticles.has(allFiles[bj].filename)) bkUnread++;
+      }
+      var bkActive = _activeDrawerSource === '__bookmarks__' ? ' active' : '';
+      var bkDim = bkUnread === 0 ? ' dimmed' : '';
+      if (!mediaLabelShown) { html += '<div class="drawer-group-label">Media</div>'; mediaLabelShown = true; }
+      html += '<div class="drawer-item' + bkActive + bkDim + '" data-source="__bookmarks__" onclick="filterBySource(\'__bookmarks__\')">'
+        + '<svg class="drawer-item-icon" aria-hidden="true"><use href="#i-bookmark"/></svg>'
+        + '<span class="drawer-item-name">Bookmarks</span>'
+        + '<span class="drawer-item-count">' + bkUnread + '</span></div>';
     }
 
     // Source rows
@@ -998,12 +1104,31 @@ function openTagsDrawer() {
   openDrawer();
 }
 
+// Filter to a source and open the sources drawer without navigating away.
+// Used by the article header pub-name click.
+function browseSource(source) {
+  var search = document.getElementById('search');
+  if (search) search.value = 'feed:"' + source + '"';
+  showSourceFilterBar(source);
+  _activeDrawerSource = source;
+  filterFiles();
+  openSourcesDrawer();
+}
+
 function filterBySource(source) {
   var search = document.getElementById('search');
   if (source === '__podcasts__') {
     if (search) search.value = 'is:podcast';
     showSourceFilterBar('Podcasts');
     _activeDrawerSource = '__podcasts__';
+  } else if (source === '__videos__') {
+    if (search) search.value = 'has:video';
+    showSourceFilterBar('Videos');
+    _activeDrawerSource = '__videos__';
+  } else if (source === '__bookmarks__') {
+    if (search) search.value = 'is:bookmark';
+    showSourceFilterBar('Bookmarks');
+    _activeDrawerSource = '__bookmarks__';
   } else {
     if (search) search.value = 'feed:"' + source + '"';
     showSourceFilterBar(source);
@@ -1041,7 +1166,15 @@ function refreshDrawerCounts() {
       var unread = 0;
       if (src === '__podcasts__') {
         for (var j = 0; j < allFiles.length; j++) {
-          if (allFiles[j].enclosureUrl && allFiles[j].enclosureType && allFiles[j].enclosureType.startsWith('audio/') && !readArticles.has(allFiles[j].filename)) unread++;
+          if (allFiles[j].enclosureUrl && isMediaEnclosure(allFiles[j].enclosureType) && !readArticles.has(allFiles[j].filename)) unread++;
+        }
+      } else if (src === '__videos__') {
+        for (var j = 0; j < allFiles.length; j++) {
+          if (allFiles[j].enclosureUrl && isVideoEnclosure(allFiles[j].enclosureType) && !readArticles.has(allFiles[j].filename)) unread++;
+        }
+      } else if (src === '__bookmarks__') {
+        for (var j = 0; j < allFiles.length; j++) {
+          if (isBookmarkArticle(allFiles[j]) && !readArticles.has(allFiles[j].filename)) unread++;
         }
       } else {
         for (var j = 0; j < allFiles.length; j++) {

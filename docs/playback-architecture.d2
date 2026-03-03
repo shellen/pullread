@@ -1,0 +1,321 @@
+# ABOUTME: Architecture diagram of audio/video playback system
+# ABOUTME: Render with: d2 docs/playback-architecture.d2 docs/playback-architecture.svg
+
+direction: down
+
+title: {
+  label: PullRead — Playback Architecture
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+# ──────────────────────────────────────────
+# Entry Points — how media enters the queue
+# ──────────────────────────────────────────
+
+entry: "Entry Points" {
+  style.fill: "#fff3e0"
+
+  listen_btn: "Listen button\n(article toolbar)" {
+    shape: step
+    style.fill: "#ffe0b2"
+  }
+
+  play_next: "Play Next menu\n(article toolbar)" {
+    shape: step
+    style.fill: "#ffe0b2"
+  }
+
+  sidebar_queue: "Queue from sidebar\n(article list)" {
+    shape: step
+    style.fill: "#ffe0b2"
+  }
+
+  video_play: "Play Video button\n(inline video controls)" {
+    shape: step
+    style.fill: "#ffccbc"
+  }
+}
+
+# ──────────────────────────────────────────
+# Queue — central state
+# ──────────────────────────────────────────
+
+queue: "Queue & State Engine (07-tts.js)" {
+  style.fill: "#e3f2fd"
+
+  state: {
+    style.fill: "#bbdefb"
+    label: |md
+      **Global State**
+      - `ttsQueue[]` — ordered items
+      - `ttsCurrentIndex` — now playing
+      - `ttsPlaying` / `ttsGenerating`
+      - `ttsSpeed` (0.5x–2.0x)
+      - `_ttsPlayGeneration` — stale-op guard
+    |
+  }
+
+  persistence: "localStorage\npr-tts-state\n(survives refresh, <24h TTL)" {
+    shape: cylinder
+    style.fill: "#90caf9"
+  }
+
+  router: "Playback Path Router" {
+    shape: diamond
+    style.fill: "#64b5f6"
+    style.font-color: white
+  }
+
+  state -> router: "playTTSItem(index)"
+  state -> persistence: "save/restore"
+}
+
+# ──────────────────────────────────────────
+# Five playback paths
+# ──────────────────────────────────────────
+
+paths: "Playback Paths" {
+  style.fill: "#e8f5e9"
+
+  browser_tts: "Browser TTS" {
+    style.fill: "#c8e6c9"
+    label: |md
+      **SpeechSynthesis API**
+      - Strips markdown → plain text
+      - Voice selection (saved pref / lang match)
+      - Estimated duration (~180 WPM)
+      - No real progress (boundary events only)
+    |
+  }
+
+  cloud_chunks: "Cloud TTS (Chunked)" {
+    style.fill: "#c8e6c9"
+    label: |md
+      **POST /api/tts/start**
+      - Sequential chunk loading
+      - Prefetch next chunk while playing
+      - Duration refines after first chunk
+      - Prefetch next queue item on last chunk
+    |
+  }
+
+  cloud_cached: "Cloud TTS (Cached)" {
+    style.fill: "#c8e6c9"
+    label: |md
+      **GET /api/tts/play?name=...**
+      - Single audio file (previously generated)
+      - Full HTMLAudioElement playback
+      - Accurate duration from metadata
+    |
+  }
+
+  podcast: "Podcast Audio" {
+    style.fill: "#a5d6a7"
+    label: |md
+      **Native <audio> element**
+      - Direct enclosure URL
+      - Resume from saved position
+      - Save progress every 5s
+      - Speed via playbackRate
+    |
+  }
+
+  video_popout: "Video Popout" {
+    style.fill: "#ffccbc"
+    label: |md
+      **Separate window (960x640)**
+      - Native <video> or HLS.js
+      - Pop-back-in → seeks inline video
+      - Auto-advance queue on close
+    |
+  }
+}
+
+# ──────────────────────────────────────────
+# YouTube — disconnected experience
+# ──────────────────────────────────────────
+
+youtube: "YouTube (Orphaned)" {
+  style.fill: "#ffcdd2"
+  style.stroke: "#e53935"
+  style.stroke-width: 2
+  style.stroke-dash: 5
+
+  yt_embed: "YouTube Embed" {
+    style.fill: "#ef9a9a"
+    label: |md
+      **Inline iframe embed**
+      - Domain detection (youtube.com / youtu.be)
+      - Extracts video ID from URL
+      - `<iframe>` with standard allowlist
+      - Thumbnail-link → iframe conversion
+    |
+  }
+
+  yt_orphan_note: {
+    shape: text
+    style.font-size: 13
+    style.font-color: "#c62828"
+    label: |md
+      **Not connected to queue, player,
+      mini player, or popout system.**
+      YouTube playback is fire-and-forget
+      inside the article body.
+    |
+  }
+}
+
+# ──────────────────────────────────────────
+# UI Layer — rendering
+# ──────────────────────────────────────────
+
+ui: "UI Layer" {
+  style.fill: "#f3e5f5"
+
+  player: "<pr-player> Web Component\n(07-tts-player.js)" {
+    style.fill: "#e1bee7"
+
+    expanded: "Expanded (Bottom Bar)" {
+      style.fill: "#ce93d8"
+      style.font-color: white
+      label: |md
+        - Transport: play/pause, ±15s skip
+        - Progress bar (draggable seek)
+        - Speed slider (15 presets)
+        - Queue toggle, popout, dismiss
+        - Artwork + title + source
+      |
+    }
+
+    mini: "Mini (Sidebar)" {
+      style.fill: "#ce93d8"
+      style.font-color: white
+      label: |md
+        - 30px bar in sidebar footer
+        - Artwork + title + play button
+        - Thin progress bar (no scrub)
+        - Click to expand
+      |
+    }
+
+    expanded -> mini: "chevron toggle\n(persisted in localStorage)"
+    mini -> expanded: "click to expand"
+  }
+
+  audio_popout: "Audio Popout (340x560)" {
+    style.fill: "#d1c4e9"
+    label: |md
+      - Self-contained HTML blob window
+      - Reads state from `window.opener`
+      - `requestAnimationFrame` sync loop
+      - Full transport + queue list
+      - "Pop back in" closes window
+    |
+  }
+
+  video_window: "Video Popout (960x640)" {
+    style.fill: "#ffccbc"
+    label: |md
+      - HTML blob with `<video>` element
+      - HLS.js from parent `window.opener`
+      - "Pop back in" → `_videoPopIn(time)`
+        seeks inline video + closes window
+    |
+  }
+
+  inline_video: "Inline Video (article body)" {
+    style.fill: "#ffccbc"
+    label: |md
+      - `<video>` in `.video-inline-player`
+      - HLS.js attachment if needed
+      - "Pop out" button → opens popout
+      - Receives pop-back-in seeks
+    |
+  }
+}
+
+# ──────────────────────────────────────────
+# Backend
+# ──────────────────────────────────────────
+
+backend: "Backend (viewer.ts)" {
+  style.fill: "#f5f5f5"
+  style.stroke-dash: 3
+
+  tts_start: "/api/tts/start" { shape: hexagon; style.fill: "#90a4ae"; style.font-color: white }
+  tts_chunk: "/api/tts/chunk/{id}/{n}" { shape: hexagon; style.fill: "#90a4ae"; style.font-color: white }
+  tts_play: "/api/tts/play?name=" { shape: hexagon; style.fill: "#90a4ae"; style.font-color: white }
+  api_file: "/api/file?name=" { shape: hexagon; style.fill: "#90a4ae"; style.font-color: white }
+}
+
+# ──────────────────────────────────────────
+# HLS
+# ──────────────────────────────────────────
+
+hls: "hls.js (354KB light)" {
+  shape: hexagon
+  style.fill: "#fff9c4"
+  label: |md
+    **HLS Streaming**
+    - Attached to `<video>` elements
+    - Safari uses native HLS
+    - Shared via `window.opener.Hls`
+      for popout windows
+  |
+}
+
+# ──────────────────────────────────────────
+# Connections
+# ──────────────────────────────────────────
+
+# Entry → Queue
+entry.listen_btn -> queue.state: "addCurrentToTTSQueue()"
+entry.play_next -> queue.state: "playNextFromArticle()"
+entry.sidebar_queue -> queue.state: "addToTTSQueue()"
+entry.video_play -> queue.state: "addToTTSQueue()\n(video item)"
+
+# Router → Playback Paths
+queue.router -> paths.browser_tts: "no enclosure\n+ provider=browser"
+queue.router -> paths.cloud_chunks: "no enclosure\n+ cloud provider\n+ not cached"
+queue.router -> paths.cloud_cached: "no enclosure\n+ cloud provider\n+ cached"
+queue.router -> paths.podcast: "has enclosureUrl\n+ audio type"
+queue.router -> paths.video_popout: "has enclosureUrl\n+ video type"
+
+# Playback → UI
+paths.browser_tts -> ui.player: "renderAudioPlayer()"
+paths.cloud_chunks -> ui.player: "renderAudioPlayer()"
+paths.cloud_cached -> ui.player: "renderAudioPlayer()"
+paths.podcast -> ui.player: "renderAudioPlayer()"
+paths.video_popout -> ui.video_window: "window.open(blob)"
+
+# UI popout connections
+ui.player -> ui.audio_popout: "popOutAudioPlayer()"
+ui.audio_popout -> ui.player: "pop back in\n(close window)"
+ui.video_window -> ui.inline_video: "_videoPopIn(time)\npop back in"
+ui.inline_video -> ui.video_window: "pop out button"
+
+# Player ↔ State
+ui.player -> queue.state: "ttsTogglePlay()\nttsSeek()\nttsCycleSpeed()"
+ui.audio_popout -> queue.state: "window.opener.*\n(rAF sync loop)"
+ui.video_window -> queue.state: "window.opener.*\n(on close → autoplayNext)"
+
+# Backend connections
+paths.browser_tts -> backend.api_file: "fetch article text"
+paths.cloud_chunks -> backend.tts_start: "begin session"
+paths.cloud_chunks -> backend.tts_chunk: "load chunks"
+paths.cloud_cached -> backend.tts_play: "stream full audio"
+
+# HLS connections
+paths.video_popout -> hls: "attachHls()"
+ui.inline_video -> hls: "attachHls()"
+ui.video_window -> hls: "parent Hls object"
+
+# YouTube is disconnected
+youtube.yt_embed -> ui.player: "NOT CONNECTED" {
+  style.stroke: "#e53935"
+  style.stroke-dash: 5
+  style.font-color: "#e53935"
+}

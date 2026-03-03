@@ -11,6 +11,7 @@ export interface AnnotationData {
   annotations: unknown[];
   tags: string[];
   machineTags: string[];
+  section?: string;
   isFavorite: boolean;
 }
 
@@ -65,6 +66,7 @@ export function initAnnotations(outputPath: string, configDir: string): void {
               annotations: data.annotations || [],
               tags: data.tags || [],
               machineTags: data.machineTags || [],
+              section: data.section || undefined,
               isFavorite: !!data.isFavorite,
             };
           } catch {}
@@ -104,14 +106,15 @@ export function allHighlights(): Record<string, unknown[]> {
 }
 
 /** Return all notes keyed by filename (for backward-compatible API) */
-export function allNotes(): Record<string, { articleNote: string; annotations: unknown[]; tags: string[]; machineTags: string[]; isFavorite: boolean }> {
-  const result: Record<string, { articleNote: string; annotations: unknown[]; tags: string[]; machineTags: string[]; isFavorite: boolean }> = {};
+export function allNotes(): Record<string, { articleNote: string; annotations: unknown[]; tags: string[]; machineTags: string[]; section?: string; isFavorite: boolean }> {
+  const result: Record<string, { articleNote: string; annotations: unknown[]; tags: string[]; machineTags: string[]; section?: string; isFavorite: boolean }> = {};
   for (const [filename, annot] of Object.entries(_cache)) {
     result[filename] = {
       articleNote: annot.articleNote,
       annotations: annot.annotations,
       tags: annot.tags,
       machineTags: annot.machineTags,
+      section: annot.section,
       isFavorite: annot.isFavorite,
     };
   }

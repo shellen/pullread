@@ -324,10 +324,11 @@ describe('EPUB support', () => {
 describe('XSS sanitization', () => {
   const rootDir = join(__dirname, '..');
 
-  test('viewer.html includes DOMPurify script tag', () => {
+  test('DOMPurify is bundled via embed-viewer.ts', () => {
     const html = readFileSync(join(rootDir, 'viewer.html'), 'utf-8');
-    expect(html).toContain('dompurify');
-    expect(html).toContain('purify.min.js');
+    expect(html).toContain('DOMPurify');
+    const pkg = JSON.parse(readFileSync(join(rootDir, 'package.json'), 'utf-8'));
+    expect(pkg.dependencies['dompurify']).toBeDefined();
   });
 
   test('02-utils.js defines sanitizeHtml helper', () => {
@@ -534,5 +535,336 @@ describe('race condition guards', () => {
     const article = readFileSync(join(rootDir, 'viewer', '04-article.js'), 'utf-8');
     expect(article).toContain('_markAsReadDelayTimer');
     expect(article).toMatch(/clearTimeout\s*\(\s*_markAsReadDelayTimer\s*\)/);
+  });
+});
+
+describe('bookmark service detection', () => {
+  let isBookmarkServiceUrl: (url: string) => boolean;
+  let isBookmarkArticle: (f: { feed?: string; domain?: string }) => boolean;
+
+  beforeAll(() => {
+    const rootDir = join(__dirname, '..');
+    const utils = readFileSync(join(rootDir, 'viewer', '02-utils.js'), 'utf-8');
+    const fn = new Function(utils + '\nreturn { isBookmarkServiceUrl, isBookmarkArticle, _bookmarkFeedNames };');
+    const fns = fn();
+    isBookmarkServiceUrl = fns.isBookmarkServiceUrl;
+    isBookmarkArticle = fns.isBookmarkArticle;
+  });
+
+  test('detects Instapaper feed URLs', () => {
+    expect(isBookmarkServiceUrl('https://www.instapaper.com/rss/123456/AbCdEf')).toBe(true);
+    expect(isBookmarkServiceUrl('https://www.instapaper.com/archive/rss/123456/AbCdEf')).toBe(true);
+  });
+
+  test('detects Pinboard feed URLs', () => {
+    expect(isBookmarkServiceUrl('https://feeds.pinboard.in/rss/u:jason/')).toBe(true);
+    expect(isBookmarkServiceUrl('https://feeds.pinboard.in/rss/secret:abc/u:jason/unread/')).toBe(true);
+  });
+
+  test('detects Raindrop.io feed URLs but not blog', () => {
+    expect(isBookmarkServiceUrl('https://raindrop.io/collection/123/feed')).toBe(true);
+    expect(isBookmarkServiceUrl('https://blog.raindrop.io/feed')).toBe(false);
+  });
+
+  test('detects Drafty link feeds', () => {
+    expect(isBookmarkServiceUrl('https://www.drafty.com/@jason/links/rss')).toBe(true);
+    expect(isBookmarkServiceUrl('https://drafty.com/@someone/links/feed.xml')).toBe(true);
+  });
+
+  test('rejects non-bookmark feeds', () => {
+    expect(isBookmarkServiceUrl('https://arstechnica.com/feed/')).toBe(false);
+    expect(isBookmarkServiceUrl('https://www.nytimes.com/rss/homepage')).toBe(false);
+    expect(isBookmarkServiceUrl('https://drafty.com/@jason/posts/rss')).toBe(false);
+    expect(isBookmarkServiceUrl('https://www.instapaper.com/help')).toBe(false);
+    expect(isBookmarkServiceUrl('https://pinboard.in/howto/')).toBe(false);
+  });
+
+  test('handles null/empty', () => {
+    expect(isBookmarkServiceUrl('')).toBe(false);
+    expect(isBookmarkServiceUrl(null as any)).toBe(false);
+  });
+
+  test('detects imported bookmarks.html articles', () => {
+    expect(isBookmarkArticle({ feed: 'import' })).toBe(true);
+  });
+
+  test('detects inbox-saved articles', () => {
+    expect(isBookmarkArticle({ feed: 'inbox' })).toBe(true);
+  });
+
+  test('does not detect regular feed articles as bookmarks', () => {
+    expect(isBookmarkArticle({ feed: 'Ars Technica' })).toBe(false);
+    expect(isBookmarkArticle({ feed: 'Hacker News' })).toBe(false);
+    expect(isBookmarkArticle({ domain: 'nytimes.com' })).toBe(false);
+  });
+});
+
+describe('editorial sections', () => {
+  let SECTION_MAP: Record<string, string>;
+  let SECTIONS: string[];
+  let resolveSection: (filename: string) => string;
+
+  beforeAll(() => {
+    const rootDir = join(__dirname, '..');
+    const utils = readFileSync(join(rootDir, 'viewer', '02-utils.js'), 'utf-8');
+    const fn = new Function(utils + '\nreturn { SECTION_MAP, SECTIONS, resolveSection };');
+    const fns = fn();
+    SECTION_MAP = fns.SECTION_MAP;
+    SECTIONS = fns.SECTIONS;
+    resolveSection = fns.resolveSection;
+  });
+
+  test('SECTIONS lists all 12 core sections', () => {
+    expect(SECTIONS).toEqual(['tech', 'news', 'science', 'health', 'business', 'culture', 'sports', 'food', 'lifestyle', 'environment', 'education', 'opinion']);
+  });
+
+  test('SECTION_MAP maps known tags to sections', () => {
+    expect(SECTION_MAP['artificialintelligence']).toBe('tech');
+    expect(SECTION_MAP['climatechange']).toBe('environment');
+    expect(SECTION_MAP['finance']).toBe('business');
+    expect(SECTION_MAP['music']).toBe('culture');
+    expect(SECTION_MAP['politics']).toBe('news');
+    expect(SECTION_MAP['medicine']).toBe('health');
+    expect(SECTION_MAP['football']).toBe('sports');
+    expect(SECTION_MAP['cooking']).toBe('food');
+    expect(SECTION_MAP['sustainability']).toBe('environment');
+    expect(SECTION_MAP['academia']).toBe('education');
+  });
+
+  test('resolveSection returns section from allNotesIndex annotation', () => {
+    (globalThis as any).allNotesIndex = { 'article.md': { machineTags: ['randomtag'], section: 'opinion' } };
+    expect(resolveSection('article.md')).toBe('opinion');
+    delete (globalThis as any).allNotesIndex;
+  });
+
+  test('resolveSection falls back to tag mapping when no annotation section', () => {
+    (globalThis as any).allNotesIndex = { 'article.md': { machineTags: ['artificialintelligence', 'openai'] } };
+    expect(resolveSection('article.md')).toBe('tech');
+    delete (globalThis as any).allNotesIndex;
+  });
+
+  test('resolveSection returns "other" when no tags match', () => {
+    (globalThis as any).allNotesIndex = { 'article.md': { machineTags: ['obscuretag'] } };
+    expect(resolveSection('article.md')).toBe('other');
+    delete (globalThis as any).allNotesIndex;
+  });
+
+  test('resolveSection returns "other" when article has no notes', () => {
+    (globalThis as any).allNotesIndex = {};
+    expect(resolveSection('article.md')).toBe('other');
+    delete (globalThis as any).allNotesIndex;
+  });
+
+  test('resolveSection picks most frequent section when tags span multiple', () => {
+    (globalThis as any).allNotesIndex = { 'article.md': { machineTags: ['programming', 'software', 'climatechange'] } };
+    expect(resolveSection('article.md')).toBe('tech');
+    delete (globalThis as any).allNotesIndex;
+  });
+
+  describe('allocateSectionSlots', () => {
+    let allocateSectionSlots: (sectionCounts: Record<string, number>, totalSlots: number) => Record<string, number>;
+
+    beforeAll(() => {
+      const rootDir = join(__dirname, '..');
+      const utils = readFileSync(join(rootDir, 'viewer', '02-utils.js'), 'utf-8');
+      const fn = new Function(utils + '\nreturn { allocateSectionSlots };');
+      allocateSectionSlots = fn().allocateSectionSlots;
+    });
+
+    test('gives every section with articles at least 1 slot', () => {
+      var result = allocateSectionSlots({ tech: 50, news: 2, science: 1 }, 10);
+      expect(result['tech']).toBeGreaterThanOrEqual(1);
+      expect(result['news']).toBeGreaterThanOrEqual(1);
+      expect(result['science']).toBeGreaterThanOrEqual(1);
+    });
+
+    test('caps any section at 40% of total slots', () => {
+      var result = allocateSectionSlots({ tech: 100, news: 5, science: 5 }, 10);
+      expect(result['tech']).toBeLessThanOrEqual(4);
+    });
+
+    test('total allocated slots equals totalSlots', () => {
+      var result = allocateSectionSlots({ tech: 30, news: 20, science: 15, business: 10, culture: 5 }, 20);
+      var total = Object.values(result).reduce((a: number, b: number) => a + b, 0);
+      expect(total).toBe(20);
+    });
+
+    test('empty sections get 0 slots', () => {
+      var result = allocateSectionSlots({ tech: 10, news: 0 }, 5);
+      expect(result['news']).toBe(0);
+    });
+
+    test('handles single section gracefully', () => {
+      var result = allocateSectionSlots({ tech: 50 }, 10);
+      expect(result['tech']).toBe(10);
+    });
+
+    test('handles more sections than slots', () => {
+      var result = allocateSectionSlots({ tech: 5, news: 5, science: 5, business: 5, culture: 5, opinion: 5, lifestyle: 5 }, 5);
+      var total = Object.values(result).reduce((a: number, b: number) => a + b, 0);
+      expect(total).toBe(5);
+      var nonZero = Object.values(result).filter((v: number) => v > 0).length;
+      expect(nonZero).toBe(5);
+    });
+  });
+});
+
+describe('For You section grouping', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('buildSectionRundown function exists in 15-graph.js', () => {
+    const graph = readFileSync(join(rootDir, 'viewer', '15-graph.js'), 'utf-8');
+    expect(graph).toMatch(/function\s+buildSectionRundown/);
+  });
+
+  test('buildSectionRundown uses resolveSection for classification', () => {
+    const graph = readFileSync(join(rootDir, 'viewer', '15-graph.js'), 'utf-8');
+    expect(graph).toContain('resolveSection');
+  });
+
+  test('buildSectionRundown uses allocateSectionSlots for proportional distribution', () => {
+    const graph = readFileSync(join(rootDir, 'viewer', '15-graph.js'), 'utf-8');
+    expect(graph).toContain('allocateSectionSlots');
+  });
+
+  test('buildSectionRundown returns objects with section, label, articles, totalCount', () => {
+    const graph = readFileSync(join(rootDir, 'viewer', '15-graph.js'), 'utf-8');
+    // Each result item should have these properties
+    expect(graph).toContain('.section');
+    expect(graph).toContain('.label');
+    expect(graph).toContain('.articles');
+    expect(graph).toContain('.totalCount');
+  });
+
+  test('buildSectionRundown processes core sections in SECTIONS order first', () => {
+    const graph = readFileSync(join(rootDir, 'viewer', '15-graph.js'), 'utf-8');
+    expect(graph).toContain('SECTIONS.slice()');
+  });
+});
+
+describe('For You section rendering', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('04-article.js has buildSectionRundownHtml function', () => {
+    const article = readFileSync(join(rootDir, 'viewer', '04-article.js'), 'utf-8');
+    expect(article).toMatch(/function\s+buildSectionRundownHtml/);
+  });
+
+  test('buildSectionRundownHtml uses buildSectionRundown data', () => {
+    const article = readFileSync(join(rootDir, 'viewer', '04-article.js'), 'utf-8');
+    expect(article).toContain('buildSectionRundown(');
+  });
+
+  test('section headers use section-header class', () => {
+    const article = readFileSync(join(rootDir, 'viewer', '04-article.js'), 'utf-8');
+    expect(article).toContain('section-header');
+  });
+
+  test('viewer.css styles section headers', () => {
+    const css = readFileSync(join(rootDir, 'viewer.css'), 'utf-8');
+    expect(css).toContain('.section-header');
+    expect(css).toContain('.section-title');
+  });
+
+  test('For You tab includes section rundown HTML', () => {
+    const article = readFileSync(join(rootDir, 'viewer', '04-article.js'), 'utf-8');
+    expect(article).toContain('buildSectionRundownHtml()');
+  });
+
+  test('section card onerror calls dashCardInitialHtml at runtime, not pre-rendered', () => {
+    const article = readFileSync(join(rootDir, 'viewer', '04-article.js'), 'utf-8');
+    // Extract the buildSectionRundownHtml function body
+    const fnMatch = article.match(/function buildSectionRundownHtml\b[\s\S]*?^}/m);
+    expect(fnMatch).toBeTruthy();
+    const fnBody = fnMatch![0];
+    // The onerror should call dashCardInitialHtml as a function (runtime call pattern)
+    // NOT pre-render it and embed raw HTML with unescaped quotes in the attribute
+    expect(fnBody).toMatch(/onerror="this\.outerHTML=dashCardInitialHtml\(/);
+    expect(fnBody).not.toContain("dashCardInitialHtml(a.domain, 80).replace");
+  });
+});
+
+describe('Tags tab section grouping', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('buildTagsTabHtml groups tags under section headings', () => {
+    const explore = readFileSync(join(rootDir, 'viewer', '10-explore.js'), 'utf-8');
+    expect(explore).toContain('section-header');
+    expect(explore).toContain('SECTION_LABELS');
+  });
+
+  test('Tags grouped by SECTION_MAP lookup', () => {
+    const explore = readFileSync(join(rootDir, 'viewer', '10-explore.js'), 'utf-8');
+    expect(explore).toContain('SECTION_MAP');
+  });
+
+  test('section groups are collapsible', () => {
+    const explore = readFileSync(join(rootDir, 'viewer', '10-explore.js'), 'utf-8');
+    expect(explore).toContain('section-collapse');
+  });
+
+  test('CSS supports section collapse', () => {
+    const css = readFileSync(join(rootDir, 'viewer.css'), 'utf-8');
+    expect(css).toContain('.section-group.collapsed .section-body');
+    expect(css).toContain('.section-chevron');
+  });
+});
+
+describe('Explore section badges', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('topic cluster cards include section badges', () => {
+    const explore = readFileSync(join(rootDir, 'viewer', '10-explore.js'), 'utf-8');
+    expect(explore).toContain('section-badge');
+  });
+
+  test('section badge determined from cluster tags via SECTION_MAP', () => {
+    const explore = readFileSync(join(rootDir, 'viewer', '10-explore.js'), 'utf-8');
+    // The cluster section detection should use SECTION_MAP
+    const badgeSection = explore.indexOf('section-badge');
+    const sectionMapRef = explore.indexOf('SECTION_MAP', badgeSection - 200);
+    expect(sectionMapRef).toBeGreaterThan(-1);
+  });
+
+  test('viewer.css styles section badges', () => {
+    const css = readFileSync(join(rootDir, 'viewer.css'), 'utf-8');
+    expect(css).toContain('.section-badge');
+  });
+});
+
+describe('discovered sections', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('discoverSections function exists in 15-graph.js', () => {
+    const graph = readFileSync(join(rootDir, 'viewer', '15-graph.js'), 'utf-8');
+    expect(graph).toMatch(/function\s+discoverSections/);
+  });
+
+  test('discoverSections filters to articles in "other" section', () => {
+    const graph = readFileSync(join(rootDir, 'viewer', '15-graph.js'), 'utf-8');
+    expect(graph).toContain('resolveSection');
+    expect(graph).toContain("=== 'other'");
+  });
+
+  test('discoverSections skips mapped and blocked tags', () => {
+    const graph = readFileSync(join(rootDir, 'viewer', '15-graph.js'), 'utf-8');
+    expect(graph).toContain('SECTION_MAP');
+    expect(graph).toContain('blockedTags');
+  });
+
+  test('discoverSections returns objects with id, label, articleFilenames', () => {
+    const graph = readFileSync(join(rootDir, 'viewer', '15-graph.js'), 'utf-8');
+    expect(graph).toContain('.id');
+    expect(graph).toContain('.label');
+    expect(graph).toContain('.articleFilenames');
+  });
+
+  test('buildSectionRundown integrates discoverSections', () => {
+    const graph = readFileSync(join(rootDir, 'viewer', '15-graph.js'), 'utf-8');
+    expect(graph).toContain('discoverSections');
+    // Should appear in buildSectionRundown
+    var rundownIdx = graph.indexOf('function buildSectionRundown');
+    var discoverIdx = graph.indexOf('discoverSections', rundownIdx);
+    expect(discoverIdx).toBeGreaterThan(rundownIdx);
   });
 });

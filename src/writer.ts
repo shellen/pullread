@@ -14,12 +14,15 @@ export interface ArticleData {
   feed?: string;
   annotation?: string;
   enclosure?: Enclosure;
+  videoEnclosure?: Enclosure;
   author?: string;
   excerpt?: string;
   thumbnail?: string;
   lang?: string;
   categories?: string[];
   source?: string;
+  commentsUrl?: string;
+  commentCount?: number;
 }
 
 export function generateFilename(title: string, bookmarkedAt: string): string {
@@ -86,6 +89,19 @@ domain: ${data.domain}`;
     if (data.enclosure.duration) {
       frontmatter += `\nenclosure_duration: "${data.enclosure.duration}"`;
     }
+  }
+
+  if (data.videoEnclosure) {
+    frontmatter += `\nvideo_enclosure_url: ${data.videoEnclosure.url}`;
+    frontmatter += `\nvideo_enclosure_type: ${data.videoEnclosure.type}`;
+  }
+
+  if (data.commentsUrl) {
+    frontmatter += `\ncomments_url: ${data.commentsUrl}`;
+  }
+
+  if (data.commentCount != null) {
+    frontmatter += `\ncomment_count: ${data.commentCount}`;
   }
 
   if (data.source) {

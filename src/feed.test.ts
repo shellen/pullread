@@ -1490,3 +1490,322 @@ describe('parseFeed - Atom link blog (Sippey.com style)', () => {
     expect(entries[0].contentHtml).toContain('NYT nails it');
   });
 });
+
+describe('parseFeed - video podcast support', () => {
+  test('extracts video enclosure from podcast:alternateEnclosure', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"
+     xmlns:podcast="https://podcastindex.org/namespace/1.0">
+  <channel>
+    <title>Video Show</title>
+    <item>
+      <title>Episode With Video Alt</title>
+      <link>https://podcast.com/ep1</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <enclosure url="https://cdn.example.com/ep1.mp3" type="audio/mpeg" length="5000000"/>
+      <itunes:duration>00:30:00</itunes:duration>
+      <podcast:alternateEnclosure type="video/mp4" length="50000000">
+        <podcast:source uri="https://cdn.example.com/ep1.mp4"/>
+      </podcast:alternateEnclosure>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries).toHaveLength(1);
+    // Primary enclosure should be audio
+    expect(entries[0].enclosure).toBeDefined();
+    expect(entries[0].enclosure!.type).toBe('audio/mpeg');
+    // Video enclosure should be separate
+    expect(entries[0].videoEnclosure).toBeDefined();
+    expect(entries[0].videoEnclosure!.url).toBe('https://cdn.example.com/ep1.mp4');
+    expect(entries[0].videoEnclosure!.type).toBe('video/mp4');
+  });
+
+  test('extracts video enclosure from media:content with medium="video"', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"
+     xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <title>Media Video Show</title>
+    <item>
+      <title>Episode With Media Video</title>
+      <link>https://podcast.com/ep2</link>
+      <pubDate>Tue, 30 Jan 2024 12:00:00 GMT</pubDate>
+      <enclosure url="https://cdn.example.com/ep2.mp3" type="audio/mpeg"/>
+      <media:content url="https://cdn.example.com/ep2.mp4" type="video/mp4" medium="video" fileSize="80000000"/>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].enclosure!.type).toBe('audio/mpeg');
+    expect(entries[0].videoEnclosure).toBeDefined();
+    expect(entries[0].videoEnclosure!.url).toBe('https://cdn.example.com/ep2.mp4');
+    expect(entries[0].videoEnclosure!.type).toBe('video/mp4');
+  });
+
+  test('clears videoEnclosure when primary enclosure is already video', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>Video-Only Podcast</title>
+    <item>
+      <title>Video Episode</title>
+      <link>https://podcast.com/ep3</link>
+      <pubDate>Wed, 31 Jan 2024 12:00:00 GMT</pubDate>
+      <enclosure url="https://cdn.example.com/ep3.mp4" type="video/mp4" length="100000000"/>
+      <itunes:duration>01:00:00</itunes:duration>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].enclosure).toBeDefined();
+    expect(entries[0].enclosure!.type).toBe('video/mp4');
+    expect(entries[0].enclosure!.url).toBe('https://cdn.example.com/ep3.mp4');
+    // No separate videoEnclosure since primary IS video
+    expect(entries[0].videoEnclosure).toBeUndefined();
+  });
+
+  test('JSON Feed separates audio and video attachments', () => {
+    const feed = JSON.stringify({
+      version: 'https://jsonfeed.org/version/1.1',
+      title: 'JSON Video Podcast',
+      items: [{
+        id: 'ep1',
+        title: 'Episode With Both',
+        url: 'https://podcast.com/ep1',
+        date_published: '2024-01-29T12:00:00Z',
+        attachments: [
+          { url: 'https://cdn.example.com/ep1.mp3', mime_type: 'audio/mpeg', duration_in_seconds: 1800 },
+          { url: 'https://cdn.example.com/ep1.mp4', mime_type: 'video/mp4', size_in_bytes: 50000000 }
+        ]
+      }]
+    });
+    const entries = parseFeed(feed);
+    expect(entries[0].enclosure!.url).toBe('https://cdn.example.com/ep1.mp3');
+    expect(entries[0].enclosure!.type).toBe('audio/mpeg');
+    expect(entries[0].videoEnclosure).toBeDefined();
+    expect(entries[0].videoEnclosure!.url).toBe('https://cdn.example.com/ep1.mp4');
+    expect(entries[0].videoEnclosure!.type).toBe('video/mp4');
+  });
+
+  test('JSON Feed promotes video-only attachment to primary enclosure', () => {
+    const feed = JSON.stringify({
+      version: 'https://jsonfeed.org/version/1.1',
+      title: 'Video-Only JSON Podcast',
+      items: [{
+        id: 'ep1',
+        title: 'Video Only',
+        url: 'https://podcast.com/ep1',
+        date_published: '2024-01-29T12:00:00Z',
+        attachments: [
+          { url: 'https://cdn.example.com/ep1.mp4', mime_type: 'video/mp4', size_in_bytes: 50000000 }
+        ]
+      }]
+    });
+    const entries = parseFeed(feed);
+    expect(entries[0].enclosure).toBeDefined();
+    expect(entries[0].enclosure!.url).toBe('https://cdn.example.com/ep1.mp4');
+    expect(entries[0].enclosure!.type).toBe('video/mp4');
+    // Promoted to primary, so no separate videoEnclosure
+    expect(entries[0].videoEnclosure).toBeUndefined();
+  });
+
+  test('handles podcast:alternateEnclosure with @_url attribute', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:podcast="https://podcastindex.org/namespace/1.0">
+  <channel>
+    <title>Alt URL Show</title>
+    <item>
+      <title>Alt URL Episode</title>
+      <link>https://podcast.com/ep4</link>
+      <pubDate>Thu, 01 Feb 2024 12:00:00 GMT</pubDate>
+      <enclosure url="https://cdn.example.com/ep4.mp3" type="audio/mpeg"/>
+      <podcast:alternateEnclosure type="video/mp4" url="https://cdn.example.com/ep4.mp4"/>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].videoEnclosure).toBeDefined();
+    expect(entries[0].videoEnclosure!.url).toBe('https://cdn.example.com/ep4.mp4');
+  });
+
+  test('ignores non-video alternateEnclosure types', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:podcast="https://podcastindex.org/namespace/1.0">
+  <channel>
+    <title>Audio Alt Show</title>
+    <item>
+      <title>Audio Alt Episode</title>
+      <link>https://podcast.com/ep5</link>
+      <pubDate>Fri, 02 Feb 2024 12:00:00 GMT</pubDate>
+      <enclosure url="https://cdn.example.com/ep5.mp3" type="audio/mpeg"/>
+      <podcast:alternateEnclosure type="audio/flac">
+        <podcast:source uri="https://cdn.example.com/ep5.flac"/>
+      </podcast:alternateEnclosure>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].enclosure!.type).toBe('audio/mpeg');
+    expect(entries[0].videoEnclosure).toBeUndefined();
+  });
+
+  test('recognizes HLS application/x-mpegURL as video in alternateEnclosure', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:podcast="https://podcastindex.org/namespace/1.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>HLS Video Show</title>
+    <item>
+      <title>HLS Episode</title>
+      <link>https://podcast.com/hls-ep</link>
+      <pubDate>Mon, 05 Feb 2024 12:00:00 GMT</pubDate>
+      <enclosure url="https://cdn.example.com/hls-ep.mp3" type="audio/mpeg"/>
+      <podcast:alternateEnclosure type="application/x-mpegURL">
+        <podcast:source uri="https://cdn.example.com/hls-ep/master.m3u8"/>
+      </podcast:alternateEnclosure>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].enclosure!.type).toBe('audio/mpeg');
+    expect(entries[0].videoEnclosure).toBeDefined();
+    expect(entries[0].videoEnclosure!.url).toBe('https://cdn.example.com/hls-ep/master.m3u8');
+    expect(entries[0].videoEnclosure!.type).toBe('application/x-mpegURL');
+  });
+
+  test('recognizes HLS application/vnd.apple.mpegurl as video in alternateEnclosure', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:podcast="https://podcastindex.org/namespace/1.0">
+  <channel>
+    <title>Apple HLS Show</title>
+    <item>
+      <title>Apple HLS Episode</title>
+      <link>https://podcast.com/apple-hls</link>
+      <pubDate>Tue, 06 Feb 2024 12:00:00 GMT</pubDate>
+      <enclosure url="https://cdn.example.com/apple-hls.mp3" type="audio/mpeg"/>
+      <podcast:alternateEnclosure type="application/vnd.apple.mpegurl" url="https://cdn.example.com/apple-hls/stream.m3u8"/>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].videoEnclosure).toBeDefined();
+    expect(entries[0].videoEnclosure!.url).toBe('https://cdn.example.com/apple-hls/stream.m3u8');
+    expect(entries[0].videoEnclosure!.type).toBe('application/vnd.apple.mpegurl');
+  });
+
+  test('recognizes HLS type in media:content', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <title>Media HLS Show</title>
+    <item>
+      <title>Media HLS Episode</title>
+      <link>https://podcast.com/media-hls</link>
+      <pubDate>Wed, 07 Feb 2024 12:00:00 GMT</pubDate>
+      <enclosure url="https://cdn.example.com/media-hls.mp3" type="audio/mpeg"/>
+      <media:content url="https://cdn.example.com/media-hls/stream.m3u8" type="application/x-mpegURL"/>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].videoEnclosure).toBeDefined();
+    expect(entries[0].videoEnclosure!.url).toBe('https://cdn.example.com/media-hls/stream.m3u8');
+  });
+
+  test('HLS primary enclosure is not duplicated as videoEnclosure', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>HLS Primary Show</title>
+    <item>
+      <title>HLS Only Episode</title>
+      <link>https://podcast.com/hls-only</link>
+      <pubDate>Thu, 08 Feb 2024 12:00:00 GMT</pubDate>
+      <enclosure url="https://cdn.example.com/stream.m3u8" type="application/x-mpegURL"/>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].enclosure!.type).toBe('application/x-mpegURL');
+    expect(entries[0].videoEnclosure).toBeUndefined();
+  });
+});
+
+describe('parseFeed - comment extraction', () => {
+  test('RSS feed with <comments> URL', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Blog</title>
+    <item>
+      <title>Post With Comments</title>
+      <link>https://example.com/post</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <comments>https://example.com/post#comments</comments>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].commentsUrl).toBe('https://example.com/post#comments');
+    expect(entries[0].commentCount).toBeUndefined();
+  });
+
+  test('RSS feed with <slash:comments> count', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:slash="http://purl.org/rss/1.0/modules/slash/">
+  <channel>
+    <title>Blog</title>
+    <item>
+      <title>Popular Post</title>
+      <link>https://example.com/popular</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <slash:comments>42</slash:comments>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].commentCount).toBe(42);
+  });
+
+  test('RSS feed with both comments URL and count', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:slash="http://purl.org/rss/1.0/modules/slash/">
+  <channel>
+    <title>Blog</title>
+    <item>
+      <title>Hot Post</title>
+      <link>https://example.com/hot</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <comments>https://example.com/hot#respond</comments>
+      <slash:comments>99</slash:comments>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].commentsUrl).toBe('https://example.com/hot#respond');
+    expect(entries[0].commentCount).toBe(99);
+  });
+
+  test('Atom feed with link rel="replies" and thr:count', () => {
+    const feed = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:thr="http://purl.org/syndication/thread/1.0">
+  <title>Atom Blog</title>
+  <entry>
+    <title>Discussed Entry</title>
+    <link href="https://example.com/discussed"/>
+    <id>urn:uuid:abc123</id>
+    <updated>2024-01-29T12:00:00Z</updated>
+    <link rel="replies" type="text/html" href="https://example.com/discussed#comments" thr:count="5"/>
+  </entry>
+</feed>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].commentsUrl).toBe('https://example.com/discussed#comments');
+    expect(entries[0].commentCount).toBe(5);
+  });
+
+  test('feeds without comment elements have undefined fields', () => {
+    const entries = parseFeed(RSS_FEED);
+    expect(entries[0].commentsUrl).toBeUndefined();
+    expect(entries[0].commentCount).toBeUndefined();
+  });
+});

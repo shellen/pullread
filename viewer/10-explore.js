@@ -157,6 +157,18 @@ function buildTagsTabHtml(data) {
     for (var ci = 0; ci < clusterLimit; ci++) {
       var cluster = clusters[ci];
       html += '<div class="topic-cluster">';
+      // Determine cluster's dominant section
+      var clusterSections = {};
+      for (var cti2 = 0; cti2 < cluster.tags.length; cti2++) {
+        var cs = SECTION_MAP[cluster.tags[cti2]];
+        if (cs) clusterSections[cs] = (clusterSections[cs] || 0) + 1;
+      }
+      var clusterSection = 'other';
+      var bestSC = 0;
+      for (var csKey in clusterSections) {
+        if (clusterSections[csKey] > bestSC) { clusterSection = csKey; bestSC = clusterSections[csKey]; }
+      }
+      html += '<span class="section-badge">' + escapeHtml(SECTION_LABELS[clusterSection] || 'Other') + '</span>';
       html += '<div class="topic-cluster-tags">';
       for (var cti = 0; cti < cluster.tags.length; cti++) {
         html += '<span class="tag-pill tag-pill-sm">' + escapeHtml(cluster.tags[cti]) + '</span>';
@@ -176,7 +188,53 @@ function buildTagsTabHtml(data) {
     html += '</div>';
   }
 
-  html += buildTagsHtml(data);
+  // Group tags by editorial section
+  var tagsBySection = {};
+  for (var ti = 0; ti < data.sortedTags.length; ti++) {
+    var tagEntry = data.sortedTags[ti];
+    var tagName = tagEntry[0];
+    var sec = SECTION_MAP[tagName] || 'other';
+    if (!tagsBySection[sec]) tagsBySection[sec] = [];
+    tagsBySection[sec].push(tagEntry);
+  }
+
+  // Render sections in order (core sections + other)
+  var sectionOrder = SECTIONS.concat(['other']);
+  for (var si = 0; si < sectionOrder.length; si++) {
+    var sec = sectionOrder[si];
+    var tags = tagsBySection[sec];
+    if (!tags || tags.length === 0) continue;
+    var totalInSection = 0;
+    for (var ci = 0; ci < tags.length; ci++) totalInSection += tags[ci][1];
+
+    html += '<div class="section-group">';
+    html += '<div class="section-header section-collapse" onclick="this.parentNode.classList.toggle(\'collapsed\')">';
+    html += '<h3 class="section-title">' + escapeHtml(SECTION_LABELS[sec] || 'Other') + '</h3>';
+    html += '<span class="section-count">' + totalInSection + ' article' + (totalInSection !== 1 ? 's' : '') + '</span>';
+    html += '<svg class="icon icon-sm section-chevron" aria-hidden="true"><use href="#i-chevron-down"/></svg>';
+    html += '</div>';
+    html += '<div class="section-body">';
+    html += '<div class="explore-tags">';
+    for (var ti2 = 0; ti2 < tags.length; ti2++) {
+      var tag = tags[ti2][0];
+      var count = tags[ti2][1];
+      if (isTagBlocked(tag)) continue;
+      html += '<button class="tag-pill" onclick="document.getElementById(\'search\').value=\'tag:\\x22' + escapeJsStr(tag) + '\\x22\';filterFiles()">';
+      html += escapeHtml(tag) + ' <span class="tag-count">' + count + '</span>';
+      html += '</button>';
+    }
+    html += '</div></div></div>';
+  }
+
+  // Blocked tags
+  if (blockedTags.size > 0) {
+    html += '<h3 style="font-size:13px;font-weight:600;margin:24px 0 8px;color:var(--muted)">Blocked Tags</h3>';
+    html += '<div class="tag-cloud">';
+    blockedTags.forEach(function(tag) {
+      html += '<button class="tag-pill tag-pill-blocked" onclick="unblockTag(\'' + escapeJsStr(tag) + '\');goHome()">' + escapeHtml(tag) + ' <span style="opacity:0.6">unblock</span></button>';
+    });
+    html += '</div>';
+  }
 
   return html;
 }

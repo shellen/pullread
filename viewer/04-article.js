@@ -45,6 +45,9 @@ function renderHub() {
   // Daily Rundown — topic briefing cards
   forYouHtml += buildDailyRundownHtml();
 
+  // Section Rundown — articles grouped by editorial section
+  forYouHtml += buildSectionRundownHtml();
+
   // Continue Reading
   var positions = JSON.parse(localStorage.getItem('pr-scroll-positions') || '{}');
   var continueReading = allFiles.filter(function(f) {
@@ -348,6 +351,41 @@ function buildDailyRundownHtml() {
   return html;
 }
 
+function buildSectionRundownHtml() {
+  var sections = buildSectionRundown();
+  if (sections.length === 0) return '';
+
+  var html = '<div class="section-rundown">';
+  for (var si = 0; si < sections.length; si++) {
+    var sec = sections[si];
+    html += '<div class="dash-section">';
+    html += '<div class="section-header">';
+    html += '<h3 class="section-title">' + escapeHtml(sec.label) + '</h3>';
+    html += '<span class="section-count">' + sec.totalCount + ' article' + (sec.totalCount !== 1 ? 's' : '') + '</span>';
+    html += '</div>';
+
+    html += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards dash-cards-compact">';
+    for (var ai = 0; ai < sec.articles.length; ai++) {
+      var a = sec.articles[ai];
+      var onclick = 'dashLoadArticle(\'' + escapeJsStr(a.filename) + '\')';
+      html += '<div class="dash-card dash-card-compact" onclick="' + onclick + '">';
+      if (a.image) {
+        html += '<img class="dash-card-img" src="' + escapeHtml(a.image) + '" alt="" loading="lazy" onerror="this.outerHTML=dashCardInitialHtml(\'' + escapeHtml(a.domain || '').replace(/'/g, "\\'") + '\',80)">';
+      } else {
+        html += dashCardInitialHtml(a.domain, 80);
+      }
+      html += '<div class="dash-card-body">';
+      html += '<div class="dash-card-title">' + escapeHtml(a.title) + '</div>';
+      html += '<div class="dash-card-meta">' + escapeHtml(a.domain || a.feed || '') + (a.bookmarked ? ' &middot; ' + timeAgo(a.bookmarked) : '') + '</div>';
+      html += '</div></div>';
+    }
+    html += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div>';
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
 function dashCardInitialHtml(name, height) {
   var c = sourceColor(name);
   var initial = (name || '?').charAt(0).toUpperCase();
@@ -535,7 +573,7 @@ function renderArticle(text, filename) {
 
     // Favicon: for podcasts with artwork, show artwork; otherwise show domain favicon
     var initials = (pubName || meta.domain).replace(/^(the |www\.)/i, '').slice(0, 2).toUpperCase();
-    var hasPodcastArt = meta.thumbnail && meta.enclosure_type && meta.enclosure_type.startsWith('audio/');
+    var hasPodcastArt = meta.thumbnail && isMediaEnclosure(meta.enclosure_type);
     var faviconHtml;
     if (hasPodcastArt) {
       faviconHtml = '<div class="pub-favicon pub-favicon-art">'
@@ -548,7 +586,8 @@ function renderArticle(text, filename) {
     }
 
     html += '<div class="pub-bar">';
-    html += '<a class="pub-identity" href="' + escapeHtml(sourceHref) + '" target="_blank" rel="noopener" title="Visit ' + escapeHtml(meta.domain) + '">';
+    var sourceName = pubName || pubDomain || meta.domain;
+    html += '<a class="pub-identity" href="' + escapeHtml(sourceHref) + '" onclick="event.preventDefault();browseSource(\'' + escapeJsStr(sourceName) + '\')" title="Browse ' + escapeHtml(sourceName) + '">';
     html += faviconHtml;
     html += '<div>';
     if (pubName && pubDomain) {
@@ -588,6 +627,12 @@ function renderArticle(text, filename) {
     metaLineParts.push('<span class="author" onclick="searchByAuthor(\'' + escapeHtml(authorText).replace(/'/g, "\\'") + '\')" title="Search for articles by this author">' + escapeHtml(authorText) + '</span>');
   }
   if (meta && meta.bookmarked) metaLineParts.push('<span title="' + escapeHtml(timeAgoTitle(meta.bookmarked)) + '">' + escapeHtml(timeAgo(meta.bookmarked)) + '</span>');
+  if (meta && meta.comments_url) {
+    var commentLabel = meta.comment_count && meta.comment_count !== '0'
+      ? meta.comment_count + ' comment' + (meta.comment_count !== '1' ? 's' : '')
+      : 'Comments';
+    metaLineParts.push('<a href="#" onclick="prOpenExternal(\'' + escapeJsStr(meta.comments_url) + '\');return false" class="comments-link" title="View comments">' + escapeHtml(commentLabel) + '</a>');
+  }
   if (metaLineParts.length) {
     html += '<div class="article-meta">' + metaLineParts.join('<span class="sep">&middot;</span>') + '</div>';
   }
@@ -605,8 +650,9 @@ function renderArticle(text, filename) {
   const isFav = articleNotes.isFavorite;
   toolbarActions += '<button onclick="toggleFavoriteFromHeader(this)" class="toolbar-action-btn' + (isFav ? ' active-fav' : '') + '" aria-label="' + (isFav ? 'Remove star' : 'Star article') + '" aria-pressed="' + isFav + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg><span class="toolbar-action-label"> Star</span></button>';
   toolbarActions += '<button onclick="markCurrentAsRead()" class="toolbar-action-btn" aria-label="Mark read"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-eye-slash"/></svg><span class="toolbar-action-label"> Mark read</span></button>';
-  var isPodcast = meta && meta.enclosure_url && meta.enclosure_type && meta.enclosure_type.startsWith('audio/');
-  var listenLabel = isPodcast ? 'Play' : 'Listen';
+  var isPodcast = meta && meta.enclosure_url && isMediaEnclosure(meta.enclosure_type);
+  var isVideo = meta && isVideoEnclosure(meta.enclosure_type);
+  var listenLabel = isVideo ? 'Watch' : isPodcast ? 'Play' : 'Listen';
   toolbarActions += '<div class="play-next-menu" id="play-next-menu">';
   toolbarActions += '<button id="listen-btn" onclick="addCurrentToTTSQueue()" class="toolbar-action-btn" aria-label="' + listenLabel + ' article"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg><span class="toolbar-action-label"> ' + listenLabel + '</span></button>';
   toolbarActions += '<button class="play-next-trigger" id="play-next-trigger" onclick="togglePlayNextMenu(event)" aria-label="Queue options" style="display:none"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>';
@@ -642,18 +688,17 @@ function renderArticle(text, filename) {
   }
 
   // YouTube embed: detect from frontmatter and inject responsive iframe
-  const isYouTube = meta && meta.domain && /youtube\.com|youtu\.be|m\.youtube\.com/.test(meta.domain);
+  const isYouTube = meta && meta.domain && isYouTubeDomain(meta.domain);
   if (isYouTube && meta.url) {
-    var ytId = null;
-    try {
-      var ytUrl = new URL(meta.url);
-      if (ytUrl.hostname === 'youtu.be') ytId = ytUrl.pathname.slice(1).split('/')[0];
-      else if (ytUrl.searchParams.get('v')) ytId = ytUrl.searchParams.get('v');
-      else { var em = ytUrl.pathname.match(/\/(embed|v)\/([^/?]+)/); if (em) ytId = em[2]; }
-    } catch {}
+    var ytId = extractYouTubeVideoId(meta.url);
     if (ytId) {
-      html += '<div class="yt-embed"><iframe src="https://www.youtube.com/embed/' + encodeURIComponent(ytId)
+      var isShort = meta.url.indexOf('/shorts/') >= 0;
+      html += '<div class="yt-embed' + (isShort ? ' yt-vertical' : '') + '" data-yt-id="' + escapeHtml(ytId) + '"><iframe src="https://www.youtube.com/embed/' + encodeURIComponent(ytId)
         + '" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy" title="Embedded video"></iframe></div>';
+      html += '<div class="video-controls">';
+      html += '<button onclick="addCurrentToTTSQueue()" class="video-controls-btn"><svg style="width:14px;height:14px"><use href="#i-play"/></svg> Play</button>';
+      html += '<button onclick="popOutCurrentYouTube()" class="video-controls-btn"><svg style="width:14px;height:14px"><use href="#i-external"/></svg> Pop out</button>';
+      html += '</div>';
     }
   }
 
@@ -677,16 +722,39 @@ function renderArticle(text, filename) {
     }
   }
 
-  // Podcast: show podcast info banner (audio plays through unified bottom bar)
+  // Podcast/video episode layout
   if (isPodcast) {
-    html += '<div class="podcast-player">';
-    html += '<svg style="width:16px;height:16px;fill:var(--muted);flex-shrink:0"><use href="#i-mic"/></svg>';
-    html += '<span style="font-size:13px;color:var(--fg)">Podcast episode</span>';
-    if (meta.enclosure_duration) {
-      html += '<span class="podcast-duration">' + escapeHtml(meta.enclosure_duration) + '</span>';
+    if (isVideo && meta.enclosure_url) {
+      // Video episodes: inline player first, controls row below
+      var posterHtml = meta.thumbnail ? ' poster="' + escapeHtml(meta.thumbnail) + '"' : '';
+      html += '<div class="video-inline-player">';
+      html += '<video controls preload="metadata"' + posterHtml + '>';
+      html += '<source src="' + escapeHtml(meta.enclosure_url) + '">';
+      html += '</video>';
+      html += '</div>';
+      html += '<div class="video-controls">';
+      html += '<button onclick="addCurrentToTTSQueue()" class="video-controls-btn"><svg style="width:14px;height:14px"><use href="#i-play"/></svg> Play</button>';
+      html += '<button onclick="popOutCurrentVideo()" class="video-controls-btn"><svg style="width:14px;height:14px"><use href="#i-external"/></svg> Pop out</button>';
+      if (meta.enclosure_duration) {
+        html += '<span class="podcast-duration" style="margin-left:auto">' + escapeHtml(meta.enclosure_duration) + '</span>';
+      }
+      html += '</div>';
+    } else {
+      // Audio podcasts: banner with icon, label, duration, play button
+      html += '<div class="podcast-player">';
+      html += '<svg style="width:16px;height:16px;fill:var(--muted);flex-shrink:0"><use href="#i-mic"/></svg>';
+      html += '<span style="font-size:13px;color:var(--fg)">Podcast episode</span>';
+      if (meta.enclosure_duration) {
+        html += '<span class="podcast-duration">' + escapeHtml(meta.enclosure_duration) + '</span>';
+      }
+      html += '<button onclick="addCurrentToTTSQueue()" style="margin-left:auto;padding:4px 12px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--link);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">Play in player</button>';
+      // Audio podcast that also has a video version
+      var fileInfo = activeFile && allFiles.find(function(af) { return af.filename === activeFile; });
+      if (fileInfo && fileInfo.videoEnclosureUrl) {
+        html += '<button onclick="openVideoVersion()" style="padding:4px 12px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--link);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">Watch video</button>';
+      }
+      html += '</div>';
     }
-    html += '<button onclick="addCurrentToTTSQueue()" style="margin-left:auto;padding:4px 12px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--link);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">Play in player</button>';
-    html += '</div>';
     // Show podcast description in a collapsible section instead of as article body
     if (body && body.trim()) {
       html += '<details class="podcast-description" open><summary>Episode description</summary>';
@@ -802,6 +870,12 @@ function renderArticle(text, filename) {
 
   content.innerHTML = html;
   document.title = (meta && meta.title) || filename || 'PullRead';
+
+  // Attach HLS.js to inline video player if source is an HLS stream
+  var inlineVideo = content.querySelector('.video-inline-player video');
+  if (inlineVideo && meta && isHlsSource(meta.enclosure_url)) {
+    attachHls(inlineVideo, meta.enclosure_url);
+  }
 
   // Populate related reading asynchronously
   populateRelatedReading(filename);
@@ -1000,6 +1074,46 @@ function localizeReviewLinks(container) {
     ext.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-external"/></svg>';
     ext.onclick = function(e) { e.stopPropagation(); };
     a.parentElement.appendChild(ext);
+  });
+}
+
+// Open the current video episode in a pop-out player window
+function popOutCurrentVideo() {
+  var file = activeFile && allFiles.find(function(f) { return f.filename === activeFile; });
+  if (!file || !file.enclosureUrl || !isVideoEnclosure(file.enclosureType)) return;
+  playVideoPopout({
+    title: file.title || 'Video',
+    enclosureUrl: file.enclosureUrl,
+    enclosureType: file.enclosureType,
+    image: file.image || '',
+    filename: activeFile,
+  });
+}
+
+// Open the current YouTube video in a pop-out player window
+function popOutCurrentYouTube() {
+  var file = activeFile && allFiles.find(function(f) { return f.filename === activeFile; });
+  if (!file) return;
+  var ytId = extractYouTubeVideoId(file.url);
+  if (!ytId) return;
+  playYouTubePopout({
+    title: file.title || 'Video',
+    youtubeVideoId: ytId,
+    image: 'https://img.youtube.com/vi/' + ytId + '/hqdefault.jpg',
+    filename: activeFile,
+  });
+}
+
+// Open the video version of a podcast that has both audio and video enclosures
+function openVideoVersion() {
+  var file = activeFile && allFiles.find(function(f) { return f.filename === activeFile; });
+  if (!file || !file.videoEnclosureUrl) return;
+  playVideoPopout({
+    title: file.title || 'Video',
+    enclosureUrl: file.videoEnclosureUrl,
+    enclosureType: file.videoEnclosureType || 'video/mp4',
+    image: file.image || '',
+    filename: activeFile,
   });
 }
 

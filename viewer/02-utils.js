@@ -1,3 +1,62 @@
+// ABOUTME: Shared utility functions for the viewer — media detection, time formatting, search, sections
+// ABOUTME: Used by sidebar, article, explore, and graph modules via concatenated global scope
+// Bookmark service detection — match specific feed URL patterns, not just domains,
+// to avoid false-matching service blogs or marketing pages
+function isBookmarkServiceUrl(feedUrl) {
+  if (!feedUrl) return false;
+  var lower = feedUrl.toLowerCase();
+  // Instapaper: /rss/{id}/{token} or /archive/rss/{id}/{token}
+  if (lower.indexOf('instapaper.com/rss/') !== -1) return true;
+  if (lower.indexOf('instapaper.com/archive/rss/') !== -1) return true;
+  // Pinboard: dedicated feed subdomain feeds.pinboard.in
+  if (lower.indexOf('feeds.pinboard.in') !== -1) return true;
+  // Raindrop.io: collection feeds (exclude blog.raindrop.io)
+  if (lower.indexOf('raindrop.io') !== -1 && lower.indexOf('blog.raindrop.io') === -1) return true;
+  // Drafty link feeds: drafty.com/@username/links/*
+  if (/drafty\.com\/@[^/]+\/links/i.test(feedUrl)) return true;
+  return false;
+}
+
+// Global set of feed names that are bookmark services (populated at init from config)
+var _bookmarkFeedNames = new Set();
+
+function isBookmarkArticle(f) {
+  var feed = f.feed || f.domain || '';
+  return feed === 'import' || feed === 'inbox' || _bookmarkFeedNames.has(feed);
+}
+
+// Media enclosure type helpers — shared across article, sidebar, and TTS
+function isAudioEnclosure(type) { return !!(type && type.startsWith('audio/')); }
+function isVideoEnclosure(type) {
+  if (!type) return false;
+  var lower = type.toLowerCase();
+  return lower.startsWith('video/') || lower === 'application/x-mpegurl' || lower === 'application/vnd.apple.mpegurl';
+}
+function isMediaEnclosure(type) { return isAudioEnclosure(type) || isVideoEnclosure(type); }
+function isHlsSource(url) {
+  if (!url) return false;
+  var lower = url.toLowerCase();
+  return lower.endsWith('.m3u8') || lower.includes('.m3u8?');
+}
+
+function extractYouTubeVideoId(url) {
+  if (!url) return null;
+  try {
+    var u = new URL(url);
+    var host = u.hostname.replace(/^www\./, '').replace(/^m\./, '');
+    if (host === 'youtu.be') return u.pathname.slice(1).split(/[/?]/)[0] || null;
+    if (host !== 'youtube.com') return null;
+    if (u.searchParams.get('v')) return u.searchParams.get('v');
+    var m = u.pathname.match(/^\/(embed|v|shorts)\/([^/?]+)/);
+    return m ? m[2] : null;
+  } catch { return null; }
+}
+
+function isYouTubeDomain(domain) {
+  if (!domain) return false;
+  return /^(www\.|m\.)?(youtube\.com|youtu\.be)$/.test(domain);
+}
+
 // Abbreviate large numbers: 0-99 exact, 100+ → "100+", 1000+ → "1K+", 13000 → "13K+"
 function approxCount(n) {
   if (n < 100) return String(n);
@@ -275,6 +334,161 @@ function prPrintHtml(bodyContent) {
     window.print();
     setTimeout(cleanup, 120000);
   }
+}
+
+// Editorial section taxonomy — maps machineTags to newspaper-style sections
+var SECTIONS = ['tech', 'news', 'science', 'health', 'business', 'culture', 'sports', 'food', 'lifestyle', 'environment', 'education', 'opinion'];
+
+var SECTION_MAP = {
+  // Tech
+  artificialintelligence: 'tech', machinelearning: 'tech', programming: 'tech',
+  software: 'tech', cybersecurity: 'tech', startups: 'tech', cloudcomputing: 'tech',
+  webdevelopment: 'tech', opensource: 'tech', datascience: 'tech', blockchain: 'tech',
+  cryptocurrency: 'tech', hardware: 'tech', robotics: 'tech', apple: 'tech',
+  google: 'tech', microsoft: 'tech', amazon: 'tech', meta: 'tech', openai: 'tech',
+  semiconductors: 'tech', computing: 'tech', android: 'tech', ios: 'tech',
+  linux: 'tech', python: 'tech', javascript: 'tech', rust: 'tech', golang: 'tech',
+  // News & Politics
+  politics: 'news', government: 'news', elections: 'news', law: 'news',
+  legislation: 'news', diplomacy: 'news', military: 'news', congress: 'news',
+  supremecourt: 'news', whitehouse: 'news', foreignpolicy: 'news',
+  immigration: 'news', democracy: 'news', journalism: 'news',
+  // Science
+  research: 'science', space: 'science', physics: 'science',
+  biology: 'science', neuroscience: 'science', genetics: 'science',
+  astronomy: 'science', nasa: 'science', chemistry: 'science',
+  // Health
+  health: 'health', medicine: 'health', publichealth: 'health',
+  mentalhealth: 'health', nutrition: 'health', wellness: 'health',
+  fitness: 'health', medical: 'health', healthcare: 'health',
+  // Business
+  finance: 'business', economics: 'business', markets: 'business',
+  entrepreneurship: 'business', investing: 'business', management: 'business',
+  venturecapital: 'business', wallstreet: 'business', banking: 'business',
+  realestate: 'business', advertising: 'business', marketing: 'business',
+  // Culture
+  arts: 'culture', entertainment: 'culture', music: 'culture', film: 'culture',
+  books: 'culture', media: 'culture', gaming: 'culture', television: 'culture',
+  literature: 'culture', theater: 'culture', design: 'culture', architecture: 'culture',
+  photography: 'culture', animation: 'culture', comics: 'culture', podcasts: 'culture',
+  // Sports
+  football: 'sports', basketball: 'sports', baseball: 'sports', soccer: 'sports',
+  tennis: 'sports', cycling: 'sports', esports: 'sports', olympics: 'sports',
+  nfl: 'sports', nba: 'sports', mlb: 'sports', hockey: 'sports',
+  golf: 'sports', running: 'sports', swimming: 'sports', athletics: 'sports',
+  // Food & Drink
+  food: 'food', cooking: 'food', recipes: 'food', restaurants: 'food',
+  wine: 'food', coffee: 'food', fermentation: 'food', baking: 'food',
+  beer: 'food', cocktails: 'food', cuisine: 'food',
+  // Lifestyle
+  travel: 'lifestyle', fashion: 'lifestyle', parenting: 'lifestyle',
+  productivity: 'lifestyle', diy: 'lifestyle', home: 'lifestyle',
+  gardening: 'lifestyle', pets: 'lifestyle', relationships: 'lifestyle',
+  // Environment
+  climate: 'environment', climatechange: 'environment', environment: 'environment',
+  energy: 'environment', sustainability: 'environment', renewables: 'environment',
+  conservation: 'environment', solar: 'environment', pollution: 'environment',
+  // Education
+  education: 'education', learning: 'education', academia: 'education',
+  schools: 'education', edtech: 'education', pedagogy: 'education',
+  university: 'education', literacy: 'education', teaching: 'education',
+  // Opinion (few tags — mostly LLM-classified)
+  essay: 'opinion', commentary: 'opinion', editorial: 'opinion', analysis: 'opinion',
+};
+
+var SECTION_LABELS = {
+  tech: 'Tech', news: 'News & Politics', science: 'Science', health: 'Health',
+  business: 'Business', culture: 'Culture', sports: 'Sports', food: 'Food & Drink',
+  lifestyle: 'Lifestyle', environment: 'Environment', education: 'Education',
+  opinion: 'Opinion', other: 'Other'
+};
+
+function resolveSection(filename) {
+  var notes = allNotesIndex[filename];
+  if (!notes) return 'other';
+  if (notes.section && SECTION_LABELS[notes.section]) return notes.section;
+  var tags = notes.machineTags || [];
+  if (tags.length === 0) return 'other';
+  var counts = {};
+  for (var i = 0; i < tags.length; i++) {
+    var s = SECTION_MAP[tags[i]];
+    if (s) counts[s] = (counts[s] || 0) + 1;
+  }
+  var best = 'other';
+  var bestCount = 0;
+  for (var key in counts) {
+    if (counts[key] > bestCount) { best = key; bestCount = counts[key]; }
+  }
+  return best;
+}
+
+// Distribute N display slots across editorial sections proportionally with floor/ceiling guarantees
+function allocateSectionSlots(sectionCounts, totalSlots) {
+  var sections = [];
+  var totalArticles = 0;
+  for (var key in sectionCounts) {
+    if (sectionCounts[key] > 0) {
+      sections.push({ id: key, count: sectionCounts[key], slots: 0 });
+      totalArticles += sectionCounts[key];
+    }
+  }
+  var result = {};
+  for (var key in sectionCounts) result[key] = 0;
+
+  if (sections.length === 0 || totalSlots <= 0) return result;
+
+  var ceiling = sections.length === 1 ? totalSlots : Math.ceil(totalSlots * 0.4);
+
+  // Give each section its proportional share, floored, with min 1
+  var allocated = 0;
+  for (var i = 0; i < sections.length; i++) {
+    var s = sections[i];
+    var share = Math.floor(totalSlots * s.count / totalArticles);
+    s.slots = Math.max(share, 1);
+    if (s.slots > ceiling) s.slots = ceiling;
+    if (s.slots > s.count) s.slots = s.count;
+    allocated += s.slots;
+  }
+
+  // Trim if over-allocated (many small sections all getting floor=1)
+  while (allocated > totalSlots) {
+    sections.sort(function(a, b) { return b.slots - a.slots; });
+    for (var i = 0; i < sections.length && allocated > totalSlots; i++) {
+      if (sections[i].slots > 1) {
+        sections[i].slots--;
+        allocated--;
+      }
+    }
+    if (allocated > totalSlots) {
+      for (var i = sections.length - 1; i >= 0 && allocated > totalSlots; i--) {
+        if (sections[i].slots > 0) {
+          sections[i].slots--;
+          allocated--;
+        }
+      }
+    }
+  }
+
+  // Distribute remaining slots to sections with most unserved demand
+  while (allocated < totalSlots) {
+    sections.sort(function(a, b) {
+      return (b.count - b.slots) - (a.count - a.slots);
+    });
+    var added = false;
+    for (var i = 0; i < sections.length && allocated < totalSlots; i++) {
+      if (sections[i].slots < ceiling && sections[i].slots < sections[i].count) {
+        sections[i].slots++;
+        allocated++;
+        added = true;
+      }
+    }
+    if (!added) break;
+  }
+
+  for (var i = 0; i < sections.length; i++) {
+    result[sections[i].id] = sections[i].slots;
+  }
+  return result;
 }
 
 // Fallback: save as HTML file when native print is unavailable

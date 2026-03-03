@@ -34,6 +34,10 @@ interface FileMeta {
   enclosureUrl: string;
   enclosureType: string;
   enclosureDuration: string;
+  videoEnclosureUrl: string;
+  videoEnclosureType: string;
+  commentsUrl: string;
+  commentCount: number;
   categories: string[];
 }
 
@@ -492,6 +496,10 @@ function listFiles(outputPath: string): FileMeta[] {
         enclosureUrl: meta.enclosure_url || '',
         enclosureType: meta.enclosure_type || '',
         enclosureDuration: meta.enclosure_duration || '',
+        videoEnclosureUrl: meta.video_enclosure_url || '',
+        videoEnclosureType: meta.video_enclosure_type || '',
+        commentsUrl: meta.comments_url || '',
+        commentCount: meta.comment_count ? parseInt(meta.comment_count, 10) : 0,
         categories,
       });
     } catch {
@@ -528,6 +536,10 @@ function listFiles(outputPath: string): FileMeta[] {
         enclosureUrl: '',
         enclosureType: '',
         enclosureDuration: '',
+        videoEnclosureUrl: '',
+        videoEnclosureType: '',
+        commentsUrl: '',
+        commentCount: 0,
         categories: [],
       });
     } catch (err) {
@@ -808,6 +820,30 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
       return;
     }
 
+    // YouTube popout player — served from real HTTP origin so embeds work
+    if (url.pathname === '/popout') {
+      const videoId = url.searchParams.get('v') || '';
+      const start = url.searchParams.get('t') || '';
+      const title = (url.searchParams.get('title') || 'Video').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+      let embedParams = 'autoplay=1&modestbranding=1&rel=0';
+      if (start) embedParams += '&start=' + encodeURIComponent(start);
+      const embedSrc = 'https://www.youtube.com/embed/' + encodeURIComponent(videoId) + '?' + embedParams;
+      const popoutHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title} — Pull Read</title>
+<style>body{margin:0;background:#111;font-family:system-ui,sans-serif;color:#fff}
+iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
+.info{position:fixed;top:12px;left:16px;font-size:13px;opacity:0.7;z-index:10}
+.pop-in{position:fixed;top:12px;right:16px;background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:6px;padding:6px 14px;font-size:13px;cursor:pointer;font-family:inherit;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:background 0.15s;z-index:10}
+.pop-in:hover{background:rgba(255,255,255,0.25)}</style></head><body>
+<div class="info">${title}</div>
+<button class="pop-in" onclick="popBackIn()">&#8617; Pop back in</button>
+<iframe src="${embedSrc}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<script>function popBackIn(){if(window.opener&&window.opener._videoPopIn)window.opener._videoPopIn(0);window.close();}</script>
+</body></html>`;
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(popoutHtml);
+      return;
+    }
+
     // Serve locally cached favicons
     const faviconMatch = url.pathname.match(/^\/favicons\/([a-zA-Z0-9._-]+\.png)$/);
     if (faviconMatch) {
@@ -1003,7 +1039,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         const name = url.searchParams.get('name');
         if (name) {
           const annot = loadAnnotation(name);
-          sendJson(res, { articleNote: annot.articleNote, annotations: annot.annotations, tags: annot.tags, isFavorite: annot.isFavorite, ...(annot.machineTags.length ? { machineTags: annot.machineTags } : {}) });
+          sendJson(res, { articleNote: annot.articleNote, annotations: annot.annotations, tags: annot.tags, isFavorite: annot.isFavorite, ...(annot.machineTags.length ? { machineTags: annot.machineTags } : {}), ...(annot.section ? { section: annot.section } : {}) });
         } else {
           sendJson(res, allNotes());
         }
@@ -1277,7 +1313,8 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
             appleAvailable: isAppleAvailable()
           },
           viewerMode: (appSettings.viewerMode as string) || 'app',
-          timeFormat: (appSettings.timeFormat as string) || '12h'
+          timeFormat: (appSettings.timeFormat as string) || '12h',
+          autoTag: appSettings.autoTag === true
         });
         return;
       }
@@ -1298,6 +1335,15 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
           if (body.timeFormat !== undefined) {
             const appSettings = loadJsonFile(APP_SETTINGS_PATH);
             appSettings.timeFormat = body.timeFormat === '24h' ? '24h' : '12h';
+            saveJsonFile(APP_SETTINGS_PATH, appSettings);
+            sendJson(res, { ok: true });
+            return;
+          }
+
+          // Auto-tag on sync preference
+          if (body.autoTag !== undefined) {
+            const appSettings = loadJsonFile(APP_SETTINGS_PATH);
+            appSettings.autoTag = body.autoTag === true;
             saveJsonFile(APP_SETTINGS_PATH, appSettings);
             sendJson(res, { ok: true });
             return;
@@ -1944,6 +1990,50 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: msg }));
       }
+      return;
+    }
+
+    // Storage info API — report cached media sizes
+    if (url.pathname === '/api/storage-info' && req.method === 'GET') {
+      const ttsCacheDir = join(outputPath, '.tts-cache');
+      const videoCacheDir = join(outputPath, '.video-cache');
+      const faviconsDir = join(outputPath, 'favicons');
+      const mdFiles = listMarkdownFiles(outputPath);
+
+      function dirSize(dir: string): number {
+        if (!existsSync(dir)) return 0;
+        let total = 0;
+        try {
+          for (const f of readdirSync(dir)) {
+            try { total += statSync(join(dir, f)).size; } catch {}
+          }
+        } catch {}
+        return total;
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify({
+        tts_cache_size: dirSize(ttsCacheDir),
+        video_cache_size: dirSize(videoCacheDir),
+        favicons_size: dirSize(faviconsDir),
+        total_articles: mdFiles.length,
+      }));
+      return;
+    }
+
+    // Clear video cache API
+    if (url.pathname === '/api/clear-video-cache' && req.method === 'POST') {
+      const videoCacheDir = join(outputPath, '.video-cache');
+      let cleared = 0;
+      if (existsSync(videoCacheDir)) {
+        try {
+          for (const f of readdirSync(videoCacheDir)) {
+            try { unlinkSync(join(videoCacheDir, f)); cleared++; } catch {}
+          }
+        } catch {}
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify({ cleared }));
       return;
     }
 

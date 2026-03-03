@@ -77,6 +77,7 @@ class PrPlayer extends HTMLElement {
         '<div class="bottom-bar-controls">' +
           '<button class="skip-btn" onpointerdown="ttsStartHoldSkip(-15)" onpointerup="ttsStopHoldSkip()" onpointerleave="ttsStopHoldSkip()" title="Rewind 15s (hold to scan)" id="tts-prev-btn"><svg><use href="#i-backward"/></svg><span class="skip-label">15</span></button>' +
           '<button class="bottom-bar-play" onclick="ttsTogglePlay()" title="Play/Pause" id="tts-play-btn"><svg><use href="#i-play"/></svg></button>' +
+          '<button class="skip-btn" id="tts-popout-btn" onclick="popOutQueueVideo()" title="Pop out video" style="display:none"><svg><use href="#i-external"/></svg></button>' +
           '<button class="skip-btn" onpointerdown="ttsStartHoldSkip(15)" onpointerup="ttsStopHoldSkip()" onpointerleave="ttsStopHoldSkip()" title="Forward 15s (hold to scan)" id="tts-next-btn"><svg><use href="#i-forward"/></svg><span class="skip-label">15</span></button>' +
         '</div>' +
         '<div class="bottom-bar-progress-row">' +
@@ -90,6 +91,7 @@ class PrPlayer extends HTMLElement {
           '<button class="audio-speed-btn" onclick="ttsToggleSpeedSlider()" title="Playback speed" id="tts-speed-btn">1x</button>' +
           '<button class="bottom-bar-queue-btn" onclick="toggleBottomBarQueue()" title="Queue" id="bottom-bar-queue-toggle"><svg><use href="#i-queue"/></svg></button>' +
           '<button class="bottom-bar-settings-btn" onclick="showSettingsPage(\'settings-voice\')" title="Voice settings"><svg><use href="#i-sliders"/></svg></button>' +
+          '<button class="bottom-bar-popout-btn" onclick="popOutAudioPlayer()" title="Pop out player" id="tts-audio-popout-btn"><svg><use href="#i-external"/></svg></button>' +
           '<button class="mini-toggle" onclick="setPlayerMode(\'mini\')" title="Minimize to sidebar"><svg class="icon icon-sm"><use href="#i-chevron-down"/></svg></button>' +
           '<button class="bottom-bar-dismiss" onclick="ttsDismissPlayer()" title="Close player"><svg><use href="#i-xmark"/></svg></button>' +
         '</div>' +
@@ -214,7 +216,9 @@ class PrPlayer extends HTMLElement {
     var btn = this.querySelector('#tts-speed-btn');
     if (!btn) return;
     var rect = btn.getBoundingClientRect();
-    var count = TTS_SPEEDS.length;
+    var isYT = _ytPlayer != null;
+    var speeds = isYT ? YOUTUBE_SPEEDS : TTS_SPEEDS;
+    var count = speeds.length;
 
     var popup = document.createElement('div');
     popup.className = 'tts-speed-popup';
@@ -222,7 +226,7 @@ class PrPlayer extends HTMLElement {
     var majorSpeeds = [0.5, 1.0, 1.5, 2.0];
     var ticksHtml = '';
     for (var i = count - 1; i >= 0; i--) {
-      var s = TTS_SPEEDS[i];
+      var s = speeds[i];
       if (majorSpeeds.indexOf(s) >= 0) {
         ticksHtml += '<div class="tts-speed-tick">' + s + 'x</div>';
       } else {
@@ -263,7 +267,7 @@ class PrPlayer extends HTMLElement {
       pct = Math.max(0, Math.min(1, pct));
       var idx = Math.round((1 - pct) * (count - 1));
       idx = Math.max(0, Math.min(count - 1, idx));
-      ttsSetSpeed(TTS_SPEEDS[idx]);
+      ttsSetSpeed(speeds[idx]);
       self._positionThumb();
     }
 
@@ -320,9 +324,11 @@ class PrPlayer extends HTMLElement {
   _positionThumb() {
     var thumb = document.getElementById('tts-speed-thumb');
     if (!thumb) return;
-    var idx = TTS_SPEEDS.indexOf(ttsSpeed);
-    if (idx < 0) idx = TTS_SPEEDS.indexOf(1.0);
-    var pct = 1 - idx / (TTS_SPEEDS.length - 1);
+    var isYT = _ytPlayer != null;
+    var speeds = isYT ? YOUTUBE_SPEEDS : TTS_SPEEDS;
+    var idx = speeds.indexOf(ttsSpeed);
+    if (idx < 0) idx = speeds.indexOf(1.0);
+    var pct = 1 - idx / (speeds.length - 1);
     thumb.style.top = (pct * 100) + '%';
   }
 
@@ -364,6 +370,7 @@ class PrPlayer extends HTMLElement {
     var playBtn = this.querySelector('#tts-play-btn');
 
     var currentItem = (currentIndex >= 0 && currentIndex < queue.length) ? queue[currentIndex] : null;
+    var isVideoItem = currentItem && isVideoEnclosure(currentItem.enclosureType);
     if (label) label.textContent = currentItem ? currentItem.title : 'No article playing';
 
     var sourceEl = this.querySelector('#audio-now-source');
@@ -381,7 +388,8 @@ class PrPlayer extends HTMLElement {
         if (currentItem.image) artSrc = currentItem.image;
         else if (currentItem.domain) artSrc = '/favicons/' + encodeURIComponent(currentItem.domain) + '.png';
       }
-      var fallbackIcon = '<svg class="bottom-bar-icon" aria-hidden="true"><use href="#i-volume"/></svg>';
+      var fallbackIconId = isVideoItem ? '#i-video' : '#i-volume';
+      var fallbackIcon = '<svg class="bottom-bar-icon" aria-hidden="true"><use href="' + fallbackIconId + '"/></svg>';
       if (artSrc) {
         var img = new Image();
         img.src = artSrc;
@@ -393,7 +401,9 @@ class PrPlayer extends HTMLElement {
         artworkEl.innerHTML = fallbackIcon;
       }
       if (currentItem) {
-        if (currentItem.enclosureUrl) {
+        if (isVideoItem) {
+          artworkEl.title = 'Video podcast';
+        } else if (currentItem.enclosureUrl) {
           artworkEl.title = 'Podcast audio';
         } else {
           var vi = ttsCurrentVoiceInfo();
@@ -404,8 +414,16 @@ class PrPlayer extends HTMLElement {
       }
     }
 
+    // Show popout state when video or audio is playing in a popout window
+    var hasVideoPopout = typeof _videoPopoutWindow !== 'undefined' && _videoPopoutWindow && !_videoPopoutWindow.closed;
+    var hasAudioPopout = typeof _audioPopoutWindow !== 'undefined' && _audioPopoutWindow && !_audioPopoutWindow.closed;
+
     if (status) {
-      if (generating) {
+      if (hasVideoPopout) {
+        status.innerHTML = 'Playing in popout <button onclick="event.stopPropagation();if(window._videoPopIn)window._videoPopIn(0)" style="margin-left:6px;padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:none;color:var(--link);font-size:11px;cursor:pointer;font-family:inherit">Pop in</button>';
+      } else if (hasAudioPopout) {
+        status.innerHTML = 'Playing in popout <button onclick="event.stopPropagation();_closeAudioPopout()" style="margin-left:6px;padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:none;color:var(--link);font-size:11px;cursor:pointer;font-family:inherit">Pop in</button>';
+      } else if (generating) {
         status.textContent = 'Generating\u2026';
       } else if (playing) {
         status.textContent = 'Playing';
@@ -420,6 +438,12 @@ class PrPlayer extends HTMLElement {
       playBtn.innerHTML = playing
         ? '<svg><use href="#i-pause"/></svg>'
         : '<svg><use href="#i-play"/></svg>';
+    }
+
+    // Show/hide pop-out button for video items
+    var popoutBtn = this.querySelector('#tts-popout-btn');
+    if (popoutBtn) {
+      popoutBtn.style.display = isVideoItem ? '' : 'none';
     }
 
     // Render queue (expanded mode only)
@@ -456,6 +480,14 @@ class PrPlayer extends HTMLElement {
 }
 
 customElements.define('pr-player', PrPlayer);
+
+/** Pop out the current queue item's video into a separate window */
+function popOutQueueVideo() {
+  var item = (ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length) ? ttsQueue[ttsCurrentIndex] : null;
+  if (item && item.enclosureUrl && isVideoEnclosure(item.enclosureType)) {
+    playVideoPopout(item);
+  }
+}
 
 /** Global helper for inline onclick handlers to switch player mode */
 function setPlayerMode(mode) {

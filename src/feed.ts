@@ -20,9 +20,12 @@ export interface FeedEntry {
   annotation?: string;
   contentHtml?: string;
   enclosure?: Enclosure;
+  videoEnclosure?: Enclosure;
   author?: string;
   categories?: string[];
   thumbnail?: string;
+  commentsUrl?: string;
+  commentCount?: number;
 }
 
 type FeedType = 'atom' | 'rss' | 'rdf' | 'json';
@@ -65,6 +68,61 @@ function extractMediaUrl(media: any): string | undefined {
   return undefined;
 }
 
+/** Check if a MIME type represents video content (including HLS streams) */
+function isVideoMimeType(type: string): boolean {
+  if (!type) return false;
+  const lower = type.toLowerCase();
+  return lower.startsWith('video/') || lower === 'application/x-mpegurl' || lower === 'application/vnd.apple.mpegurl';
+}
+
+/**
+ * Extract video enclosure from podcast:alternateEnclosure or media:content.
+ * Returns an Enclosure if a video rendition is found, undefined otherwise.
+ */
+function extractVideoEnclosure(item: any): Enclosure | undefined {
+  // podcast:alternateEnclosure (Podcasting 2.0 spec)
+  const altEnc = item['podcast:alternateEnclosure'];
+  if (altEnc) {
+    const alts = Array.isArray(altEnc) ? altEnc : [altEnc];
+    for (const alt of alts) {
+      const type = alt['@_type'] || '';
+      if (isVideoMimeType(type)) {
+        // Source URL can be in podcast:source child or @_url
+        const source = alt['podcast:source'];
+        const url = source?.['@_uri'] || source?.['@_url'] || alt['@_url'] || '';
+        if (url) {
+          return {
+            url,
+            type,
+            length: alt['@_length'] ? parseInt(alt['@_length'], 10) : undefined,
+            duration: alt['@_duration'] || item['itunes:duration'] || undefined,
+          };
+        }
+      }
+    }
+  }
+
+  // media:content with medium="video" or video MIME type
+  const media = item['media:content'];
+  if (media) {
+    const items = Array.isArray(media) ? media : [media];
+    for (const m of items) {
+      const type = m['@_type'] || '';
+      const medium = m['@_medium'] || '';
+      if (isVideoMimeType(type) || medium === 'video') {
+        return {
+          url: m['@_url'] || '',
+          type: type || 'video/mp4',
+          length: m['@_fileSize'] ? parseInt(m['@_fileSize'], 10) : undefined,
+          duration: m['@_duration'] ? formatDuration(parseInt(m['@_duration'], 10)) : undefined,
+        };
+      }
+    }
+  }
+
+  return undefined;
+}
+
 function extractCategories(raw: any): string[] | undefined {
   if (!raw) return undefined;
   const items = Array.isArray(raw) ? raw : [raw];
@@ -99,14 +157,27 @@ function parseJsonFeed(text: string): FeedEntry[] {
     }
 
     let enclosure: Enclosure | undefined;
+    let videoEnclosure: Enclosure | undefined;
     if (Array.isArray(item.attachments) && item.attachments.length > 0) {
-      const att = item.attachments[0];
-      enclosure = {
-        url: att.url,
-        type: att.mime_type,
-        length: att.size_in_bytes || undefined,
-        duration: att.duration_in_seconds ? formatDuration(att.duration_in_seconds) : undefined
-      };
+      for (const att of item.attachments) {
+        const mime = att.mime_type || '';
+        const enc: Enclosure = {
+          url: att.url,
+          type: mime,
+          length: att.size_in_bytes || undefined,
+          duration: att.duration_in_seconds ? formatDuration(att.duration_in_seconds) : undefined
+        };
+        if (!enclosure && (mime.startsWith('audio/') || !mime.startsWith('video/'))) {
+          enclosure = enc;
+        } else if (!videoEnclosure && mime.startsWith('video/')) {
+          videoEnclosure = enc;
+        }
+      }
+      // If only a video attachment exists, use it as primary enclosure
+      if (!enclosure && videoEnclosure) {
+        enclosure = videoEnclosure;
+        videoEnclosure = undefined;
+      }
     }
 
     // JSON Feed author: item.author.name (v1.0) or item.authors[0].name (v1.1)
@@ -127,6 +198,7 @@ function parseJsonFeed(text: string): FeedEntry[] {
       annotation: annotation || undefined,
       contentHtml: contentHtml || undefined,
       enclosure,
+      videoEnclosure,
       author: jsonAuthorStr || undefined,
       categories: categories?.length ? categories : undefined,
       thumbnail
@@ -201,6 +273,20 @@ function parseAtomFeed(feed: any): FeedEntry[] {
       || feedImage
       || undefined;
 
+    // Comments: Atom <link rel="replies"> with optional thr:count
+    let commentsUrl: string | undefined;
+    let commentCount: number | undefined;
+    const links = Array.isArray(entry.link) ? entry.link : (entry.link ? [entry.link] : []);
+    const repliesLink = links.find((l: any) => l['@_rel'] === 'replies');
+    if (repliesLink) {
+      commentsUrl = repliesLink['@_href'] || undefined;
+      const thrCount = repliesLink['@_thr:count'];
+      if (thrCount != null) {
+        const parsed = parseInt(String(thrCount), 10);
+        if (!isNaN(parsed)) commentCount = parsed;
+      }
+    }
+
     return {
       title: extractTitle(entry.title),
       url,
@@ -210,7 +296,9 @@ function parseAtomFeed(feed: any): FeedEntry[] {
       contentHtml: contentHtml || undefined,
       author: author || undefined,
       categories,
-      thumbnail
+      thumbnail,
+      commentsUrl,
+      commentCount,
     };
   });
 }
@@ -286,6 +374,19 @@ function parseRssFeed(rss: any): FeedEntry[] {
       || channelImage
       || undefined;
 
+    // Check for a separate video rendition (podcast:alternateEnclosure or media:content)
+    let videoEnclosure = extractVideoEnclosure(item);
+
+    // If the primary enclosure is already video, promote it and clear videoEnclosure
+    if (enclosure && isVideoMimeType(enclosure.type)) {
+      videoEnclosure = undefined; // primary IS the video
+    }
+
+    // Comments: RSS <comments> URL and <slash:comments> count
+    const commentsUrl = typeof item.comments === 'string' ? item.comments.trim() : undefined;
+    const rawSlashComments = item['slash:comments'];
+    const commentCount = rawSlashComments != null ? parseInt(String(rawSlashComments), 10) : undefined;
+
     return [{
       title: extractTitle(item.title),
       url,
@@ -294,9 +395,12 @@ function parseRssFeed(rss: any): FeedEntry[] {
       annotation: description || undefined,
       contentHtml: contentHtml || undefined,
       enclosure,
+      videoEnclosure,
       author: authorName || undefined,
       categories,
-      thumbnail
+      thumbnail,
+      commentsUrl: commentsUrl || undefined,
+      commentCount: commentCount && !isNaN(commentCount) ? commentCount : undefined,
     }];
   });
 }
