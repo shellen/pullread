@@ -1,9 +1,10 @@
-// ABOUTME: Tests for markdown file generation
-// ABOUTME: Verifies filename slugification, frontmatter, and enclosure formatting
+// ABOUTME: Tests for markdown file generation and filesystem write guard
+// ABOUTME: Verifies filename slugification, frontmatter, enclosure formatting, and path restrictions
 
-import { generateFilename, generateMarkdown, fileSubpath, resolveFilePath, listMarkdownFiles, listEpubFiles, writeArticle, migrateToDateFolders, exportNotebook } from './writer';
+import { generateFilename, generateMarkdown, fileSubpath, resolveFilePath, listMarkdownFiles, listEpubFiles, writeArticle, migrateToDateFolders, exportNotebook, assertWritablePath, setOutputPath, resetWriteGuard } from './writer';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'fs';
-import { join } from 'path';
+import { join, resolve, sep } from 'path';
+import { homedir } from 'os';
 
 describe('generateFilename', () => {
   test('creates date-prefixed slug', () => {
@@ -517,5 +518,64 @@ describe('exportNotebook', () => {
     expect(content).toContain('Key finding');
     expect(content).toContain('*(article.md)*');
     expect(content).toContain('https://example.com');
+  });
+});
+
+describe('assertWritablePath', () => {
+  const configDir = resolve(join(homedir(), '.config', 'pullread'));
+
+  beforeEach(() => {
+    resetWriteGuard();
+  });
+
+  test('allows paths within config dir', () => {
+    expect(() => assertWritablePath(join(configDir, 'feeds.json'))).not.toThrow();
+  });
+
+  test('allows paths in nested config subdirectories', () => {
+    expect(() => assertWritablePath(join(configDir, 'sub', 'deep', 'file.json'))).not.toThrow();
+  });
+
+  test('blocks paths outside allowed directories', () => {
+    expect(() => assertWritablePath('/etc/passwd')).toThrow('Write blocked');
+  });
+
+  test('blocks traversal via ..', () => {
+    expect(() => assertWritablePath(join(configDir, '..', '..', 'etc', 'passwd'))).toThrow('Write blocked');
+  });
+
+  test('blocks prefix collisions', () => {
+    // /Users/x/.config/pullread-evil should NOT match /Users/x/.config/pullread
+    expect(() => assertWritablePath(configDir + '-evil/file.txt')).toThrow('Write blocked');
+  });
+
+  test('allows paths within registered output path', () => {
+    setOutputPath('/tmp/pullread-output');
+    expect(() => assertWritablePath('/tmp/pullread-output/2024/01/article.md')).not.toThrow();
+  });
+
+  test('allows the output directory itself', () => {
+    setOutputPath('/tmp/pullread-output');
+    expect(() => assertWritablePath('/tmp/pullread-output')).not.toThrow();
+  });
+
+  test('registers multiple output paths', () => {
+    setOutputPath('/tmp/output-a');
+    setOutputPath('/tmp/output-b');
+    expect(() => assertWritablePath('/tmp/output-a/file.md')).not.toThrow();
+    expect(() => assertWritablePath('/tmp/output-b/file.md')).not.toThrow();
+  });
+
+  test('does not duplicate already-registered paths', () => {
+    setOutputPath('/tmp/pullread-output');
+    setOutputPath('/tmp/pullread-output');
+    // No error — just verifying it doesn't break
+    expect(() => assertWritablePath('/tmp/pullread-output/file.md')).not.toThrow();
+  });
+
+  test('expands tilde in setOutputPath', () => {
+    setOutputPath('~/Documents/pullread-test');
+    const expanded = resolve(join(homedir(), 'Documents', 'pullread-test'));
+    expect(() => assertWritablePath(join(expanded, 'article.md'))).not.toThrow();
   });
 });

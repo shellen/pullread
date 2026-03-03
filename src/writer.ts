@@ -1,9 +1,37 @@
-// ABOUTME: Generates markdown files with YAML frontmatter
-// ABOUTME: Handles filename slugification and content formatting
+// ABOUTME: Generates markdown files with YAML frontmatter and enforces filesystem write boundaries
+// ABOUTME: Handles filename slugification, content formatting, and path validation
 
 import { writeFileSync, existsSync, mkdirSync, readdirSync, statSync, renameSync, unlinkSync } from 'fs';
-import { join, dirname, basename, extname } from 'path';
+import { join, dirname, basename, extname, resolve, sep } from 'path';
+import { homedir } from 'os';
 import { Enclosure } from './feed';
+
+const ALLOWED_WRITE_DIRS: string[] = [
+  resolve(join(homedir(), '.config', 'pullread'))
+];
+
+export function setOutputPath(path: string): void {
+  const resolved = resolve(path.replace(/^~/, homedir()));
+  if (!ALLOWED_WRITE_DIRS.includes(resolved)) {
+    ALLOWED_WRITE_DIRS.push(resolved);
+  }
+}
+
+export function assertWritablePath(targetPath: string): void {
+  const resolved = resolve(targetPath);
+  const allowed = ALLOWED_WRITE_DIRS.some(dir =>
+    resolved === dir || resolved.startsWith(dir + sep)
+  );
+  if (!allowed) {
+    throw new Error('Write blocked: path is outside allowed directories');
+  }
+}
+
+/** Reset allowed dirs to just the config dir. For testing only. */
+export function resetWriteGuard(): void {
+  ALLOWED_WRITE_DIRS.length = 0;
+  ALLOWED_WRITE_DIRS.push(resolve(join(homedir(), '.config', 'pullread')));
+}
 
 export interface ArticleData {
   title: string;

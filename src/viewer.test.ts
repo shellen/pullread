@@ -2,6 +2,7 @@
 // ABOUTME: Covers reprocessFile, parseFrontmatter, sync progress, and XSS sanitization
 
 import { reprocessFile, parseFrontmatter } from './viewer';
+import { setOutputPath, resetWriteGuard } from './writer';
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -64,7 +65,12 @@ describe('reprocessFile', () => {
   beforeEach(() => {
     testDir = join(tmpdir(), `pullread-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(testDir, { recursive: true });
+    setOutputPath(testDir);
     mockFetchAndExtract.mockReset();
+  });
+
+  afterAll(() => {
+    resetWriteGuard();
   });
 
   test('returns error when file does not exist', async () => {
