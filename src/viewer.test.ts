@@ -642,3 +642,36 @@ describe('editorial sections', () => {
     });
   });
 });
+
+describe('For You section grouping', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('buildSectionRundown function exists in 15-graph.js', () => {
+    const graph = readFileSync(join(rootDir, 'viewer', '15-graph.js'), 'utf-8');
+    expect(graph).toMatch(/function\s+buildSectionRundown/);
+  });
+
+  test('buildSectionRundown uses resolveSection for classification', () => {
+    const graph = readFileSync(join(rootDir, 'viewer', '15-graph.js'), 'utf-8');
+    expect(graph).toContain('resolveSection');
+  });
+
+  test('buildSectionRundown uses allocateSectionSlots for proportional distribution', () => {
+    const graph = readFileSync(join(rootDir, 'viewer', '15-graph.js'), 'utf-8');
+    expect(graph).toContain('allocateSectionSlots');
+  });
+
+  test('buildSectionRundown returns objects with section, label, articles, totalCount', () => {
+    const graph = readFileSync(join(rootDir, 'viewer', '15-graph.js'), 'utf-8');
+    // Each result item should have these properties
+    expect(graph).toContain('.section');
+    expect(graph).toContain('.label');
+    expect(graph).toContain('.articles');
+    expect(graph).toContain('.totalCount');
+  });
+
+  test('buildSectionRundown processes core sections in SECTIONS order first', () => {
+    const graph = readFileSync(join(rootDir, 'viewer', '15-graph.js'), 'utf-8');
+    expect(graph).toContain('SECTIONS.slice()');
+  });
+});

@@ -227,6 +227,68 @@ function buildDailyRundown(maxTopics) {
   return result.slice(0, maxTopics);
 }
 
+function buildSectionRundown(maxPerSection) {
+  if (maxPerSection === undefined) maxPerSection = 20;
+
+  // Group unread articles by section
+  var sectionArticles = {};
+  for (var i = 0; i < allFiles.length; i++) {
+    var f = allFiles[i];
+    if (readArticles.has(f.filename)) continue;
+    var sec = resolveSection(f.filename);
+    if (!sectionArticles[sec]) sectionArticles[sec] = [];
+    sectionArticles[sec].push(f);
+  }
+
+  // Allocate slots proportionally
+  var counts = {};
+  for (var sec in sectionArticles) counts[sec] = sectionArticles[sec].length;
+  var sectionCount = Object.keys(counts).length;
+  var totalSlots = Math.min(maxPerSection * sectionCount, 30);
+  var slots = allocateSectionSlots(counts, totalSlots);
+
+  // Score and rank articles within each section
+  var engagement = computeSourceEngagement();
+  var mc = getMixerConfig();
+  var result = [];
+
+  // Core sections first in defined order, then any discovered sections
+  var allSections = SECTIONS.slice();
+  for (var sec in counts) {
+    if (allSections.indexOf(sec) === -1) allSections.push(sec);
+  }
+
+  for (var si = 0; si < allSections.length; si++) {
+    var sec = allSections[si];
+    var articles = sectionArticles[sec];
+    if (!articles || articles.length === 0) continue;
+    var slotCount = slots[sec] || 1;
+
+    articles.sort(function(a, b) {
+      return magicScore(b, engagement, mc) - magicScore(a, engagement, mc);
+    });
+
+    var picked = articles.slice(0, slotCount);
+    var entry = {};
+    entry.section = sec;
+    entry.label = SECTION_LABELS[sec] || mixerFormatTopic(sec);
+    entry.articles = picked.map(function(f) {
+      return {
+        filename: f.filename,
+        title: f.title,
+        domain: f.domain || '',
+        image: f.image || '',
+        bookmarked: f.bookmarked || '',
+        feed: f.feed || ''
+      };
+    });
+    entry.totalCount = articles.length;
+    result.push(entry);
+  }
+
+  return result;
+}
+
 function initRundown() {
   var track = document.querySelector('.rundown-track');
   if (!track) return;
