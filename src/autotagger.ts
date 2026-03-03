@@ -1,9 +1,11 @@
 // ABOUTME: Automatic machine tagging of articles using LLM providers
 // ABOUTME: Extracts topic, entity, and theme tags for relational mapping between articles
 
-import { readFileSync } from 'fs';
-import { basename } from 'path';
-import { summarizeText, loadLLMConfig, LLMConfig, Provider, getDefaultModel } from './summarizer';
+import { readFileSync, writeFileSync } from 'fs';
+import { basename, join } from 'path';
+import { homedir } from 'os';
+import { execFileSync } from 'child_process';
+import { summarizeText, loadLLMConfig, LLMConfig, Provider, getDefaultModel, ensureAppleBinary } from './summarizer';
 import { listMarkdownFiles, resolveFilePath } from './writer';
 import { loadAnnotation, saveAnnotation, allNotes } from './annotations';
 
@@ -142,6 +144,108 @@ export function migrateDashedTags(): number {
   return migrated;
 }
 
+// Compiled Swift binary for batch autotagging via JSONL.
+// Reads JSONL input (one {"id","prompt"} per line), processes each with an independent
+// LanguageModelSession, and writes JSONL output ({"id","response"} or {"id","error"}).
+const BATCH_AUTOTAG_SWIFT = `import Foundation
+import FoundationModels
+
+@main struct Run {
+    static func main() async throws {
+        let inputPath = CommandLine.arguments[1]
+        let lines = try String(contentsOfFile: inputPath, encoding: .utf8)
+            .components(separatedBy: "\\n")
+            .filter { !$0.isEmpty }
+
+        for line in lines {
+            guard let data = line.data(using: .utf8),
+                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: String],
+                  let id = obj["id"],
+                  let prompt = obj["prompt"] else { continue }
+
+            do {
+                let session = LanguageModelSession()
+                let response = try await session.respond(to: prompt)
+                let result = try JSONSerialization.data(withJSONObject: ["id": id, "response": response.content])
+                print(String(data: result, encoding: .utf8)!)
+            } catch {
+                let result = try JSONSerialization.data(withJSONObject: ["id": id, "error": error.localizedDescription])
+                print(String(data: result, encoding: .utf8)!)
+            }
+            fflush(stdout)
+        }
+    }
+}
+`;
+
+export interface BatchArticle {
+  filename: string;
+  body: string;
+  title: string;
+}
+
+// Process all articles in a single compiled Swift binary invocation.
+// Returns { tagged, failed } on success, or null if the binary can't be compiled
+// (caller should fall back to sequential processing).
+export async function autotagBatchApple(
+  articles: BatchArticle[],
+  llmConfig: LLMConfig
+): Promise<{ tagged: number; failed: number } | null> {
+  const binary = ensureAppleBinary(BATCH_AUTOTAG_SWIFT, '.apple-batch-autotag');
+  if (!binary) return null;
+
+  const configDir = join(homedir(), '.config', 'pullread');
+  const inputPath = join(configDir, '.autotag-batch-input.jsonl');
+
+  // Build JSONL input
+  const jsonlLines = articles.map(article => {
+    const trimmed = article.body.split(/\s+/).slice(0, 4000).join(' ');
+    const prompt = `${AUTOTAG_PROMPT}\n\n---\n\n${trimmed}`;
+    return JSON.stringify({ id: article.filename, prompt });
+  });
+  writeFileSync(inputPath, jsonlLines.join('\n') + '\n');
+
+  let tagged = 0;
+  let failed = 0;
+
+  try {
+    const timeout = articles.length * 15_000 + 60_000;
+    const output = execFileSync(binary, [inputPath], {
+      encoding: 'utf-8',
+      timeout,
+      maxBuffer: 50 * 1024 * 1024,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+
+    const outputLines = output.trim().split('\n').filter(l => l.trim());
+    for (const line of outputLines) {
+      try {
+        const obj = JSON.parse(line);
+        if (obj.error) {
+          console.log(`  ${obj.id}: failed: ${obj.error}`);
+          failed++;
+          continue;
+        }
+        const { machineTags, section } = parseAutotagResponse(obj.response);
+        if (machineTags.length > 0) {
+          saveMachineTags(obj.id, machineTags, section);
+          console.log(`  ${obj.id}: [${machineTags.join(', ')}]${section ? ` (${section})` : ''}`);
+          tagged++;
+        } else {
+          failed++;
+        }
+      } catch {
+        failed++;
+      }
+    }
+  } catch (err: any) {
+    console.log(`  Batch processing failed: ${err.message}`);
+    failed = articles.length;
+  }
+
+  return { tagged, failed };
+}
+
 /**
  * Batch auto-tag all articles in the output directory that don't already have machine tags.
  */
@@ -160,15 +264,13 @@ export async function autotagBatch(
     .map(f => basename(f))
     .filter(f => !f.startsWith('_'));
 
-  let tagged = 0;
   let skipped = 0;
-  let failed = 0;
-
   const activeModel = llmConfig.model || getDefaultModel(llmConfig.provider);
   console.log(`  Using ${llmConfig.provider} / ${activeModel}`);
 
+  // Collect articles to process
+  const articles: BatchArticle[] = [];
   for (const file of files) {
-    // Skip if already has machine tags (unless force mode)
     if (!force && hasMachineTags(file)) {
       skipped++;
       continue;
@@ -177,7 +279,6 @@ export async function autotagBatch(
     const filePath = resolveFilePath(outputPath, file);
     const content = readFileSync(filePath, 'utf-8');
 
-    // Get article body (strip frontmatter)
     const match = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
     const body = match ? match[1] : content;
 
@@ -188,13 +289,30 @@ export async function autotagBatch(
 
     const titleMatch = content.match(/^title: "?(.*?)"?\s*$/m);
     const title = titleMatch ? titleMatch[1].slice(0, 50) : file;
+    articles.push({ filename: file, body, title });
+  }
 
+  // Apple provider: batch all articles in a single binary invocation
+  if (llmConfig.provider === 'apple') {
+    const batchResult = await autotagBatchApple(articles, llmConfig);
+    if (batchResult) {
+      return { tagged: batchResult.tagged, skipped, failed: batchResult.failed };
+    }
+    // Binary compilation failed — fall through to sequential processing
+    console.log('  Binary compilation failed, falling back to sequential processing');
+  }
+
+  // Sequential processing for cloud providers (or Apple fallback)
+  let tagged = 0;
+  let failed = 0;
+
+  for (const article of articles) {
     try {
-      process.stdout.write(`  ${title}...`);
-      const result = await autotagText(body, llmConfig);
+      process.stdout.write(`  ${article.title}...`);
+      const result = await autotagText(article.body, llmConfig);
 
       if (result.machineTags.length > 0) {
-        saveMachineTags(file, result.machineTags, result.section);
+        saveMachineTags(article.filename, result.machineTags, result.section);
         console.log(` [${result.machineTags.join(', ')}]${result.section ? ` (${result.section})` : ''}`);
         tagged++;
       } else {
