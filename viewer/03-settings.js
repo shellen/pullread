@@ -235,6 +235,120 @@ function settingsBtnSelect(btn, hiddenId, val) {
   btn.classList.add('active');
 }
 
+// Magic Mixer helpers and event handlers
+function mixerTagRow(tag, val, labels) {
+  var safeId = tag.replace(/[^a-zA-Z0-9]/g, '_');
+  var h = '<div class="mixer-tag-row">';
+  h += '<span class="mixer-tag-name" title="' + escapeHtml(tag) + '">' + escapeHtml(tag) + '</span>';
+  h += '<input type="range" min="-2" max="2" value="' + val + '" class="mixer-range mixer-tag-range" oninput="mixerTagChanged(\'' + escapeJsStr(tag) + '\',this.value)">';
+  h += '<span class="mixer-tag-label" id="mixer-tag-label-' + safeId + '">' + labels[val + 2] + '</span>';
+  h += '</div>';
+  return h;
+}
+
+var _mixerDebounce = null;
+
+function _mixerSave(config) {
+  localStorage.setItem('pr-magic-mixer', JSON.stringify(config));
+  clearTimeout(_mixerDebounce);
+  _mixerDebounce = setTimeout(function() { scheduleRenderFileList(); }, 300);
+}
+
+function mixerSelectPreset(key) {
+  if (key === 'custom') return;
+  var preset = MIXER_PRESETS[key];
+  if (!preset) return;
+  var config = getMixerConfig();
+  config.preset = key;
+  config.weights = { recency: preset.recency, source: preset.source, unread: preset.unread, signals: preset.signals };
+  config.diversity = preset.diversity;
+  _mixerSave(config);
+  _mixerHighlightPreset(key);
+  // Update sliders if advanced section is visible
+  var adv = document.getElementById('mixer-advanced');
+  if (adv && adv.style.display !== 'none') {
+    ['recency', 'source', 'unread', 'signals'].forEach(function(k) {
+      var el = document.getElementById('mixer-' + k);
+      var lbl = document.getElementById('mixer-val-' + k);
+      if (el) el.value = config.weights[k];
+      if (lbl) lbl.textContent = config.weights[k];
+    });
+    var divEl = document.getElementById('mixer-diversity');
+    var divLbl = document.getElementById('mixer-val-diversity');
+    if (divEl) divEl.value = config.diversity;
+    if (divLbl) divLbl.textContent = config.diversity;
+  }
+}
+
+function mixerSliderChanged(key, val) {
+  val = parseInt(val, 10);
+  var config = getMixerConfig();
+  config.weights[key] = val;
+  config.preset = 'custom';
+  _mixerSave(config);
+  var lbl = document.getElementById('mixer-val-' + key);
+  if (lbl) lbl.textContent = val;
+  _mixerHighlightPreset('custom');
+}
+
+function mixerDiversityChanged(val) {
+  val = parseInt(val, 10);
+  var config = getMixerConfig();
+  config.diversity = val;
+  _mixerDetectPreset(config);
+  _mixerSave(config);
+  var lbl = document.getElementById('mixer-val-diversity');
+  if (lbl) lbl.textContent = val;
+}
+
+function mixerTagChanged(tag, val) {
+  val = parseInt(val, 10);
+  var config = getMixerConfig();
+  if (!config.tagBoosts) config.tagBoosts = {};
+  if (val === 0) delete config.tagBoosts[tag];
+  else config.tagBoosts[tag] = val;
+  _mixerSave(config);
+  var boostLabels = ['Reduce', 'Less', 'Neutral', 'More', 'Boost'];
+  var safeId = tag.replace(/[^a-zA-Z0-9]/g, '_');
+  var lbl = document.getElementById('mixer-tag-label-' + safeId);
+  if (lbl) lbl.textContent = boostLabels[val + 2];
+}
+
+function mixerToggleAdvanced() {
+  var adv = document.getElementById('mixer-advanced');
+  var toggle = document.getElementById('mixer-advanced-toggle');
+  if (!adv) return;
+  var show = adv.style.display === 'none';
+  adv.style.display = show ? '' : 'none';
+  if (toggle) toggle.textContent = show ? 'Hide advanced \u25B2' : 'Show advanced \u25BC';
+}
+
+function mixerReset() {
+  localStorage.removeItem('pr-magic-mixer');
+  scheduleRenderFileList();
+  openSettings('reading');
+}
+
+function _mixerHighlightPreset(key) {
+  document.querySelectorAll('#mixer-preset-pills .pill').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('data-val') === key);
+  });
+}
+
+function _mixerDetectPreset(config) {
+  var w = config.weights;
+  for (var key in MIXER_PRESETS) {
+    var p = MIXER_PRESETS[key];
+    if (w.recency === p.recency && w.source === p.source && w.unread === p.unread && w.signals === p.signals && config.diversity === p.diversity) {
+      config.preset = key;
+      _mixerHighlightPreset(key);
+      return;
+    }
+  }
+  config.preset = 'custom';
+  _mixerHighlightPreset('custom');
+}
+
 function settingsCustomSelect(btnId, options, currentVal, onSelect) {
   var existing = document.getElementById(btnId + '-panel');
   if (existing) { existing.remove(); return; }
@@ -550,6 +664,91 @@ function showSettingsPage(scrollToSection) {
   html += '</div>';
   html += '<div style="padding:6px 0"><button onclick="showBreakReminder()" style="font-size:12px;padding:4px 12px;background:var(--sidebar-bg);color:var(--link);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit">Preview break reminder</button></div>';
   html += '</div>';
+
+  // -- Magic Mixer card --
+  html += '<div class="card" id="settings-magic-mixer">';
+  html += '<div class="card-title">Magic Mixer</div>';
+  html += '<div class="card-desc">Control how Magic sort ranks your sidebar.</div>';
+  if (!magicSort) {
+    html += '<p style="color:var(--muted);font-size:13px">Magic sort is off. <a href="#" onclick="toggleMagicSort();openSettings(\'reading\');return false" style="color:var(--link)">Enable it</a> to use the mixer.</p>';
+  } else {
+    var mc = getMixerConfig();
+    var presets = [
+      ['balanced', 'Balanced'],
+      ['whats_new', "What\u2019s New"],
+      ['deep_reading', 'Deep Reading'],
+      ['discovery', 'Discovery'],
+      ['custom', 'Custom']
+    ];
+    html += '<div class="setting-row"><div class="setting-label"><label>Preset</label><div class="setting-desc">Quick configurations for common reading styles</div></div>';
+    html += '<div class="setting-control"><div class="pill-group" id="mixer-preset-pills">';
+    for (var mpi = 0; mpi < presets.length; mpi++) {
+      var pKey = presets[mpi][0], pLabel = presets[mpi][1];
+      var isActive = mc.preset === pKey || (!mc.preset && pKey === 'balanced');
+      html += '<button class="pill' + (isActive ? ' active' : '') + '" data-val="' + pKey + '" onclick="mixerSelectPreset(\'' + pKey + '\')">' + pLabel + '</button>';
+    }
+    html += '</div></div></div>';
+    html += '<div style="margin:8px 0"><a href="#" id="mixer-advanced-toggle" onclick="mixerToggleAdvanced();return false" style="font-size:12px;color:var(--link);text-decoration:none">Show advanced \u25BC</a></div>';
+    html += '<div id="mixer-advanced" style="display:none">';
+    var mixerSliders = [
+      ['recency', 'Freshness', 'How much newer articles are prioritized'],
+      ['source', 'Sources I read', 'Boost feeds you interact with more'],
+      ['unread', 'Unread boost', 'How much unread articles float up'],
+      ['signals', 'My activity', 'Boost starred, highlighted, or annotated articles']
+    ];
+    for (var msi = 0; msi < mixerSliders.length; msi++) {
+      var sKey = mixerSliders[msi][0], sLabel = mixerSliders[msi][1], sDesc = mixerSliders[msi][2];
+      var sVal = mc.weights[sKey];
+      html += '<div class="mixer-slider-row">';
+      html += '<div class="mixer-slider-label"><span>' + sLabel + '</span><span class="mixer-slider-value" id="mixer-val-' + sKey + '">' + sVal + '</span></div>';
+      html += '<input type="range" min="0" max="100" value="' + sVal + '" class="mixer-range" id="mixer-' + sKey + '" oninput="mixerSliderChanged(\'' + sKey + '\',this.value)">';
+      html += '<div class="mixer-slider-desc">' + sDesc + '</div>';
+      html += '</div>';
+    }
+    html += '<div class="mixer-slider-row">';
+    html += '<div class="mixer-slider-label"><span>Max per source</span><span class="mixer-slider-value" id="mixer-val-diversity">' + mc.diversity + '</span></div>';
+    html += '<input type="range" min="1" max="5" value="' + mc.diversity + '" class="mixer-range" id="mixer-diversity" oninput="mixerDiversityChanged(this.value)">';
+    html += '<div class="mixer-slider-desc">Maximum articles from one feed before mixing in others</div>';
+    html += '</div>';
+    // Tag boosts
+    var allTagCounts = {};
+    for (var mti = 0; mti < allFiles.length; mti++) {
+      var mcats = allFiles[mti].categories || [];
+      for (var mtj = 0; mtj < mcats.length; mtj++) {
+        allTagCounts[mcats[mtj]] = (allTagCounts[mcats[mtj]] || 0) + 1;
+      }
+    }
+    var tagEntries = Object.keys(allTagCounts).map(function(t) { return { tag: t, count: allTagCounts[t] }; });
+    tagEntries.sort(function(a, b) { return b.count - a.count; });
+    if (tagEntries.length > 0) {
+      html += '<div class="mixer-section-label">Content Mix</div>';
+      var boostLabels = ['Reduce', 'Less', 'Neutral', 'More', 'Boost'];
+      var showAllTags = tagEntries.length <= 8;
+      var visibleTags = showAllTags ? tagEntries : tagEntries.slice(0, 8);
+      html += '<div id="mixer-tags-visible">';
+      for (var mvt = 0; mvt < visibleTags.length; mvt++) {
+        var mtag = visibleTags[mvt].tag;
+        var bVal = (mc.tagBoosts && mc.tagBoosts[mtag]) || 0;
+        html += mixerTagRow(mtag, bVal, boostLabels);
+      }
+      html += '</div>';
+      if (!showAllTags) {
+        html += '<div id="mixer-tags-hidden" style="display:none">';
+        for (var mht = 8; mht < tagEntries.length; mht++) {
+          var htag = tagEntries[mht].tag;
+          var hbVal = (mc.tagBoosts && mc.tagBoosts[htag]) || 0;
+          html += mixerTagRow(htag, hbVal, boostLabels);
+        }
+        html += '</div>';
+        html += '<a href="#" onclick="document.getElementById(\'mixer-tags-hidden\').style.display=\'\';this.style.display=\'none\';return false" style="font-size:12px;color:var(--link);text-decoration:none">Show all ' + tagEntries.length + ' tags</a>';
+      }
+    }
+    html += '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">';
+    html += '<button onclick="mixerReset()" style="font-size:12px;padding:4px 12px;background:var(--sidebar-bg);color:var(--muted);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit">Reset to defaults</button>';
+    html += '</div>';
+    html += '</div>'; // end advanced section
+  }
+  html += '</div>'; // end magic mixer card
 
   html += '</div>'; // end reading tab
 

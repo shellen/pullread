@@ -14,16 +14,18 @@ function renderFileList() {
   if (magicSort) {
     if (displayFiles === filteredFiles) displayFiles = filteredFiles.slice();
     var engagement = computeSourceEngagement();
+    var mc = getMixerConfig();
     displayFiles.sort(function(a, b) {
-      return magicScore(b, engagement) - magicScore(a, engagement);
+      return magicScore(b, engagement, mc) - magicScore(a, engagement, mc);
     });
-    // Source diversity: max 3 articles per source in top positions, extras pushed down
+    // Source diversity cap from mixer config
+    var diversityCap = mc.diversity || 3;
     var sourceCounts = {};
     var top = [], overflow = [];
     for (var di = 0; di < displayFiles.length; di++) {
       var key = displayFiles[di].feed || displayFiles[di].domain || 'unknown';
       sourceCounts[key] = (sourceCounts[key] || 0) + 1;
-      if (sourceCounts[key] <= 3) top.push(displayFiles[di]);
+      if (sourceCounts[key] <= diversityCap) top.push(displayFiles[di]);
       else overflow.push(displayFiles[di]);
     }
     displayFiles = top.concat(overflow);
@@ -245,6 +247,22 @@ function toggleMagicSort() {
   renderFileList();
 }
 
+// Magic Mixer presets and config
+var MIXER_PRESETS = {
+  balanced:     { recency: 40, source: 35, unread: 15, signals: 10, diversity: 3 },
+  whats_new:    { recency: 60, source: 15, unread: 20, signals: 5,  diversity: 2 },
+  deep_reading: { recency: 15, source: 50, unread: 10, signals: 25, diversity: 4 },
+  discovery:    { recency: 25, source: 20, unread: 30, signals: 25, diversity: 2 }
+};
+
+function getMixerConfig() {
+  try {
+    var raw = localStorage.getItem('pr-magic-mixer');
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return { preset: 'balanced', weights: { recency: 40, source: 35, unread: 15, signals: 10 }, diversity: 3, tagBoosts: {} };
+}
+
 function computeSourceEngagement() {
   var stats = {};
   for (var i = 0; i < allFiles.length; i++) {
@@ -271,29 +289,50 @@ function computeSourceEngagement() {
   return engagement;
 }
 
-function magicScore(f, engagement) {
-  // Recency: exponential decay (weight 40)
-  // Podcasts use 12-hour half-life (decay 1.386), articles use 3-day (decay 0.231)
+function magicScore(f, engagement, mixerConfig) {
+  var w = mixerConfig.weights;
+  var sum = w.recency + w.source + w.unread + w.signals;
+  if (sum === 0) { w = { recency: 25, source: 25, unread: 25, signals: 25 }; sum = 100; }
+  var wR = w.recency / sum, wS = w.source / sum, wU = w.unread / sum, wSig = w.signals / sum;
+
+  // Recency: exponential decay
   var age = f.bookmarked ? (Date.now() - new Date(f.bookmarked).getTime()) / 86400000 : 30;
   var isPodcast = f.enclosureUrl && isMediaEnclosure(f.enclosureType);
   var decay = isPodcast ? 1.386 : 0.231;
   var recency = Math.exp(-decay * age);
 
-  // Source engagement (weight 35)
+  // Source engagement
   var key = f.feed || f.domain || 'unknown';
   var source = engagement[key] || 0;
 
-  // Unread boost (weight 15)
+  // Unread boost
   var unread = readArticles.has(f.filename) ? 0 : 1;
 
-  // Article signals (weight 10)
+  // Article signals
   var signals = 0;
   var notes = allNotesIndex[f.filename];
   if (notes && notes.isFavorite) signals += 0.3;
   if (allHighlightsIndex[f.filename] && allHighlightsIndex[f.filename].length) signals += 0.2;
   if (notes && (notes.articleNote || (notes.annotations && notes.annotations.length))) signals += 0.15;
 
-  return 40 * recency + 35 * source + 15 * unread + 10 * Math.min(signals, 1);
+  var rawScore = 100 * (wR * recency + wS * source + wU * unread + wSig * Math.min(signals, 1));
+
+  // Tag boost multiplier
+  var boosts = mixerConfig.tagBoosts;
+  if (boosts) {
+    var cats = f.categories || [];
+    var bestBoost = 0;
+    for (var ci = 0; ci < cats.length; ci++) {
+      var b = boosts[cats[ci]];
+      if (b !== undefined && Math.abs(b) > Math.abs(bestBoost)) bestBoost = b;
+    }
+    if (bestBoost !== 0) {
+      var multipliers = { '-2': 0.25, '-1': 0.5, '1': 1.5, '2': 2 };
+      rawScore *= (multipliers[String(bestBoost)] || 1);
+    }
+  }
+
+  return rawScore;
 }
 
 // Debounced localStorage write for read articles
