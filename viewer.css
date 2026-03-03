@@ -1217,6 +1217,16 @@
     font-size: 12px;
     color: var(--muted);
   }
+  .section-group { margin-bottom: 16px; }
+  .section-group.collapsed .section-body { display: none; }
+  .section-group.collapsed .section-chevron { transform: rotate(-90deg); }
+  .section-collapse { cursor: pointer; user-select: none; }
+  .section-chevron {
+    color: var(--muted);
+    transition: transform 0.15s ease;
+    margin-left: auto;
+  }
+  .section-body { padding: 4px 0 8px; }
   .dash-view-all {
     font-size: 12px;
     color: var(--link);

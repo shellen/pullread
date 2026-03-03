@@ -705,3 +705,29 @@ describe('For You section rendering', () => {
     expect(article).toContain('buildSectionRundownHtml()');
   });
 });
+
+describe('Tags tab section grouping', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('buildTagsTabHtml groups tags under section headings', () => {
+    const explore = readFileSync(join(rootDir, 'viewer', '10-explore.js'), 'utf-8');
+    expect(explore).toContain('section-header');
+    expect(explore).toContain('SECTION_LABELS');
+  });
+
+  test('Tags grouped by SECTION_MAP lookup', () => {
+    const explore = readFileSync(join(rootDir, 'viewer', '10-explore.js'), 'utf-8');
+    expect(explore).toContain('SECTION_MAP');
+  });
+
+  test('section groups are collapsible', () => {
+    const explore = readFileSync(join(rootDir, 'viewer', '10-explore.js'), 'utf-8');
+    expect(explore).toContain('section-collapse');
+  });
+
+  test('CSS supports section collapse', () => {
+    const css = readFileSync(join(rootDir, 'viewer.css'), 'utf-8');
+    expect(css).toContain('.section-group.collapsed .section-body');
+    expect(css).toContain('.section-chevron');
+  });
+});
