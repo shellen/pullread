@@ -236,12 +236,6 @@ function settingsBtnSelect(btn, hiddenId, val) {
 }
 
 // Magic Mixer helpers and event handlers
-var SECTION_LABELS = {
-  tech: 'Technology', news: 'News', science: 'Science', health: 'Health',
-  business: 'Business', culture: 'Culture', sports: 'Sports', food: 'Food',
-  lifestyle: 'Lifestyle', environment: 'Environment', education: 'Education', opinion: 'Opinion'
-};
-
 function mixerSectionRow(section, val, labels) {
   var displayName = SECTION_LABELS[section] || section;
   var h = '<div class="mixer-tag-row">';

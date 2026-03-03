@@ -283,7 +283,7 @@ function buildSectionRundown(maxPerSection) {
     var picked = articles.slice(0, slotCount);
     var entry = {};
     entry.section = sec;
-    entry.label = SECTION_LABELS[sec] || mixerFormatTopic(sec);
+    entry.label = SECTION_LABELS[sec] || formatTopicLabel(sec);
     entry.articles = picked.map(function(f) {
       return {
         filename: f.filename,
@@ -346,7 +346,7 @@ function discoverSections(maxDiscovered) {
       if (!usedArticles[tagArticleMap[tag][j]]) articles.push(tagArticleMap[tag][j]);
     }
     if (articles.length < 5) continue;
-    discovered.push({ id: tag, label: mixerFormatTopic(tag), articleFilenames: articles });
+    discovered.push({ id: tag, label: formatTopicLabel(tag), articleFilenames: articles });
     for (var j = 0; j < articles.length; j++) usedArticles[articles[j]] = true;
   }
 

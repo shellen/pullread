@@ -403,6 +403,14 @@ var SECTION_LABELS = {
   opinion: 'Opinion', other: 'Other'
 };
 
+function formatTopicLabel(tag) {
+  var spaced = tag.replace(/([a-z])([A-Z])/g, '$1 $2');
+  if (spaced === tag && tag.length > 12) {
+    spaced = tag.replace(/(intelligence|learning|science|change|policy|security|computing|technology|development|management|engineering)$/i, ' $1');
+  }
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
 function resolveSection(filename) {
   var notes = allNotesIndex[filename];
   if (!notes) return 'other';
