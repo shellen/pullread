@@ -1730,3 +1730,82 @@ describe('parseFeed - video podcast support', () => {
     expect(entries[0].videoEnclosure).toBeUndefined();
   });
 });
+
+describe('parseFeed - comment extraction', () => {
+  test('RSS feed with <comments> URL', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Blog</title>
+    <item>
+      <title>Post With Comments</title>
+      <link>https://example.com/post</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <comments>https://example.com/post#comments</comments>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].commentsUrl).toBe('https://example.com/post#comments');
+    expect(entries[0].commentCount).toBeUndefined();
+  });
+
+  test('RSS feed with <slash:comments> count', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:slash="http://purl.org/rss/1.0/modules/slash/">
+  <channel>
+    <title>Blog</title>
+    <item>
+      <title>Popular Post</title>
+      <link>https://example.com/popular</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <slash:comments>42</slash:comments>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].commentCount).toBe(42);
+  });
+
+  test('RSS feed with both comments URL and count', () => {
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:slash="http://purl.org/rss/1.0/modules/slash/">
+  <channel>
+    <title>Blog</title>
+    <item>
+      <title>Hot Post</title>
+      <link>https://example.com/hot</link>
+      <pubDate>Mon, 29 Jan 2024 12:00:00 GMT</pubDate>
+      <comments>https://example.com/hot#respond</comments>
+      <slash:comments>99</slash:comments>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].commentsUrl).toBe('https://example.com/hot#respond');
+    expect(entries[0].commentCount).toBe(99);
+  });
+
+  test('Atom feed with link rel="replies" and thr:count', () => {
+    const feed = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:thr="http://purl.org/syndication/thread/1.0">
+  <title>Atom Blog</title>
+  <entry>
+    <title>Discussed Entry</title>
+    <link href="https://example.com/discussed"/>
+    <id>urn:uuid:abc123</id>
+    <updated>2024-01-29T12:00:00Z</updated>
+    <link rel="replies" type="text/html" href="https://example.com/discussed#comments" thr:count="5"/>
+  </entry>
+</feed>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].commentsUrl).toBe('https://example.com/discussed#comments');
+    expect(entries[0].commentCount).toBe(5);
+  });
+
+  test('feeds without comment elements have undefined fields', () => {
+    const entries = parseFeed(RSS_FEED);
+    expect(entries[0].commentsUrl).toBeUndefined();
+    expect(entries[0].commentCount).toBeUndefined();
+  });
+});

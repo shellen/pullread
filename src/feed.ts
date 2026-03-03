@@ -24,6 +24,8 @@ export interface FeedEntry {
   author?: string;
   categories?: string[];
   thumbnail?: string;
+  commentsUrl?: string;
+  commentCount?: number;
 }
 
 type FeedType = 'atom' | 'rss' | 'rdf' | 'json';
@@ -271,6 +273,20 @@ function parseAtomFeed(feed: any): FeedEntry[] {
       || feedImage
       || undefined;
 
+    // Comments: Atom <link rel="replies"> with optional thr:count
+    let commentsUrl: string | undefined;
+    let commentCount: number | undefined;
+    const links = Array.isArray(entry.link) ? entry.link : (entry.link ? [entry.link] : []);
+    const repliesLink = links.find((l: any) => l['@_rel'] === 'replies');
+    if (repliesLink) {
+      commentsUrl = repliesLink['@_href'] || undefined;
+      const thrCount = repliesLink['@_thr:count'];
+      if (thrCount != null) {
+        const parsed = parseInt(String(thrCount), 10);
+        if (!isNaN(parsed)) commentCount = parsed;
+      }
+    }
+
     return {
       title: extractTitle(entry.title),
       url,
@@ -280,7 +296,9 @@ function parseAtomFeed(feed: any): FeedEntry[] {
       contentHtml: contentHtml || undefined,
       author: author || undefined,
       categories,
-      thumbnail
+      thumbnail,
+      commentsUrl,
+      commentCount,
     };
   });
 }
@@ -364,6 +382,11 @@ function parseRssFeed(rss: any): FeedEntry[] {
       videoEnclosure = undefined; // primary IS the video
     }
 
+    // Comments: RSS <comments> URL and <slash:comments> count
+    const commentsUrl = typeof item.comments === 'string' ? item.comments.trim() : undefined;
+    const rawSlashComments = item['slash:comments'];
+    const commentCount = rawSlashComments != null ? parseInt(String(rawSlashComments), 10) : undefined;
+
     return [{
       title: extractTitle(item.title),
       url,
@@ -375,7 +398,9 @@ function parseRssFeed(rss: any): FeedEntry[] {
       videoEnclosure,
       author: authorName || undefined,
       categories,
-      thumbnail
+      thumbnail,
+      commentsUrl: commentsUrl || undefined,
+      commentCount: commentCount && !isNaN(commentCount) ? commentCount : undefined,
     }];
   });
 }

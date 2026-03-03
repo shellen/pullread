@@ -588,6 +588,12 @@ function renderArticle(text, filename) {
     metaLineParts.push('<span class="author" onclick="searchByAuthor(\'' + escapeHtml(authorText).replace(/'/g, "\\'") + '\')" title="Search for articles by this author">' + escapeHtml(authorText) + '</span>');
   }
   if (meta && meta.bookmarked) metaLineParts.push('<span title="' + escapeHtml(timeAgoTitle(meta.bookmarked)) + '">' + escapeHtml(timeAgo(meta.bookmarked)) + '</span>');
+  if (meta && meta.comments_url) {
+    var commentLabel = meta.comment_count && meta.comment_count !== '0'
+      ? meta.comment_count + ' comment' + (meta.comment_count !== '1' ? 's' : '')
+      : 'Comments';
+    metaLineParts.push('<a href="#" onclick="prOpenExternal(\'' + escapeJsStr(meta.comments_url) + '\');return false" class="comments-link" title="View comments">' + escapeHtml(commentLabel) + '</a>');
+  }
   if (metaLineParts.length) {
     html += '<div class="article-meta">' + metaLineParts.join('<span class="sep">&middot;</span>') + '</div>';
   }

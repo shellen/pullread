@@ -275,6 +275,8 @@ async function syncFeed(
         lang,
         categories: entry.categories,
         source,
+        commentsUrl: entry.commentsUrl,
+        commentCount: entry.commentCount,
       });
 
       storage.markProcessed({

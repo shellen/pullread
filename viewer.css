@@ -1811,6 +1811,8 @@
   }
   .article-meta .author:hover { text-decoration: underline; }
   .article-meta .sep { color: var(--border); font-size: 10px; }
+  .comments-link { color: var(--muted); text-decoration: none; cursor: pointer; }
+  .comments-link:hover { color: var(--link); }
   .article-hero {
     margin: 16px 0 20px;
   }

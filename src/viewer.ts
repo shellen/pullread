@@ -36,6 +36,8 @@ interface FileMeta {
   enclosureDuration: string;
   videoEnclosureUrl: string;
   videoEnclosureType: string;
+  commentsUrl: string;
+  commentCount: number;
   categories: string[];
 }
 
@@ -496,6 +498,8 @@ function listFiles(outputPath: string): FileMeta[] {
         enclosureDuration: meta.enclosure_duration || '',
         videoEnclosureUrl: meta.video_enclosure_url || '',
         videoEnclosureType: meta.video_enclosure_type || '',
+        commentsUrl: meta.comments_url || '',
+        commentCount: meta.comment_count ? parseInt(meta.comment_count, 10) : 0,
         categories,
       });
     } catch {
@@ -534,6 +538,8 @@ function listFiles(outputPath: string): FileMeta[] {
         enclosureDuration: '',
         videoEnclosureUrl: '',
         videoEnclosureType: '',
+        commentsUrl: '',
+        commentCount: 0,
         categories: [],
       });
     } catch (err) {
