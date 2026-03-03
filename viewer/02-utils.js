@@ -388,7 +388,7 @@ function allocateSectionSlots(sectionCounts, totalSlots) {
   var result = {};
   for (var key in sectionCounts) result[key] = 0;
 
-  if (sections.length === 0 || totalSlots === 0) return result;
+  if (sections.length === 0 || totalSlots <= 0) return result;
 
   var ceiling = sections.length === 1 ? totalSlots : Math.ceil(totalSlots * 0.4);
 
