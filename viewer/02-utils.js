@@ -1,3 +1,5 @@
+// ABOUTME: Shared utility functions for the viewer — media detection, time formatting, search, sections
+// ABOUTME: Used by sidebar, article, explore, and graph modules via concatenated global scope
 // Media enclosure type helpers — shared across article, sidebar, and TTS
 function isAudioEnclosure(type) { return !!(type && type.startsWith('audio/')); }
 function isVideoEnclosure(type) {
