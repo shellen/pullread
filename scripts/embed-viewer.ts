@@ -89,6 +89,7 @@ const ICON_MAP: Array<{ id: string; file: string; variant?: 'solid' | 'chevron' 
   { id: 'i-backward', file: 'backward.svg' },
   { id: 'i-bars', file: 'bars-3.svg' },
   { id: 'i-book', file: 'book-open.svg' },
+  { id: 'i-bookmark', file: 'bookmark.svg' },
   { id: 'i-calendar', file: 'calendar.svg' },
   { id: 'i-chevron-down', file: 'chevron-down.svg', variant: 'chevron' },
   { id: 'i-chevron-left', file: 'chevron-left.svg', variant: 'chevron' },

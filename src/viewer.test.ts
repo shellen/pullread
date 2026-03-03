@@ -538,6 +538,40 @@ describe('race condition guards', () => {
   });
 });
 
+describe('bookmark service detection', () => {
+  let isBookmarkServiceUrl: (url: string) => boolean;
+
+  beforeAll(() => {
+    const rootDir = join(__dirname, '..');
+    const utils = readFileSync(join(rootDir, 'viewer', '02-utils.js'), 'utf-8');
+    const fn = new Function(utils + '\nreturn { isBookmarkServiceUrl };');
+    isBookmarkServiceUrl = fn().isBookmarkServiceUrl;
+  });
+
+  test('detects known bookmark services', () => {
+    expect(isBookmarkServiceUrl('https://www.instapaper.com/rss/123/abc')).toBe(true);
+    expect(isBookmarkServiceUrl('https://raindrop.io/collection/123/feed')).toBe(true);
+    expect(isBookmarkServiceUrl('https://pinboard.in/feeds/u:user/unread/')).toBe(true);
+    expect(isBookmarkServiceUrl('https://getpocket.com/users/user/feed/all')).toBe(true);
+  });
+
+  test('detects Drafty link feeds', () => {
+    expect(isBookmarkServiceUrl('https://www.drafty.com/@jason/links/rss')).toBe(true);
+    expect(isBookmarkServiceUrl('https://drafty.com/@someone/links/feed.xml')).toBe(true);
+  });
+
+  test('rejects non-bookmark feeds', () => {
+    expect(isBookmarkServiceUrl('https://arstechnica.com/feed/')).toBe(false);
+    expect(isBookmarkServiceUrl('https://www.nytimes.com/rss/homepage')).toBe(false);
+    expect(isBookmarkServiceUrl('https://drafty.com/@jason/posts/rss')).toBe(false);
+  });
+
+  test('handles null/empty', () => {
+    expect(isBookmarkServiceUrl('')).toBe(false);
+    expect(isBookmarkServiceUrl(null as any)).toBe(false);
+  });
+});
+
 describe('editorial sections', () => {
   let SECTION_MAP: Record<string, string>;
   let SECTIONS: string[];

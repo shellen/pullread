@@ -1,5 +1,30 @@
 // ABOUTME: Shared utility functions for the viewer — media detection, time formatting, search, sections
 // ABOUTME: Used by sidebar, article, explore, and graph modules via concatenated global scope
+// Bookmark service detection — feeds from these domains are bookmark/read-later sources
+var BOOKMARK_DOMAINS = [
+  'instapaper.com', 'raindrop.io', 'pinboard.in', 'getpocket.com',
+  'readwise.io', 'omnivore.app', 'wallabag.org', 'linkding.',
+  'matter.md',
+];
+
+function isBookmarkServiceUrl(feedUrl) {
+  if (!feedUrl) return false;
+  var lower = feedUrl.toLowerCase();
+  for (var i = 0; i < BOOKMARK_DOMAINS.length; i++) {
+    if (lower.indexOf(BOOKMARK_DOMAINS[i]) !== -1) return true;
+  }
+  // Drafty link feeds: https://www.drafty.com/@username/links/*
+  if (/drafty\.com\/@[^/]+\/links/i.test(feedUrl)) return true;
+  return false;
+}
+
+// Global set of feed names that are bookmark services (populated at init from config)
+var _bookmarkFeedNames = new Set();
+
+function isBookmarkArticle(f) {
+  return _bookmarkFeedNames.has(f.feed || f.domain || '');
+}
+
 // Media enclosure type helpers — shared across article, sidebar, and TTS
 function isAudioEnclosure(type) { return !!(type && type.startsWith('audio/')); }
 function isVideoEnclosure(type) {
