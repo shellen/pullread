@@ -553,16 +553,21 @@ describe('editorial sections', () => {
     resolveSection = fns.resolveSection;
   });
 
-  test('SECTIONS lists all 7 core sections', () => {
-    expect(SECTIONS).toEqual(['tech', 'news', 'science', 'business', 'culture', 'opinion', 'lifestyle']);
+  test('SECTIONS lists all 12 core sections', () => {
+    expect(SECTIONS).toEqual(['tech', 'news', 'science', 'health', 'business', 'culture', 'sports', 'food', 'lifestyle', 'environment', 'education', 'opinion']);
   });
 
   test('SECTION_MAP maps known tags to sections', () => {
     expect(SECTION_MAP['artificialintelligence']).toBe('tech');
-    expect(SECTION_MAP['climatechange']).toBe('science');
+    expect(SECTION_MAP['climatechange']).toBe('environment');
     expect(SECTION_MAP['finance']).toBe('business');
     expect(SECTION_MAP['music']).toBe('culture');
     expect(SECTION_MAP['politics']).toBe('news');
+    expect(SECTION_MAP['medicine']).toBe('health');
+    expect(SECTION_MAP['football']).toBe('sports');
+    expect(SECTION_MAP['cooking']).toBe('food');
+    expect(SECTION_MAP['sustainability']).toBe('environment');
+    expect(SECTION_MAP['academia']).toBe('education');
   });
 
   test('resolveSection returns section from allNotesIndex annotation', () => {

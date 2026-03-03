@@ -14,7 +14,7 @@ const AUTOTAG_PROMPT = `Extract 3-8 machine tags from this article for relationa
 
 Return ONLY a valid JSON object with two fields:
 - "tags": array of lowercase tag strings with no spaces or dashes
-- "section": one of "tech", "news", "science", "business", "culture", "opinion", "lifestyle"
+- "section": one of "tech", "news", "science", "health", "business", "culture", "sports", "food", "lifestyle", "environment", "education", "opinion"
 
 No explanation, no markdown formatting — just the raw JSON object.
 Example: {"tags": ["artificialintelligence","openai","regulation","samaltman","safety"], "section": "tech"}
@@ -26,7 +26,7 @@ interface AutotagResult {
   model: string;
 }
 
-const VALID_SECTIONS = ['tech', 'news', 'science', 'business', 'culture', 'opinion', 'lifestyle'];
+const VALID_SECTIONS = ['tech', 'news', 'science', 'health', 'business', 'culture', 'sports', 'food', 'lifestyle', 'environment', 'education', 'opinion'];
 
 
 /**

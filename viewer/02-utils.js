@@ -312,7 +312,7 @@ function prPrintHtml(bodyContent) {
 }
 
 // Editorial section taxonomy — maps machineTags to newspaper-style sections
-var SECTIONS = ['tech', 'news', 'science', 'business', 'culture', 'opinion', 'lifestyle'];
+var SECTIONS = ['tech', 'news', 'science', 'health', 'business', 'culture', 'sports', 'food', 'lifestyle', 'environment', 'education', 'opinion'];
 
 var SECTION_MAP = {
   // Tech
@@ -323,16 +323,19 @@ var SECTION_MAP = {
   google: 'tech', microsoft: 'tech', amazon: 'tech', meta: 'tech', openai: 'tech',
   semiconductors: 'tech', computing: 'tech', android: 'tech', ios: 'tech',
   linux: 'tech', python: 'tech', javascript: 'tech', rust: 'tech', golang: 'tech',
-  // News
+  // News & Politics
   politics: 'news', government: 'news', elections: 'news', law: 'news',
   legislation: 'news', diplomacy: 'news', military: 'news', congress: 'news',
   supremecourt: 'news', whitehouse: 'news', foreignpolicy: 'news',
   immigration: 'news', democracy: 'news', journalism: 'news',
   // Science
-  research: 'science', climate: 'science', climatechange: 'science', space: 'science',
-  biology: 'science', physics: 'science', medicine: 'science', environment: 'science',
-  neuroscience: 'science', genetics: 'science', astronomy: 'science', nasa: 'science',
-  health: 'science', publichealth: 'science', mentalhealth: 'science',
+  research: 'science', space: 'science', physics: 'science',
+  biology: 'science', neuroscience: 'science', genetics: 'science',
+  astronomy: 'science', nasa: 'science', chemistry: 'science',
+  // Health
+  health: 'health', medicine: 'health', publichealth: 'health',
+  mentalhealth: 'health', nutrition: 'health', wellness: 'health',
+  fitness: 'health', medical: 'health', healthcare: 'health',
   // Business
   finance: 'business', economics: 'business', markets: 'business',
   entrepreneurship: 'business', investing: 'business', management: 'business',
@@ -343,17 +346,36 @@ var SECTION_MAP = {
   books: 'culture', media: 'culture', gaming: 'culture', television: 'culture',
   literature: 'culture', theater: 'culture', design: 'culture', architecture: 'culture',
   photography: 'culture', animation: 'culture', comics: 'culture', podcasts: 'culture',
+  // Sports
+  football: 'sports', basketball: 'sports', baseball: 'sports', soccer: 'sports',
+  tennis: 'sports', cycling: 'sports', esports: 'sports', olympics: 'sports',
+  nfl: 'sports', nba: 'sports', mlb: 'sports', hockey: 'sports',
+  golf: 'sports', running: 'sports', swimming: 'sports', athletics: 'sports',
+  // Food & Drink
+  food: 'food', cooking: 'food', recipes: 'food', restaurants: 'food',
+  wine: 'food', coffee: 'food', fermentation: 'food', baking: 'food',
+  beer: 'food', cocktails: 'food', cuisine: 'food',
+  // Lifestyle
+  travel: 'lifestyle', fashion: 'lifestyle', parenting: 'lifestyle',
+  productivity: 'lifestyle', diy: 'lifestyle', home: 'lifestyle',
+  gardening: 'lifestyle', pets: 'lifestyle', relationships: 'lifestyle',
+  // Environment
+  climate: 'environment', climatechange: 'environment', environment: 'environment',
+  energy: 'environment', sustainability: 'environment', renewables: 'environment',
+  conservation: 'environment', solar: 'environment', pollution: 'environment',
+  // Education
+  education: 'education', learning: 'education', academia: 'education',
+  schools: 'education', edtech: 'education', pedagogy: 'education',
+  university: 'education', literacy: 'education', teaching: 'education',
   // Opinion (few tags — mostly LLM-classified)
   essay: 'opinion', commentary: 'opinion', editorial: 'opinion', analysis: 'opinion',
-  // Lifestyle
-  food: 'lifestyle', travel: 'lifestyle', fitness: 'lifestyle', fashion: 'lifestyle',
-  parenting: 'lifestyle', cooking: 'lifestyle', wellness: 'lifestyle',
-  productivity: 'lifestyle', diy: 'lifestyle',
 };
 
 var SECTION_LABELS = {
-  tech: 'Tech', news: 'News', science: 'Science', business: 'Business',
-  culture: 'Culture', opinion: 'Opinion', lifestyle: 'Lifestyle', other: 'Other'
+  tech: 'Tech', news: 'News & Politics', science: 'Science', health: 'Health',
+  business: 'Business', culture: 'Culture', sports: 'Sports', food: 'Food & Drink',
+  lifestyle: 'Lifestyle', environment: 'Environment', education: 'Education',
+  opinion: 'Opinion', other: 'Other'
 };
 
 function resolveSection(filename) {

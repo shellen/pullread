@@ -4,17 +4,22 @@
 
 **Approach:** Hybrid fixed + discovered sections with tag-first classification and LLM fallback.
 
-## Core Sections (7 fixed)
+## Core Sections (12 fixed)
 
-| Section | Example machineTags |
-|---------|---------------------|
-| **Tech** | artificialintelligence, programming, software, cybersecurity, startups, machinelearning, cloudcomputing |
-| **News** | politics, government, currentevents, elections, law, legislation, diplomacy |
-| **Science** | research, climate, space, health, biology, physics, medicine, environment |
-| **Business** | finance, economics, markets, entrepreneurship, investing, management |
-| **Culture** | arts, entertainment, music, film, books, media, gaming, television |
-| **Opinion** | essays, commentary, analysis (hard to detect from tags alone — LLM fallback) |
-| **Lifestyle** | food, travel, design, photography, fitness, fashion, parenting |
+| Section | Slug | Example machineTags |
+|---------|------|---------------------|
+| **Tech** | `tech` | artificialintelligence, programming, software, cybersecurity, startups, machinelearning, hardware |
+| **News & Politics** | `news` | politics, government, elections, law, diplomacy, journalism, military |
+| **Science** | `science` | research, space, physics, biology, astronomy, neuroscience, genetics |
+| **Health** | `health` | medicine, publichealth, mentalhealth, nutrition, wellness, fitness |
+| **Business** | `business` | finance, economics, markets, investing, management, venturecapital |
+| **Culture** | `culture` | arts, music, film, books, gaming, television, media, design |
+| **Sports** | `sports` | football, basketball, baseball, soccer, tennis, cycling, esports |
+| **Food & Drink** | `food` | cooking, recipes, restaurants, wine, coffee, fermentation, food |
+| **Lifestyle** | `lifestyle` | travel, fashion, parenting, diy, home, photography |
+| **Environment** | `environment` | climate, energy, sustainability, renewables, conservation, climatechange |
+| **Education** | `education` | learning, academia, schools, edtech, pedagogy, university |
+| **Opinion** | `opinion` | essay, commentary, editorial, analysis |
 
 Plus **2-3 discovered sections** — the system clusters remaining unclassified tags and surfaces any group with 5+ articles as a user-specific section (e.g., someone reading lots of cycling feeds gets a "Cycling" section).
 
@@ -22,7 +27,7 @@ Plus **2-3 discovered sections** — the system clusters remaining unclassified 
 
 1. **Tag mapping** — Static `SECTION_MAP` object maps each machineTag string to a section slug. Applied client-side in the viewer. Covers ~80% of articles with zero cost.
 
-2. **LLM fallback** — Articles with no confident tag mapping get a `section` field during the autotagger pass. Piggyback on the existing machineTags LLM call by adding section classification to the prompt. One of: `tech`, `news`, `science`, `business`, `culture`, `opinion`, `lifestyle`.
+2. **LLM fallback** — Articles with no confident tag mapping get a `section` field during the autotagger pass. Piggyback on the existing machineTags LLM call by adding section classification to the prompt. One of: `tech`, `news`, `science`, `health`, `business`, `culture`, `sports`, `food`, `lifestyle`, `environment`, `education`, `opinion`.
 
 3. **Storage** — Section stored in annotation JSON alongside machineTags as `"section": "tech"`. Once classified, never re-classified unless user triggers re-tag.
 
