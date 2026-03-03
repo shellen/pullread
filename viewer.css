@@ -1444,6 +1444,8 @@
   /* Compact cards wrap instead of horizontal scroll */
   .dash-cards-compact {
     flex-wrap: wrap;
+    gap: 20px 16px;
+    overflow-x: visible;
   }
 
   /* Source-colored initial letter placeholder */
