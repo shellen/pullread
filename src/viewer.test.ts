@@ -324,10 +324,11 @@ describe('EPUB support', () => {
 describe('XSS sanitization', () => {
   const rootDir = join(__dirname, '..');
 
-  test('viewer.html includes DOMPurify script tag', () => {
+  test('DOMPurify is bundled via embed-viewer.ts', () => {
     const html = readFileSync(join(rootDir, 'viewer.html'), 'utf-8');
-    expect(html).toContain('dompurify');
-    expect(html).toContain('purify.min.js');
+    expect(html).toContain('DOMPurify');
+    const pkg = JSON.parse(readFileSync(join(rootDir, 'package.json'), 'utf-8'));
+    expect(pkg.dependencies['dompurify']).toBeDefined();
   });
 
   test('02-utils.js defines sanitizeHtml helper', () => {

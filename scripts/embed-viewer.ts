@@ -169,16 +169,50 @@ const css = readFileSync(cssPath, 'utf-8');
 const jsFiles = readdirSync(jsDir).filter(f => f.endsWith('.js') && !f.endsWith('.test.js')).sort();
 const jsModules = jsFiles.map(f => readFileSync(join(jsDir, f), 'utf-8'));
 
-// Bundle hls.js light build for HLS streaming support (Safari handles natively)
-const hlsPath = join(rootDir, 'node_modules', 'hls.js', 'dist', 'hls.light.min.js');
-const hlsJs = existsSync(hlsPath) ? readFileSync(hlsPath, 'utf-8') : '';
-if (hlsJs) {
-  console.log(`  HLS: ${hlsJs.length} bytes (hls.light.min.js)`);
-} else {
-  console.warn('  Warning: hls.js light build not found (run bun install)');
+// Bundle third-party libraries for offline support (no CDN dependencies at runtime)
+const vendorLibs: Array<{ name: string; path: string; required: boolean }> = [
+  { name: 'hls.js',      path: 'hls.js/dist/hls.light.min.js',                   required: false },
+  { name: 'marked',      path: 'marked/lib/marked.umd.js',                        required: true },
+  { name: 'highlight.js', path: '@highlightjs/cdn-assets/highlight.min.js',        required: true },
+  { name: 'DOMPurify',   path: 'dompurify/dist/purify.min.js',                    required: true },
+  { name: 'mermaid',     path: 'mermaid/dist/mermaid.min.js',                      required: false },
+];
+
+const vendorJs: string[] = [];
+for (const lib of vendorLibs) {
+  const libPath = join(rootDir, 'node_modules', lib.path);
+  if (existsSync(libPath)) {
+    const content = readFileSync(libPath, 'utf-8');
+    vendorJs.push(content);
+    console.log(`  ${lib.name}: ${content.length} bytes (${lib.path.split('/').pop()})`);
+  } else if (lib.required) {
+    console.error(`  ERROR: ${lib.name} not found at ${lib.path} (run bun install)`);
+    process.exit(1);
+  } else {
+    console.warn(`  Warning: ${lib.name} not found (run bun install)`);
+  }
 }
 
-const js = (hlsJs ? hlsJs + '\n' : '') + jsModules.join('\n');
+// Bundle highlight.js theme CSS as separate <style> blocks with IDs for theme switching
+// (updateHljsTheme() in 04-article.js toggles them via getElementById)
+const hljsThemes: Array<{ name: string; path: string; media: string; id: string }> = [
+  { name: 'github',      path: '@highlightjs/cdn-assets/styles/github.min.css',      media: '(prefers-color-scheme: light)', id: 'hljs-light' },
+  { name: 'github-dark', path: '@highlightjs/cdn-assets/styles/github-dark.min.css', media: '(prefers-color-scheme: dark)',  id: 'hljs-dark' },
+];
+
+let hljsStyleTags = '';
+for (const theme of hljsThemes) {
+  const themePath = join(rootDir, 'node_modules', theme.path);
+  if (existsSync(themePath)) {
+    const content = readFileSync(themePath, 'utf-8');
+    hljsStyleTags += `<style id="${theme.id}" media="${theme.media}">${content}</style>\n`;
+    console.log(`  hljs ${theme.name}: ${content.length} bytes`);
+  } else {
+    console.warn(`  Warning: hljs theme ${theme.name} not found`);
+  }
+}
+
+const js = vendorJs.join('\n') + '\n' + jsModules.join('\n');
 
 // Generate font @font-face CSS and prepend to the main CSS
 const fontCss = generateFontCSS();
@@ -188,6 +222,7 @@ const iconSymbols = generateIconSymbols();
 
 // Inline icons, CSS (with fonts prepended), and JS into the HTML template
 html = html.replace('<!-- INJECT:ICONS -->', () => iconSymbols);
+html = html.replace('<!-- INJECT:HLJS_THEMES -->', () => hljsStyleTags);
 html = html.replace('/* INJECT:CSS */', () => fontCss + '\n' + css);
 html = html.replace('/* INJECT:JS */', () => js);
 
