@@ -7,19 +7,26 @@ import { summarizeText, loadLLMConfig, LLMConfig, Provider, getDefaultModel } fr
 import { listMarkdownFiles, resolveFilePath } from './writer';
 import { loadAnnotation, saveAnnotation, allNotes } from './annotations';
 
-const AUTOTAG_PROMPT = `Extract 3-8 machine tags from this article for relational mapping. Tags should help identify connections between articles. Include:
+const AUTOTAG_PROMPT = `Extract 3-8 machine tags from this article for relational mapping, and classify the article into an editorial section. Tags should help identify connections between articles. Include:
 - Main topics (e.g., "artificialintelligence", "climatechange", "economics")
 - Key entities mentioned prominently — people, companies, technologies, places
 - Themes (e.g., "regulation", "opensource", "privacy", "fundraising")
 
-Return ONLY a valid JSON array of lowercase tag strings with no spaces or dashes. No explanation, no markdown formatting — just the raw JSON array.
-Example: ["artificialintelligence","openai","regulation","samaltman","safety"]
+Return ONLY a valid JSON object with two fields:
+- "tags": array of lowercase tag strings with no spaces or dashes
+- "section": one of "tech", "news", "science", "business", "culture", "opinion", "lifestyle"
+
+No explanation, no markdown formatting — just the raw JSON object.
+Example: {"tags": ["artificialintelligence","openai","regulation","samaltman","safety"], "section": "tech"}
 For non-English articles, use English tags where a clear English equivalent exists, but keep proper nouns and culturally specific terms in their original language.`;
 
 interface AutotagResult {
   machineTags: string[];
+  section?: string;
   model: string;
 }
+
+const VALID_SECTIONS = ['tech', 'news', 'science', 'business', 'culture', 'opinion', 'lifestyle'];
 
 
 /**
@@ -43,46 +50,58 @@ export async function autotagText(articleText: string, config?: LLMConfig): Prom
     // We still use the same model; the prompt determines the output format
   });
 
-  const machineTags = parseTagsFromResponse(result.summary);
-  return { machineTags, model: result.model };
+  const { machineTags, section } = parseAutotagResponse(result.summary);
+  return { machineTags, section, model: result.model };
 }
 
 /**
- * Parse a JSON array of tags from the LLM response.
- * Handles common formatting issues like markdown code blocks.
+ * Parse tags and optional section from the LLM response.
+ * Handles both object format {tags, section} and legacy array format.
  */
-function parseTagsFromResponse(response: string): string[] {
+function parseAutotagResponse(response: string): { machineTags: string[]; section?: string } {
   let text = response.trim();
-
-  // Strip markdown code block if present
   text = text.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
   text = text.trim();
 
+  const normalizeTags = (arr: unknown[]): string[] =>
+    arr
+      .filter((t: unknown): t is string => typeof t === 'string')
+      .map(t => t.toLowerCase().trim().replace(/[\s\-]+/g, ''))
+      .filter(t => t.length > 0 && t.length <= 50);
+
+  const validateSection = (s: unknown): string | undefined =>
+    typeof s === 'string' && VALID_SECTIONS.includes(s.toLowerCase()) ? s.toLowerCase() : undefined;
+
   try {
     const parsed = JSON.parse(text);
+    if (parsed && !Array.isArray(parsed) && typeof parsed === 'object' && Array.isArray(parsed.tags)) {
+      return { machineTags: normalizeTags(parsed.tags), section: validateSection(parsed.section) };
+    }
     if (Array.isArray(parsed)) {
-      return parsed
-        .filter((t: unknown): t is string => typeof t === 'string')
-        .map(t => t.toLowerCase().trim().replace(/[\s\-]+/g, ''))
-        .filter(t => t.length > 0 && t.length <= 50);
+      return { machineTags: normalizeTags(parsed) };
     }
   } catch {
-    // Try to extract array-like content from the response
+    const objMatch = text.match(/\{[\s\S]*\}/);
+    if (objMatch) {
+      try {
+        const parsed = JSON.parse(objMatch[0]);
+        if (parsed && Array.isArray(parsed.tags)) {
+          return { machineTags: normalizeTags(parsed.tags), section: validateSection(parsed.section) };
+        }
+      } catch {}
+    }
     const arrayMatch = text.match(/\[[\s\S]*?\]/);
     if (arrayMatch) {
       try {
         const parsed = JSON.parse(arrayMatch[0]);
         if (Array.isArray(parsed)) {
-          return parsed
-            .filter((t: unknown): t is string => typeof t === 'string')
-            .map(t => t.toLowerCase().trim().replace(/[\s\-]+/g, ''))
-            .filter(t => t.length > 0 && t.length <= 50);
+          return { machineTags: normalizeTags(parsed) };
         }
       } catch {}
     }
   }
 
-  return [];
+  return { machineTags: [] };
 }
 
 /**
@@ -96,9 +115,11 @@ export function hasMachineTags(filename: string): boolean {
 /**
  * Save machine tags for an article. Preserves existing user data.
  */
-export function saveMachineTags(filename: string, machineTags: string[]): void {
+export function saveMachineTags(filename: string, machineTags: string[], section?: string): void {
   const existing = loadAnnotation(filename);
-  saveAnnotation(filename, { ...existing, machineTags });
+  const update = { ...existing, machineTags };
+  if (section) update.section = section;
+  saveAnnotation(filename, update);
 }
 
 /**
@@ -173,8 +194,8 @@ export async function autotagBatch(
       const result = await autotagText(body, llmConfig);
 
       if (result.machineTags.length > 0) {
-        saveMachineTags(file, result.machineTags);
-        console.log(` [${result.machineTags.join(', ')}]`);
+        saveMachineTags(file, result.machineTags, result.section);
+        console.log(` [${result.machineTags.join(', ')}]${result.section ? ` (${result.section})` : ''}`);
         tagged++;
       } else {
         console.log(' no tags extracted');

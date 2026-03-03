@@ -1015,7 +1015,7 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
         const name = url.searchParams.get('name');
         if (name) {
           const annot = loadAnnotation(name);
-          sendJson(res, { articleNote: annot.articleNote, annotations: annot.annotations, tags: annot.tags, isFavorite: annot.isFavorite, ...(annot.machineTags.length ? { machineTags: annot.machineTags } : {}) });
+          sendJson(res, { articleNote: annot.articleNote, annotations: annot.annotations, tags: annot.tags, isFavorite: annot.isFavorite, ...(annot.machineTags.length ? { machineTags: annot.machineTags } : {}), ...(annot.section ? { section: annot.section } : {}) });
         } else {
           sendJson(res, allNotes());
         }
