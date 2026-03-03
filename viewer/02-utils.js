@@ -12,6 +12,24 @@ function isHlsSource(url) {
   return lower.endsWith('.m3u8') || lower.includes('.m3u8?');
 }
 
+function extractYouTubeVideoId(url) {
+  if (!url) return null;
+  try {
+    var u = new URL(url);
+    var host = u.hostname.replace(/^www\./, '').replace(/^m\./, '');
+    if (host === 'youtu.be') return u.pathname.slice(1).split(/[/?]/)[0] || null;
+    if (host !== 'youtube.com') return null;
+    if (u.searchParams.get('v')) return u.searchParams.get('v');
+    var m = u.pathname.match(/^\/(embed|v|shorts)\/([^/?]+)/);
+    return m ? m[2] : null;
+  } catch { return null; }
+}
+
+function isYouTubeDomain(domain) {
+  if (!domain) return false;
+  return /^(www\.|m\.)?(youtube\.com|youtu\.be)$/.test(domain);
+}
+
 // Abbreviate large numbers: 0-99 exact, 100+ → "100+", 1000+ → "1K+", 13000 → "13K+"
 function approxCount(n) {
   if (n < 100) return String(n);
