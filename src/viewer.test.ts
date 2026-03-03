@@ -704,6 +704,18 @@ describe('For You section rendering', () => {
     const article = readFileSync(join(rootDir, 'viewer', '04-article.js'), 'utf-8');
     expect(article).toContain('buildSectionRundownHtml()');
   });
+
+  test('section card onerror calls dashCardInitialHtml at runtime, not pre-rendered', () => {
+    const article = readFileSync(join(rootDir, 'viewer', '04-article.js'), 'utf-8');
+    // Extract the buildSectionRundownHtml function body
+    const fnMatch = article.match(/function buildSectionRundownHtml\b[\s\S]*?^}/m);
+    expect(fnMatch).toBeTruthy();
+    const fnBody = fnMatch![0];
+    // The onerror should call dashCardInitialHtml as a function (runtime call pattern)
+    // NOT pre-render it and embed raw HTML with unescaped quotes in the attribute
+    expect(fnBody).toMatch(/onerror="this\.outerHTML=dashCardInitialHtml\(/);
+    expect(fnBody).not.toContain("dashCardInitialHtml(a.domain, 80).replace");
+  });
 });
 
 describe('Tags tab section grouping', () => {

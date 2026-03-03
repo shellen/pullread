@@ -370,7 +370,7 @@ function buildSectionRundownHtml() {
       var onclick = 'dashLoadArticle(\'' + escapeJsStr(a.filename) + '\')';
       html += '<div class="dash-card dash-card-compact" onclick="' + onclick + '">';
       if (a.image) {
-        html += '<img class="dash-card-img" src="' + escapeHtml(a.image) + '" alt="" loading="lazy" onerror="this.outerHTML=\'' + dashCardInitialHtml(a.domain, 80).replace(/'/g, "\\'") + '\'">';
+        html += '<img class="dash-card-img" src="' + escapeHtml(a.image) + '" alt="" loading="lazy" onerror="this.outerHTML=dashCardInitialHtml(\'' + escapeHtml(a.domain || '').replace(/'/g, "\\'") + '\',80)">';
       } else {
         html += dashCardInitialHtml(a.domain, 80);
       }
