@@ -4,7 +4,7 @@
 import { readFileSync, writeFileSync } from 'fs';
 import { basename, join } from 'path';
 import { homedir } from 'os';
-import { execFileSync } from 'child_process';
+import { execFile, ExecFileOptions } from 'child_process';
 import { summarizeText, loadLLMConfig, LLMConfig, Provider, getDefaultModel, ensureAppleBinary } from './summarizer';
 import { listMarkdownFiles, resolveFilePath } from './writer';
 import { loadAnnotation, saveAnnotation, allNotes } from './annotations';
@@ -210,11 +210,15 @@ export async function autotagBatchApple(
 
   try {
     const timeout = articles.length * 15_000 + 60_000;
-    const output = execFileSync(binary, [inputPath], {
-      encoding: 'utf-8',
-      timeout,
-      maxBuffer: 50 * 1024 * 1024,
-      stdio: ['pipe', 'pipe', 'pipe']
+    const output = await new Promise<string>((resolve, reject) => {
+      execFile(binary, [inputPath], {
+        encoding: 'utf-8',
+        timeout,
+        maxBuffer: 50 * 1024 * 1024,
+      } as ExecFileOptions, (err, stdout) => {
+        if (err) reject(err);
+        else resolve(stdout as string);
+      });
     });
 
     const outputLines = output.trim().split('\n').filter(l => l.trim());

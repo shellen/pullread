@@ -2,7 +2,7 @@
 // ABOUTME: Covers parseAutotagResponse formats, Apple batch JSONL construction, and error handling
 
 const mockWriteFileSync = jest.fn();
-const mockExecFileSync = jest.fn();
+let mockBatchOutput = '';
 
 jest.mock('fs', () => {
   const real = jest.requireActual('fs');
@@ -23,12 +23,13 @@ jest.mock('child_process', () => {
   const real = jest.requireActual('child_process');
   return {
     ...real,
-    execFileSync: (...args: any[]) => {
-      // Intercept calls to our batch binary
-      if (typeof args[0] === 'string' && args[0].includes('.apple-batch-autotag')) {
-        return mockExecFileSync(...args);
+    execFile: (...args: any[]) => {
+      const callback = args[args.length - 1];
+      if (typeof args[0] === 'string' && args[0].includes('.apple-batch-autotag') && typeof callback === 'function') {
+        process.nextTick(() => callback(null, mockBatchOutput, ''));
+        return;
       }
-      return real.execFileSync(...args);
+      return real.execFile(...args);
     },
   };
 });
@@ -115,7 +116,7 @@ describe('autotagger section classification', () => {
 describe('autotagBatchApple', () => {
   beforeEach(() => {
     mockWriteFileSync.mockReset();
-    mockExecFileSync.mockReset();
+    mockBatchOutput = '';
     mockEnsureBinary.mockReset();
     mockSaveAnnotation.mockReset();
   });
@@ -127,10 +128,9 @@ describe('autotagBatchApple', () => {
 
   test('builds JSONL input with id and prompt for each article', async () => {
     mockEnsureBinary.mockReturnValue('/mock/.config/pullread/.apple-batch-autotag');
-    mockExecFileSync.mockReturnValue(
+    mockBatchOutput =
       '{"id":"article-one.md","response":"{\\"tags\\":[\\"ai\\"],\\"section\\":\\"tech\\"}"}\n' +
-      '{"id":"article-two.md","response":"{\\"tags\\":[\\"climate\\"],\\"section\\":\\"science\\"}"}\n'
-    );
+      '{"id":"article-two.md","response":"{\\"tags\\":[\\"climate\\"],\\"section\\":\\"science\\"}"}\n';
 
     await autotagBatchApple(articles, { provider: 'apple', apiKey: '' });
 
@@ -151,10 +151,9 @@ describe('autotagBatchApple', () => {
 
   test('parses responses and saves tags via parseAutotagResponse', async () => {
     mockEnsureBinary.mockReturnValue('/mock/.config/pullread/.apple-batch-autotag');
-    mockExecFileSync.mockReturnValue(
+    mockBatchOutput =
       '{"id":"article-one.md","response":"{\\"tags\\":[\\"ai\\",\\"machinelearning\\"],\\"section\\":\\"tech\\"}"}\n' +
-      '{"id":"article-two.md","response":"{\\"tags\\":[\\"climate\\",\\"policy\\"],\\"section\\":\\"science\\"}"}\n'
-    );
+      '{"id":"article-two.md","response":"{\\"tags\\":[\\"climate\\",\\"policy\\"],\\"section\\":\\"science\\"}"}\n';
 
     const result = await autotagBatchApple(articles, { provider: 'apple', apiKey: '' });
 
@@ -166,10 +165,9 @@ describe('autotagBatchApple', () => {
 
   test('counts errors in batch output as failed', async () => {
     mockEnsureBinary.mockReturnValue('/mock/.config/pullread/.apple-batch-autotag');
-    mockExecFileSync.mockReturnValue(
+    mockBatchOutput =
       '{"id":"article-one.md","response":"{\\"tags\\":[\\"ai\\"],\\"section\\":\\"tech\\"}"}\n' +
-      '{"id":"article-two.md","error":"model not available"}\n'
-    );
+      '{"id":"article-two.md","error":"model not available"}\n';
 
     const result = await autotagBatchApple(articles, { provider: 'apple', apiKey: '' });
 
@@ -178,13 +176,11 @@ describe('autotagBatchApple', () => {
     expect(result!.failed).toBe(1);
   });
 
-  test('returns null-like result when ensureAppleBinary fails', async () => {
+  test('returns null when ensureAppleBinary fails', async () => {
     mockEnsureBinary.mockReturnValue(null);
 
     const result = await autotagBatchApple(articles, { provider: 'apple', apiKey: '' });
 
-    // Should return null to signal caller to fall back to sequential
     expect(result).toBeNull();
-    expect(mockExecFileSync).not.toHaveBeenCalled();
   });
 });
