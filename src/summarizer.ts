@@ -470,7 +470,7 @@ export function ensureAppleBinary(scriptContent: string, binaryName: string): st
   // Write source and compile
   try {
     writeFileSync(swiftPath, scriptContent);
-    execFileSync('swiftc', [swiftPath, '-o', binaryPath], {
+    execFileSync('swiftc', ['-parse-as-library', swiftPath, '-o', binaryPath], {
       timeout: 120_000,
       stdio: ['pipe', 'pipe', 'pipe']
     });
