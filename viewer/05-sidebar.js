@@ -249,18 +249,31 @@ function toggleMagicSort() {
 
 // Magic Mixer presets and config
 var MIXER_PRESETS = {
-  balanced:     { recency: 40, source: 35, unread: 15, signals: 10, diversity: 3 },
-  whats_new:    { recency: 60, source: 15, unread: 20, signals: 5,  diversity: 2 },
-  deep_reading: { recency: 15, source: 50, unread: 10, signals: 25, diversity: 4 },
-  discovery:    { recency: 25, source: 20, unread: 30, signals: 25, diversity: 2 }
+  balanced:     { recency: 4, source: 4, unread: 2, signals: 1, diversity: 3 },
+  whats_new:    { recency: 6, source: 2, unread: 2, signals: 1, diversity: 2 },
+  deep_reading: { recency: 2, source: 5, unread: 1, signals: 3, diversity: 4 },
+  discovery:    { recency: 3, source: 2, unread: 3, signals: 3, diversity: 2 }
 };
 
 function getMixerConfig() {
   try {
     var raw = localStorage.getItem('pr-magic-mixer');
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      var config = JSON.parse(raw);
+      // Migrate old 0-100 scale configs to 0-10
+      var w = config.weights;
+      if (w && (w.recency > 10 || w.source > 10 || w.unread > 10 || w.signals > 10)) {
+        w.recency = Math.round(w.recency / 10);
+        w.source = Math.round(w.source / 10);
+        w.unread = Math.round(w.unread / 10);
+        w.signals = Math.round(w.signals / 10);
+        config.preset = 'custom';
+        localStorage.setItem('pr-magic-mixer', JSON.stringify(config));
+      }
+      return config;
+    }
   } catch(e) {}
-  return { preset: 'balanced', weights: { recency: 40, source: 35, unread: 15, signals: 10 }, diversity: 3, tagBoosts: {} };
+  return { preset: 'balanced', weights: { recency: 4, source: 4, unread: 2, signals: 1 }, diversity: 3, tagBoosts: {} };
 }
 
 function computeSourceEngagement() {
@@ -317,13 +330,13 @@ function magicScore(f, engagement, mixerConfig) {
 
   var rawScore = 100 * (wR * recency + wS * source + wU * unread + wSig * Math.min(signals, 1));
 
-  // Tag boost multiplier
+  // Tag boost multiplier — match against machineTags from AI auto-tagging
   var boosts = mixerConfig.tagBoosts;
-  if (boosts) {
-    var cats = f.categories || [];
+  if (boosts && Object.keys(boosts).length > 0) {
+    var articleTags = (notes && notes.machineTags) || [];
     var bestBoost = 0;
-    for (var ci = 0; ci < cats.length; ci++) {
-      var b = boosts[cats[ci]];
+    for (var ci = 0; ci < articleTags.length; ci++) {
+      var b = boosts[articleTags[ci]];
       if (b !== undefined && Math.abs(b) > Math.abs(bestBoost)) bestBoost = b;
     }
     if (bestBoost !== 0) {
