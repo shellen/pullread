@@ -1,15 +1,15 @@
 // ---- TTS Audio Playback ----
-let ttsQueue = [];
-let ttsCurrentIndex = -1;
-let ttsAudio = null;        // HTMLAudioElement for cloud TTS
-let ttsSynthUtterance = null; // SpeechSynthesisUtterance for browser TTS
-let ttsPlaying = false;
-let ttsSpeed = 1.0;
-let ttsProvider = 'browser';
+var ttsQueue = [];
+var ttsCurrentIndex = -1;
+var ttsAudio = null;        // HTMLAudioElement for cloud TTS
+var ttsSynthUtterance = null; // SpeechSynthesisUtterance for browser TTS
+var ttsPlaying = false;
+var ttsSpeed = 1.0;
+var ttsProvider = 'browser';
 var ttsVoiceLabel = '';
-let ttsGenerating = false;
-let ttsProgressTimer = null;
-let _ttsChunkSession = null; // { id, totalChunks, currentChunk, elapsedTime }
+var ttsGenerating = false;
+var ttsProgressTimer = null;
+var _ttsChunkSession = null; // { id, totalChunks, currentChunk, elapsedTime }
 var _ttsPlayGeneration = 0;  // incremented on stop — stale async ops check this to bail out
 var _ttsNextPrefetch = null;  // { filename, sessionId, totalChunks, currentChunk, done }
 var _browserTTSState = null;  // { text, estimatedSeconds, startTime, seekOffset, voice, lang }
