@@ -537,3 +537,61 @@ describe('race condition guards', () => {
     expect(article).toMatch(/clearTimeout\s*\(\s*_markAsReadDelayTimer\s*\)/);
   });
 });
+
+describe('editorial sections', () => {
+  let SECTION_MAP: Record<string, string>;
+  let SECTIONS: string[];
+  let resolveSection: (filename: string) => string;
+
+  beforeAll(() => {
+    const rootDir = join(__dirname, '..');
+    const utils = readFileSync(join(rootDir, 'viewer', '02-utils.js'), 'utf-8');
+    const fn = new Function(utils + '\nreturn { SECTION_MAP, SECTIONS, resolveSection };');
+    const fns = fn();
+    SECTION_MAP = fns.SECTION_MAP;
+    SECTIONS = fns.SECTIONS;
+    resolveSection = fns.resolveSection;
+  });
+
+  test('SECTIONS lists all 7 core sections', () => {
+    expect(SECTIONS).toEqual(['tech', 'news', 'science', 'business', 'culture', 'opinion', 'lifestyle']);
+  });
+
+  test('SECTION_MAP maps known tags to sections', () => {
+    expect(SECTION_MAP['artificialintelligence']).toBe('tech');
+    expect(SECTION_MAP['climatechange']).toBe('science');
+    expect(SECTION_MAP['finance']).toBe('business');
+    expect(SECTION_MAP['music']).toBe('culture');
+    expect(SECTION_MAP['politics']).toBe('news');
+  });
+
+  test('resolveSection returns section from allNotesIndex annotation', () => {
+    (globalThis as any).allNotesIndex = { 'article.md': { machineTags: ['randomtag'], section: 'opinion' } };
+    expect(resolveSection('article.md')).toBe('opinion');
+    delete (globalThis as any).allNotesIndex;
+  });
+
+  test('resolveSection falls back to tag mapping when no annotation section', () => {
+    (globalThis as any).allNotesIndex = { 'article.md': { machineTags: ['artificialintelligence', 'openai'] } };
+    expect(resolveSection('article.md')).toBe('tech');
+    delete (globalThis as any).allNotesIndex;
+  });
+
+  test('resolveSection returns "other" when no tags match', () => {
+    (globalThis as any).allNotesIndex = { 'article.md': { machineTags: ['obscuretag'] } };
+    expect(resolveSection('article.md')).toBe('other');
+    delete (globalThis as any).allNotesIndex;
+  });
+
+  test('resolveSection returns "other" when article has no notes', () => {
+    (globalThis as any).allNotesIndex = {};
+    expect(resolveSection('article.md')).toBe('other');
+    delete (globalThis as any).allNotesIndex;
+  });
+
+  test('resolveSection picks most frequent section when tags span multiple', () => {
+    (globalThis as any).allNotesIndex = { 'article.md': { machineTags: ['programming', 'software', 'climatechange'] } };
+    expect(resolveSection('article.md')).toBe('tech');
+    delete (globalThis as any).allNotesIndex;
+  });
+});

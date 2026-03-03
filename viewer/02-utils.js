@@ -309,6 +309,70 @@ function prPrintHtml(bodyContent) {
   }
 }
 
+// Editorial section taxonomy — maps machineTags to newspaper-style sections
+var SECTIONS = ['tech', 'news', 'science', 'business', 'culture', 'opinion', 'lifestyle'];
+
+var SECTION_MAP = {
+  // Tech
+  artificialintelligence: 'tech', machinelearning: 'tech', programming: 'tech',
+  software: 'tech', cybersecurity: 'tech', startups: 'tech', cloudcomputing: 'tech',
+  webdevelopment: 'tech', opensource: 'tech', datascience: 'tech', blockchain: 'tech',
+  cryptocurrency: 'tech', hardware: 'tech', robotics: 'tech', apple: 'tech',
+  google: 'tech', microsoft: 'tech', amazon: 'tech', meta: 'tech', openai: 'tech',
+  semiconductors: 'tech', computing: 'tech', android: 'tech', ios: 'tech',
+  linux: 'tech', python: 'tech', javascript: 'tech', rust: 'tech', golang: 'tech',
+  // News
+  politics: 'news', government: 'news', elections: 'news', law: 'news',
+  legislation: 'news', diplomacy: 'news', military: 'news', congress: 'news',
+  supremecourt: 'news', whitehouse: 'news', foreignpolicy: 'news',
+  immigration: 'news', democracy: 'news', journalism: 'news',
+  // Science
+  research: 'science', climate: 'science', climatechange: 'science', space: 'science',
+  biology: 'science', physics: 'science', medicine: 'science', environment: 'science',
+  neuroscience: 'science', genetics: 'science', astronomy: 'science', nasa: 'science',
+  health: 'science', publichealth: 'science', mentalhealth: 'science',
+  // Business
+  finance: 'business', economics: 'business', markets: 'business',
+  entrepreneurship: 'business', investing: 'business', management: 'business',
+  venturecapital: 'business', wallstreet: 'business', banking: 'business',
+  realestate: 'business', advertising: 'business', marketing: 'business',
+  // Culture
+  arts: 'culture', entertainment: 'culture', music: 'culture', film: 'culture',
+  books: 'culture', media: 'culture', gaming: 'culture', television: 'culture',
+  literature: 'culture', theater: 'culture', design: 'culture', architecture: 'culture',
+  photography: 'culture', animation: 'culture', comics: 'culture', podcasts: 'culture',
+  // Opinion (few tags — mostly LLM-classified)
+  essay: 'opinion', commentary: 'opinion', editorial: 'opinion', analysis: 'opinion',
+  // Lifestyle
+  food: 'lifestyle', travel: 'lifestyle', fitness: 'lifestyle', fashion: 'lifestyle',
+  parenting: 'lifestyle', cooking: 'lifestyle', wellness: 'lifestyle',
+  productivity: 'lifestyle', diy: 'lifestyle',
+};
+
+var SECTION_LABELS = {
+  tech: 'Tech', news: 'News', science: 'Science', business: 'Business',
+  culture: 'Culture', opinion: 'Opinion', lifestyle: 'Lifestyle', other: 'Other'
+};
+
+function resolveSection(filename) {
+  var notes = allNotesIndex[filename];
+  if (!notes) return 'other';
+  if (notes.section && SECTION_LABELS[notes.section]) return notes.section;
+  var tags = notes.machineTags || [];
+  if (tags.length === 0) return 'other';
+  var counts = {};
+  for (var i = 0; i < tags.length; i++) {
+    var s = SECTION_MAP[tags[i]];
+    if (s) counts[s] = (counts[s] || 0) + 1;
+  }
+  var best = 'other';
+  var bestCount = 0;
+  for (var key in counts) {
+    if (counts[key] > bestCount) { best = key; bestCount = counts[key]; }
+  }
+  return best;
+}
+
 // Fallback: save as HTML file when native print is unavailable
 function prPrintFallback(bodyContent) {
   var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Export</title>'
