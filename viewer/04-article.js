@@ -374,7 +374,7 @@ function buildSectionRundownHtml() {
       } else {
         html += dashCardInitialHtml(a.domain, 80);
       }
-      html += '<div class="dash-card-text">';
+      html += '<div class="dash-card-body">';
       html += '<div class="dash-card-title">' + escapeHtml(a.title) + '</div>';
       html += '<div class="dash-card-meta">' + escapeHtml(a.domain || a.feed || '') + (a.bookmarked ? ' &middot; ' + timeAgo(a.bookmarked) : '') + '</div>';
       html += '</div></div>';
