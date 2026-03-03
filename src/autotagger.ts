@@ -30,6 +30,12 @@ interface AutotagResult {
 
 const VALID_SECTIONS = ['tech', 'news', 'science', 'health', 'business', 'culture', 'sports', 'food', 'lifestyle', 'environment', 'education', 'opinion'];
 
+// Apple Intelligence has a 4096-token context window.
+// The autotag prompt is ~150 tokens, response ~100 tokens, leaving ~3800 for article.
+// URLs and code tokenize at ~2 tokens/word, so use conservative limit.
+const APPLE_AUTOTAG_WORD_LIMIT = 1200;
+const CLOUD_AUTOTAG_WORD_LIMIT = 4000;
+
 
 /**
  * Extract machine tags from article text using the configured LLM.
@@ -38,11 +44,8 @@ const VALID_SECTIONS = ['tech', 'news', 'science', 'health', 'business', 'cultur
 export async function autotagText(articleText: string, config?: LLMConfig): Promise<AutotagResult> {
   const llmConfig = config || loadLLMConfig() || { provider: 'apple' as Provider, apiKey: '' };
 
-  // We call summarizeText with a custom prompt by prepending the autotag prompt
-  // to the article text, which works because summarizeText passes the full text
-  // to the LLM. Instead, we'll use the same provider functions directly.
-  // For simplicity, we construct a prompt that includes our instruction + article text.
-  const trimmed = articleText.split(/\s+/).slice(0, 4000).join(' ');
+  const wordLimit = llmConfig.provider === 'apple' ? APPLE_AUTOTAG_WORD_LIMIT : CLOUD_AUTOTAG_WORD_LIMIT;
+  const trimmed = articleText.split(/\s+/).slice(0, wordLimit).join(' ');
   const prompt = `${AUTOTAG_PROMPT}\n\n---\n\n${trimmed}`;
 
   // Use summarizeText which handles all provider routing
@@ -197,9 +200,9 @@ export async function autotagBatchApple(
   const configDir = join(homedir(), '.config', 'pullread');
   const inputPath = join(configDir, '.autotag-batch-input.jsonl');
 
-  // Build JSONL input
+  // Build JSONL input — truncate to fit Apple's 4096-token context window
   const jsonlLines = articles.map(article => {
-    const trimmed = article.body.split(/\s+/).slice(0, 4000).join(' ');
+    const trimmed = article.body.split(/\s+/).slice(0, APPLE_AUTOTAG_WORD_LIMIT).join(' ');
     const prompt = `${AUTOTAG_PROMPT}\n\n---\n\n${trimmed}`;
     return JSON.stringify({ id: article.filename, prompt });
   });

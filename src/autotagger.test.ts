@@ -183,4 +183,61 @@ describe('autotagBatchApple', () => {
 
     expect(result).toBeNull();
   });
+
+  test('truncates article text to fit Apple context window', async () => {
+    mockEnsureBinary.mockReturnValue('/mock/.config/pullread/.apple-batch-autotag');
+    mockBatchOutput =
+      '{"id":"long-article.md","response":"{\\"tags\\":[\\"ai\\"],\\"section\\":\\"tech\\"}"}\n';
+
+    // Create an article with 3000 words (well over the Apple limit)
+    const longBody = Array(3000).fill('word').join(' ');
+    const longArticles = [{ filename: 'long-article.md', body: longBody, title: 'Long Article' }];
+
+    await autotagBatchApple(longArticles, { provider: 'apple', apiKey: '' });
+
+    const jsonlContent = mockWriteFileSync.mock.calls[0][1] as string;
+    const line = JSON.parse(jsonlContent.trim());
+    const promptWords = line.prompt.split(/\s+/).length;
+    // Prompt should be well under 2000 words total (article portion + autotag instructions)
+    expect(promptWords).toBeLessThan(1500);
+  });
+});
+
+describe('autotagText word limits', () => {
+  beforeEach(() => {
+    mockSummarize.mockReset();
+  });
+
+  test('truncates to lower limit for Apple provider', async () => {
+    mockSummarize.mockResolvedValue({
+      summary: '{"tags": ["ai"], "section": "tech"}',
+      model: 'apple-on-device',
+    });
+
+    // Create article with 3000 words
+    const longText = Array(3000).fill('word').join(' ');
+    await autotagText(longText, { provider: 'apple' as any, apiKey: '' });
+
+    // The prompt passed to summarizeText should be truncated for Apple
+    const passedPrompt = mockSummarize.mock.calls[0][0];
+    const wordCount = passedPrompt.split(/\s+/).length;
+    // Should be ~1200 words of article + ~120 words of prompt < 1500
+    expect(wordCount).toBeLessThan(1500);
+  });
+
+  test('uses higher limit for cloud providers', async () => {
+    mockSummarize.mockResolvedValue({
+      summary: '{"tags": ["ai"], "section": "tech"}',
+      model: 'claude-sonnet',
+    });
+
+    // Create article with 3000 words
+    const longText = Array(3000).fill('word').join(' ');
+    await autotagText(longText, { provider: 'anthropic' as any, apiKey: 'sk-test' });
+
+    const passedPrompt = mockSummarize.mock.calls[0][0];
+    const wordCount = passedPrompt.split(/\s+/).length;
+    // Cloud providers should keep the higher 4000 word limit
+    expect(wordCount).toBeGreaterThan(2000);
+  });
 });
