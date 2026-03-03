@@ -1216,6 +1216,12 @@ function showSettingsPage(scrollToSection) {
         h += '</div>';
       }
 
+      // Auto-tag on sync toggle
+      h += '<div class="setting-row" style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">';
+      h += '<div class="setting-label"><label>Auto-tag on sync</label><div class="setting-desc">Automatically tag new articles when feeds sync</div></div>';
+      h += '<div class="setting-control"><input type="checkbox" id="sp-autotag"' + (data.autoTag ? ' checked' : '') + ' onchange="settingsPageSaveAutoTag()" style="width:18px;height:18px;accent-color:var(--link)"></div>';
+      h += '</div>';
+
       sec.innerHTML = h;
     }).catch(function() {
       var sec = document.getElementById('settings-ai');
@@ -1240,6 +1246,15 @@ function settingsPageSaveTimeFormat() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ timeFormat: fmt }),
+  });
+}
+
+function settingsPageSaveAutoTag() {
+  var el = document.getElementById('sp-autotag');
+  fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ autoTag: el.checked }),
   });
 }
 

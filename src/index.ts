@@ -443,6 +443,24 @@ async function sync(feedFilter?: string, retryFailed = false): Promise<void> {
 
     console.log(`\nDone: ${totalSuccess} saved, ${totalFailed} failed`);
 
+    // Auto-tag newly synced articles if enabled in settings
+    if (totalSuccess > 0) {
+      try {
+        const settingsPath = join(homedir(), '.config', 'pullread', 'settings.json');
+        const settings = existsSync(settingsPath) ? JSON.parse(readFileSync(settingsPath, 'utf-8')) : {};
+        if (settings.autoTag === true) {
+          const llmConfig = loadLLMConfig();
+          if (llmConfig) {
+            console.log('\nAuto-tagging new articles...');
+            const { tagged, skipped, failed: tagFailed } = await autotagBatch(config.outputPath, { config: llmConfig });
+            console.log(`  Tagged: ${tagged}, skipped: ${skipped}, failed: ${tagFailed}`);
+          }
+        }
+      } catch (err) {
+        console.log(`  Auto-tagging failed: ${err instanceof Error ? err.message : err}`);
+      }
+    }
+
   } finally {
     clearSyncProgress();
     storage.close();

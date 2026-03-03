@@ -1313,7 +1313,8 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
             appleAvailable: isAppleAvailable()
           },
           viewerMode: (appSettings.viewerMode as string) || 'app',
-          timeFormat: (appSettings.timeFormat as string) || '12h'
+          timeFormat: (appSettings.timeFormat as string) || '12h',
+          autoTag: appSettings.autoTag === true
         });
         return;
       }
@@ -1334,6 +1335,15 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
           if (body.timeFormat !== undefined) {
             const appSettings = loadJsonFile(APP_SETTINGS_PATH);
             appSettings.timeFormat = body.timeFormat === '24h' ? '24h' : '12h';
+            saveJsonFile(APP_SETTINGS_PATH, appSettings);
+            sendJson(res, { ok: true });
+            return;
+          }
+
+          // Auto-tag on sync preference
+          if (body.autoTag !== undefined) {
+            const appSettings = loadJsonFile(APP_SETTINGS_PATH);
+            appSettings.autoTag = body.autoTag === true;
             saveJsonFile(APP_SETTINGS_PATH, appSettings);
             sendJson(res, { ok: true });
             return;
