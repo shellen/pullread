@@ -330,18 +330,13 @@ function magicScore(f, engagement, mixerConfig) {
 
   var rawScore = 100 * (wR * recency + wS * source + wU * unread + wSig * Math.min(signals, 1));
 
-  // Tag boost multiplier — match against machineTags from AI auto-tagging
+  // Section boost multiplier — match against editorial section from AI auto-tagging
   var boosts = mixerConfig.tagBoosts;
-  if (boosts && Object.keys(boosts).length > 0) {
-    var articleTags = (notes && notes.machineTags) || [];
-    var bestBoost = 0;
-    for (var ci = 0; ci < articleTags.length; ci++) {
-      var b = boosts[articleTags[ci]];
-      if (b !== undefined && Math.abs(b) > Math.abs(bestBoost)) bestBoost = b;
-    }
-    if (bestBoost !== 0) {
+  if (boosts && Object.keys(boosts).length > 0 && notes && notes.section) {
+    var sectionBoost = boosts[notes.section];
+    if (sectionBoost !== undefined && sectionBoost !== 0) {
       var multipliers = { '-2': 0.25, '-1': 0.5, '1': 1.5, '2': 2 };
-      rawScore *= (multipliers[String(bestBoost)] || 1);
+      rawScore *= (multipliers[String(sectionBoost)] || 1);
     }
   }
 
