@@ -586,7 +586,8 @@ function renderArticle(text, filename) {
     }
 
     html += '<div class="pub-bar">';
-    html += '<a class="pub-identity" href="' + escapeHtml(sourceHref) + '" target="_blank" rel="noopener" title="Visit ' + escapeHtml(meta.domain) + '">';
+    var sourceName = pubName || pubDomain || meta.domain;
+    html += '<a class="pub-identity" href="' + escapeHtml(sourceHref) + '" onclick="event.preventDefault();browseSource(\'' + escapeJsStr(sourceName) + '\')" title="Browse ' + escapeHtml(sourceName) + '">';
     html += faviconHtml;
     html += '<div>';
     if (pubName && pubDomain) {

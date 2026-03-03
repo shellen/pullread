@@ -1104,6 +1104,17 @@ function openTagsDrawer() {
   openDrawer();
 }
 
+// Filter to a source and open the sources drawer without navigating away.
+// Used by the article header pub-name click.
+function browseSource(source) {
+  var search = document.getElementById('search');
+  if (search) search.value = 'feed:"' + source + '"';
+  showSourceFilterBar(source);
+  _activeDrawerSource = source;
+  filterFiles();
+  openSourcesDrawer();
+}
+
 function filterBySource(source) {
   var search = document.getElementById('search');
   if (source === '__podcasts__') {
