@@ -594,4 +594,51 @@ describe('editorial sections', () => {
     expect(resolveSection('article.md')).toBe('tech');
     delete (globalThis as any).allNotesIndex;
   });
+
+  describe('allocateSectionSlots', () => {
+    let allocateSectionSlots: (sectionCounts: Record<string, number>, totalSlots: number) => Record<string, number>;
+
+    beforeAll(() => {
+      const rootDir = join(__dirname, '..');
+      const utils = readFileSync(join(rootDir, 'viewer', '02-utils.js'), 'utf-8');
+      const fn = new Function(utils + '\nreturn { allocateSectionSlots };');
+      allocateSectionSlots = fn().allocateSectionSlots;
+    });
+
+    test('gives every section with articles at least 1 slot', () => {
+      var result = allocateSectionSlots({ tech: 50, news: 2, science: 1 }, 10);
+      expect(result['tech']).toBeGreaterThanOrEqual(1);
+      expect(result['news']).toBeGreaterThanOrEqual(1);
+      expect(result['science']).toBeGreaterThanOrEqual(1);
+    });
+
+    test('caps any section at 40% of total slots', () => {
+      var result = allocateSectionSlots({ tech: 100, news: 5, science: 5 }, 10);
+      expect(result['tech']).toBeLessThanOrEqual(4);
+    });
+
+    test('total allocated slots equals totalSlots', () => {
+      var result = allocateSectionSlots({ tech: 30, news: 20, science: 15, business: 10, culture: 5 }, 20);
+      var total = Object.values(result).reduce((a: number, b: number) => a + b, 0);
+      expect(total).toBe(20);
+    });
+
+    test('empty sections get 0 slots', () => {
+      var result = allocateSectionSlots({ tech: 10, news: 0 }, 5);
+      expect(result['news']).toBe(0);
+    });
+
+    test('handles single section gracefully', () => {
+      var result = allocateSectionSlots({ tech: 50 }, 10);
+      expect(result['tech']).toBe(10);
+    });
+
+    test('handles more sections than slots', () => {
+      var result = allocateSectionSlots({ tech: 5, news: 5, science: 5, business: 5, culture: 5, opinion: 5, lifestyle: 5 }, 5);
+      var total = Object.values(result).reduce((a: number, b: number) => a + b, 0);
+      expect(total).toBe(5);
+      var nonZero = Object.values(result).filter((v: number) => v > 0).length;
+      expect(nonZero).toBe(5);
+    });
+  });
 });

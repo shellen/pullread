@@ -375,6 +375,75 @@ function resolveSection(filename) {
   return best;
 }
 
+// Distribute N display slots across editorial sections proportionally with floor/ceiling guarantees
+function allocateSectionSlots(sectionCounts, totalSlots) {
+  var sections = [];
+  var totalArticles = 0;
+  for (var key in sectionCounts) {
+    if (sectionCounts[key] > 0) {
+      sections.push({ id: key, count: sectionCounts[key], slots: 0 });
+      totalArticles += sectionCounts[key];
+    }
+  }
+  var result = {};
+  for (var key in sectionCounts) result[key] = 0;
+
+  if (sections.length === 0 || totalSlots === 0) return result;
+
+  var ceiling = sections.length === 1 ? totalSlots : Math.ceil(totalSlots * 0.4);
+
+  // Give each section its proportional share, floored, with min 1
+  var allocated = 0;
+  for (var i = 0; i < sections.length; i++) {
+    var s = sections[i];
+    var share = Math.floor(totalSlots * s.count / totalArticles);
+    s.slots = Math.max(share, 1);
+    if (s.slots > ceiling) s.slots = ceiling;
+    if (s.slots > s.count) s.slots = s.count;
+    allocated += s.slots;
+  }
+
+  // Trim if over-allocated (many small sections all getting floor=1)
+  while (allocated > totalSlots) {
+    sections.sort(function(a, b) { return b.slots - a.slots; });
+    for (var i = 0; i < sections.length && allocated > totalSlots; i++) {
+      if (sections[i].slots > 1) {
+        sections[i].slots--;
+        allocated--;
+      }
+    }
+    if (allocated > totalSlots) {
+      for (var i = sections.length - 1; i >= 0 && allocated > totalSlots; i--) {
+        if (sections[i].slots > 0) {
+          sections[i].slots--;
+          allocated--;
+        }
+      }
+    }
+  }
+
+  // Distribute remaining slots to sections with most unserved demand
+  while (allocated < totalSlots) {
+    sections.sort(function(a, b) {
+      return (b.count - b.slots) - (a.count - a.slots);
+    });
+    var added = false;
+    for (var i = 0; i < sections.length && allocated < totalSlots; i++) {
+      if (sections[i].slots < ceiling && sections[i].slots < sections[i].count) {
+        sections[i].slots++;
+        allocated++;
+        added = true;
+      }
+    }
+    if (!added) break;
+  }
+
+  for (var i = 0; i < sections.length; i++) {
+    result[sections[i].id] = sections[i].slots;
+  }
+  return result;
+}
+
 // Fallback: save as HTML file when native print is unavailable
 function prPrintFallback(bodyContent) {
   var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Export</title>'
