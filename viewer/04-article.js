@@ -45,6 +45,9 @@ function renderHub() {
   // Daily Rundown — topic briefing cards
   forYouHtml += buildDailyRundownHtml();
 
+  // Section Rundown — articles grouped by editorial section
+  forYouHtml += buildSectionRundownHtml();
+
   // Continue Reading
   var positions = JSON.parse(localStorage.getItem('pr-scroll-positions') || '{}');
   var continueReading = allFiles.filter(function(f) {
@@ -345,6 +348,41 @@ function buildDailyRundownHtml() {
   html += '</div>';
   html += '</div>';
 
+  return html;
+}
+
+function buildSectionRundownHtml() {
+  var sections = buildSectionRundown();
+  if (sections.length === 0) return '';
+
+  var html = '<div class="section-rundown">';
+  for (var si = 0; si < sections.length; si++) {
+    var sec = sections[si];
+    html += '<div class="dash-section">';
+    html += '<div class="section-header">';
+    html += '<h3 class="section-title">' + escapeHtml(sec.label) + '</h3>';
+    html += '<span class="section-count">' + sec.totalCount + ' article' + (sec.totalCount !== 1 ? 's' : '') + '</span>';
+    html += '</div>';
+
+    html += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards dash-cards-compact">';
+    for (var ai = 0; ai < sec.articles.length; ai++) {
+      var a = sec.articles[ai];
+      var onclick = 'dashLoadArticle(\'' + escapeJsStr(a.filename) + '\')';
+      html += '<div class="dash-card dash-card-compact" onclick="' + onclick + '">';
+      if (a.image) {
+        html += '<img class="dash-card-img" src="' + escapeHtml(a.image) + '" alt="" loading="lazy" onerror="this.outerHTML=\'' + dashCardInitialHtml(a.domain, 80).replace(/'/g, "\\'") + '\'">';
+      } else {
+        html += dashCardInitialHtml(a.domain, 80);
+      }
+      html += '<div class="dash-card-text">';
+      html += '<div class="dash-card-title">' + escapeHtml(a.title) + '</div>';
+      html += '<div class="dash-card-meta">' + escapeHtml(a.domain || a.feed || '') + (a.bookmarked ? ' &middot; ' + timeAgo(a.bookmarked) : '') + '</div>';
+      html += '</div></div>';
+    }
+    html += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div>';
+    html += '</div>';
+  }
+  html += '</div>';
   return html;
 }
 

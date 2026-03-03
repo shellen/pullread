@@ -675,3 +675,33 @@ describe('For You section grouping', () => {
     expect(graph).toContain('SECTIONS.slice()');
   });
 });
+
+describe('For You section rendering', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('04-article.js has buildSectionRundownHtml function', () => {
+    const article = readFileSync(join(rootDir, 'viewer', '04-article.js'), 'utf-8');
+    expect(article).toMatch(/function\s+buildSectionRundownHtml/);
+  });
+
+  test('buildSectionRundownHtml uses buildSectionRundown data', () => {
+    const article = readFileSync(join(rootDir, 'viewer', '04-article.js'), 'utf-8');
+    expect(article).toContain('buildSectionRundown(');
+  });
+
+  test('section headers use section-header class', () => {
+    const article = readFileSync(join(rootDir, 'viewer', '04-article.js'), 'utf-8');
+    expect(article).toContain('section-header');
+  });
+
+  test('viewer.css styles section headers', () => {
+    const css = readFileSync(join(rootDir, 'viewer.css'), 'utf-8');
+    expect(css).toContain('.section-header');
+    expect(css).toContain('.section-title');
+  });
+
+  test('For You tab includes section rundown HTML', () => {
+    const article = readFileSync(join(rootDir, 'viewer', '04-article.js'), 'utf-8');
+    expect(article).toContain('buildSectionRundownHtml()');
+  });
+});
