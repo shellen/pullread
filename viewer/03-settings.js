@@ -942,6 +942,15 @@ function showSettingsPage(scrollToSection) {
       h += '</div><input type="hidden" id="sp-max-age" value="' + (cfg.maxAgeDays || 0) + '"></div>';
       h += '</div>';
 
+      // Manage Sources link
+      var feedCount = cfg.feeds ? Object.keys(cfg.feeds).length : 0;
+      h += '<div style="padding-top:12px;border-top:1px solid var(--border);margin-top:12px">';
+      h += '<a href="#" onclick="showManageSourcesPage();return false" style="font-size:13px;color:var(--link);text-decoration:none;display:inline-flex;align-items:center;gap:5px">';
+      h += '<svg style="width:14px;height:14px" aria-hidden="true"><use href="#i-gear"/></svg>';
+      h += 'Manage Sources';
+      if (feedCount > 0) h += ' <span style="color:var(--muted)">(' + feedCount + ')</span>';
+      h += '</a></div>';
+
       sec.innerHTML = h;
       sec._configData = cfg;
     }).catch(function() {
