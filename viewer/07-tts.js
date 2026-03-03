@@ -17,6 +17,36 @@ var _browserTTSState = null;  // { text, estimatedSeconds, startTime, seekOffset
 var autoplayMode = localStorage.getItem('pr-autoplay-mode') || (localStorage.getItem('pr-podcast-autoplay') === '1' ? 'podcasts' : 'off');
 
 const TTS_SPEEDS = [0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.15, 1.2, 1.3, 1.5, 1.75, 2.0];
+const YOUTUBE_SPEEDS = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+
+// YouTube IFrame API state
+var _ytApiLoaded = false;
+var _ytApiLoading = false;
+var _ytApiCallbacks = [];
+var _ytPlayer = null;
+var _ytProgressInterval = null;
+
+function loadYouTubeApi(callback) {
+  if (_ytApiLoaded && window.YT && window.YT.Player) { callback(); return; }
+  _ytApiCallbacks.push(callback);
+  if (_ytApiLoading) return;
+  _ytApiLoading = true;
+  var tag = document.createElement('script');
+  tag.src = 'https://www.youtube.com/iframe_api';
+  tag.onerror = function() {
+    _ytApiLoading = false;
+    _ytApiCallbacks.forEach(function(cb) { cb(new Error('Failed to load YouTube API')); });
+    _ytApiCallbacks = [];
+  };
+  document.head.appendChild(tag);
+}
+
+window.onYouTubeIframeAPIReady = function() {
+  _ytApiLoaded = true;
+  _ytApiLoading = false;
+  _ytApiCallbacks.forEach(function(cb) { cb(); });
+  _ytApiCallbacks = [];
+};
 
 /** Deterministic hash of a string to an index in [0, max). djb2 algorithm. */
 function hashStringToIndex(str, max) {
@@ -154,8 +184,10 @@ function playNextFromArticle(filename) {
     renderAudioPlayer();
     return;
   }
-  var newItem = { filename: filename, title: file.title, image: file.image || '', domain: file.domain || '', feed: file.feed || '' };
-  if (file.enclosureUrl && isMediaEnclosure(file.enclosureType)) {
+  var ytId = isYouTubeDomain(file.domain) ? extractYouTubeVideoId(file.url) : null;
+  var newItem = { filename: filename, title: file.title, image: ytId ? 'https://img.youtube.com/vi/' + ytId + '/hqdefault.jpg' : (file.image || ''), domain: file.domain || '', feed: file.feed || '' };
+  if (ytId) { newItem.youtubeVideoId = ytId; }
+  else if (file.enclosureUrl && isMediaEnclosure(file.enclosureType)) {
     newItem.enclosureUrl = file.enclosureUrl;
     newItem.enclosureType = file.enclosureType;
   }
@@ -188,8 +220,10 @@ async function addToTTSQueue(filename) {
     } catch {}
   }
 
-  var item = { filename, title: file.title, image: file.image || '', domain: file.domain || '', feed: file.feed || '' };
-  if (file.enclosureUrl && isMediaEnclosure(file.enclosureType)) {
+  var ytId = isYouTubeDomain(file.domain) ? extractYouTubeVideoId(file.url) : null;
+  var item = { filename, title: file.title, image: ytId ? 'https://img.youtube.com/vi/' + ytId + '/hqdefault.jpg' : (file.image || ''), domain: file.domain || '', feed: file.feed || '' };
+  if (ytId) { item.youtubeVideoId = ytId; }
+  else if (file.enclosureUrl && isMediaEnclosure(file.enclosureType)) {
     item.enclosureUrl = file.enclosureUrl;
     item.enclosureType = file.enclosureType;
   }
@@ -286,6 +320,12 @@ async function playTTSItem(index) {
   const item = ttsQueue[index];
   ttsPlaying = true;
   renderAudioPlayer();
+
+  // YouTube videos use the IFrame API
+  if (item.youtubeVideoId) {
+    playYouTube(item);
+    return;
+  }
 
   // Media enclosures play natively — no TTS synthesis needed
   if (item.enclosureUrl) {
@@ -836,6 +876,198 @@ function playVideoPopout(item) {
   }
 }
 
+function playYouTube(item) {
+  stopListenLoading();
+  var gen = _ttsPlayGeneration;
+
+  _ytCleanup();
+
+  loadYouTubeApi(function(err) {
+    if (err || gen !== _ttsPlayGeneration) {
+      if (err) showToast('YouTube player controls unavailable.');
+      ttsPlaying = false;
+      ttsGenerating = false;
+      renderAudioPlayer();
+      return;
+    }
+
+    // Find the embed container in the article body
+    var container = document.querySelector('.yt-embed');
+    if (!container) {
+      playYouTubePopout(item);
+      return;
+    }
+
+    // Replace the bare iframe with a YT.Player container div
+    container.innerHTML = '<div id="yt-player-target"></div>';
+
+    _ytPlayer = new YT.Player('yt-player-target', {
+      videoId: item.youtubeVideoId,
+      playerVars: {
+        autoplay: 1,
+        modestbranding: 1,
+        rel: 0,
+        playsinline: 1,
+      },
+      events: {
+        onReady: function(e) {
+          if (gen !== _ttsPlayGeneration) { e.target.destroy(); return; }
+          ttsGenerating = false;
+          ttsPlaying = true;
+          renderAudioPlayer();
+          var rate = _ytNearestSpeed(ttsSpeed);
+          e.target.setPlaybackRate(rate);
+          _ytStartProgressPolling();
+        },
+        onStateChange: function(e) {
+          if (gen !== _ttsPlayGeneration) return;
+          if (e.data === YT.PlayerState.PLAYING) {
+            ttsPlaying = true;
+            renderAudioPlayer();
+          } else if (e.data === YT.PlayerState.PAUSED) {
+            ttsPlaying = false;
+            renderAudioPlayer();
+          } else if (e.data === YT.PlayerState.ENDED) {
+            _ytCleanup();
+            ttsPlaying = false;
+            renderAudioPlayer();
+            if (ttsCurrentIndex + 1 < ttsQueue.length) {
+              setTimeout(function() { playTTSItem(ttsCurrentIndex + 1); }, 500);
+            } else {
+              autoplayNext(item.filename);
+            }
+          }
+        },
+        onPlaybackRateChange: function(e) {
+          ttsSpeed = e.data;
+          renderAudioPlayer();
+        },
+        onError: function(e) {
+          console.warn('[YT] Player error:', e.data);
+          showToast('YouTube playback error');
+          _ytCleanup();
+          ttsPlaying = false;
+          renderAudioPlayer();
+        },
+      }
+    });
+  });
+
+  ttsPlaying = true;
+  ttsGenerating = true;
+  renderAudioPlayer();
+}
+
+function _ytNearestSpeed(speed) {
+  var best = 1.0, bestDist = Infinity;
+  for (var i = 0; i < YOUTUBE_SPEEDS.length; i++) {
+    var d = Math.abs(YOUTUBE_SPEEDS[i] - speed);
+    if (d < bestDist) { bestDist = d; best = YOUTUBE_SPEEDS[i]; }
+  }
+  return best;
+}
+
+function _ytStartProgressPolling() {
+  _ytStopProgressPolling();
+  _ytProgressInterval = setInterval(function() {
+    if (!_ytPlayer || !_ytPlayer.getCurrentTime) return;
+    var cur = _ytPlayer.getCurrentTime();
+    var dur = _ytPlayer.getDuration();
+    if (dur > 0) {
+      var pct = (cur / dur * 100).toFixed(1);
+      var prog = document.getElementById('tts-progress');
+      if (prog) prog.style.width = pct + '%';
+      var curEl = document.getElementById('tts-time-current');
+      if (curEl) curEl.textContent = formatTime(cur);
+      var totEl = document.getElementById('tts-time-total');
+      if (totEl) totEl.textContent = formatTime(dur);
+    }
+  }, 250);
+}
+
+function _ytStopProgressPolling() {
+  if (_ytProgressInterval) { clearInterval(_ytProgressInterval); _ytProgressInterval = null; }
+}
+
+function _ytCleanup() {
+  _ytStopProgressPolling();
+  if (_ytPlayer) {
+    try { _ytPlayer.destroy(); } catch {}
+    _ytPlayer = null;
+  }
+  ttsGenerating = false;
+}
+
+function playYouTubePopout(item, startTime) {
+  _ytCleanup();
+  ttsPlaying = true;
+  renderAudioPlayer();
+
+  var title = (item.title || 'Video').replace(/</g, '&lt;');
+
+  var html = '<!DOCTYPE html><html><head>'
+    + '<meta charset="UTF-8"><title>' + title + ' — Pull Read</title>'
+    + '<style>'
+    + 'body{margin:0;background:#111;display:flex;align-items:center;justify-content:center;height:100vh;font-family:system-ui,sans-serif;color:#fff}'
+    + '#yt-popout{width:100%;height:100%}'
+    + '.info{position:fixed;top:12px;left:16px;font-size:13px;opacity:0.7;z-index:10}'
+    + '.pop-in{position:fixed;top:12px;right:16px;background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:6px;padding:6px 14px;font-size:13px;cursor:pointer;font-family:inherit;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:background 0.15s;z-index:10}'
+    + '.pop-in:hover{background:rgba(255,255,255,0.25)}'
+    + '</style></head><body>'
+    + '<div class="info">' + title + '</div>'
+    + '<button class="pop-in" onclick="popBackIn()">&#8617; Pop back in</button>'
+    + '<div id="yt-popout"></div>'
+    + '<scr' + 'ipt>'
+    + 'function popBackIn(){'
+    + '  var t=0;try{t=_p.getCurrentTime();}catch(e){}'
+    + '  if(window.opener&&window.opener._videoPopIn)window.opener._videoPopIn(t);'
+    + '  window.close();'
+    + '}'
+    + 'var tag=document.createElement("script");tag.src="https://www.youtube.com/iframe_api";document.head.appendChild(tag);'
+    + 'var _p;'
+    + 'window.onYouTubeIframeAPIReady=function(){'
+    + '  _p=new YT.Player("yt-popout",{videoId:"' + item.youtubeVideoId + '",playerVars:{autoplay:1,modestbranding:1,rel:0' + (startTime ? ',start:' + Math.floor(startTime) : '') + '},events:{'
+    + '    onStateChange:function(e){if(e.data===YT.PlayerState.ENDED)window.close();}'
+    + '  }});'
+    + '};'
+    + '</scr' + 'ipt></body></html>';
+
+  var blob = new Blob([html], { type: 'text/html' });
+  var blobUrl = URL.createObjectURL(blob);
+  var w = window.open(blobUrl, '_blank', 'width=960,height=640,menubar=no,toolbar=no');
+  URL.revokeObjectURL(blobUrl);
+
+  if (w) {
+    _videoPopoutWindow = w;
+    renderAudioPlayer();
+    var check = setInterval(function() {
+      if (w.closed) {
+        clearInterval(check);
+        _videoPopoutWindow = null;
+        if (_videoPopbackData) {
+          _videoPopbackData = null;
+          ttsPlaying = false;
+          renderAudioPlayer();
+          return;
+        }
+        ttsPlaying = false;
+        renderAudioPlayer();
+        if (ttsCurrentIndex + 1 < ttsQueue.length) {
+          setTimeout(function() { playTTSItem(ttsCurrentIndex + 1); }, 500);
+        } else {
+          autoplayNext(item.filename);
+        }
+      }
+    }, 500);
+  } else {
+    _videoPopoutWindow = null;
+    ttsPlaying = false;
+    renderAudioPlayer();
+    showToast('Pop-up blocked. Opening video in new tab.');
+    window.open('https://www.youtube.com/watch?v=' + item.youtubeVideoId, '_blank');
+  }
+}
+
 var _audioPopoutWindow = null;
 
 /** Close the audio popout and bring playback back to the main window */
@@ -1246,6 +1478,7 @@ async function ttsPlayNextChunk(index, seekPct) {
 
 function stopTTS() {
   _ttsPlayGeneration++;
+  _ytCleanup();
   clearInterval(ttsProgressTimer);
   _ttsChunkSession = null;
   _ttsChunkBuffer.clear();
@@ -1274,6 +1507,17 @@ function stopTTS() {
 
 function ttsTogglePlay() {
   if (ttsQueue.length === 0) return;
+
+  // YouTube player
+  if (_ytPlayer && _ytPlayer.getPlayerState) {
+    var state = _ytPlayer.getPlayerState();
+    if (state === YT.PlayerState.PLAYING) {
+      _ytPlayer.pauseVideo();
+    } else {
+      _ytPlayer.playVideo();
+    }
+    return;
+  }
 
   // HTMLAudioElement takes priority — handles cloud TTS, cached, AND podcast audio
   // (podcasts skip loadTTSSettings so ttsProvider may be stale)
@@ -1346,6 +1590,10 @@ function ttsStopHoldSkip() {
 }
 
 function skipTime(seconds) {
+  if (_ytPlayer && _ytPlayer.getCurrentTime) {
+    _ytPlayer.seekTo(_ytPlayer.getCurrentTime() + seconds, true);
+    return;
+  }
   if (_ttsChunkSession) {
     var session = _ttsChunkSession;
     // Duration not yet known — skip within current chunk if audio exists
@@ -1408,6 +1656,10 @@ function seekToChunkPosition(pct) {
 }
 
 function ttsSeek(pct) {
+  if (_ytPlayer && _ytPlayer.getDuration) {
+    _ytPlayer.seekTo(pct * _ytPlayer.getDuration(), true);
+    return;
+  }
   if (_ttsChunkSession) {
     seekToChunkPosition(pct);
     return;
@@ -1441,6 +1693,9 @@ function ttsSetSpeed(speed) {
   var anpSpeed = document.querySelector('.article-now-playing .anp-speed');
   if (anpSpeed) anpSpeed.textContent = speed + 'x';
 
+  if (_ytPlayer && _ytPlayer.setPlaybackRate) {
+    _ytPlayer.setPlaybackRate(_ytNearestSpeed(speed));
+  }
   if (ttsAudio) {
     ttsAudio.playbackRate = speed;
   }
@@ -1451,10 +1706,11 @@ function ttsSetSpeed(speed) {
 }
 
 function ttsCycleSpeed() {
-  var idx = TTS_SPEEDS.indexOf(ttsSpeed);
-  if (idx < 0) idx = TTS_SPEEDS.indexOf(1.0);
-  var next = (idx + 1) % TTS_SPEEDS.length;
-  ttsSetSpeed(TTS_SPEEDS[next]);
+  var speeds = _ytPlayer ? YOUTUBE_SPEEDS : TTS_SPEEDS;
+  var idx = speeds.indexOf(ttsSpeed);
+  if (idx < 0) idx = speeds.indexOf(1.0);
+  var next = (idx + 1) % speeds.length;
+  ttsSetSpeed(speeds[next]);
 }
 
 function removeTTSQueueItem(index) {

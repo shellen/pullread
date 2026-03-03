@@ -216,7 +216,9 @@ class PrPlayer extends HTMLElement {
     var btn = this.querySelector('#tts-speed-btn');
     if (!btn) return;
     var rect = btn.getBoundingClientRect();
-    var count = TTS_SPEEDS.length;
+    var isYT = _ytPlayer != null;
+    var speeds = isYT ? YOUTUBE_SPEEDS : TTS_SPEEDS;
+    var count = speeds.length;
 
     var popup = document.createElement('div');
     popup.className = 'tts-speed-popup';
@@ -224,7 +226,7 @@ class PrPlayer extends HTMLElement {
     var majorSpeeds = [0.5, 1.0, 1.5, 2.0];
     var ticksHtml = '';
     for (var i = count - 1; i >= 0; i--) {
-      var s = TTS_SPEEDS[i];
+      var s = speeds[i];
       if (majorSpeeds.indexOf(s) >= 0) {
         ticksHtml += '<div class="tts-speed-tick">' + s + 'x</div>';
       } else {
@@ -265,7 +267,7 @@ class PrPlayer extends HTMLElement {
       pct = Math.max(0, Math.min(1, pct));
       var idx = Math.round((1 - pct) * (count - 1));
       idx = Math.max(0, Math.min(count - 1, idx));
-      ttsSetSpeed(TTS_SPEEDS[idx]);
+      ttsSetSpeed(speeds[idx]);
       self._positionThumb();
     }
 
@@ -322,9 +324,11 @@ class PrPlayer extends HTMLElement {
   _positionThumb() {
     var thumb = document.getElementById('tts-speed-thumb');
     if (!thumb) return;
-    var idx = TTS_SPEEDS.indexOf(ttsSpeed);
-    if (idx < 0) idx = TTS_SPEEDS.indexOf(1.0);
-    var pct = 1 - idx / (TTS_SPEEDS.length - 1);
+    var isYT = _ytPlayer != null;
+    var speeds = isYT ? YOUTUBE_SPEEDS : TTS_SPEEDS;
+    var idx = speeds.indexOf(ttsSpeed);
+    if (idx < 0) idx = speeds.indexOf(1.0);
+    var pct = 1 - idx / (speeds.length - 1);
     thumb.style.top = (pct * 100) + '%';
   }
 

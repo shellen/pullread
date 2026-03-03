@@ -649,18 +649,17 @@ function renderArticle(text, filename) {
   }
 
   // YouTube embed: detect from frontmatter and inject responsive iframe
-  const isYouTube = meta && meta.domain && /youtube\.com|youtu\.be|m\.youtube\.com/.test(meta.domain);
+  const isYouTube = meta && meta.domain && isYouTubeDomain(meta.domain);
   if (isYouTube && meta.url) {
-    var ytId = null;
-    try {
-      var ytUrl = new URL(meta.url);
-      if (ytUrl.hostname === 'youtu.be') ytId = ytUrl.pathname.slice(1).split('/')[0];
-      else if (ytUrl.searchParams.get('v')) ytId = ytUrl.searchParams.get('v');
-      else { var em = ytUrl.pathname.match(/\/(embed|v)\/([^/?]+)/); if (em) ytId = em[2]; }
-    } catch {}
+    var ytId = extractYouTubeVideoId(meta.url);
     if (ytId) {
-      html += '<div class="yt-embed"><iframe src="https://www.youtube.com/embed/' + encodeURIComponent(ytId)
+      var isShort = meta.url.indexOf('/shorts/') >= 0;
+      html += '<div class="yt-embed' + (isShort ? ' yt-vertical' : '') + '" data-yt-id="' + escapeHtml(ytId) + '"><iframe src="https://www.youtube.com/embed/' + encodeURIComponent(ytId)
         + '" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy" title="Embedded video"></iframe></div>';
+      html += '<div class="video-controls">';
+      html += '<button onclick="addCurrentToTTSQueue()" class="video-controls-btn"><svg style="width:14px;height:14px"><use href="#i-play"/></svg> Play</button>';
+      html += '<button onclick="popOutCurrentYouTube()" class="video-controls-btn"><svg style="width:14px;height:14px"><use href="#i-external"/></svg> Pop out</button>';
+      html += '</div>';
     }
   }
 
@@ -1048,6 +1047,20 @@ function popOutCurrentVideo() {
     enclosureUrl: file.enclosureUrl,
     enclosureType: file.enclosureType,
     image: file.image || '',
+    filename: activeFile,
+  });
+}
+
+// Open the current YouTube video in a pop-out player window
+function popOutCurrentYouTube() {
+  var file = activeFile && allFiles.find(function(f) { return f.filename === activeFile; });
+  if (!file) return;
+  var ytId = extractYouTubeVideoId(file.url);
+  if (!ytId) return;
+  playYouTubePopout({
+    title: file.title || 'Video',
+    youtubeVideoId: ytId,
+    image: 'https://img.youtube.com/vi/' + ytId + '/hqdefault.jpg',
     filename: activeFile,
   });
 }

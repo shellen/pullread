@@ -450,6 +450,16 @@ async function loadFile(index) {
   if (_breakSessionStart === 0) _breakSessionStart = Date.now();
   _sidebarView = 'home'; syncSidebarTabs();
   var prevActive = activeFile;
+
+  // Auto-popout YouTube if playing inline and navigating away
+  if (_ytPlayer && ttsPlaying && ttsQueue[ttsCurrentIndex]) {
+    var ytItem = ttsQueue[ttsCurrentIndex];
+    var ytTime = 0;
+    try { ytTime = _ytPlayer.getCurrentTime(); } catch(e) {}
+    _ytCleanup();
+    playYouTubePopout(ytItem, ytTime);
+  }
+
   activeFile = file.filename;
   _activeDrawerSource = file.feed || null;
   updateDrawerActiveState();
