@@ -1,19 +1,18 @@
 // ABOUTME: Shared utility functions for the viewer — media detection, time formatting, search, sections
 // ABOUTME: Used by sidebar, article, explore, and graph modules via concatenated global scope
-// Bookmark service detection — feeds from these domains are bookmark/read-later sources
-var BOOKMARK_DOMAINS = [
-  'instapaper.com', 'raindrop.io', 'pinboard.in', 'getpocket.com',
-  'readwise.io', 'omnivore.app', 'wallabag.org', 'linkding.',
-  'matter.md',
-];
-
+// Bookmark service detection — match specific feed URL patterns, not just domains,
+// to avoid false-matching service blogs or marketing pages
 function isBookmarkServiceUrl(feedUrl) {
   if (!feedUrl) return false;
   var lower = feedUrl.toLowerCase();
-  for (var i = 0; i < BOOKMARK_DOMAINS.length; i++) {
-    if (lower.indexOf(BOOKMARK_DOMAINS[i]) !== -1) return true;
-  }
-  // Drafty link feeds: https://www.drafty.com/@username/links/*
+  // Instapaper: /rss/{id}/{token} or /archive/rss/{id}/{token}
+  if (lower.indexOf('instapaper.com/rss/') !== -1) return true;
+  if (lower.indexOf('instapaper.com/archive/rss/') !== -1) return true;
+  // Pinboard: dedicated feed subdomain feeds.pinboard.in
+  if (lower.indexOf('feeds.pinboard.in') !== -1) return true;
+  // Raindrop.io: collection feeds (exclude blog.raindrop.io)
+  if (lower.indexOf('raindrop.io') !== -1 && lower.indexOf('blog.raindrop.io') === -1) return true;
+  // Drafty link feeds: drafty.com/@username/links/*
   if (/drafty\.com\/@[^/]+\/links/i.test(feedUrl)) return true;
   return false;
 }

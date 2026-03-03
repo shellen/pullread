@@ -548,11 +548,19 @@ describe('bookmark service detection', () => {
     isBookmarkServiceUrl = fn().isBookmarkServiceUrl;
   });
 
-  test('detects known bookmark services', () => {
-    expect(isBookmarkServiceUrl('https://www.instapaper.com/rss/123/abc')).toBe(true);
+  test('detects Instapaper feed URLs', () => {
+    expect(isBookmarkServiceUrl('https://www.instapaper.com/rss/123456/AbCdEf')).toBe(true);
+    expect(isBookmarkServiceUrl('https://www.instapaper.com/archive/rss/123456/AbCdEf')).toBe(true);
+  });
+
+  test('detects Pinboard feed URLs', () => {
+    expect(isBookmarkServiceUrl('https://feeds.pinboard.in/rss/u:jason/')).toBe(true);
+    expect(isBookmarkServiceUrl('https://feeds.pinboard.in/rss/secret:abc/u:jason/unread/')).toBe(true);
+  });
+
+  test('detects Raindrop.io feed URLs but not blog', () => {
     expect(isBookmarkServiceUrl('https://raindrop.io/collection/123/feed')).toBe(true);
-    expect(isBookmarkServiceUrl('https://pinboard.in/feeds/u:user/unread/')).toBe(true);
-    expect(isBookmarkServiceUrl('https://getpocket.com/users/user/feed/all')).toBe(true);
+    expect(isBookmarkServiceUrl('https://blog.raindrop.io/feed')).toBe(false);
   });
 
   test('detects Drafty link feeds', () => {
@@ -564,6 +572,8 @@ describe('bookmark service detection', () => {
     expect(isBookmarkServiceUrl('https://arstechnica.com/feed/')).toBe(false);
     expect(isBookmarkServiceUrl('https://www.nytimes.com/rss/homepage')).toBe(false);
     expect(isBookmarkServiceUrl('https://drafty.com/@jason/posts/rss')).toBe(false);
+    expect(isBookmarkServiceUrl('https://www.instapaper.com/help')).toBe(false);
+    expect(isBookmarkServiceUrl('https://pinboard.in/howto/')).toBe(false);
   });
 
   test('handles null/empty', () => {
