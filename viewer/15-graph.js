@@ -240,6 +240,18 @@ function buildSectionRundown(maxPerSection) {
     sectionArticles[sec].push(f);
   }
 
+  // Add discovered sections from unclassified articles
+  var discovered = discoverSections(3);
+  for (var di = 0; di < discovered.length; di++) {
+    var dsec = discovered[di];
+    if (!sectionArticles[dsec.id]) sectionArticles[dsec.id] = [];
+    for (var dai = 0; dai < dsec.articleFilenames.length; dai++) {
+      var f = allFiles.find(function(af) { return af.filename === dsec.articleFilenames[dai]; });
+      if (f && !readArticles.has(f.filename)) sectionArticles[dsec.id].push(f);
+    }
+    if (!SECTION_LABELS[dsec.id]) SECTION_LABELS[dsec.id] = dsec.label;
+  }
+
   // Allocate slots proportionally
   var counts = {};
   for (var sec in sectionArticles) counts[sec] = sectionArticles[sec].length;
@@ -287,6 +299,58 @@ function buildSectionRundown(maxPerSection) {
   }
 
   return result;
+}
+
+function discoverSections(maxDiscovered) {
+  if (maxDiscovered === undefined) maxDiscovered = 3;
+
+  // Collect articles in "other" section
+  var otherArticles = [];
+  for (var i = 0; i < allFiles.length; i++) {
+    if (resolveSection(allFiles[i].filename) === 'other') {
+      otherArticles.push(allFiles[i]);
+    }
+  }
+  if (otherArticles.length < 5) return [];
+
+  // Count unmapped tags among "other" articles
+  var tagCounts = {};
+  var tagArticleMap = {};
+  for (var i = 0; i < otherArticles.length; i++) {
+    var notes = allNotesIndex[otherArticles[i].filename];
+    var tags = (notes && notes.machineTags) || [];
+    for (var j = 0; j < tags.length; j++) {
+      var tag = tags[j];
+      if (SECTION_MAP[tag]) continue;
+      if (blockedTags.has(tag)) continue;
+      tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+      if (!tagArticleMap[tag]) tagArticleMap[tag] = [];
+      tagArticleMap[tag].push(otherArticles[i].filename);
+    }
+  }
+
+  // Find tags with 5+ articles, sorted by frequency
+  var candidates = [];
+  for (var tag in tagCounts) {
+    if (tagCounts[tag] >= 5) candidates.push({ tag: tag, count: tagCounts[tag] });
+  }
+  candidates.sort(function(a, b) { return b.count - a.count; });
+
+  // Pick top discovered sections, avoiding article overlap
+  var discovered = [];
+  var usedArticles = {};
+  for (var i = 0; i < candidates.length && discovered.length < maxDiscovered; i++) {
+    var tag = candidates[i].tag;
+    var articles = [];
+    for (var j = 0; j < tagArticleMap[tag].length; j++) {
+      if (!usedArticles[tagArticleMap[tag][j]]) articles.push(tagArticleMap[tag][j]);
+    }
+    if (articles.length < 5) continue;
+    discovered.push({ id: tag, label: mixerFormatTopic(tag), articleFilenames: articles });
+    for (var j = 0; j < articles.length; j++) usedArticles[articles[j]] = true;
+  }
+
+  return discovered;
 }
 
 function initRundown() {

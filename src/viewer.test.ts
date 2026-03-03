@@ -753,3 +753,40 @@ describe('Explore section badges', () => {
     expect(css).toContain('.section-badge');
   });
 });
+
+describe('discovered sections', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('discoverSections function exists in 15-graph.js', () => {
+    const graph = readFileSync(join(rootDir, 'viewer', '15-graph.js'), 'utf-8');
+    expect(graph).toMatch(/function\s+discoverSections/);
+  });
+
+  test('discoverSections filters to articles in "other" section', () => {
+    const graph = readFileSync(join(rootDir, 'viewer', '15-graph.js'), 'utf-8');
+    expect(graph).toContain('resolveSection');
+    expect(graph).toContain("=== 'other'");
+  });
+
+  test('discoverSections skips mapped and blocked tags', () => {
+    const graph = readFileSync(join(rootDir, 'viewer', '15-graph.js'), 'utf-8');
+    expect(graph).toContain('SECTION_MAP');
+    expect(graph).toContain('blockedTags');
+  });
+
+  test('discoverSections returns objects with id, label, articleFilenames', () => {
+    const graph = readFileSync(join(rootDir, 'viewer', '15-graph.js'), 'utf-8');
+    expect(graph).toContain('.id');
+    expect(graph).toContain('.label');
+    expect(graph).toContain('.articleFilenames');
+  });
+
+  test('buildSectionRundown integrates discoverSections', () => {
+    const graph = readFileSync(join(rootDir, 'viewer', '15-graph.js'), 'utf-8');
+    expect(graph).toContain('discoverSections');
+    // Should appear in buildSectionRundown
+    var rundownIdx = graph.indexOf('function buildSectionRundown');
+    var discoverIdx = graph.indexOf('discoverSections', rundownIdx);
+    expect(discoverIdx).toBeGreaterThan(rundownIdx);
+  });
+});
