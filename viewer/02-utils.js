@@ -21,7 +21,8 @@ function isBookmarkServiceUrl(feedUrl) {
 var _bookmarkFeedNames = new Set();
 
 function isBookmarkArticle(f) {
-  return _bookmarkFeedNames.has(f.feed || f.domain || '');
+  var feed = f.feed || f.domain || '';
+  return feed === 'import' || feed === 'inbox' || _bookmarkFeedNames.has(feed);
 }
 
 // Media enclosure type helpers — shared across article, sidebar, and TTS

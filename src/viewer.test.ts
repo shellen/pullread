@@ -540,12 +540,15 @@ describe('race condition guards', () => {
 
 describe('bookmark service detection', () => {
   let isBookmarkServiceUrl: (url: string) => boolean;
+  let isBookmarkArticle: (f: { feed?: string; domain?: string }) => boolean;
 
   beforeAll(() => {
     const rootDir = join(__dirname, '..');
     const utils = readFileSync(join(rootDir, 'viewer', '02-utils.js'), 'utf-8');
-    const fn = new Function(utils + '\nreturn { isBookmarkServiceUrl };');
-    isBookmarkServiceUrl = fn().isBookmarkServiceUrl;
+    const fn = new Function(utils + '\nreturn { isBookmarkServiceUrl, isBookmarkArticle, _bookmarkFeedNames };');
+    const fns = fn();
+    isBookmarkServiceUrl = fns.isBookmarkServiceUrl;
+    isBookmarkArticle = fns.isBookmarkArticle;
   });
 
   test('detects Instapaper feed URLs', () => {
@@ -579,6 +582,20 @@ describe('bookmark service detection', () => {
   test('handles null/empty', () => {
     expect(isBookmarkServiceUrl('')).toBe(false);
     expect(isBookmarkServiceUrl(null as any)).toBe(false);
+  });
+
+  test('detects imported bookmarks.html articles', () => {
+    expect(isBookmarkArticle({ feed: 'import' })).toBe(true);
+  });
+
+  test('detects inbox-saved articles', () => {
+    expect(isBookmarkArticle({ feed: 'inbox' })).toBe(true);
+  });
+
+  test('does not detect regular feed articles as bookmarks', () => {
+    expect(isBookmarkArticle({ feed: 'Ars Technica' })).toBe(false);
+    expect(isBookmarkArticle({ feed: 'Hacker News' })).toBe(false);
+    expect(isBookmarkArticle({ domain: 'nytimes.com' })).toBe(false);
   });
 });
 
