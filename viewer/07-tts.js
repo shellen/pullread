@@ -1032,12 +1032,11 @@ function playYouTubePopout(item, startTime) {
     + '};'
     + '</scr' + 'ipt></body></html>';
 
-  var blob = new Blob([html], { type: 'text/html' });
-  var blobUrl = URL.createObjectURL(blob);
-  var w = window.open(blobUrl, '_blank', 'width=960,height=640,menubar=no,toolbar=no');
-  URL.revokeObjectURL(blobUrl);
-
+  var w = window.open('about:blank', '_blank', 'width=960,height=640,menubar=no,toolbar=no');
   if (w) {
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
     _videoPopoutWindow = w;
     renderAudioPlayer();
     var check = setInterval(function() {
