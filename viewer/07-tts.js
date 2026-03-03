@@ -1014,19 +1014,10 @@ function playYouTubePopout(item, startTime) {
       if (w.closed) {
         clearInterval(check);
         _videoPopoutWindow = null;
-        if (_videoPopbackData) {
-          _videoPopbackData = null;
-          ttsPlaying = false;
-          renderAudioPlayer();
-          return;
-        }
+        _videoPopbackData = null;
         ttsPlaying = false;
         renderAudioPlayer();
-        if (ttsCurrentIndex + 1 < ttsQueue.length) {
-          setTimeout(function() { playTTSItem(ttsCurrentIndex + 1); }, 500);
-        } else {
-          autoplayNext(item.filename);
-        }
+        bottomBarGoToArticle();
       }
     }, 500);
   } else {
