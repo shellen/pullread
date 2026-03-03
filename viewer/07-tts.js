@@ -1027,6 +1027,7 @@ function playYouTubePopout(item, startTime) {
     + 'var _p;'
     + 'window.onYouTubeIframeAPIReady=function(){'
     + '  _p=new YT.Player("yt-popout",{videoId:"' + item.youtubeVideoId + '",playerVars:{autoplay:1,modestbranding:1,rel:0' + (startTime ? ',start:' + Math.floor(startTime) : '') + '},events:{'
+    + '    onReady:function(e){e.target.playVideo();},'
     + '    onStateChange:function(e){if(e.data===YT.PlayerState.ENDED)window.close();}'
     + '  }});'
     + '};'
