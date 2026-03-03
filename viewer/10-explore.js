@@ -157,6 +157,18 @@ function buildTagsTabHtml(data) {
     for (var ci = 0; ci < clusterLimit; ci++) {
       var cluster = clusters[ci];
       html += '<div class="topic-cluster">';
+      // Determine cluster's dominant section
+      var clusterSections = {};
+      for (var cti2 = 0; cti2 < cluster.tags.length; cti2++) {
+        var cs = SECTION_MAP[cluster.tags[cti2]];
+        if (cs) clusterSections[cs] = (clusterSections[cs] || 0) + 1;
+      }
+      var clusterSection = 'other';
+      var bestSC = 0;
+      for (var csKey in clusterSections) {
+        if (clusterSections[csKey] > bestSC) { clusterSection = csKey; bestSC = clusterSections[csKey]; }
+      }
+      html += '<span class="section-badge">' + escapeHtml(SECTION_LABELS[clusterSection] || 'Other') + '</span>';
       html += '<div class="topic-cluster-tags">';
       for (var cti = 0; cti < cluster.tags.length; cti++) {
         html += '<span class="tag-pill tag-pill-sm">' + escapeHtml(cluster.tags[cti]) + '</span>';

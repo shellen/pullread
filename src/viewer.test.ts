@@ -731,3 +731,25 @@ describe('Tags tab section grouping', () => {
     expect(css).toContain('.section-chevron');
   });
 });
+
+describe('Explore section badges', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('topic cluster cards include section badges', () => {
+    const explore = readFileSync(join(rootDir, 'viewer', '10-explore.js'), 'utf-8');
+    expect(explore).toContain('section-badge');
+  });
+
+  test('section badge determined from cluster tags via SECTION_MAP', () => {
+    const explore = readFileSync(join(rootDir, 'viewer', '10-explore.js'), 'utf-8');
+    // The cluster section detection should use SECTION_MAP
+    const badgeSection = explore.indexOf('section-badge');
+    const sectionMapRef = explore.indexOf('SECTION_MAP', badgeSection - 200);
+    expect(sectionMapRef).toBeGreaterThan(-1);
+  });
+
+  test('viewer.css styles section badges', () => {
+    const css = readFileSync(join(rootDir, 'viewer.css'), 'utf-8');
+    expect(css).toContain('.section-badge');
+  });
+});
