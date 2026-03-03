@@ -1003,40 +1003,11 @@ function playYouTubePopout(item, startTime) {
   ttsPlaying = true;
   renderAudioPlayer();
 
-  var title = (item.title || 'Video').replace(/</g, '&lt;');
-
-  var embedParams = 'autoplay=1&modestbranding=1&rel=0';
-  if (startTime) embedParams += '&start=' + Math.floor(startTime);
-  var embedSrc = 'https://www.youtube.com/embed/' + encodeURIComponent(item.youtubeVideoId) + '?' + embedParams;
-
-  var w = window.open('about:blank', '_blank', 'width=960,height=640,menubar=no,toolbar=no');
+  var popoutUrl = '/popout?v=' + encodeURIComponent(item.youtubeVideoId)
+    + '&title=' + encodeURIComponent(item.title || 'Video')
+    + (startTime ? '&t=' + Math.floor(startTime) : '');
+  var w = window.open(popoutUrl, '_blank', 'width=960,height=640,menubar=no,toolbar=no');
   if (w) {
-    var d = w.document;
-    d.title = title + ' — Pull Read';
-    var style = d.createElement('style');
-    style.textContent = 'body{margin:0;background:#111;font-family:system-ui,sans-serif;color:#fff}'
-      + 'iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}'
-      + '.info{position:fixed;top:12px;left:16px;font-size:13px;opacity:0.7;z-index:10}'
-      + '.pop-in{position:fixed;top:12px;right:16px;background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:6px;padding:6px 14px;font-size:13px;cursor:pointer;font-family:inherit;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:background 0.15s;z-index:10}'
-      + '.pop-in:hover{background:rgba(255,255,255,0.25)}';
-    d.head.appendChild(style);
-    var info = d.createElement('div');
-    info.className = 'info';
-    info.textContent = item.title || 'Video';
-    d.body.appendChild(info);
-    var btn = d.createElement('button');
-    btn.className = 'pop-in';
-    btn.innerHTML = '&#8617; Pop back in';
-    btn.onclick = function() {
-      if (w.opener && w.opener._videoPopIn) w.opener._videoPopIn(0);
-      w.close();
-    };
-    d.body.appendChild(btn);
-    var iframe = d.createElement('iframe');
-    iframe.src = embedSrc;
-    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
-    iframe.allowFullscreen = true;
-    d.body.appendChild(iframe);
     _videoPopoutWindow = w;
     renderAudioPlayer();
     var check = setInterval(function() {

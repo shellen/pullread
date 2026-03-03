@@ -820,6 +820,30 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
       return;
     }
 
+    // YouTube popout player — served from real HTTP origin so embeds work
+    if (url.pathname === '/popout') {
+      const videoId = url.searchParams.get('v') || '';
+      const start = url.searchParams.get('t') || '';
+      const title = (url.searchParams.get('title') || 'Video').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+      let embedParams = 'autoplay=1&modestbranding=1&rel=0';
+      if (start) embedParams += '&start=' + encodeURIComponent(start);
+      const embedSrc = 'https://www.youtube.com/embed/' + encodeURIComponent(videoId) + '?' + embedParams;
+      const popoutHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title} — Pull Read</title>
+<style>body{margin:0;background:#111;font-family:system-ui,sans-serif;color:#fff}
+iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
+.info{position:fixed;top:12px;left:16px;font-size:13px;opacity:0.7;z-index:10}
+.pop-in{position:fixed;top:12px;right:16px;background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:6px;padding:6px 14px;font-size:13px;cursor:pointer;font-family:inherit;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:background 0.15s;z-index:10}
+.pop-in:hover{background:rgba(255,255,255,0.25)}</style></head><body>
+<div class="info">${title}</div>
+<button class="pop-in" onclick="popBackIn()">&#8617; Pop back in</button>
+<iframe src="${embedSrc}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<script>function popBackIn(){if(window.opener&&window.opener._videoPopIn)window.opener._videoPopIn(0);window.close();}</script>
+</body></html>`;
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(popoutHtml);
+      return;
+    }
+
     // Serve locally cached favicons
     const faviconMatch = url.pathname.match(/^\/favicons\/([a-zA-Z0-9._-]+\.png)$/);
     if (faviconMatch) {
