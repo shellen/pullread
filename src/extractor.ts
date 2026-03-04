@@ -633,9 +633,15 @@ export function extractArticle(html: string, url: string): ExtractedArticle | nu
   // Set document URL for Readability
   Object.defineProperty(document, 'URL', { value: url });
 
-  // Extract document language from <html lang="..."> before Readability mutates the DOM
+  // Extract document language and og:image before Readability mutates the DOM
   const htmlEl = document.querySelector('html');
   const lang = htmlEl?.getAttribute('lang')?.split('-')[0] || undefined;
+
+  const getMetaContent = (prop: string): string => {
+    const el = document.querySelector(`meta[property="${prop}"], meta[name="${prop}"]`);
+    return el?.getAttribute('content') || '';
+  };
+  const thumbnail = getMetaContent('og:image') || getMetaContent('twitter:image') || undefined;
 
   const reader = new Readability(document);
   const article = reader.parse();
@@ -658,12 +664,17 @@ export function extractArticle(html: string, url: string): ExtractedArticle | nu
       markdown,
       byline: article.byline || undefined,
       excerpt: article.excerpt || undefined,
+      thumbnail,
       lang,
     };
   }
 
   // Fallback: try OpenGraph and JSON-LD extraction
-  return extractFallback(document, url);
+  const fallback = extractFallback(document, url);
+  if (fallback && !fallback.thumbnail && thumbnail) {
+    fallback.thumbnail = thumbnail;
+  }
+  return fallback;
 }
 
 function extractFallback(document: any, url: string): ExtractedArticle | null {
