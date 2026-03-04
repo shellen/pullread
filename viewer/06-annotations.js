@@ -760,12 +760,14 @@ function toggleReadFromHeader(btn) {
     markCurrentAsUnread();
     btn.classList.remove('active-read');
     btn.setAttribute('aria-label', 'Mark read');
+    btn.setAttribute('title', 'Mark as read');
     btn.querySelector('.toolbar-action-label').textContent = ' Read';
     showToast('Marked as unread');
   } else {
     markCurrentAsRead();
     btn.classList.add('active-read');
     btn.setAttribute('aria-label', 'Mark unread');
+    btn.setAttribute('title', 'Mark as unread');
     btn.querySelector('.toolbar-action-label').textContent = ' Unread';
   }
 }
