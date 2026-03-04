@@ -469,6 +469,11 @@ function filterFiles() {
           const domQ = tl.slice(7).replace(/^"(.*)"$/, '$1');
           return f.domain.toLowerCase().includes(domQ);
         }
+        // Operator: section:value — filter by editorial section
+        if (tl.startsWith('section:')) {
+          const secQ = tl.slice(8).replace(/^"(.*)"$/, '$1');
+          return resolveSection(f.filename) === secQ;
+        }
         // Operator: author:value (supports author:"First Last")
         if (tl.startsWith('author:')) {
           const authQ = tl.slice(7).replace(/^"(.*)"$/, '$1');
