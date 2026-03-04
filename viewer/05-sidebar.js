@@ -1154,10 +1154,12 @@ function clearSourceFilter() {
   var search = document.getElementById('search');
   if (search) search.value = '';
   _activeDrawerSource = null;
-  // Reset nav to All Items
-  document.querySelectorAll('.sidebar-nav-item').forEach(function(item) {
-    item.classList.toggle('active', item.dataset.nav === 'all');
-  });
+  // Reset nav to All Items only when in articles view
+  if (_sidebarView !== 'notebooks') {
+    document.querySelectorAll('.sidebar-nav-item').forEach(function(item) {
+      item.classList.toggle('active', item.dataset.nav === 'all');
+    });
+  }
   filterFiles();
 }
 
