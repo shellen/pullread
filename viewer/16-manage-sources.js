@@ -31,6 +31,7 @@ function showManageSourcesPage() {
   empty.style.display = 'none';
   content.style.display = 'block';
   content.classList.remove('settings-view');
+  content.classList.remove('ask-view');
   content.classList.add('manage-sources-view');
   document.title = 'Sources \u2014 PullRead';
   document.getElementById('margin-notes').innerHTML = '';

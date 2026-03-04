@@ -1,7 +1,7 @@
 // ABOUTME: Tests for article summarization chunking logic
 // ABOUTME: Verifies splitIntoSections and chunkedSummarize for long article handling
 
-import { splitIntoSections, chunkedSummarize } from './summarizer';
+import { splitIntoSections, chunkedSummarize, promptLLM, ProviderCallFn } from './summarizer';
 
 describe('splitIntoSections', () => {
   test('returns single section for short text', () => {
@@ -122,5 +122,51 @@ describe('chunkedSummarize', () => {
     const article = makeLongArticle(2, 4500);
     const result = await chunkedSummarize(article, callFn);
     expect(result).toBe('The synthesized summary');
+  });
+});
+
+describe('promptLLM', () => {
+  test('sends prompt to call function and returns text + model', async () => {
+    const callFn: ProviderCallFn = async (prompt, _maxTokens) => {
+      return 'LLM response about ' + prompt.slice(0, 10);
+    };
+
+    const result = await promptLLM('What is AI?', { provider: 'openai', apiKey: 'test', model: 'gpt-5' }, undefined, callFn);
+    expect(result.text).toContain('LLM response');
+    expect(result.model).toBe('gpt-5');
+  });
+
+  test('uses default maxTokens of 1024', async () => {
+    let capturedMaxTokens = 0;
+    const callFn: ProviderCallFn = async (_prompt, maxTokens) => {
+      capturedMaxTokens = maxTokens;
+      return 'response';
+    };
+
+    await promptLLM('question', { provider: 'anthropic', apiKey: 'test', model: 'claude' }, undefined, callFn);
+    expect(capturedMaxTokens).toBe(1024);
+  });
+
+  test('respects custom maxTokens', async () => {
+    let capturedMaxTokens = 0;
+    const callFn: ProviderCallFn = async (_prompt, maxTokens) => {
+      capturedMaxTokens = maxTokens;
+      return 'response';
+    };
+
+    await promptLLM('question', { provider: 'anthropic', apiKey: 'test', model: 'claude' }, 512, callFn);
+    expect(capturedMaxTokens).toBe(512);
+  });
+
+  test('passes full prompt string to call function', async () => {
+    let capturedPrompt = '';
+    const callFn: ProviderCallFn = async (prompt, _maxTokens) => {
+      capturedPrompt = prompt;
+      return 'response';
+    };
+
+    const fullPrompt = 'System: You are helpful.\n\nUser: What is the weather?';
+    await promptLLM(fullPrompt, { provider: 'openai', apiKey: 'test', model: 'gpt-5' }, undefined, callFn);
+    expect(capturedPrompt).toBe(fullPrompt);
   });
 });

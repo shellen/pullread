@@ -838,6 +838,84 @@ describe('Explore section badges', () => {
   });
 });
 
+describe('findRelevantArticles', () => {
+  const { findRelevantArticles } = require('./viewer');
+
+  test('scores articles by keyword matches in title, excerpt, summary, categories, domain', () => {
+    const articles: any[] = [
+      { filename: 'ai-article.md', title: 'AI Revolution in Healthcare', url: 'https://example.com/1', domain: 'techblog.com', bookmarked: '', feed: '', author: '', mtime: '', hasSummary: true, summaryProvider: '', summaryModel: '', excerpt: 'Artificial intelligence transforms medical diagnosis', image: '', enclosureUrl: '', enclosureType: '', enclosureDuration: '', videoEnclosureUrl: '', videoEnclosureType: '', commentsUrl: '', commentCount: 0, categories: ['Technology', 'Health'] },
+      { filename: 'cooking.md', title: 'Best Pasta Recipes', url: 'https://food.com/pasta', domain: 'food.com', bookmarked: '', feed: '', author: '', mtime: '', hasSummary: false, summaryProvider: '', summaryModel: '', excerpt: 'Easy pasta dishes for weeknights', image: '', enclosureUrl: '', enclosureType: '', enclosureDuration: '', videoEnclosureUrl: '', videoEnclosureType: '', commentsUrl: '', commentCount: 0, categories: ['Food'] },
+      { filename: 'ai-ethics.md', title: 'Ethics of AI', url: 'https://example.com/2', domain: 'example.com', bookmarked: '', feed: '', author: '', mtime: '', hasSummary: true, summaryProvider: '', summaryModel: '', excerpt: 'Should AI make decisions about healthcare?', image: '', enclosureUrl: '', enclosureType: '', enclosureDuration: '', videoEnclosureUrl: '', videoEnclosureType: '', commentsUrl: '', commentCount: 0, categories: ['Technology'] },
+    ];
+
+    const result = findRelevantArticles('What does AI mean for healthcare?', articles, 3);
+    expect(result.length).toBe(2);
+    // Both AI articles should appear; cooking should not
+    const filenames = result.map((a: any) => a.filename);
+    expect(filenames).toContain('ai-article.md');
+    expect(filenames).toContain('ai-ethics.md');
+    expect(filenames).not.toContain('cooking.md');
+  });
+
+  test('returns empty array when no articles match', () => {
+    const articles: any[] = [
+      { filename: 'cooking.md', title: 'Best Pasta Recipes', url: '', domain: 'food.com', bookmarked: '', feed: '', author: '', mtime: '', hasSummary: false, summaryProvider: '', summaryModel: '', excerpt: 'Easy pasta dishes', image: '', enclosureUrl: '', enclosureType: '', enclosureDuration: '', videoEnclosureUrl: '', videoEnclosureType: '', commentsUrl: '', commentCount: 0, categories: ['Food'] },
+    ];
+
+    const result = findRelevantArticles('quantum physics breakthroughs', articles, 3);
+    expect(result).toHaveLength(0);
+  });
+
+  test('respects limit parameter', () => {
+    const articles: any[] = [];
+    for (let i = 0; i < 10; i++) {
+      articles.push({ filename: `ai-${i}.md`, title: `AI Article ${i}`, url: '', domain: 'ai.com', bookmarked: '', feed: '', author: '', mtime: '', hasSummary: false, summaryProvider: '', summaryModel: '', excerpt: 'Artificial intelligence research', image: '', enclosureUrl: '', enclosureType: '', enclosureDuration: '', videoEnclosureUrl: '', videoEnclosureType: '', commentsUrl: '', commentCount: 0, categories: ['AI'] });
+    }
+
+    const result = findRelevantArticles('AI research', articles, 3);
+    expect(result.length).toBeLessThanOrEqual(3);
+  });
+
+  test('title matches score higher than domain matches', () => {
+    const articles: any[] = [
+      { filename: 'domain-only.md', title: 'Something Else', url: '', domain: 'ai.com', bookmarked: '', feed: '', author: '', mtime: '', hasSummary: false, summaryProvider: '', summaryModel: '', excerpt: 'Unrelated content', image: '', enclosureUrl: '', enclosureType: '', enclosureDuration: '', videoEnclosureUrl: '', videoEnclosureType: '', commentsUrl: '', commentCount: 0, categories: [] },
+      { filename: 'title-match.md', title: 'AI Transforms Everything', url: '', domain: 'blog.com', bookmarked: '', feed: '', author: '', mtime: '', hasSummary: false, summaryProvider: '', summaryModel: '', excerpt: 'About artificial intelligence', image: '', enclosureUrl: '', enclosureType: '', enclosureDuration: '', videoEnclosureUrl: '', videoEnclosureType: '', commentsUrl: '', commentCount: 0, categories: [] },
+    ];
+
+    const result = findRelevantArticles('AI', articles, 2);
+    expect(result[0].filename).toBe('title-match.md');
+  });
+});
+
+describe('ask page structure', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('17-ask.js defines renderAskPage function', () => {
+    const ask = readFileSync(join(rootDir, 'viewer', '17-ask.js'), 'utf-8');
+    expect(ask).toMatch(/function\s+renderAskPage/);
+  });
+
+  test('13-init.js handles #tab=ask hash', () => {
+    const init = readFileSync(join(rootDir, 'viewer', '13-init.js'), 'utf-8');
+    expect(init).toContain("params.tab === 'ask'");
+    expect(init).toContain('renderAskPage');
+  });
+
+  test('viewer.css has ask-view styles', () => {
+    const css = readFileSync(join(rootDir, 'viewer.css'), 'utf-8');
+    expect(css).toContain('.ask-view');
+    expect(css).toContain('.ask-messages');
+    expect(css).toContain('.ask-input-area');
+  });
+
+  test('viewer.ts has /api/ask endpoint', () => {
+    const viewer = readFileSync(join(rootDir, 'src', 'viewer.ts'), 'utf-8');
+    expect(viewer).toContain("/api/ask");
+    expect(viewer).toContain('findRelevantArticles');
+    expect(viewer).toContain('promptLLM');
+  });
+});
+
 describe('discovered sections', () => {
   const rootDir = join(__dirname, '..');
 

@@ -538,6 +538,7 @@ function showSettingsPage(scrollToSection) {
   empty.style.display = 'none';
   content.style.display = 'block';
   content.classList.remove('manage-sources-view');
+  content.classList.remove('ask-view');
   content.classList.add('settings-view');
   document.title = 'Settings \u2014 PullRead';
   document.getElementById('margin-notes').innerHTML = '';
