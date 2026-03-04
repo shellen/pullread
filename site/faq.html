@@ -498,9 +498,9 @@ SORT bookmarked DESC
     <h2 class="faq-section-title">Command Line</h2>
 
     <div class="faq-item">
-      <h3 class="faq-question">Can I use Pull Read without the macOS app?</h3>
+      <h3 class="faq-question">Does Pull Read have a CLI?</h3>
       <div class="faq-answer">
-        <p>Yes. Pull Read includes a standalone CLI that runs on any platform with Node.js or Bun. Clone the <a href="https://github.com/shellen/pullread">GitHub repo</a>, run <code>npm install</code>, and use commands like <code>pullread sync</code>, <code>pullread view</code>, and <code>pullread review</code>. The in-app Guide has the full command reference.</p>
+        <p>Yes. The macOS app bundles a CLI that it uses behind the scenes to sync feeds, generate reviews, and run auto-tagging. Power users can also invoke it directly from Terminal to script or automate tasks. The in-app Guide has the full command reference.</p>
       </div>
     </div>
 
@@ -512,9 +512,9 @@ SORT bookmarked DESC
     </div>
 
     <div class="faq-item">
-      <h3 class="faq-question">Where does the CLI store its configuration?</h3>
+      <h3 class="faq-question">Where does Pull Read store its data?</h3>
       <div class="faq-answer">
-        <p>Feed configuration lives at <code>~/.config/pullread/feeds.json</code>. Articles are saved to the output folder specified in your config (default: <code>~/Documents/PullRead</code>). Both paths can be overridden with <code>--config-path</code> and <code>--data-path</code> flags.</p>
+        <p>Feed configuration lives at <code>~/.config/pullread/feeds.json</code> and settings (including AI provider keys) at <code>~/.config/pullread/settings.json</code>. Articles are saved to the output folder specified in your config (default: <code>~/Documents/PullRead</code>).</p>
       </div>
     </div>
   </div>

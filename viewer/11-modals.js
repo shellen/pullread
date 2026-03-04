@@ -161,13 +161,7 @@ function showGuideModal() {
     <p>Import bookmarks.html files exported from Chrome, Safari, Firefox, or Pocket directly from Settings or via the CLI with <code>pullread import &lt;file&gt;</code>.</p>
 
     <h2>Command-Line Interface (CLI)</h2>
-    <p>PullRead includes a standalone CLI that runs on any platform with Node.js or Bun — no macOS app required. Install from the <a href="https://github.com/shellen/pullread" target="_blank" rel="noopener">GitHub repo</a> and run commands directly from your terminal.</p>
-
-    <h3>Getting Started</h3>
-    <pre><code>git clone https://github.com/shellen/pullread.git
-cd pullread
-npm install
-npx pullread --help</code></pre>
+    <p>PullRead bundles a CLI that the app uses behind the scenes to sync feeds, generate reviews, run auto-tagging, and more. You don't need to use it directly — the app handles everything — but it's there for power users who want to script or automate tasks.</p>
 
     <h3>Commands</h3>
     <table>
@@ -190,8 +184,7 @@ npx pullread --help</code></pre>
     </table>
 
     <h3>Configuration</h3>
-    <p>The CLI reads feed configuration from <code>~/.config/pullread/feeds.json</code>. You can override paths with <code>--config-path</code> and <code>--data-path</code> flags. Articles are saved to the output folder specified in your config (default: <code>~/Documents/PullRead</code>).</p>
-    <p>AI features (summarize, autotag, review) require a provider and API key configured in your feeds.json under the <code>llm</code> section.</p>
+    <p>Feed configuration is stored at <code>~/.config/pullread/feeds.json</code> and articles are saved to the output folder specified in your config (default: <code>~/Documents/PullRead</code>). AI features (summarize, autotag, review) require a provider and API key configured in Settings or in <code>~/.config/pullread/settings.json</code>.</p>
 
     <h2>Keyboard Shortcuts</h2>
     <p>Shortcuts follow Google Reader conventions where possible.</p>
@@ -247,8 +240,8 @@ npx pullread --help</code></pre>
     <h3>How do I reset my reading history?</h3>
     <p>Reading history is stored in your browser's localStorage. Clear it by opening developer tools (Cmd+Option+I), going to Application &rarr; Local Storage, and removing the <code>pr-read-articles</code> key.</p>
 
-    <h3>Can I use PullRead without the macOS app?</h3>
-    <p>Yes. The CLI works standalone on any platform with Node.js/Bun. Run <code>pullread view</code> to launch the article reader in your browser.</p>
+    <h3>Can I script PullRead from Terminal?</h3>
+    <p>Yes. The app bundles a CLI binary that you can invoke directly. See the Command-Line Interface section above for the full list of commands.</p>
 
     <h3>Am I allowed to save articles?</h3>
     <p>Pull Read is intended for personal reading and archival. You are responsible for ensuring your use complies with applicable copyright laws and the terms of service of any websites you access. Only sync content you are authorized to copy. Do not use Pull Read to redistribute or commercially exploit content you do not have rights to.</p>
