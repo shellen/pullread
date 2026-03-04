@@ -763,34 +763,32 @@ function openSingleNotebook() {
 }
 
 function syncSidebarTabs() {
-  document.querySelectorAll('.sidebar-tab[data-tab]').forEach(function(t) {
-    t.classList.toggle('active', t.dataset.tab === _sidebarView);
-  });
+  // When switching to notebooks view, highlight notebook nav and dim others
+  if (_sidebarView === 'notebooks') {
+    document.querySelectorAll('.sidebar-nav-item').forEach(function(item) {
+      item.classList.toggle('active', item.dataset.nav === 'notebook');
+    });
+  }
 
-  // File list always visible; sort bar only on articles tab
+  // File list always visible; sort bar only on articles view
+  var isArticles = _sidebarView === 'home';
   var fileCount = document.getElementById('file-count');
   var fileList = document.getElementById('file-list');
-  if (fileCount) fileCount.style.display = _sidebarView === 'home' ? '' : 'none';
+  if (fileCount) fileCount.style.display = isArticles ? '' : 'none';
   if (fileList) fileList.style.display = '';
 
   // Update search placeholder contextually
   var search = document.getElementById('search');
   if (search) {
     if (_sidebarView === 'notebooks') search.placeholder = 'Search notebooks...';
-    else search.placeholder = 'Search articles...';
+    else search.placeholder = 'Search...';
   }
 
-  // Pinned filters only apply to articles (home view)
+  // Pinned filters only apply to articles
   var pinnedContainer = document.getElementById('pinned-filters');
-  if (pinnedContainer) pinnedContainer.style.display = _sidebarView === 'home' ? '' : 'none';
+  if (pinnedContainer) pinnedContainer.style.display = isArticles ? '' : 'none';
   var pinBtn = document.getElementById('search-pin');
-  if (pinBtn && _sidebarView !== 'home') pinBtn.style.display = 'none';
-
-  // Sort toggles visibility handled by file-count container above
-
-  // Nav items only visible on home tab
-  var navEl = document.getElementById('sidebar-nav');
-  if (navEl) navEl.style.display = _sidebarView === 'home' ? '' : 'none';
+  if (pinBtn && !isArticles) pinBtn.style.display = 'none';
 }
 
 // ---- Sidebar nav filter (All Items / Sources / Tags / Unread / Starred) ----
@@ -801,16 +799,19 @@ function sidebarNavFilter(filter) {
   });
 
   var search = document.getElementById('search');
-  if (filter === 'all') {
+  if (filter === 'explore') {
+    closeDrawer();
+    switchSidebarView('home');
+    return;
+  } else if (filter === 'notebook') {
+    closeDrawer();
+    switchSidebarView('notebooks');
+    return;
+  } else if (filter === 'all') {
     if (search) search.value = '';
     clearSourceFilter();
     filterFiles();
     closeDrawer();
-    if (displayFiles.length > 0) loadFile(0);
-  } else if (filter === 'unread') {
-    if (search) search.value = 'is:unread';
-    closeDrawer();
-    filterFiles();
     if (displayFiles.length > 0) loadFile(0);
   } else if (filter === 'starred') {
     if (search) search.value = 'is:starred';
@@ -819,8 +820,6 @@ function sidebarNavFilter(filter) {
     if (displayFiles.length > 0) loadFile(0);
   } else if (filter === 'sources') {
     openSourcesDrawer();
-  } else if (filter === 'tags') {
-    openTagsDrawer();
   }
 }
 
@@ -836,7 +835,7 @@ function openSourcesDrawer() {
   var title = document.getElementById('drawer-title');
   var contentEl = document.getElementById('drawer-content');
   var footerEl = document.getElementById('drawer-footer');
-  if (title) title.textContent = 'Sources';
+  if (title) title.textContent = 'Sources & Tags';
 
   // Group articles by feed/domain
   var domainArticles = {};
@@ -861,6 +860,7 @@ function openSourcesDrawer() {
 
   var sortMode = localStorage.getItem('pr-sources-sort') || 'recent';
   var _drawerFilter = '';
+  var _showAllTags = false;
 
   function sortEntries(mode) {
     if (mode === 'az') {
@@ -887,7 +887,7 @@ function openSourcesDrawer() {
     // Search/filter input + sort bar (sticky toolbar)
     html += '<div class="drawer-toolbar">';
     html += '<div class="drawer-search">';
-    html += '<input type="text" id="drawer-filter-input" placeholder="Filter sources\u2026" value="' + escapeHtml(_drawerFilter) + '">';
+    html += '<input type="text" id="drawer-filter-input" placeholder="Filter sources & tags\u2026" value="' + escapeHtml(_drawerFilter) + '">';
     html += '</div>';
     html += '<div class="drawer-sort-bar">';
     html += '<button class="drawer-sort-btn' + (sortMode === 'recent' ? ' active' : '') + '" data-sort="recent" title="Sort by most recent article">Recent</button>';
@@ -969,6 +969,41 @@ function openSourcesDrawer() {
         + '<span class="drawer-item-count">' + unread + '</span></div>';
     }
 
+    // By Tag section — top tags nested under sources
+    var tagCounts = {};
+    for (var fn in allNotesIndex) {
+      var notes = allNotesIndex[fn];
+      var allTags = (notes.tags || []).concat(notes.machineTags || []);
+      for (var ti = 0; ti < allTags.length; ti++) {
+        tagCounts[allTags[ti]] = (tagCounts[allTags[ti]] || 0) + 1;
+      }
+    }
+    var tagEntries = Object.entries(tagCounts);
+    tagEntries.sort(function(a, b) { return b[1] - a[1]; });
+
+    var MAX_TAGS = 15;
+    var visibleTags = [];
+    for (var tg = 0; tg < tagEntries.length; tg++) {
+      if (filterLower && tagEntries[tg][0].toLowerCase().indexOf(filterLower) === -1) continue;
+      visibleTags.push(tagEntries[tg]);
+    }
+
+    if (visibleTags.length > 0) {
+      html += '<div class="drawer-group-label">By Tag</div>';
+      var tagLimit = _showAllTags ? visibleTags.length : Math.min(MAX_TAGS, visibleTags.length);
+      for (var tv = 0; tv < tagLimit; tv++) {
+        html += '<div class="drawer-item" onclick="filterByTag(\'' + escapeJsStr(visibleTags[tv][0]) + '\')">'
+          + '<span class="drawer-item-dot" style="background:var(--link)"></span>'
+          + '<span class="drawer-item-name">' + escapeHtml(visibleTags[tv][0]) + '</span>'
+          + '<span class="drawer-item-count">' + visibleTags[tv][1] + '</span></div>';
+      }
+      if (visibleTags.length > MAX_TAGS && !_showAllTags) {
+        html += '<div class="drawer-show-all" id="drawer-show-all-tags">Show all ' + visibleTags.length + ' tags\u2026</div>';
+      } else if (_showAllTags && visibleTags.length > MAX_TAGS) {
+        html += '<div class="drawer-show-all" id="drawer-collapse-tags">Show fewer</div>';
+      }
+    }
+
     if (contentEl) {
       contentEl.innerHTML = html;
 
@@ -993,6 +1028,12 @@ function openSourcesDrawer() {
           if (fi) { fi.focus(); fi.setSelectionRange(pos, pos); }
         });
       }
+
+      // Wire show all / collapse tags
+      var showAllBtn = document.getElementById('drawer-show-all-tags');
+      if (showAllBtn) showAllBtn.addEventListener('click', function() { _showAllTags = true; renderSources(); });
+      var collapseBtn = document.getElementById('drawer-collapse-tags');
+      if (collapseBtn) collapseBtn.addEventListener('click', function() { _showAllTags = false; renderSources(); });
     }
   }
 
@@ -1006,100 +1047,6 @@ function openSourcesDrawer() {
   }
 
   renderSources();
-  openDrawer();
-}
-
-function openTagsDrawer() {
-  var title = document.getElementById('drawer-title');
-  var content = document.getElementById('drawer-content');
-  var footerEl = document.getElementById('drawer-footer');
-  if (title) title.textContent = 'Tags';
-  if (footerEl) footerEl.style.display = 'none';
-
-  // Collect tags from annotations index
-  var tagCounts = {};
-  for (var filename in allNotesIndex) {
-    var notes = allNotesIndex[filename];
-    var allTags = (notes.tags || []).concat(notes.machineTags || []);
-    for (var i = 0; i < allTags.length; i++) {
-      tagCounts[allTags[i]] = (tagCounts[allTags[i]] || 0) + 1;
-    }
-  }
-
-  var entries = Object.entries(tagCounts);
-  var sortMode = localStorage.getItem('pr-tags-sort') || 'count';
-  var _tagFilter = '';
-
-  function sortEntries(mode) {
-    if (mode === 'az') {
-      entries.sort(function(a, b) { return a[0].localeCompare(b[0]); });
-    } else {
-      entries.sort(function(a, b) { return b[1] - a[1]; });
-    }
-  }
-
-  function renderTags() {
-    var html = '';
-
-    // Search/filter input + sort bar (sticky toolbar)
-    html += '<div class="drawer-toolbar">';
-    html += '<div class="drawer-search">';
-    html += '<input type="text" id="drawer-tag-filter" placeholder="Filter tags\u2026" value="' + escapeHtml(_tagFilter) + '">';
-    html += '</div>';
-    html += '<div class="drawer-sort-bar">';
-    html += '<button class="drawer-sort-btn' + (sortMode === 'count' ? ' active' : '') + '" data-sort="count" title="Sort by frequency">Count</button>';
-    html += '<button class="drawer-sort-btn' + (sortMode === 'az' ? ' active' : '') + '" data-sort="az" title="Sort alphabetically">A\u2013Z</button>';
-    html += '</div></div>';
-
-    var filterLower = _tagFilter.toLowerCase();
-    sortEntries(sortMode);
-
-    var shown = 0;
-    for (var ti = 0; ti < entries.length; ti++) {
-      var tag = entries[ti][0];
-      var count = entries[ti][1];
-      if (filterLower && tag.toLowerCase().indexOf(filterLower) === -1) continue;
-      html += '<div class="drawer-item" onclick="filterByTag(\'' + escapeJsStr(tag) + '\')">'
-        + '<span class="drawer-item-dot" style="background:var(--link)"></span>'
-        + '<span class="drawer-item-name">' + escapeHtml(tag) + '</span>'
-        + '<span class="drawer-item-count">' + count + '</span></div>';
-      shown++;
-    }
-
-    if (!entries.length) {
-      html += '<div style="padding:16px 8px;color:var(--muted);font-size:13px;text-align:center">No tags yet. Tags appear when articles are auto-tagged or you add them manually.</div>';
-    } else if (!shown) {
-      html += '<div style="padding:16px 8px;color:var(--muted);font-size:13px;text-align:center">No tags matching \u201c' + escapeHtml(_tagFilter) + '\u201d</div>';
-    }
-
-    if (content) {
-      content.innerHTML = html;
-
-      // Wire sort buttons
-      var btns = content.querySelectorAll('.drawer-sort-btn');
-      for (var b = 0; b < btns.length; b++) {
-        btns[b].addEventListener('click', function() {
-          sortMode = this.dataset.sort;
-          localStorage.setItem('pr-tags-sort', sortMode);
-          renderTags();
-        });
-      }
-
-      // Wire search filter
-      var filterInput = document.getElementById('drawer-tag-filter');
-      if (filterInput) {
-        filterInput.addEventListener('input', function() {
-          _tagFilter = this.value;
-          var pos = this.selectionStart;
-          renderTags();
-          var fi = document.getElementById('drawer-tag-filter');
-          if (fi) { fi.focus(); fi.setSelectionRange(pos, pos); }
-        });
-      }
-    }
-  }
-
-  renderTags();
   openDrawer();
 }
 
@@ -1184,9 +1131,6 @@ function refreshDrawerCounts() {
       countEl.textContent = unread;
       items[i].classList.toggle('dimmed', unread === 0);
     }
-  } else if (title.textContent === 'Tags') {
-    // Tags drawer — just re-render since tag counts change less often
-    openTagsDrawer();
   }
 }
 
@@ -1210,10 +1154,12 @@ function clearSourceFilter() {
   var search = document.getElementById('search');
   if (search) search.value = '';
   _activeDrawerSource = null;
-  // Reset nav to All Items
-  document.querySelectorAll('.sidebar-nav-item').forEach(function(item) {
-    item.classList.toggle('active', item.dataset.nav === 'all');
-  });
+  // Reset nav to All Items only when in articles view
+  if (_sidebarView !== 'notebooks') {
+    document.querySelectorAll('.sidebar-nav-item').forEach(function(item) {
+      item.classList.toggle('active', item.dataset.nav === 'all');
+    });
+  }
   filterFiles();
 }
 
@@ -1231,7 +1177,6 @@ function scheduleNavCounts() {
 function updateNavCounts() {
   var allCount = document.getElementById('nav-count-all');
   var sourcesCount = document.getElementById('nav-count-sources');
-  var tagsCount = document.getElementById('nav-count-tags');
   var unreadCount = document.getElementById('nav-count-unread');
   var starredCount = document.getElementById('nav-count-starred');
 
@@ -1250,18 +1195,6 @@ function updateNavCounts() {
     var sc = Object.keys(domains).length;
     sourcesCount.textContent = sc ? approxCount(sc) : '';
     sourcesCount.title = sc ? sc.toLocaleString() + ' sources' : '';
-  }
-
-  // Count unique tags
-  if (tagsCount) {
-    var tags = {};
-    for (var fn in allNotesIndex) {
-      var n = allNotesIndex[fn];
-      (n.tags || []).concat(n.machineTags || []).forEach(function(t) { tags[t] = true; });
-    }
-    var tc = Object.keys(tags).length;
-    tagsCount.textContent = tc ? approxCount(tc) : '';
-    tagsCount.title = tc ? tc.toLocaleString() + ' tags' : '';
   }
 
   // Count unread

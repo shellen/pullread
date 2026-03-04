@@ -397,7 +397,10 @@ async function playBrowserTTS(filename, domain) {
   if (!text) { ttsPlaying = false; renderAudioPlayer(); return; }
 
   const { meta, body } = parseFrontmatter(text);
-  const ttsText = (meta && meta.title ? meta.title + '\n\n' : '') + body;
+  var pubName = (meta && meta.feed) || (meta && meta.domain) || (meta && meta.url) || '';
+  var ttsPrefix = '';
+  if (pubName) ttsPrefix = pubName + '.\n\n';
+  const ttsText = ttsPrefix + (meta && meta.title ? meta.title + '\n\n' : '') + body;
   const plainText = stripMarkdownForTTS(ttsText);
 
   // Detach old utterance handlers before cancel to prevent stale onend/onerror

@@ -753,6 +753,28 @@ function toggleFavorite(btn) {
 // Alias for backward compatibility with header button onclick
 var toggleFavoriteFromHeader = toggleFavorite;
 
+function toggleReadFromHeader(btn) {
+  if (!activeFile) return;
+  var isRead = readArticles.has(activeFile);
+  var useEl = btn.querySelector('use');
+  if (isRead) {
+    markCurrentAsUnread();
+    btn.classList.remove('active-read');
+    btn.setAttribute('aria-label', 'Mark read');
+    btn.setAttribute('title', 'Mark as read');
+    useEl.setAttribute('href', '#i-envelope-open');
+    btn.querySelector('.toolbar-action-label').textContent = ' Read';
+    showToast('Marked as unread');
+  } else {
+    markCurrentAsRead();
+    btn.classList.add('active-read');
+    btn.setAttribute('aria-label', 'Mark unread');
+    btn.setAttribute('title', 'Mark as unread');
+    useEl.setAttribute('href', '#i-envelope');
+    btn.querySelector('.toolbar-action-label').textContent = ' Unread';
+  }
+}
+
 var _tagEditMode = false;
 
 function toggleNotesFromHeader() {

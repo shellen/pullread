@@ -378,36 +378,6 @@
     gap: 2px;
   }
 
-  /* Sidebar tabs */
-  .sidebar-tabs {
-    display: flex;
-    flex-shrink: 0;
-    border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
-  }
-  .sidebar-tab {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    padding: 8px 4px;
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    color: var(--muted);
-    font-size: 12px;
-    font-weight: 500;
-    font-family: inherit;
-    cursor: pointer;
-    transition: color 0.12s, border-color 0.12s;
-  }
-  .sidebar-tab:hover { color: var(--fg); }
-  .sidebar-tab.active {
-    color: var(--fg);
-    border-bottom-color: var(--accent);
-  }
-  .sidebar-tab .icon { width: 14px; height: 14px; }
-
   /* Sidebar nav items */
   .sidebar-nav {
     display: flex;
@@ -420,7 +390,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 8px;
+    padding: 8px 10px;
     background: none;
     border: none;
     border-radius: 6px;
@@ -665,6 +635,14 @@
     letter-spacing: 0.8px;
     color: var(--muted);
   }
+  .drawer-show-all {
+    padding: 8px 10px;
+    font-size: 12px;
+    color: var(--link);
+    cursor: pointer;
+    text-align: center;
+  }
+  .drawer-show-all:hover { text-decoration: underline; }
   .drawer-footer {
     padding: 10px;
     border-top: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
@@ -1090,6 +1068,8 @@
   }
   .toolbar-action-btn.active-fav { color: #d97706; }
   .toolbar-action-btn.active-fav:hover { color: #b45309; }
+  .toolbar-action-btn.active-read { opacity: 0.45; }
+  .toolbar-action-btn.active-read:hover { opacity: 0.7; }
   .reader-toolbar-right {
     display: flex;
     align-items: center;
@@ -1240,9 +1220,6 @@
   .spotlight-slide {
     flex: 0 0 100%;
     position: relative;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
   }
@@ -1254,7 +1231,10 @@
     object-fit: cover;
   }
   .spotlight-slide-body {
-    position: relative;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
     z-index: 1;
     padding: 24px 16px 16px;
     background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.5) 60%, transparent 100%);
@@ -4712,6 +4692,55 @@
   .explore-tab-panel { display: none; }
   .explore-tab-panel.active { display: block; }
 
+  /* Discover tab */
+  .discover-tab { padding: 0 0 32px; }
+  .discover-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 0 24px;
+  }
+  .discover-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--fg);
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+    white-space: nowrap;
+  }
+  .discover-chip:hover {
+    background: var(--sidebar-hover);
+    border-color: var(--muted);
+  }
+  .discover-chip .icon { width: 14px; height: 14px; opacity: 0.6; }
+  .discover-section { margin: 0 0 28px; }
+  .discover-section-heading {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 12px;
+    color: var(--fg);
+  }
+  .discover-source-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 4px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.12s;
+  }
+  .discover-source-row:hover { background: var(--sidebar-hover); }
+  .discover-source-row .file-item-favicon { width: 18px; height: 18px; border-radius: 4px; flex-shrink: 0; }
+  .discover-source-name { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .discover-source-count { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+
   /* Flat tag pills — Tailwind-inspired */
   .tag-cloud {
     display: flex;
@@ -4904,9 +4933,6 @@
     box-sizing: border-box;
     position: relative;
     overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
     -webkit-tap-highlight-color: transparent;
     cursor: pointer;
     user-select: none;
@@ -4931,7 +4957,10 @@
   .rundown-card:nth-child(4) .rundown-card-img { animation-delay: -15s; }
   .rundown-card:nth-child(5) .rundown-card-img { animation-delay: -7s; }
   .rundown-card-body {
-    position: relative;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
     z-index: 1;
     padding: 24px 16px 16px;
     background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.5) 60%, transparent 100%);

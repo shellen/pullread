@@ -189,6 +189,7 @@
     <a href="#ai">AI Features</a>
     <a href="#data">Data & Privacy</a>
     <a href="#obsidian">Obsidian</a>
+    <a href="#cli">Command Line</a>
     <a href="#troubleshooting">Troubleshooting</a>
   </div>
 </div>
@@ -488,6 +489,38 @@ SORT bookmarked DESC
       <h3 class="faq-question">Do I need an Obsidian plugin?</h3>
       <div class="faq-answer">
         <p>No. Pull Read's output is standard Markdown with standard YAML frontmatter. No plugin required. Dataview is recommended for querying your reading library but isn't necessary for basic use.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Command Line -->
+  <div class="faq-section reveal" id="cli">
+    <h2 class="faq-section-title">Command Line</h2>
+
+    <div class="faq-item">
+      <h3 class="faq-question">Does Pull Read have a CLI?</h3>
+      <div class="faq-answer">
+        <p>Yes. The macOS app bundles a CLI binary you can also run directly from Terminal. Create a symlink to make it available on your PATH:</p>
+        <pre><code># Apple Silicon (M1/M2/M3/M4)
+ln -sf "/Applications/Pull Read.app/Contents/Resources/binaries/pullread-cli-aarch64-apple-darwin" /usr/local/bin/pullread
+
+# Intel
+ln -sf "/Applications/Pull Read.app/Contents/Resources/binaries/pullread-cli-x86_64-apple-darwin" /usr/local/bin/pullread</code></pre>
+        <p>Then run <code>pullread</code> with no arguments to see all available commands. The in-app Guide has the full command reference.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <h3 class="faq-question">What can the CLI do?</h3>
+      <div class="faq-answer">
+        <p>Everything the app does for content processing: sync feeds, open the reader in your browser, generate AI summaries and tags, import bookmarks, and create reading reviews. Run <code>pullread</code> with no arguments to see all available commands.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <h3 class="faq-question">Where does Pull Read store its data?</h3>
+      <div class="faq-answer">
+        <p>Feed configuration lives at <code>~/.config/pullread/feeds.json</code> and settings (including AI provider keys) at <code>~/.config/pullread/settings.json</code>. Articles are saved to the output folder specified in your config (default: <code>~/Documents/PullRead</code>).</p>
       </div>
     </div>
   </div>

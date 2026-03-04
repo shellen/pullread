@@ -60,9 +60,19 @@ function extractMediaUrl(media: any): string | undefined {
   if (!media) return undefined;
   // Single element: { '@_url': '...' }
   if (media['@_url']) return media['@_url'];
-  // Array of media:content elements — pick the first image
+  // Array of media:content elements — pick the largest image rendition
   if (Array.isArray(media)) {
-    const img = media.find((m: any) => !m['@_medium'] || m['@_medium'] === 'image');
+    const images = media.filter((m: any) => m['@_url'] && (!m['@_medium'] || m['@_medium'] === 'image'));
+    if (images.length > 1) {
+      // Sort by width descending; pick the largest rendition
+      const sorted = images.sort((a: any, b: any) => {
+        const aw = parseInt(a['@_width'] || '0', 10);
+        const bw = parseInt(b['@_width'] || '0', 10);
+        return bw - aw;
+      });
+      return sorted[0]['@_url'];
+    }
+    const img = images[0];
     return img?.['@_url'] || media[0]?.['@_url'] || undefined;
   }
   return undefined;

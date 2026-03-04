@@ -69,7 +69,7 @@ function showGuideModal() {
     <p>PullRead syncs your bookmarks and RSS feeds into clean Markdown files you can read, search, highlight, and keep forever. Articles are stored locally on your Mac.</p>
 
     <h2>Dashboard</h2>
-    <p>When you first open PullRead, the dashboard shows a personalized overview of your reading: articles you're in the middle of, recent reviews, favorites, and the latest additions. Click any card to jump straight to that article, or click the PullRead logo to return to the dashboard.</p>
+    <p>When you first open PullRead, the dashboard shows a personalized overview of your reading: articles you're in the middle of, recent reviews, starred articles, and the latest additions. Click any card to jump straight to that article, or click the PullRead logo to return to the dashboard.</p>
 
     <h2>How does syncing work?</h2>
     <p>PullRead fetches new items from your configured feeds (Instapaper, Pinboard, Raindrop, RSS, etc.) and extracts the article content into Markdown. You can sync manually from the menu bar, or set an automatic interval in Settings (every 30 min, 1 hour, 4 hours, or 12 hours).</p>
@@ -82,7 +82,7 @@ function showGuideModal() {
     <table>
       <thead><tr><th>Operator</th><th>Description</th></tr></thead>
       <tbody>
-        <tr><td><code>is:starred</code></td><td>Starred articles (also <code>is:favorite</code>, <code>is:fav</code>)</td></tr>
+        <tr><td><code>is:starred</code></td><td>Starred articles (also <code>is:star</code>, <code>is:fav</code>)</td></tr>
         <tr><td><code>is:read</code> / <code>is:unread</code></td><td>Filter by read status</td></tr>
         <tr><td><code>has:summary</code></td><td>Articles with AI summaries</td></tr>
         <tr><td><code>has:highlights</code></td><td>Articles with highlights</td></tr>
@@ -97,7 +97,7 @@ function showGuideModal() {
     <p>Combine operators with spaces for AND logic (<code>is:fav tag:tech</code>), or use <code>OR</code> between groups (<code>tag:ai OR tag:ml</code>). Wrap multi-word searches in quotes (<code>"machine learning"</code>). Plain text searches title, domain, feed, and tags.</p>
 
     <h2>Highlights &amp; Notes</h2>
-    <p>Select any text and press <strong>h</strong> to highlight it, or use the floating toolbar to choose a color. Click a highlight to add a note. Press <strong>n</strong> to open the notes panel for article-level notes, tags, and favorites.</p>
+    <p>Select any text and press <strong>h</strong> to highlight it, or use the floating toolbar to choose a color. Click a highlight to add a note. Press <strong>n</strong> to open the notes panel for article-level notes, tags, and starring.</p>
 
     <h2>Voice Notes</h2>
     <p>Click the microphone icon next to the notes textarea to dictate notes hands-free. Speech is transcribed in real-time using the Web Speech API and automatically saved to your article notes when you stop recording.</p>
@@ -197,31 +197,43 @@ function showGuideModal() {
       </tbody>
     </table>
 
-    <h2>FAQ</h2>
+    <h2>Command-Line Interface (CLI)</h2>
+    <p>PullRead bundles a CLI that the app uses behind the scenes to sync feeds, generate reviews, run auto-tagging, and more. You can also run it directly from Terminal to script or automate tasks.</p>
 
-    <h3>Where are my articles stored?</h3>
-    <p>Articles are saved as Markdown files in the output folder you configure in Settings (e.g., <code>~/Dropbox/Articles</code>). They're plain text files you can open in any editor. Highlights, notes, and settings are stored in <code>~/.config/pullread/</code>.</p>
+    <h3>Running from Terminal</h3>
+    <p>The CLI binary lives inside the app bundle. To use it, create a symlink or alias. The binary name includes your Mac's architecture:</p>
+    <pre><code># Apple Silicon (M1/M2/M3/M4)
+ln -sf "/Applications/Pull Read.app/Contents/Resources/binaries/pullread-cli-aarch64-apple-darwin" /usr/local/bin/pullread
 
-    <h3>Do I need an API key?</h3>
-    <p>Only for AI features (summaries, auto-tagging, reviews, and paid TTS). Reading, highlighting, searching, and browser TTS are all free with no API key. Apple Intelligence (macOS 26+) works without a key too.</p>
+# Intel
+ln -sf "/Applications/Pull Read.app/Contents/Resources/binaries/pullread-cli-x86_64-apple-darwin" /usr/local/bin/pullread</code></pre>
+    <p>Then run <code>pullread</code> with no arguments to see available commands.</p>
 
-    <h3>Is my data sent anywhere?</h3>
-    <p>Articles stay on your Mac. Data is only sent to an API when you explicitly use summaries, auto-tagging, or cloud TTS providers (OpenAI/ElevenLabs). Browser TTS is fully local. API keys are stored locally and never shared between features (your Summaries key is separate from your TTS key).</p>
+    <h3>Commands</h3>
+    <table>
+      <thead><tr><th>Command</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>pullread sync</code></td><td>Sync all configured feeds</td></tr>
+        <tr><td><code>pullread sync --feed &lt;name&gt;</code></td><td>Sync a single feed by name</td></tr>
+        <tr><td><code>pullread sync --retry-failed</code></td><td>Retry previously failed URLs</td></tr>
+        <tr><td><code>pullread view</code></td><td>Open the article viewer in your browser</td></tr>
+        <tr><td><code>pullread view --port &lt;n&gt;</code></td><td>Use a custom port (default: 7777)</td></tr>
+        <tr><td><code>pullread summarize --batch</code></td><td>Summarize articles that don't have summaries yet</td></tr>
+        <tr><td><code>pullread summarize --min-size N</code></td><td>Skip articles under N characters (default: 500)</td></tr>
+        <tr><td><code>pullread autotag --batch</code></td><td>Generate machine tags for untagged articles</td></tr>
+        <tr><td><code>pullread autotag --batch --force</code></td><td>Re-tag all articles, including already tagged ones</td></tr>
+        <tr><td><code>pullread autotag --min-size N</code></td><td>Skip articles under N characters (default: 500)</td></tr>
+        <tr><td><code>pullread import &lt;file.html&gt;</code></td><td>Import bookmarks from an HTML file (Netscape format)</td></tr>
+        <tr><td><code>pullread review</code></td><td>Generate a weekly review of recent articles</td></tr>
+        <tr><td><code>pullread review --days N</code></td><td>Review the past N days (default: 7)</td></tr>
+      </tbody>
+    </table>
 
-    <h3>Why can't PullRead extract some articles?</h3>
-    <p>Some sites use paywalls, bot detection, or JavaScript-only rendering that blocks extraction. Try enabling browser cookies in Settings to use your existing login sessions. You can also retry failed articles with <code>pullread sync --retry-failed</code>.</p>
+    <h3>Configuration</h3>
+    <p>Feed configuration is stored at <code>~/.config/pullread/feeds.json</code> and articles are saved to the output folder specified in your config (default: <code>~/Documents/PullRead</code>). AI features (summarize, autotag, review) require a provider and API key configured in Settings or in <code>~/.config/pullread/settings.json</code>.</p>
 
-    <h3>How do I reset my reading history?</h3>
-    <p>Reading history is stored in your browser's localStorage. Clear it by opening developer tools (Cmd+Option+I), going to Application &rarr; Local Storage, and removing the <code>pr-read-articles</code> key.</p>
-
-    <h3>Can I use PullRead without the macOS app?</h3>
-    <p>Yes. The CLI works standalone on any platform with Node.js/Bun. Run <code>pullread view</code> to launch the article reader in your browser.</p>
-
-    <h3>Am I allowed to save articles?</h3>
-    <p>Pull Read is intended for personal reading and archival. You are responsible for ensuring your use complies with applicable copyright laws and the terms of service of any websites you access. Only sync content you are authorized to copy. Do not use Pull Read to redistribute or commercially exploit content you do not have rights to.</p>
-
-    <h3>What happens when I use AI summaries?</h3>
-    <p>When you click Summarize, article text is sent to your selected LLM provider (Anthropic, OpenAI, Gemini, or OpenRouter) using your own API key. Apple Intelligence processes entirely on-device. Summaries are saved locally in the article's frontmatter. The same applies to auto-tagging and weekly reviews.</p>
+    <h2 id="guide-faq">FAQ</h2>
+    <p>Have questions? See the <a href="#" onclick="prOpenExternal('https://pullread.com/faq');return false">FAQ on our website</a> for answers about storage, privacy, API keys, and more.</p>
 
     <h2>Support</h2>
     <p>Need help? Email us at <a href="#" onclick="prOpenExternal('mailto:support@alittledrive.com');return false">support@alittledrive.com</a> and we'll get back to you as soon as we can.</p>
@@ -444,7 +456,7 @@ function renderStepSearch() {
     + '<div class="ob-glass-card">'
     + '<div class="ob-method"><div class="ob-method-icon"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg></div><div><div class="ob-method-title">Search Operators</div><div class="ob-method-desc">Type <code>is:unread</code>, <code>tag:tech</code>, <code>feed:NYT</code>, <code>has:highlights</code> and more in the search bar.</div></div></div>'
     + '<div class="ob-method"><div class="ob-method-icon"><svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg></div><div><div class="ob-method-title">Pinned Filters</div><div class="ob-method-desc">Pin up to 3 frequent searches as quick-access buttons below the search bar.</div></div></div>'
-    + '<div class="ob-method"><div class="ob-method-icon"><svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg></div><div><div class="ob-method-title">Favorites</div><div class="ob-method-desc">Heart any article. Find them with <code>is:favorite</code>.</div></div></div>'
+    + '<div class="ob-method"><div class="ob-method-icon"><svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg></div><div><div class="ob-method-title">Starred</div><div class="ob-method-desc">Star any article. Find them with <code>is:starred</code>.</div></div></div>'
     + '<div class="ob-method"><div class="ob-method-icon"><svg class="icon" aria-hidden="true"><use href="#i-tags"/></svg></div><div><div class="ob-method-title">Explore</div><div class="ob-method-desc">Tag cloud and topic connections across your entire library.</div></div></div>'
     + '</div>';
 }

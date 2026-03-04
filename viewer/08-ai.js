@@ -264,7 +264,6 @@ function toggleMoreMenu(e) {
 
   var items = '';
   items += '<button onclick="toggleNotesFromHeader(); closeMoreMenu()"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-pen"/></svg> Tags</button>';
-  items += '<button onclick="markCurrentAsUnread(); closeMoreMenu()"><svg class="share-icon" viewBox="0 0 512 512"><use href="#i-eye-slash"/></svg> Mark Unread</button>';
   if (serverMode) {
     items += '<button onclick="closeMoreMenu(); reprocessFromMenu()" title="Re-fetch this article from the original URL"><svg class="share-icon" viewBox="0 0 24 24"><use href="#i-cloud-download"/></svg> Re-fetch from source</button>';
   }

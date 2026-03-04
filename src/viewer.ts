@@ -457,14 +457,24 @@ function listFiles(outputPath: string): FileMeta[] {
       const head = buf.slice(0, bytesRead).toString('utf-8');
       const meta = parseFrontmatter(head);
 
-      // Use frontmatter thumbnail if available, otherwise extract first image from body
+      // Use frontmatter thumbnail if available, otherwise extract first suitable image from body
       let image = meta.thumbnail || '';
       if (!image) {
         const fmEnd = head.indexOf('\n---\n');
         if (fmEnd > 0) {
           const bodyStart = head.slice(fmEnd + 5);
-          const imgMatch = bodyStart.match(/!\[.*?\]\((https?:\/\/[^)]+)\)/);
-          if (imgMatch) image = imgMatch[1];
+          const imgRe = /!\[.*?\]\((https?:\/\/[^)]+)\)/g;
+          let imgMatch;
+          while ((imgMatch = imgRe.exec(bodyStart)) !== null) {
+            const src = imgMatch[1].toLowerCase();
+            // Skip tracking pixels, badges, tiny icons, and feeds.feedburner
+            if (/[?&](w|width|sz)=\d{1,2}(&|$)/.test(src)) continue;
+            if (/\/(pixel|beacon|track|spacer|blank|badge|icon)\b/i.test(src)) continue;
+            if (/feeds\.feedburner\.com/i.test(src)) continue;
+            if (/\.(gif|svg)(\?|$)/.test(src) && !/\d{3,}/.test(src)) continue;
+            image = imgMatch[1];
+            break;
+          }
         }
       }
 

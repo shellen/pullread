@@ -409,6 +409,7 @@ function renderHub() {
   var activeTab = getHomeTab();
   var tabs = [
     { id: 'rundown', label: 'Rundown' },
+    { id: 'discover', label: 'Discover' },
     { id: 'stats', label: 'Stats' }
   ];
   // Migrate anyone who had a removed tab saved
@@ -429,6 +430,7 @@ function renderHub() {
   var rundownHtml = buildRundownTab(engagement, mc);
 
   html += '<div id="explore-rundown" class="explore-tab-panel' + (activeTab === 'rundown' ? ' active' : '') + '">' + rundownHtml + '</div>';
+  html += '<div id="explore-discover" class="explore-tab-panel' + (activeTab === 'discover' ? ' active' : '') + '">' + buildDiscoverTab(data) + '</div>';
   html += '<div id="explore-stats" class="explore-tab-panel' + (activeTab === 'stats' ? ' active' : '') + '">' + buildStatsTabHtml(data) + '</div>';
 
   dash.innerHTML = html;
@@ -709,6 +711,10 @@ function dashGenerateReview(days) {
 function goHome() {
   if (_markAsReadDelayTimer) { console.debug('[PR] goHome clearing markAsRead timer'); clearTimeout(_markAsReadDelayTimer); _markAsReadDelayTimer = null; }
   _sidebarView = 'home'; syncSidebarTabs();
+  // Highlight explore nav item
+  document.querySelectorAll('.sidebar-nav-item').forEach(function(item) {
+    item.classList.toggle('active', item.dataset.nav === 'explore');
+  });
   activeFile = null;
   _activeDrawerSource = null;
   updateDrawerActiveState();
@@ -893,7 +899,8 @@ function renderArticle(text, filename) {
   var toolbarActions = '';
   const isFav = articleNotes.isFavorite;
   toolbarActions += '<button onclick="toggleFavoriteFromHeader(this)" class="toolbar-action-btn' + (isFav ? ' active-fav' : '') + '" aria-label="' + (isFav ? 'Remove star' : 'Star article') + '" aria-pressed="' + isFav + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg><span class="toolbar-action-label"> Star</span></button>';
-  toolbarActions += '<button onclick="markCurrentAsRead()" class="toolbar-action-btn" aria-label="Mark read"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-eye-slash"/></svg><span class="toolbar-action-label"> Mark read</span></button>';
+  var isRead = activeFile && readArticles.has(activeFile);
+  toolbarActions += '<button onclick="toggleReadFromHeader(this)" class="toolbar-action-btn' + (isRead ? ' active-read' : '') + '" title="' + (isRead ? 'Mark as unread' : 'Mark as read') + '" aria-label="' + (isRead ? 'Mark unread' : 'Mark read') + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isRead ? 'envelope' : 'envelope-open') + '"/></svg><span class="toolbar-action-label"> ' + (isRead ? 'Unread' : 'Read') + '</span></button>';
   var isPodcast = meta && meta.enclosure_url && isMediaEnclosure(meta.enclosure_type);
   var isVideo = meta && isVideoEnclosure(meta.enclosure_type);
   var listenLabel = isVideo ? 'Watch' : isPodcast ? 'Play' : 'Listen';
