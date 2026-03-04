@@ -65,8 +65,8 @@ PullRead connects to bookmark services like Instapaper, Pinboard, Raindrop, and 
 - **Retry mechanism** - Failed extractions are tracked and can be retried later
 - **Podcast support** - Saves episode metadata with audio links (perfect for show notes)
 - **Built-in article reader** - Two-pane local web UI with full keyboard navigation, highlights, notes, and tags
-- **Sources & tags browsers** - Browse articles by feed or topic with sortable sources (Recent, A–Z, Count)
-- **Homepage dashboard** - Card-based landing page with continue reading, reviews, favorites, and recent articles
+- **Sources & Tags drawer** - Browse articles by feed or topic in a unified drawer with sortable sources (Recent, A–Z, Count)
+- **Explore page** - Card-based landing view with story deck, continue reading, and section cards
 - **Search operators** - Filter articles with `is:favorite`, `tag:tech`, `has:summary`, AND/OR logic, and more
 - **Weekly reviews** - AI-generated summaries of your recent reading (daily/weekly schedule or on-demand)
 - **Cross-platform desktop app** - Tauri-based menu bar app with bundled CLI (macOS first, Windows/Linux planned)
@@ -508,7 +508,7 @@ Select any text in an article to see a floating toolbar with highlight color opt
 
 #### Sources & Tags
 
-Click **Sources** or **Tags** in the sidebar to browse articles grouped by feed or topic. The Sources drawer includes sort buttons:
+Click **Sources** in the sidebar to open the Sources & Tags drawer. Browse articles grouped by feed or topic. The drawer includes sort buttons:
 
 - **Recent** — feeds with the most recently bookmarked articles first (default)
 - **A–Z** — alphabetical by feed name
