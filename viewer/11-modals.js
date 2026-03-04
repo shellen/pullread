@@ -161,7 +161,16 @@ function showGuideModal() {
     <p>Import bookmarks.html files exported from Chrome, Safari, Firefox, or Pocket directly from Settings or via the CLI with <code>pullread import &lt;file&gt;</code>.</p>
 
     <h2>Command-Line Interface (CLI)</h2>
-    <p>PullRead bundles a CLI that the app uses behind the scenes to sync feeds, generate reviews, run auto-tagging, and more. You don't need to use it directly — the app handles everything — but it's there for power users who want to script or automate tasks.</p>
+    <p>PullRead bundles a CLI that the app uses behind the scenes to sync feeds, generate reviews, run auto-tagging, and more. You can also run it directly from Terminal to script or automate tasks.</p>
+
+    <h3>Running from Terminal</h3>
+    <p>The CLI binary lives inside the app bundle. To use it, create a symlink or alias. The binary name includes your Mac's architecture:</p>
+    <pre><code># Apple Silicon (M1/M2/M3/M4)
+ln -sf "/Applications/Pull Read.app/Contents/Resources/binaries/pullread-cli-aarch64-apple-darwin" /usr/local/bin/pullread
+
+# Intel
+ln -sf "/Applications/Pull Read.app/Contents/Resources/binaries/pullread-cli-x86_64-apple-darwin" /usr/local/bin/pullread</code></pre>
+    <p>Then run <code>pullread</code> with no arguments to see available commands.</p>
 
     <h3>Commands</h3>
     <table>
