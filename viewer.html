@@ -45,7 +45,7 @@
   <div class="main">
     <aside class="sidebar" id="sidebar" aria-label="Navigation">
       <div class="sidebar-header">
-        <span class="brand" onclick="goHome()" role="heading" aria-level="1" title="Home"><div class="brand-icon-box" aria-hidden="true"><svg fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="3" y="3" width="15" height="19" rx="2"/><line x1="7" y1="10.5" x2="14" y2="10.5"/><line x1="7" y1="14" x2="12.5" y2="14"/><line x1="7" y1="17.5" x2="11" y2="17.5"/><path d="M14 2v7l2.25-1.75L18.5 9V2z" fill="currentColor" stroke="none"/></svg></div>Pull Read</span>
+        <span class="brand" onclick="goHome()" role="heading" aria-level="1" title="Explore"><div class="brand-icon-box" aria-hidden="true"><svg fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="3" y="3" width="15" height="19" rx="2"/><line x1="7" y1="10.5" x2="14" y2="10.5"/><line x1="7" y1="14" x2="12.5" y2="14"/><line x1="7" y1="17.5" x2="11" y2="17.5"/><path d="M14 2v7l2.25-1.75L18.5 9V2z" fill="currentColor" stroke="none"/></svg></div>Pull Read</span>
         <div class="sidebar-header-actions">
           <button class="toolbar-icon-btn" onclick="toggleQuickAdd()" aria-label="Add article by URL" title="Add URL" id="quick-add-btn"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg></button>
           <button class="toolbar-icon-btn" onclick="refreshArticleList()" aria-label="Refresh articles" title="Refresh" id="refresh-btn"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></button>
@@ -53,12 +53,12 @@
         </div>
       </div>
       <div class="sidebar-tabs" id="sidebar-tabs">
-        <button class="sidebar-tab active" data-tab="home" onclick="switchSidebarView('home')"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-home"/></svg> Home</button>
+        <button class="sidebar-tab active" data-tab="home" onclick="switchSidebarView('home')"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-home"/></svg> Explore</button>
         <button class="sidebar-tab" data-tab="notebooks" onclick="switchSidebarView('notebooks')"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-pen"/></svg> Notebook</button>
       </div>
       <div class="sidebar-search" role="search">
-        <label for="search" class="sr-only">Search articles</label>
-        <input type="text" id="search" placeholder="Search articles..." oninput="filterFiles()" />
+        <label for="search" class="sr-only">Search</label>
+        <input type="text" id="search" placeholder="Search..." oninput="filterFiles()" />
         <button class="search-clear" id="search-clear" onclick="clearSearch()" aria-label="Clear search">&times;</button>
         <button class="search-pin" id="search-pin" onclick="pinCurrentSearch()" aria-label="Pin this filter" title="Pin this filter">
           <svg class="icon icon-sm" aria-hidden="true"><use href="#i-pin"/></svg>
@@ -69,7 +69,6 @@
         <button class="sidebar-nav-item active" data-nav="all" onclick="sidebarNavFilter('all')"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-inbox"/></svg><span class="sidebar-nav-label">All Items</span><span class="sidebar-nav-count" id="nav-count-all"></span></button>
         <button class="sidebar-nav-item" data-nav="sources" onclick="sidebarNavFilter('sources')"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-squares"/></svg><span class="sidebar-nav-label">Sources</span><span class="sidebar-nav-count" id="nav-count-sources"></span><svg class="icon icon-xs sidebar-nav-chevron" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
         <button class="sidebar-nav-item" data-nav="tags" onclick="sidebarNavFilter('tags')"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-tags"/></svg><span class="sidebar-nav-label">Tags</span><span class="sidebar-nav-count" id="nav-count-tags"></span><svg class="icon icon-xs sidebar-nav-chevron" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
-        <button class="sidebar-nav-item" data-nav="unread" onclick="sidebarNavFilter('unread')"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-eye-slash"/></svg><span class="sidebar-nav-label">Unread</span><span class="sidebar-nav-count" id="nav-count-unread"></span></button>
         <button class="sidebar-nav-item" data-nav="starred" onclick="sidebarNavFilter('starred')"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-heart"/></svg><span class="sidebar-nav-label">Starred</span><span class="sidebar-nav-count" id="nav-count-starred"></span></button>
       </nav>
       <div class="quick-add-row" id="quick-add-row" style="display:none">

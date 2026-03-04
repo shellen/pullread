@@ -345,6 +345,76 @@ function buildStatsTabHtml(data) {
   return html;
 }
 
+function buildDiscoverTab(data) {
+  var chips = [
+    { label: 'Favorites', query: 'is:starred', icon: '#i-heart' },
+    { label: 'Unread', query: 'is:unread', icon: '#i-eye-slash' },
+    { label: 'Has Summary', query: 'has:summary', icon: '#i-wand' },
+    { label: 'Has Highlights', query: 'has:highlights', icon: '#i-book' },
+    { label: 'Has Notes', query: 'has:notes', icon: '#i-comment' },
+    { label: 'Podcasts', query: 'is:podcast', icon: '#i-headphones' },
+    { label: 'Videos', query: 'has:video', icon: '#i-video' },
+    { label: 'Bookmarks', query: 'is:bookmark', icon: '#i-bookmark' }
+  ];
+
+  var html = '<div class="discover-tab">';
+
+  // Filter chips
+  html += '<div class="discover-chips">';
+  for (var i = 0; i < chips.length; i++) {
+    var c = chips[i];
+    html += '<button class="discover-chip" onclick="document.getElementById(\'search\').value=\'' + escapeJsStr(c.query) + '\';filterFiles()">';
+    html += '<svg class="icon icon-sm" aria-hidden="true"><use href="' + c.icon + '"/></svg> ';
+    html += escapeHtml(c.label);
+    html += '</button>';
+  }
+  html += '</div>';
+
+  // Connections (articles linked by shared tags)
+  var connectionsHtml = buildConnectionsHtml(data.tagArticles, data.sortedTags);
+  if (connectionsHtml) {
+    html += '<div class="discover-section">';
+    html += '<h3 class="discover-section-heading">Connections</h3>';
+    html += connectionsHtml;
+    html += '</div>';
+  }
+
+  // Top Sources preview (top 10)
+  var topDomains = data.sortedDomains.slice(0, 10);
+  if (topDomains.length > 0) {
+    html += '<div class="discover-section">';
+    html += '<h3 class="discover-section-heading">Top Sources</h3>';
+    for (var di = 0; di < topDomains.length; di++) {
+      var domain = topDomains[di][0];
+      var count = topDomains[di][1].length;
+      html += '<div class="discover-source-row" onclick="document.getElementById(\'search\').value=\'domain:\\x22' + escapeJsStr(domain) + '\\x22\';filterFiles()">';
+      html += '<img class="file-item-favicon" src="/favicons/' + encodeURIComponent(domain) + '.png" alt="" loading="lazy" onerror="drawerFaviconFallback(this,\'' + escapeJsStr(domain) + '\')">';
+      html += '<span class="discover-source-name">' + escapeHtml(domain) + '</span>';
+      html += '<span class="discover-source-count">' + count + '</span>';
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+
+  // Top Tags preview
+  var visibleTags = data.sortedTags.filter(function(entry) { return !isTagBlocked(entry[0]); }).slice(0, 30);
+  if (visibleTags.length > 0) {
+    html += '<div class="discover-section">';
+    html += '<h3 class="discover-section-heading">Tags</h3>';
+    html += '<div class="tag-cloud">';
+    for (var ti = 0; ti < visibleTags.length; ti++) {
+      var tag = visibleTags[ti][0];
+      var tagCount = visibleTags[ti][1];
+      html += '<button class="tag-pill" onclick="document.getElementById(\'search\').value=\'tag:\\x22' + escapeJsStr(tag) + '\\x22\';filterFiles()">' + escapeHtml(tag) + '<span class="tag-count">' + tagCount + '</span></button>';
+    }
+    html += '</div>';
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
 // ---- Standalone Explore page (renders as inline page like Guide) ----
 function showTagCloud() {
   _sidebarView = 'home'; syncSidebarTabs();

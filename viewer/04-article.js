@@ -409,6 +409,7 @@ function renderHub() {
   var activeTab = getHomeTab();
   var tabs = [
     { id: 'rundown', label: 'Rundown' },
+    { id: 'discover', label: 'Discover' },
     { id: 'stats', label: 'Stats' }
   ];
   // Migrate anyone who had a removed tab saved
@@ -429,6 +430,7 @@ function renderHub() {
   var rundownHtml = buildRundownTab(engagement, mc);
 
   html += '<div id="explore-rundown" class="explore-tab-panel' + (activeTab === 'rundown' ? ' active' : '') + '">' + rundownHtml + '</div>';
+  html += '<div id="explore-discover" class="explore-tab-panel' + (activeTab === 'discover' ? ' active' : '') + '">' + buildDiscoverTab(data) + '</div>';
   html += '<div id="explore-stats" class="explore-tab-panel' + (activeTab === 'stats' ? ' active' : '') + '">' + buildStatsTabHtml(data) + '</div>';
 
   dash.innerHTML = html;

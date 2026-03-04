@@ -420,7 +420,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 8px;
+    padding: 8px 10px;
     background: none;
     border: none;
     border-radius: 6px;
@@ -4711,6 +4711,55 @@
   }
   .explore-tab-panel { display: none; }
   .explore-tab-panel.active { display: block; }
+
+  /* Discover tab */
+  .discover-tab { padding: 0 0 32px; }
+  .discover-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 0 24px;
+  }
+  .discover-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--fg);
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+    white-space: nowrap;
+  }
+  .discover-chip:hover {
+    background: var(--sidebar-hover);
+    border-color: var(--muted);
+  }
+  .discover-chip .icon { width: 14px; height: 14px; opacity: 0.6; }
+  .discover-section { margin: 0 0 28px; }
+  .discover-section-heading {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 12px;
+    color: var(--fg);
+  }
+  .discover-source-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 4px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.12s;
+  }
+  .discover-source-row:hover { background: var(--sidebar-hover); }
+  .discover-source-row .file-item-favicon { width: 18px; height: 18px; border-radius: 4px; flex-shrink: 0; }
+  .discover-source-name { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .discover-source-count { font-size: 11px; color: var(--muted); flex-shrink: 0; }
 
   /* Flat tag pills — Tailwind-inspired */
   .tag-cloud {
