@@ -7,6 +7,135 @@ function setHomeTab(tab) {
   localStorage.setItem('pr-home-tab', tab);
 }
 
+function buildRundownTab(engagement, mc) {
+  var html = '<div class="rundown-tab">';
+
+  // Gather unread articles, scored and sorted
+  var unread = allFiles.filter(function(f) {
+    return !readArticles.has(f.filename) && f.feed !== 'weekly-review' && f.feed !== 'daily-review' && f.domain !== 'pullread';
+  });
+  unread.sort(function(a, b) {
+    return magicScore(b, engagement, mc) - magicScore(a, engagement, mc);
+  });
+
+  if (unread.length === 0) {
+    html += '<p style="color:var(--muted);padding:20px;text-align:center">All caught up</p></div>';
+    return html;
+  }
+
+  // Pick top articles with images for story deck (up to 7)
+  var withImages = unread.filter(function(f) { return f.image; });
+  var deckArticles = withImages.slice(0, 7);
+
+  // Track used filenames so we don't repeat in feed columns
+  var usedSet = {};
+  for (var di = 0; di < deckArticles.length; di++) usedSet[deckArticles[di].filename] = true;
+
+  html += '<div class="rundown-layout">';
+
+  // --- Left: story deck ---
+  if (deckArticles.length > 0) {
+    html += '<div class="rundown-deck" id="rundown-deck">';
+
+    // Dots
+    html += '<div class="spotlight-deck-dots">';
+    for (var di = 0; di < deckArticles.length; di++) {
+      html += '<span class="spotlight-deck-dot' + (di === 0 ? ' active' : '') + '" onclick="rundownDeckGoTo(' + di + ')"></span>';
+    }
+    html += '</div>';
+
+    // Nav buttons
+    html += '<button class="spotlight-deck-nav prev" onclick="rundownDeckPrev()" aria-label="Previous">&#8249;</button>';
+    html += '<button class="spotlight-deck-nav next" onclick="rundownDeckNext()" aria-label="Next">&#8250;</button>';
+
+    // Slide track
+    html += '<div class="rundown-deck-track" id="rundown-deck-track">';
+    for (var si = 0; si < deckArticles.length; si++) {
+      var a = deckArticles[si];
+      var sec = resolveSection(a.filename);
+      var color = sectionColor(sec);
+      var secLabel = SECTION_LABELS[sec] || sec;
+
+      html += '<div class="spotlight-slide" onclick="dashLoadArticle(\'' + escapeJsStr(a.filename) + '\')">';
+      html += '<img src="' + escapeHtml(a.image) + '" alt="" loading="' + (si === 0 ? 'eager' : 'lazy') + '" onerror="this.style.display=\'none\'">';
+      html += '<div class="spotlight-slide-body">';
+      html += '<span class="spotlight-slide-section" style="background:' + color + '">' + escapeHtml(secLabel) + '</span>';
+      html += '<div class="spotlight-slide-title">' + escapeHtml(a.title) + '</div>';
+      html += '<div class="spotlight-slide-meta">' + escapeHtml(a.domain || a.feed || '') + (a.bookmarked ? ' &middot; ' + timeAgo(a.bookmarked) : '') + '</div>';
+      html += '</div></div>';
+    }
+    html += '</div>'; // track
+    html += '</div>'; // deck
+  }
+
+  // --- Right: feed column ---
+  html += '<div class="rundown-feed-col">';
+
+  // Group remaining unread articles by section (keep 5: display 4, 5th for header click)
+  var sectionArts = {};
+  for (var i = 0; i < unread.length; i++) {
+    var f = unread[i];
+    if (usedSet[f.filename]) continue;
+    var sec = resolveSection(f.filename);
+    if (!sectionArts[sec]) sectionArts[sec] = [];
+    if (sectionArts[sec].length < 5) sectionArts[sec].push(f);
+  }
+
+  // Order sections by article count descending
+  var sectionKeys = Object.keys(sectionArts).sort(function(a, b) {
+    return sectionArts[b].length - sectionArts[a].length;
+  });
+
+  // Show top 5 sections
+  for (var ski = 0; ski < Math.min(sectionKeys.length, 5); ski++) {
+    var sec = sectionKeys[ski];
+    var arts = sectionArts[sec];
+    var color = sectionColor(sec);
+    var label = SECTION_LABELS[sec] || sec;
+    var top = arts[0];
+
+    // Header click loads first article NOT shown in this widget
+    var headerTarget = arts[4]; // 5th article (beyond the 4 displayed)
+    var headerAction = headerTarget
+      ? 'dashLoadArticle(\'' + escapeJsStr(headerTarget.filename) + '\')'
+      : 'document.getElementById(\'search\').value=\'section:\\x22' + escapeJsStr(sec) + '\\x22\';filterFiles()';
+
+    html += '<div class="rundown-feed-section">';
+    html += '<div class="rundown-feed-header" onclick="' + headerAction + '" style="cursor:pointer">';
+    html += '<span class="rundown-feed-title"><span class="rundown-feed-accent" style="background:' + color + '"></span>' + escapeHtml(label) + '</span>';
+    html += '<a class="rundown-feed-more" onclick="event.stopPropagation();document.getElementById(\'search\').value=\'section:\\x22' + escapeJsStr(sec) + '\\x22\';filterFiles()">More &rsaquo;</a>';
+    html += '</div>';
+
+    // Top article with thumbnail
+    if (top) {
+      html += '<div class="rundown-feed-top" onclick="dashLoadArticle(\'' + escapeJsStr(top.filename) + '\')">';
+      if (top.image) {
+        html += '<div class="rundown-feed-thumb"><img src="' + escapeHtml(top.image) + '" alt="" loading="lazy" onerror="this.parentNode.remove()"></div>';
+      }
+      html += '<div><div class="rundown-feed-top-title">' + escapeHtml(top.title) + '</div>';
+      html += '<div class="rundown-feed-top-meta">' + escapeHtml(top.domain || top.feed || '');
+      if (top.bookmarked) html += ' &middot; ' + timeAgo(top.bookmarked);
+      html += '</div></div></div>';
+    }
+
+    // Sub headlines (display up to 4 total: 1 top + 3 subs)
+    for (var hi = 1; hi < Math.min(arts.length, 4); hi++) {
+      var a = arts[hi];
+      html += '<div class="rundown-feed-sub" onclick="dashLoadArticle(\'' + escapeJsStr(a.filename) + '\')">';
+      html += '<span class="rundown-feed-sub-title">' + escapeHtml(a.title) + '</span>';
+      if (a.bookmarked) html += '<span class="rundown-feed-sub-time">' + timeAgo(a.bookmarked) + '</span>';
+      html += '</div>';
+    }
+
+    html += '</div>';
+  }
+
+  html += '</div>'; // end feed-col
+  html += '</div>'; // end rundown-layout
+  html += '</div>'; // end rundown-tab
+  return html;
+}
+
 function buildBriefTab(engagement, mc) {
   var html = '<div class="brief-tab">';
 
@@ -366,6 +495,62 @@ function initSpotlightDeck() {
   }, { passive: true });
 }
 
+// Rundown deck navigation (parallel to spotlight deck)
+var _rundownDeckIndex = 0;
+var _rundownDeckTimer = null;
+
+function rundownDeckGoTo(index) {
+  var deck = document.getElementById('rundown-deck');
+  if (!deck) return;
+  var track = document.getElementById('rundown-deck-track');
+  var dots = deck.querySelectorAll('.spotlight-deck-dot');
+  var count = dots.length;
+  if (index < 0) index = count - 1;
+  if (index >= count) index = 0;
+  _rundownDeckIndex = index;
+  track.style.transform = 'translateX(-' + (index * 100) + '%)';
+  for (var i = 0; i < dots.length; i++) {
+    dots[i].classList.toggle('active', i === index);
+  }
+  rundownDeckResetTimer();
+}
+
+function rundownDeckNext() { rundownDeckGoTo(_rundownDeckIndex + 1); }
+function rundownDeckPrev() { rundownDeckGoTo(_rundownDeckIndex - 1); }
+
+function rundownDeckResetTimer() {
+  clearInterval(_rundownDeckTimer);
+  if (window.innerWidth > 700) {
+    _rundownDeckTimer = setInterval(function() {
+      rundownDeckGoTo(_rundownDeckIndex + 1);
+    }, 8000);
+  }
+}
+
+function initRundownDeck() {
+  var deck = document.getElementById('rundown-deck');
+  if (!deck) return;
+  _rundownDeckIndex = 0;
+  rundownDeckResetTimer();
+
+  deck.addEventListener('mouseenter', function() { clearInterval(_rundownDeckTimer); });
+  deck.addEventListener('mouseleave', function() { rundownDeckResetTimer(); });
+
+  var startX = 0;
+  deck.addEventListener('touchstart', function(e) {
+    startX = e.touches[0].clientX;
+    clearInterval(_rundownDeckTimer);
+  }, { passive: true });
+  deck.addEventListener('touchend', function(e) {
+    var dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 40) {
+      dx > 0 ? rundownDeckPrev() : rundownDeckNext();
+    } else {
+      rundownDeckResetTimer();
+    }
+  }, { passive: true });
+}
+
 function renderHub() {
   var dash = document.getElementById('dashboard');
   if (!dash) return;
@@ -395,6 +580,7 @@ function renderHub() {
   // --- Tab bar ---
   var activeTab = getHomeTab();
   var tabs = [
+    { id: 'rundown', label: 'Rundown' },
     { id: 'brief', label: 'Brief' },
     { id: 'sections', label: 'Sections' },
     { id: 'spotlight', label: 'Spotlight' },
@@ -415,10 +601,12 @@ function renderHub() {
   var mc = getMixerConfig();
 
   // Build Home variant tabs
+  var rundownHtml = buildRundownTab(engagement, mc);
   var briefHtml = buildBriefTab(engagement, mc);
   var sectionsHtml = buildSectionsTab(engagement, mc);
   var spotlightHtml = buildSpotlightTab(engagement, mc);
 
+  html += '<div id="explore-rundown" class="explore-tab-panel' + (activeTab === 'rundown' ? ' active' : '') + '">' + rundownHtml + '</div>';
   html += '<div id="explore-brief" class="explore-tab-panel' + (activeTab === 'brief' ? ' active' : '') + '">' + briefHtml + '</div>';
   html += '<div id="explore-sections" class="explore-tab-panel' + (activeTab === 'sections' ? ' active' : '') + '">' + sectionsHtml + '</div>';
   html += '<div id="explore-spotlight" class="explore-tab-panel' + (activeTab === 'spotlight' ? ' active' : '') + '">' + spotlightHtml + '</div>';
@@ -437,14 +625,17 @@ function renderHub() {
       var tabId = btn.dataset.tab;
       document.getElementById('explore-' + tabId).classList.add('active');
       setHomeTab(tabId);
-      // Manage spotlight auto-advance timer
+      // Manage auto-advance timers
       if (tabId === 'spotlight') spotlightResetTimer();
       else if (_spotlightTimer) { clearInterval(_spotlightTimer); _spotlightTimer = null; }
+      if (tabId === 'rundown') rundownDeckResetTimer();
+      else if (_rundownDeckTimer) { clearInterval(_rundownDeckTimer); _rundownDeckTimer = null; }
     });
   });
 
   requestAnimationFrame(initDashChevrons);
   requestAnimationFrame(initSpotlightDeck);
+  requestAnimationFrame(initRundownDeck);
 
   // If audio is queued, switch to mini player so controls stay visible in sidebar
   if (typeof ttsQueue !== 'undefined' && ttsQueue.length > 0) {

@@ -6,9 +6,9 @@ var SUGGESTED_FEEDS_FALLBACK = [
   { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index', category: 'Tech' },
   { name: 'The Verge', url: 'https://www.theverge.com/rss/index.xml', category: 'Tech' },
   { name: 'Platformer', url: 'https://www.platformer.news/rss/', category: 'Tech' },
-  { name: 'Stratechery', url: 'https://stratechery.com/feed/', category: 'Business' },
+  { name: 'On my Om', url: 'https://om.co/feed/', category: 'Tech' },
   { name: 'kottke.org', url: 'https://feeds.kottke.org/main', category: 'Culture' },
-  { name: 'Hacker News', url: 'https://hnrss.org/frontpage', category: 'Tech' },
+  { name: 'Stereogum', url: 'https://www.stereogum.com/feed/', category: 'Culture' },
   { name: 'Seth Godin', url: 'https://feeds.feedblitz.com/sethsblog', category: 'Business' }
 ];
 

@@ -884,17 +884,16 @@ function openSourcesDrawer() {
   function renderSources() {
     var html = '';
 
-    // Search/filter input
+    // Search/filter input + sort bar (sticky toolbar)
+    html += '<div class="drawer-toolbar">';
     html += '<div class="drawer-search">';
     html += '<input type="text" id="drawer-filter-input" placeholder="Filter sources\u2026" value="' + escapeHtml(_drawerFilter) + '">';
     html += '</div>';
-
-    // Sort bar
     html += '<div class="drawer-sort-bar">';
     html += '<button class="drawer-sort-btn' + (sortMode === 'recent' ? ' active' : '') + '" data-sort="recent" title="Sort by most recent article">Recent</button>';
     html += '<button class="drawer-sort-btn' + (sortMode === 'az' ? ' active' : '') + '" data-sort="az" title="Sort alphabetically by name">A\u2013Z</button>';
     html += '<button class="drawer-sort-btn' + (sortMode === 'count' ? ' active' : '') + '" data-sort="count" title="Sort by number of articles">Count</button>';
-    html += '</div>';
+    html += '</div></div>';
 
     var filterLower = _drawerFilter.toLowerCase();
 
@@ -1042,16 +1041,15 @@ function openTagsDrawer() {
   function renderTags() {
     var html = '';
 
-    // Search/filter input
+    // Search/filter input + sort bar (sticky toolbar)
+    html += '<div class="drawer-toolbar">';
     html += '<div class="drawer-search">';
     html += '<input type="text" id="drawer-tag-filter" placeholder="Filter tags\u2026" value="' + escapeHtml(_tagFilter) + '">';
     html += '</div>';
-
-    // Sort bar
     html += '<div class="drawer-sort-bar">';
     html += '<button class="drawer-sort-btn' + (sortMode === 'count' ? ' active' : '') + '" data-sort="count" title="Sort by frequency">Count</button>';
     html += '<button class="drawer-sort-btn' + (sortMode === 'az' ? ' active' : '') + '" data-sort="az" title="Sort alphabetically">A\u2013Z</button>';
-    html += '</div>';
+    html += '</div></div>';
 
     var filterLower = _tagFilter.toLowerCase();
     sortEntries(sortMode);

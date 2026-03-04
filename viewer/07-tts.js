@@ -1050,6 +1050,13 @@ function popOutAudioPlayer() {
   var item = (ttsCurrentIndex >= 0 && ttsCurrentIndex < ttsQueue.length) ? ttsQueue[ttsCurrentIndex] : null;
   var title = item ? item.title : 'PullRead Player';
 
+  // Heroicon SVG paths (24/solid)
+  var ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M4.5 5.653c0-1.427 1.529-2.33 2.779-1.643l11.54 6.347c1.295.712 1.295 2.573 0 3.286L7.28 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" clip-rule="evenodd"/></svg>';
+  var ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M6.75 5.25a.75.75 0 0 1 .75-.75H9a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H7.5a.75.75 0 0 1-.75-.75V5.25Zm7.5 0A.75.75 0 0 1 15 4.5h1.5a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H15a.75.75 0 0 1-.75-.75V5.25Z" clip-rule="evenodd"/></svg>';
+  var ICON_BACKWARD = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.195 18.44c1.25.714 2.805-.189 2.805-1.629v-2.34l6.945 3.968c1.25.715 2.805-.188 2.805-1.628V8.69c0-1.44-1.555-2.343-2.805-1.628L12 11.029v-2.34c0-1.44-1.555-2.343-2.805-1.628l-7.108 4.061c-1.26.72-1.26 2.536 0 3.256l7.108 4.061Z"/></svg>';
+  var ICON_FORWARD = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M5.055 7.06C3.805 6.347 2.25 7.25 2.25 8.69v8.122c0 1.44 1.555 2.343 2.805 1.628L12 14.471v2.34c0 1.44 1.555 2.343 2.805 1.628l7.108-4.061c1.26-.72 1.26-2.536 0-3.256l-7.108-4.061C13.555 6.346 12 7.249 12 8.689v2.34L5.055 7.061Z"/></svg>';
+  var ICON_NOTE = '<svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M19.952 1.651a.75.75 0 0 1 .298.599V16.303a3 3 0 0 1-2.176 2.884l-1.32.377a2.553 2.553 0 1 1-1.403-4.909l2.311-.66a1.5 1.5 0 0 0 1.088-1.442V6.994l-9 2.572v9.737a3 3 0 0 1-2.176 2.884l-1.32.377a2.553 2.553 0 1 1-1.402-4.909l2.31-.66a1.5 1.5 0 0 0 1.088-1.442V5.25a.75.75 0 0 1 .544-.721l10.5-3a.75.75 0 0 1 .658.122Z" clip-rule="evenodd"/></svg>';
+
   var html = '<!DOCTYPE html><html><head>'
     + '<meta charset="UTF-8"><title>' + (title || 'PullRead Player').replace(/</g, '&lt;') + '</title>'
     + '<style>'
@@ -1095,10 +1102,10 @@ function popOutAudioPlayer() {
     + '</style></head><body>'
     + '<div class="top-bar">'
     + '<span class="top-bar-title">PullRead</span>'
-    + '<button class="pop-in" onclick="popBackIn()">&#8617; Pop back in</button>'
+    + '<button class="pop-in" id="pp-pop-in">&#8617; Pop back in</button>'
     + '</div>'
     + '<div class="now-playing">'
-    + '<div class="artwork" id="pp-artwork"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.68-.57-1.93-1.42A6.98 6.98 0 012.25 12c0-.65.09-1.28.25-1.88A2.01 2.01 0 014.51 8.7H6.75z"/></svg></div>'
+    + '<div class="artwork" id="pp-artwork">' + ICON_NOTE + '</div>'
     + '<div class="track-info">'
     + '<span class="track-title" id="pp-title">No track</span>'
     + '<span class="track-source" id="pp-source"></span>'
@@ -1109,19 +1116,24 @@ function popOutAudioPlayer() {
     + '<div class="progress-times"><span id="pp-time-cur">0:00</span><span id="pp-time-tot">0:00</span></div>'
     + '</div>'
     + '<div class="controls">'
-    + '<button class="speed-btn" id="pp-speed" onclick="cycleSpeed()">1x</button>'
-    + '<button class="ctrl-btn" onclick="skip(-15)" title="Rewind 15s"><svg viewBox="0 0 24 24"><path d="M9.195 18.44c1.25.714 2.805-.189 2.805-1.629v-2.34l6.945 3.968c1.25.715 2.805-.188 2.805-1.628V7.19c0-1.44-1.555-2.343-2.805-1.628L12 9.53V7.19c0-1.44-1.555-2.343-2.805-1.628l-7.108 4.061c-1.26.72-1.26 2.536 0 3.256l7.108 4.061z"/></svg></button>'
-    + '<button class="play-btn" id="pp-play" onclick="toggle()"><svg viewBox="0 0 24 24"><path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"/></svg></button>'
-    + '<button class="ctrl-btn" onclick="skip(15)" title="Forward 15s"><svg viewBox="0 0 24 24"><path d="M5.055 7.19c0-1.44 1.555-2.343 2.805-1.628L12 9.53V7.19c0-1.44 1.555-2.343 2.805-1.628l7.108 4.062c1.26.72 1.26 2.535 0 3.255l-7.108 4.062c-1.25.714-2.805-.19-2.805-1.629v-2.34l-6.945 3.968C3.805 18.152 2.25 17.249 2.25 15.81V7.19z"/></svg></button>'
+    + '<button class="speed-btn" id="pp-speed">1x</button>'
+    + '<button class="ctrl-btn" id="pp-rwd" title="Rewind 15s">' + ICON_BACKWARD + '</button>'
+    + '<button class="play-btn" id="pp-play">' + ICON_PLAY + '</button>'
+    + '<button class="ctrl-btn" id="pp-fwd" title="Forward 15s">' + ICON_FORWARD + '</button>'
     + '<button class="ctrl-btn" style="visibility:hidden;width:36px"></button>'
     + '</div>'
     + '<div class="queue-section" id="pp-queue"></div>'
     + '<scr' + 'ipt>'
     + 'var O=window.opener;'
-    + 'function popBackIn(){if(O&&O._closeAudioPopout)O._closeAudioPopout();else window.close();}'
-    + 'function toggle(){if(O&&O.ttsTogglePlay)O.ttsTogglePlay();}'
-    + 'function skip(s){if(O&&O.skipTime)O.skipTime(s);}'
-    + 'function cycleSpeed(){if(O&&O.ttsCycleSpeed)O.ttsCycleSpeed();}'
+    + 'var ICON_PLAY=\'' + ICON_PLAY.replace(/'/g, "\\'") + '\';'
+    + 'var ICON_PAUSE=\'' + ICON_PAUSE.replace(/'/g, "\\'") + '\';'
+    + 'var ICON_NOTE=\'' + ICON_NOTE.replace(/'/g, "\\'") + '\';'
+    // Wire all controls via addEventListener
+    + 'document.getElementById("pp-pop-in").addEventListener("click",function(){if(O&&O._closeAudioPopout)O._closeAudioPopout();else window.close();});'
+    + 'document.getElementById("pp-play").addEventListener("click",function(){if(O&&O.ttsTogglePlay)O.ttsTogglePlay();});'
+    + 'document.getElementById("pp-rwd").addEventListener("click",function(){if(O&&O.skipTime)O.skipTime(-15);});'
+    + 'document.getElementById("pp-fwd").addEventListener("click",function(){if(O&&O.skipTime)O.skipTime(15);});'
+    + 'document.getElementById("pp-speed").addEventListener("click",function(){if(O&&O.ttsCycleSpeed)O.ttsCycleSpeed();});'
     + 'function fmtTime(s){if(!s||!isFinite(s))return"0:00";s=Math.floor(s);var m=Math.floor(s/60),sec=s%60;return m+":"+(sec<10?"0":"")+sec;}'
     + 'function updateUI(){'
     + 'if(!O||O.closed){return;}'
@@ -1137,14 +1149,14 @@ function popOutAudioPlayer() {
     + 'var speedBtn=document.getElementById("pp-speed");'
     + 'if(titleEl)titleEl.textContent=item?item.title:"No track";'
     + 'if(sourceEl)sourceEl.textContent=item?(item.feed||item.domain||""):"";'
-    + 'document.title=item?(item.title+" — PullRead"):"PullRead Player";'
-    // Artwork
+    + 'document.title=item?(item.title+" \\u2014 PullRead"):"PullRead Player";'
+    // Artwork: try item.image, then favicon, fall back to musical note icon
     + 'if(artEl&&item){'
     + 'var src=item.image||(item.domain?"/favicons/"+encodeURIComponent(item.domain)+".png":"");'
     + 'if(src&&!artEl.querySelector("img[src=\\""+CSS.escape(src)+"\\"]")){'
-    + 'var img=new Image();img.src=src;img.alt="";img.onerror=function(){artEl.innerHTML=\'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.68-.57-1.93-1.42A6.98 6.98 0 012.25 12c0-.65.09-1.28.25-1.88A2.01 2.01 0 014.51 8.7H6.75z"/></svg>\';};'
+    + 'var img=new Image();img.src=src;img.alt="";img.onerror=function(){artEl.innerHTML=ICON_NOTE;};'
     + 'artEl.innerHTML="";artEl.appendChild(img);'
-    + '}else if(!src){artEl.innerHTML=\'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.68-.57-1.93-1.42A6.98 6.98 0 012.25 12c0-.65.09-1.28.25-1.88A2.01 2.01 0 014.51 8.7H6.75z"/></svg>\';}'
+    + '}else if(!src){artEl.innerHTML=ICON_NOTE;}'
     + '}'
     // Progress
     + 'var audio=O.ttsAudio;'
@@ -1154,19 +1166,19 @@ function popOutAudioPlayer() {
     + 'if(curEl)curEl.textContent=fmtTime(audio.currentTime);'
     + 'if(totEl)totEl.textContent=fmtTime(audio.duration);'
     + '}else{if(progEl)progEl.style.width="0";if(curEl)curEl.textContent="0:00";if(totEl)totEl.textContent="0:00";}'
-    // Play button
-    + 'if(playBtn)playBtn.innerHTML=playing?\'<svg viewBox="0 0 24 24"><path d="M6.75 5.25h3v13.5h-3V5.25zm7.5 0h3v13.5h-3V5.25z"/></svg>\':\'<svg viewBox="0 0 24 24"><path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"/></svg>\';'
+    // Play/pause button icon
+    + 'if(playBtn)playBtn.innerHTML=playing?ICON_PAUSE:ICON_PLAY;'
     + 'if(speedBtn)speedBtn.textContent=spd+"x";'
-    // Queue
+    // Queue (uses event delegation instead of inline onclick)
     + 'var qEl=document.getElementById("pp-queue");'
     + 'if(qEl&&q.length>0){'
     + 'var h=\'<div class="queue-header"><span>Queue (\'+(q.length)+\')</span></div>\';'
     + 'for(var i=0;i<q.length;i++){'
     + 'var it=q[i],src2=it.feed||it.domain||"";'
-    + 'h+=\'<div class="queue-item\'+(i===ci?" active":"")+\'" onclick="if(O&&O.playTTSItem)O.playTTSItem(\'+i+\')">\';'
+    + 'h+=\'<div class="queue-item\'+(i===ci?" active":"")+\'" data-qi="\'+i+\'">\';'
     + 'h+=\'<span class="queue-num">\'+(i===ci?"&#9654;":(i+1))+\'</span>\';'
     + 'h+=\'<div class="queue-info"><span>\'+escHtml(it.title)+\'</span>\'+(src2?\'<span class="q-source">\'+escHtml(src2)+\'</span>\':"")+\'</div>\';'
-    + 'h+=\'<button class="queue-remove" onclick="event.stopPropagation();if(O&&O.removeTTSQueueItem)O.removeTTSQueueItem(\'+i+\')">&times;</button>\';'
+    + 'h+=\'<button class="queue-remove" data-qr="\'+i+\'">&times;</button>\';'
     + 'h+=\'</div>\';'
     + '}'
     + 'qEl.innerHTML=h;'
@@ -1174,6 +1186,13 @@ function popOutAudioPlayer() {
     + 'requestAnimationFrame(updateUI);'
     + '}'
     + 'function escHtml(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}'
+    // Queue event delegation
+    + 'document.getElementById("pp-queue").addEventListener("click",function(e){'
+    + 'var rm=e.target.closest("[data-qr]");'
+    + 'if(rm){e.stopPropagation();var idx=parseInt(rm.dataset.qr,10);if(O&&O.removeTTSQueueItem)O.removeTTSQueueItem(idx);return;}'
+    + 'var qi=e.target.closest("[data-qi]");'
+    + 'if(qi){var idx=parseInt(qi.dataset.qi,10);if(O&&O.playTTSItem)O.playTTSItem(idx);}'
+    + '});'
     // Progress bar drag-to-seek
     + 'var ppWrap=document.getElementById("pp-progress-wrap");'
     + 'if(ppWrap){'

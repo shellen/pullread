@@ -566,7 +566,7 @@
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 4px 8px 12px;
+    padding: 0 8px 12px;
   }
   .drawer-item {
     display: flex;
@@ -587,7 +587,7 @@
     height: 18px;
     border-radius: 4px;
     flex-shrink: 0;
-    background: var(--sidebar-hover);
+    background: #fff;
     object-fit: cover;
   }
   .drawer-item-icon {
@@ -608,6 +608,12 @@
     color: var(--muted);
     flex-shrink: 0;
     font-weight: 500;
+  }
+  .drawer-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--sidebar-bg);
   }
   .drawer-search {
     padding: 8px 10px;
@@ -1006,6 +1012,7 @@
     border-radius: 3px;
     flex-shrink: 0;
     opacity: 0.7;
+    background: #fff;
   }
   .file-item-artwork {
     width: 18px;
@@ -1197,6 +1204,103 @@
     color: var(--muted);
     font-size: 13px;
   }
+  /* Rundown tab — newspaper front page layout */
+  .rundown-layout {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 20px;
+    align-items: start;
+  }
+  @media (max-width: 700px) {
+    .rundown-layout { grid-template-columns: 1fr; }
+  }
+
+  /* Rundown story deck (reuses spotlight slide/dot/nav classes) */
+  .rundown-deck {
+    aspect-ratio: 9 / 16;
+    max-height: 600px;
+    border-radius: 14px;
+    overflow: hidden;
+    position: relative;
+    background: #000;
+  }
+  .rundown-deck-track {
+    display: flex;
+    height: 100%;
+    transition: transform 0.5s ease;
+  }
+  @media (max-width: 700px) {
+    .rundown-deck {
+      aspect-ratio: 9 / 16;
+      max-height: 480px;
+    }
+  }
+
+  /* Rundown tab — feed column */
+  .rundown-feed-col {
+    display: flex; flex-direction: column;
+  }
+  .rundown-feed-section {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--card-bg, var(--bg));
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .rundown-feed-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .rundown-feed-title {
+    font-size: 13px; font-weight: 700; color: var(--fg);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .rundown-feed-accent {
+    width: 3px; height: 14px; border-radius: 2px; flex-shrink: 0;
+  }
+  .rundown-feed-more {
+    font-size: 11px; color: var(--link); font-weight: 500;
+    cursor: pointer; text-decoration: none;
+  }
+  .rundown-feed-top {
+    display: flex; gap: 10px; padding: 11px 14px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer; transition: background 0.12s;
+  }
+  .rundown-feed-top:hover { background: var(--hover); }
+  .rundown-feed-thumb {
+    width: 60px; height: 48px; border-radius: 5px;
+    overflow: hidden; flex-shrink: 0;
+  }
+  .rundown-feed-thumb img {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+  }
+  .rundown-feed-top-title {
+    font-size: 12px; font-weight: 600; color: var(--fg);
+    line-height: 1.4; margin-bottom: 3px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .rundown-feed-top-meta {
+    font-size: 11px; color: var(--muted);
+  }
+  .rundown-feed-sub {
+    display: flex; align-items: baseline;
+    justify-content: space-between; gap: 8px;
+    padding: 6px 14px; cursor: pointer;
+    transition: background 0.12s;
+    border-bottom: 1px solid var(--border);
+  }
+  .rundown-feed-sub:last-child { border-bottom: none; }
+  .rundown-feed-sub:hover { background: var(--hover); }
+  .rundown-feed-sub-title {
+    font-size: 11px; color: var(--fg-secondary); line-height: 1.4; flex: 1;
+    display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .rundown-feed-sub-time {
+    font-size: 10px; color: var(--muted); flex-shrink: 0; white-space: nowrap;
+  }
+
   /* Brief tab — mini treemap */
   .brief-treemap {
     display: flex;
@@ -1445,7 +1549,7 @@
     display: flex;
     gap: 16px;
     padding: 0 4px;
-    min-height: 400px;
+    align-items: flex-start;
   }
   @media (max-width: 700px) {
     .spotlight-layout { flex-direction: column; }
@@ -1455,18 +1559,19 @@
   .spotlight-deck {
     flex: 0 0 40%;
     max-width: 40%;
+    aspect-ratio: 9 / 16;
+    max-height: 600px;
     border-radius: 14px;
     overflow: hidden;
     position: relative;
     background: #000;
-    min-height: 400px;
   }
   @media (max-width: 700px) {
     .spotlight-deck {
       flex: none;
       max-width: 100%;
-      min-height: 240px;
-      max-height: 300px;
+      aspect-ratio: 9 / 16;
+      max-height: 480px;
     }
   }
   .spotlight-deck-track {
@@ -1800,6 +1905,7 @@
     border-radius: 3px;
     filter: grayscale(100%);
     transition: filter 0.2s;
+    background: #fff;
     background: #fff;
     box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06);
     flex-shrink: 0;
@@ -2167,7 +2273,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--sidebar-hover);
+    background: #fff;
   }
   .pub-favicon img {
     width: 100%;
@@ -5999,6 +6105,7 @@
     border-radius: 2px;
     filter: grayscale(100%);
     flex-shrink: 0;
+    background: #fff;
   }
   .connection-article:hover img { filter: grayscale(0%); }
   .connection-article .conn-domain {
@@ -6049,6 +6156,7 @@
     height: 12px;
     border-radius: 2px;
     filter: grayscale(100%);
+    background: #fff;
   }
   .most-viewed-item:hover .most-viewed-meta img { filter: grayscale(0%); }
   .most-viewed-pct {
