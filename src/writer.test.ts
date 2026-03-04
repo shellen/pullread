@@ -497,11 +497,14 @@ describe('exportNotebook', () => {
   });
   afterAll(cleanTestDir);
 
-  test('exports notebook as markdown with frontmatter', () => {
+  test('exports notebook with note content and frontmatter', () => {
     const notebook: import('./writer').Notebook = {
       id: 'nb-abc123',
       title: 'My Research Notes',
-      notes: [{ text: 'Key finding', source: 'article.md' }],
+      notes: [
+        { id: 'note-1', content: '# Key Finding\n\nImportant discovery here.', sourceArticle: 'article.md', createdAt: '2024-01-15T10:00:00Z', updatedAt: '2024-01-15T10:00:00Z' },
+        { id: 'note-2', content: '# Second Note\n\nAnother insight.', createdAt: '2024-01-16T10:00:00Z', updatedAt: '2024-01-16T10:00:00Z' },
+      ],
       sources: ['https://example.com'],
       tags: ['research', 'ai'],
       createdAt: '2024-01-15T10:00:00Z',
@@ -509,15 +512,64 @@ describe('exportNotebook', () => {
     };
 
     const filename = exportNotebook(TEST_DIR, notebook);
-    expect(filename).toBe('my-research-notes.md');
+    expect(filename).toBe('notebook.md');
 
     const content = readFileSync(join(TEST_DIR, 'notebooks', filename), 'utf-8');
-    expect(content).toContain('title: "My Research Notes"');
+    expect(content).toContain('title: "Notebook"');
     expect(content).toContain('created: 2024-01-15T10:00:00Z');
     expect(content).toContain('tags: ["research", "ai"]');
-    expect(content).toContain('Key finding');
-    expect(content).toContain('*(article.md)*');
+    expect(content).toContain('# Key Finding');
+    expect(content).toContain('Important discovery here.');
+    expect(content).toContain('# Second Note');
     expect(content).toContain('https://example.com');
+  });
+
+  test('cleans up stale title-based export file', () => {
+    // Simulate an old export with a title-based filename
+    const dir = join(TEST_DIR, 'notebooks');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'testing.md'), 'old export');
+
+    const notebook: import('./writer').Notebook = {
+      id: 'nb-shared',
+      title: 'Testing',
+      notes: [{ id: 'note-1', content: '# Real Note', createdAt: '2024-01-15T10:00:00Z', updatedAt: '2024-01-15T10:00:00Z' }],
+      createdAt: '2024-01-15T10:00:00Z',
+      updatedAt: '2024-01-16T14:00:00Z',
+    };
+
+    const filename = exportNotebook(TEST_DIR, notebook);
+    expect(filename).toBe('notebook.md');
+
+    // New canonical file exists
+    expect(existsSync(join(dir, 'notebook.md'))).toBe(true);
+    const content = readFileSync(join(dir, 'notebook.md'), 'utf-8');
+    expect(content).toContain('# Real Note');
+
+    // Old title-based file cleaned up
+    expect(existsSync(join(dir, 'testing.md'))).toBe(false);
+  });
+
+  test('skips empty notes in export', () => {
+    const notebook: import('./writer').Notebook = {
+      id: 'nb-shared',
+      title: 'Notebook',
+      notes: [
+        { id: 'note-1', content: '# Has Content', createdAt: '2024-01-15T10:00:00Z', updatedAt: '2024-01-15T10:00:00Z' },
+        { id: 'note-2', content: '', createdAt: '2024-01-15T10:00:00Z', updatedAt: '2024-01-15T10:00:00Z' },
+        { id: 'note-3', content: '   ', createdAt: '2024-01-15T10:00:00Z', updatedAt: '2024-01-15T10:00:00Z' },
+      ],
+      createdAt: '2024-01-15T10:00:00Z',
+      updatedAt: '2024-01-16T14:00:00Z',
+    };
+
+    exportNotebook(TEST_DIR, notebook);
+    const content = readFileSync(join(TEST_DIR, 'notebooks', 'notebook.md'), 'utf-8');
+    expect(content).toContain('# Has Content');
+    // Only one --- separator (from the single non-empty note)
+    const separators = content.split('---').length - 1;
+    // frontmatter has 2 ---, plus one note separator = 3
+    expect(separators).toBe(3);
   });
 });
 

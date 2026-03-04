@@ -400,7 +400,7 @@ var SECTION_LABELS = {
   tech: 'Tech', news: 'News & Politics', science: 'Science', health: 'Health',
   business: 'Business', culture: 'Culture', sports: 'Sports', food: 'Food & Drink',
   lifestyle: 'Lifestyle', environment: 'Environment', education: 'Education',
-  opinion: 'Opinion', other: 'Other'
+  opinion: 'Opinion', other: 'More'
 };
 
 var SECTION_COLORS = {

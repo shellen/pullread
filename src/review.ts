@@ -12,6 +12,7 @@ export interface ArticleMeta {
   url: string;
   bookmarked: string;
   domain: string;
+  filename?: string;
   feed?: string;
   summary?: string;
   excerpt?: string;
@@ -124,6 +125,7 @@ export function getRecentArticles(outputPath: string, days: number = 7): Article
       const meta = parseFrontmatter(text);
       if (!meta) continue;
 
+      meta.filename = file.name;
       const bookmarkDate = new Date(meta.bookmarked);
       if (bookmarkDate >= cutoff) {
         articles.push(meta);
@@ -237,4 +239,51 @@ ${clusterSection}`;
   writeFileSync(fullPath, markdown, 'utf-8');
 
   return { filename, review };
+}
+
+export async function generateBriefing(outputPath: string, days: number = 1): Promise<{
+  briefing: string;
+  articles: Array<{ title: string; filename: string; domain: string }>;
+} | null> {
+  const allArticles = getRecentArticles(outputPath, days);
+  if (allArticles.length === 0) return null;
+
+  // Cap at 25 for context window safety
+  const articles = allArticles.slice(0, 25);
+
+  const articleList = articles.map((a, i) => {
+    let entry = `${i + 1}. "${a.title}" (${a.domain})`;
+    if (a.summary) entry += `\n   Summary: ${a.summary}`;
+    else if (a.excerpt) entry += `\n   Excerpt: ${a.excerpt}`;
+    return entry;
+  }).join('\n');
+
+  const prompt = `You are a sharp, well-read friend giving an overview of what's in the reading queue. Below are ${articles.length} articles bookmarked in the past ${days === 1 ? 'day' : days + ' days'}.
+
+Write about two paragraphs of flowing prose with no headings — no #, no ##. Keep it concise and specific.
+
+LINKING RULE — THIS IS CRITICAL: Every article you mention MUST have its **exact title** wrapped in markdown bold (**double asterisks**). Copy the title exactly from the numbered list below. Example: if the list has '"Apple Does Fusion"', write **Apple Does Fusion** in your text. Do NOT put titles in quotes — use bold. This creates clickable links in the UI.
+
+When articles share a theme, group them naturally. Name the author or publication when it adds credibility (e.g., "Om Malik digs into fusion energy in **Apple Does Fusion**").
+
+If there's a video, podcast, or other media item, call out the type — e.g., "there's a Daily Show clip, **Episode Title Here**".
+
+Tone: be somber and respectful when mentioning death, tragedy, or loss. Never sound excited about bad news.
+
+Do NOT use generic summarizing language like "underscoring the human impact" or "highlighting broader themes." Be specific — say what the article is actually about.
+
+Articles:
+${articleList}
+
+Briefing:`;
+
+  const result = await summarizeText(prompt);
+
+  const articleMeta = articles.map(a => ({
+    title: a.title,
+    filename: a.filename || '',
+    domain: a.domain,
+  }));
+
+  return { briefing: result.summary, articles: articleMeta };
 }

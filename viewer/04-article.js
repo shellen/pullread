@@ -1,7 +1,7 @@
 // ABOUTME: Hub landing page (merged Home + Explore) and article rendering.
 // ABOUTME: renderHub() builds the tabbed hub; loadFile() renders individual articles.
 function getHomeTab() {
-  return localStorage.getItem('pr-home-tab') || 'brief';
+  return localStorage.getItem('pr-home-tab') || 'rundown';
 }
 function setHomeTab(tab) {
   localStorage.setItem('pr-home-tab', tab);
@@ -31,9 +31,10 @@ function buildRundownTab(engagement, mc) {
   var usedSet = {};
   for (var di = 0; di < deckArticles.length; di++) usedSet[deckArticles[di].filename] = true;
 
-  html += '<div class="rundown-layout">';
+  // --- Top row: story deck + briefing ---
+  html += '<div class="rundown-top">';
 
-  // --- Left: story deck ---
+  // Story deck
   if (deckArticles.length > 0) {
     html += '<div class="rundown-deck" id="rundown-deck">';
 
@@ -68,232 +69,152 @@ function buildRundownTab(engagement, mc) {
     html += '</div>'; // deck
   }
 
-  // --- Right: feed column ---
-  html += '<div class="rundown-feed-col">';
+  // Briefing area: AI prose when available, reading suggestions otherwise
+  if (serverMode && llmConfigured) {
+    html += '<div class="rundown-briefing" id="rundown-briefing">';
+    html += '<button class="rundown-briefing-refresh" onclick="loadBriefing(true)" aria-label="Refresh briefing" title="Refresh">';
+    html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M21 21v-5h-5"/></svg>';
+    html += '</button>';
+    html += '<div class="rundown-briefing-body" id="rundown-briefing-body">';
+    html += '<div class="briefing-skeleton"><div class="skeleton-line w80"></div><div class="skeleton-line w60"></div><div class="skeleton-line w90"></div><div class="skeleton-line w70"></div></div>';
+    html += '</div>';
+    html += '</div>';
+  } else {
+    // Fallback: show top unread articles as reading suggestions
+    var suggestions = unread.filter(function(f) { return !usedSet[f.filename]; }).slice(0, 3);
+    if (suggestions.length > 0) {
+      html += '<div class="rundown-briefing">';
+      for (var si = 0; si < suggestions.length; si++) {
+        var sg = suggestions[si];
+        html += '<div class="sections-headline" onclick="dashLoadArticle(\'' + escapeJsStr(sg.filename) + '\')">';
+        html += '<span class="sections-headline-title">' + escapeHtml(sg.title) + '</span>';
+        html += '<span class="sections-headline-time">' + escapeHtml(sg.domain || sg.feed || '') + '</span>';
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+  }
 
-  // Group remaining unread articles by section (keep 5: display 4, 5th for header click)
-  var sectionArts = {};
+  html += '</div>'; // end rundown-top
+
+  // --- Continue Reading card (partially-read articles with progress bars) ---
+  var positions = JSON.parse(localStorage.getItem('pr-scroll-positions') || '{}');
+  var continueReading = allFiles.filter(function(f) {
+    var pos = positions[f.filename];
+    return pos && pos.pct > 0.05 && pos.pct < 0.95 && !usedSet[f.filename];
+  });
+  continueReading.sort(function(a, b) {
+    return (positions[b.filename].ts || 0) - (positions[a.filename].ts || 0);
+  });
+  continueReading = continueReading.slice(0, 4);
+  for (var ci = 0; ci < continueReading.length; ci++) usedSet[continueReading[ci].filename] = true;
+
+  // --- Latest card (newest unread articles) ---
+  var latestUnread = unread.filter(function(f) { return !usedSet[f.filename]; });
+  latestUnread.sort(function(a, b) {
+    return new Date(b.bookmarked || 0).getTime() - new Date(a.bookmarked || 0).getTime();
+  });
+  var latestArticles = latestUnread.slice(0, 5);
+  for (var li = 0; li < latestArticles.length; li++) usedSet[latestArticles[li].filename] = true;
+
+  // --- Section modules (12 editorial categories only) ---
+  var secMap = {};
   for (var i = 0; i < unread.length; i++) {
     var f = unread[i];
     if (usedSet[f.filename]) continue;
     var sec = resolveSection(f.filename);
-    if (!sectionArts[sec]) sectionArts[sec] = [];
-    if (sectionArts[sec].length < 5) sectionArts[sec].push(f);
+    if (SECTIONS.indexOf(sec) === -1) continue;
+    if (!secMap[sec]) secMap[sec] = [];
+    secMap[sec].push(f);
   }
-
-  // Order sections by article count descending
-  var sectionKeys = Object.keys(sectionArts).sort(function(a, b) {
-    return sectionArts[b].length - sectionArts[a].length;
+  var sectionKeys = Object.keys(secMap).sort(function(a, b) {
+    return secMap[b].length - secMap[a].length;
   });
 
-  // Show top 5 sections
-  for (var ski = 0; ski < Math.min(sectionKeys.length, 5); ski++) {
-    var sec = sectionKeys[ski];
-    var arts = sectionArts[sec];
-    var color = sectionColor(sec);
-    var label = SECTION_LABELS[sec] || sec;
-    var top = arts[0];
+  var hasCards = continueReading.length > 0 || latestArticles.length > 0 || sectionKeys.length > 0;
+  if (hasCards) {
 
-    // Header click loads first article NOT shown in this widget
-    var headerTarget = arts[4]; // 5th article (beyond the 4 displayed)
-    var headerAction = headerTarget
-      ? 'dashLoadArticle(\'' + escapeJsStr(headerTarget.filename) + '\')'
-      : 'document.getElementById(\'search\').value=\'section:\\x22' + escapeJsStr(sec) + '\\x22\';filterFiles()';
+    html += '<div class="rundown-sections">';
 
-    html += '<div class="rundown-feed-section">';
-    html += '<div class="rundown-feed-header" onclick="' + headerAction + '" style="cursor:pointer">';
-    html += '<span class="rundown-feed-title"><span class="rundown-feed-accent" style="background:' + color + '"></span>' + escapeHtml(label) + '</span>';
-    html += '<a class="rundown-feed-more" onclick="event.stopPropagation();document.getElementById(\'search\').value=\'section:\\x22' + escapeJsStr(sec) + '\\x22\';filterFiles()">More &rsaquo;</a>';
-    html += '</div>';
-
-    // Top article with thumbnail
-    if (top) {
-      html += '<div class="rundown-feed-top" onclick="dashLoadArticle(\'' + escapeJsStr(top.filename) + '\')">';
-      if (top.image) {
-        html += '<div class="rundown-feed-thumb"><img src="' + escapeHtml(top.image) + '" alt="" loading="lazy" onerror="this.parentNode.remove()"></div>';
+    // Continue Reading card (featured first article + headline rows with progress)
+    if (continueReading.length > 0) {
+      html += '<div class="sections-block">';
+      html += '<div class="sections-block-header">';
+      html += '<div class="sections-block-color" style="background:var(--accent)"></div>';
+      html += '<span class="sections-block-name">Continue Reading</span>';
+      html += '</div>';
+      // Featured article (first one)
+      var crFeat = continueReading[0];
+      var crFeatPct = Math.round((positions[crFeat.filename].pct || 0) * 100);
+      html += '<div class="sections-featured" onclick="dashLoadArticle(\'' + escapeJsStr(crFeat.filename) + '\')">';
+      if (crFeat.image) {
+        html += '<img src="' + escapeHtml(crFeat.image) + '" alt="" loading="lazy" onerror="this.remove()">';
       }
-      html += '<div><div class="rundown-feed-top-title">' + escapeHtml(top.title) + '</div>';
-      html += '<div class="rundown-feed-top-meta">' + escapeHtml(top.domain || top.feed || '');
-      if (top.bookmarked) html += ' &middot; ' + timeAgo(top.bookmarked);
-      html += '</div></div></div>';
-    }
-
-    // Sub headlines (display up to 4 total: 1 top + 3 subs)
-    for (var hi = 1; hi < Math.min(arts.length, 4); hi++) {
-      var a = arts[hi];
-      html += '<div class="rundown-feed-sub" onclick="dashLoadArticle(\'' + escapeJsStr(a.filename) + '\')">';
-      html += '<span class="rundown-feed-sub-title">' + escapeHtml(a.title) + '</span>';
-      if (a.bookmarked) html += '<span class="rundown-feed-sub-time">' + timeAgo(a.bookmarked) + '</span>';
+      html += '<div class="sections-featured-body">';
+      html += '<div class="sections-featured-title">' + escapeHtml(crFeat.title) + '</div>';
+      html += '<div class="sections-featured-meta">' + escapeHtml(crFeat.domain || crFeat.feed || '') + ' &middot; ' + crFeatPct + '% read</div>';
+      html += '</div></div>';
+      html += '<div class="sections-progress"><div class="sections-progress-bar" style="width:' + crFeatPct + '%"></div></div>';
+      // Remaining as headline rows with progress
+      for (var ci = 1; ci < continueReading.length; ci++) {
+        var cr = continueReading[ci];
+        var pct = Math.round((positions[cr.filename].pct || 0) * 100);
+        html += '<div class="sections-headline" onclick="dashLoadArticle(\'' + escapeJsStr(cr.filename) + '\')">';
+        html += '<span class="sections-headline-title">' + escapeHtml(cr.title) + '</span>';
+        html += '<span class="sections-headline-time">' + pct + '%</span>';
+        html += '<div class="sections-progress"><div class="sections-progress-bar" style="width:' + pct + '%"></div></div>';
+        html += '</div>';
+      }
       html += '</div>';
     }
 
-    html += '</div>';
-  }
-
-  html += '</div>'; // end feed-col
-  html += '</div>'; // end rundown-layout
-  html += '</div>'; // end rundown-tab
-  return html;
-}
-
-function buildBriefTab(engagement, mc) {
-  var html = '<div class="brief-tab">';
-
-  // Count unread articles per section
-  var sectionUnread = {};
-  var totalUnread = 0;
-  for (var i = 0; i < allFiles.length; i++) {
-    var f = allFiles[i];
-    if (readArticles.has(f.filename)) continue;
-    if (f.feed === 'weekly-review' || f.feed === 'daily-review' || f.domain === 'pullread') continue;
-    var sec = resolveSection(f.filename);
-    sectionUnread[sec] = (sectionUnread[sec] || 0) + 1;
-    totalUnread++;
-  }
-
-  // Sort sections by unread count descending
-  var sortedSections = Object.keys(sectionUnread).sort(function(a, b) {
-    return sectionUnread[b] - sectionUnread[a];
-  });
-
-  if (totalUnread === 0) {
-    html += '<p style="color:var(--muted);padding:20px;text-align:center">All caught up</p>';
-    html += '</div>';
-    return html;
-  }
-
-  // Mini treemap — colored blocks proportional to unread count
-  html += '<div class="brief-treemap">';
-  for (var si = 0; si < sortedSections.length; si++) {
-    var sec = sortedSections[si];
-    var count = sectionUnread[sec];
-    var grow = Math.max(Math.round(count / totalUnread * 20), 1);
-    var color = sectionColor(sec);
-    var label = SECTION_LABELS[sec] || sec;
-    html += '<div class="brief-treemap-block" style="flex-grow:' + grow + ';background:' + color + '" onclick="document.getElementById(\'search\').value=\'section:' + escapeJsStr(sec) + '\';filterFiles()">';
-    html += '<span class="brief-treemap-label">' + escapeHtml(label) + '</span>';
-    html += '<span class="brief-treemap-count">' + count + '</span>';
-    html += '</div>';
-  }
-  html += '</div>';
-
-  // Score all unread articles
-  var unreadArticles = allFiles.filter(function(f) {
-    return !readArticles.has(f.filename) && f.feed !== 'weekly-review' && f.feed !== 'daily-review' && f.domain !== 'pullread';
-  });
-  unreadArticles.sort(function(a, b) {
-    return magicScore(b, engagement, mc) - magicScore(a, engagement, mc);
-  });
-
-  // Lead story — highest scoring unread article
-  if (unreadArticles.length > 0) {
-    var lead = unreadArticles[0];
-    html += '<div class="brief-lead" onclick="dashLoadArticle(\'' + escapeJsStr(lead.filename) + '\')">';
-    if (lead.image) {
-      html += '<img src="' + escapeHtml(lead.image) + '" alt="" loading="eager" onerror="this.remove()">';
-    }
-    html += '<div class="brief-lead-body">';
-    html += '<div class="brief-lead-title">' + escapeHtml(lead.title) + '</div>';
-    html += '<div class="brief-lead-meta">' + escapeHtml(lead.domain || lead.feed || '') + (lead.bookmarked ? ' &middot; ' + timeAgo(lead.bookmarked) : '') + '</div>';
-    if (lead.excerpt) {
-      html += '<div class="brief-lead-excerpt">' + escapeHtml(lead.excerpt) + '</div>';
-    }
-    html += '</div></div>';
-  }
-
-  // Section headlines — group unread articles by section, up to 3 per section
-  var sectionArticles = {};
-  for (var ai = 0; ai < unreadArticles.length; ai++) {
-    var a = unreadArticles[ai];
-    var sec = resolveSection(a.filename);
-    if (!sectionArticles[sec]) sectionArticles[sec] = [];
-    if (sectionArticles[sec].length < 3) sectionArticles[sec].push(a);
-  }
-
-  for (var si2 = 0; si2 < sortedSections.length; si2++) {
-    var sec = sortedSections[si2];
-    var articles = sectionArticles[sec];
-    if (!articles || articles.length === 0) continue;
-    var color = sectionColor(sec);
-    var label = SECTION_LABELS[sec] || sec;
-
-    html += '<div class="brief-section-group">';
-    html += '<div class="brief-section-name"><span class="brief-section-dot" style="background:' + color + '"></span>' + escapeHtml(label) + '</div>';
-    for (var hi = 0; hi < articles.length; hi++) {
-      var a = articles[hi];
-      html += '<div class="brief-headline-row" onclick="dashLoadArticle(\'' + escapeJsStr(a.filename) + '\')">';
-      html += '<span class="brief-headline-title">' + escapeHtml(a.title) + '</span>';
-      html += '<span class="brief-headline-source">' + escapeHtml(a.domain || a.feed || '') + '</span>';
-      if (a.bookmarked) html += '<span class="brief-headline-time">' + timeAgo(a.bookmarked) + '</span>';
+    // Latest card
+    if (latestArticles.length > 0) {
+      html += '<div class="sections-block">';
+      html += '<div class="sections-block-header">';
+      html += '<div class="sections-block-color" style="background:var(--link)"></div>';
+      html += '<span class="sections-block-name">Latest</span>';
+      html += '</div>';
+      // Featured article (first with thumb)
+      var latFeat = latestArticles[0];
+      html += '<div class="sections-featured" onclick="dashLoadArticle(\'' + escapeJsStr(latFeat.filename) + '\')">';
+      if (latFeat.image) {
+        html += '<img src="' + escapeHtml(latFeat.image) + '" alt="" loading="lazy" onerror="this.remove()">';
+      }
+      html += '<div class="sections-featured-body">';
+      html += '<div class="sections-featured-title">' + escapeHtml(latFeat.title) + '</div>';
+      html += '<div class="sections-featured-meta">' + escapeHtml(latFeat.domain || latFeat.feed || '') + (latFeat.bookmarked ? ' &middot; ' + timeAgo(latFeat.bookmarked) : '') + '</div>';
+      html += '</div></div>';
+      // Headline list (up to 4 more)
+      for (var li = 1; li < latestArticles.length; li++) {
+        var la = latestArticles[li];
+        html += '<div class="sections-headline" onclick="dashLoadArticle(\'' + escapeJsStr(la.filename) + '\')">';
+        html += '<span class="sections-headline-title">' + escapeHtml(la.title) + '</span>';
+        if (la.bookmarked) html += '<span class="sections-headline-time">' + timeAgo(la.bookmarked) + '</span>';
+        html += '</div>';
+      }
       html += '</div>';
     }
-    html += '</div>';
-  }
 
-  // Continue reading
-  var positions = JSON.parse(localStorage.getItem('pr-scroll-positions') || '{}');
-  var continueReading = allFiles.filter(function(f) {
-    var pos = positions[f.filename];
-    return pos && pos.pct > 0.05 && pos.pct < 0.9;
-  }).sort(function(a, b) {
-    return (positions[b.filename].ts || 0) - (positions[a.filename].ts || 0);
-  }).slice(0, 3);
+    // Section modules
+    for (var ski = 0; ski < sectionKeys.length; ski++) {
+      var secId = sectionKeys[ski];
+      var arts = secMap[secId];
+      var color = sectionColor(secId);
+      var label = SECTION_LABELS[secId] || secId;
+      var totalCount = arts.length;
 
-  if (continueReading.length > 0) {
-    html += '<div class="dash-section">';
-    html += '<div class="dash-section-header"><span class="dash-section-title">Continue Reading</span></div>';
-    html += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards">';
-    for (var ci = 0; ci < continueReading.length; ci++) {
-      html += dashCardHtml(continueReading[ci], positions[continueReading[ci].filename] ? positions[continueReading[ci].filename].pct : undefined, ci === 0 ? 'featured' : 'standard');
-    }
-    html += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
-  }
+      html += '<div class="sections-block">';
 
-  html += '</div>';
-  return html;
-}
+      // Header with color accent, label, count
+      html += '<div class="sections-block-header">';
+      html += '<div class="sections-block-color" style="background:' + color + '"></div>';
+      html += '<span class="sections-block-name">' + escapeHtml(label) + '</span>';
+      html += '<span class="sections-block-count">' + totalCount + '</span>';
+      html += '</div>';
 
-function buildSectionsTab(engagement, mc) {
-  var html = '<div class="sections-tab">';
-
-  var sections = buildSectionRundown();
-  if (sections.length === 0) {
-    html += '<p style="color:var(--muted);padding:20px;text-align:center">No unread articles</p>';
-    html += '</div>';
-    return html;
-  }
-
-  // Sort sections by engagement weight
-  sections.sort(function(a, b) {
-    var engA = 0, engB = 0;
-    for (var i = 0; i < a.articles.length; i++) {
-      var key = a.articles[i].feed || a.articles[i].domain || 'unknown';
-      engA += engagement[key] || 0;
-    }
-    for (var i = 0; i < b.articles.length; i++) {
-      var key = b.articles[i].feed || b.articles[i].domain || 'unknown';
-      engB += engagement[key] || 0;
-    }
-    return engB - engA;
-  });
-
-  html += '<div class="sections-grid">';
-  for (var si = 0; si < sections.length; si++) {
-    var sec = sections[si];
-    var color = sectionColor(sec.section);
-
-    html += '<div class="sections-block">';
-
-    // Header
-    html += '<div class="sections-block-header">';
-    html += '<div class="sections-block-color" style="background:' + color + '"></div>';
-    html += '<span class="sections-block-name">' + escapeHtml(sec.label) + '</span>';
-    html += '<span class="sections-block-count">' + sec.totalCount + '</span>';
-    html += '</div>';
-
-    // Featured article (first one)
-    if (sec.articles.length > 0) {
-      var feat = sec.articles[0];
+      // Featured article with thumbnail
+      var feat = arts[0];
       html += '<div class="sections-featured" onclick="dashLoadArticle(\'' + escapeJsStr(feat.filename) + '\')">';
       if (feat.image) {
         html += '<img src="' + escapeHtml(feat.image) + '" alt="" loading="lazy" onerror="this.remove()">';
@@ -302,200 +223,32 @@ function buildSectionsTab(engagement, mc) {
       html += '<div class="sections-featured-title">' + escapeHtml(feat.title) + '</div>';
       html += '<div class="sections-featured-meta">' + escapeHtml(feat.domain || feat.feed || '') + (feat.bookmarked ? ' &middot; ' + timeAgo(feat.bookmarked) : '') + '</div>';
       html += '</div></div>';
-    }
 
-    // Headline list (remaining articles, up to 4)
-    for (var hi = 1; hi < Math.min(sec.articles.length, 5); hi++) {
-      var a = sec.articles[hi];
-      html += '<div class="sections-headline" onclick="dashLoadArticle(\'' + escapeJsStr(a.filename) + '\')">';
-      html += '<span class="sections-headline-title">' + escapeHtml(a.title) + '</span>';
-      if (a.bookmarked) html += '<span class="sections-headline-time">' + timeAgo(a.bookmarked) + '</span>';
+      // Headline list (up to 4 more)
+      for (var hi = 1; hi < Math.min(arts.length, 5); hi++) {
+        var a = arts[hi];
+        html += '<div class="sections-headline" onclick="dashLoadArticle(\'' + escapeJsStr(a.filename) + '\')">';
+        html += '<span class="sections-headline-title">' + escapeHtml(a.title) + '</span>';
+        if (a.bookmarked) html += '<span class="sections-headline-time">' + timeAgo(a.bookmarked) + '</span>';
+        html += '</div>';
+      }
+
+      // "More in Section" — open the first unseen article and filter sidebar to section
+      if (totalCount > 5) {
+        var nextArt = arts[5];
+        html += '<a class="sections-more" onclick="dashLoadArticle(\'' + escapeJsStr(nextArt.filename) + '\');document.getElementById(\'search\').value=\'section:&quot;' + escapeJsStr(secId) + '&quot;\';filterFiles()">More in ' + escapeHtml(label) + ' (' + totalCount + ') &rsaquo;</a>';
+      }
+
       html += '</div>';
     }
-
-    // "More in Section" link
-    if (sec.totalCount > sec.articles.length) {
-      html += '<a class="sections-more" onclick="document.getElementById(\'search\').value=\'section:' + escapeJsStr(sec.section) + '\';filterFiles()">More in ' + escapeHtml(sec.label) + ' (' + sec.totalCount + ') &rsaquo;</a>';
-    }
-
-    html += '</div>';
+    html += '</div>'; // end rundown-sections
   }
-  html += '</div>';
 
-  html += '</div>';
+  html += '</div>'; // end rundown-tab
   return html;
 }
 
-function buildSpotlightTab(engagement, mc) {
-  var html = '<div class="spotlight-tab">';
-
-  // Get top articles with images for story deck
-  var unreadWithImages = allFiles.filter(function(f) {
-    return !readArticles.has(f.filename) && f.image && f.feed !== 'weekly-review' && f.feed !== 'daily-review' && f.domain !== 'pullread';
-  });
-  unreadWithImages.sort(function(a, b) {
-    return magicScore(b, engagement, mc) - magicScore(a, engagement, mc);
-  });
-
-  var deckArticles = unreadWithImages.slice(0, 7);
-  var restArticles = unreadWithImages.slice(7, 25);
-
-  // Also include articles without images in the cards grid
-  var unreadNoImages = allFiles.filter(function(f) {
-    return !readArticles.has(f.filename) && !f.image && f.feed !== 'weekly-review' && f.feed !== 'daily-review' && f.domain !== 'pullread';
-  });
-  unreadNoImages.sort(function(a, b) {
-    return magicScore(b, engagement, mc) - magicScore(a, engagement, mc);
-  });
-  restArticles = restArticles.concat(unreadNoImages.slice(0, 10));
-
-  if (deckArticles.length === 0 && restArticles.length === 0) {
-    html += '<p style="color:var(--muted);padding:20px;text-align:center">No unread articles</p></div>';
-    return html;
-  }
-
-  html += '<div class="spotlight-layout">';
-
-  // Story deck (left column)
-  if (deckArticles.length > 0) {
-    html += '<div class="spotlight-deck" id="spotlight-deck">';
-
-    // Dots
-    html += '<div class="spotlight-deck-dots">';
-    for (var di = 0; di < deckArticles.length; di++) {
-      html += '<span class="spotlight-deck-dot' + (di === 0 ? ' active' : '') + '" onclick="spotlightGoTo(' + di + ')"></span>';
-    }
-    html += '</div>';
-
-    // Nav buttons
-    html += '<button class="spotlight-deck-nav prev" onclick="spotlightPrev()" aria-label="Previous">&#8249;</button>';
-    html += '<button class="spotlight-deck-nav next" onclick="spotlightNext()" aria-label="Next">&#8250;</button>';
-
-    // Slide track
-    html += '<div class="spotlight-deck-track" id="spotlight-deck-track">';
-    for (var si = 0; si < deckArticles.length; si++) {
-      var a = deckArticles[si];
-      var sec = resolveSection(a.filename);
-      var color = sectionColor(sec);
-      var secLabel = SECTION_LABELS[sec] || sec;
-
-      html += '<div class="spotlight-slide" onclick="dashLoadArticle(\'' + escapeJsStr(a.filename) + '\')">';
-      html += '<img src="' + escapeHtml(a.image) + '" alt="" loading="' + (si === 0 ? 'eager' : 'lazy') + '" onerror="this.style.display=\'none\'">';
-      html += '<div class="spotlight-slide-body">';
-      html += '<span class="spotlight-slide-section" style="background:' + color + '">' + escapeHtml(secLabel) + '</span>';
-      html += '<div class="spotlight-slide-title">' + escapeHtml(a.title) + '</div>';
-      html += '<div class="spotlight-slide-meta">' + escapeHtml(a.domain || a.feed || '') + (a.bookmarked ? ' &middot; ' + timeAgo(a.bookmarked) : '') + '</div>';
-      html += '</div></div>';
-    }
-    html += '</div>'; // track
-    html += '</div>'; // deck
-  }
-
-  // Media cards grid (right area)
-  html += '<div class="spotlight-cards" id="spotlight-cards">';
-  if (restArticles.length > 0) {
-    for (var ri = 0; ri < restArticles.length; ri++) {
-      var a = restArticles[ri];
-      var sec = resolveSection(a.filename);
-      var color = sectionColor(sec);
-      var secLabel = SECTION_LABELS[sec] || sec;
-      // First 2 cards are large if they have images
-      var isLarge = ri < 2 && a.image;
-      var sizeClass = isLarge ? ' spotlight-card-large' : '';
-
-      html += '<div class="spotlight-card' + sizeClass + '" onclick="dashLoadArticle(\'' + escapeJsStr(a.filename) + '\')">';
-      if (a.image) {
-        html += '<img src="' + escapeHtml(a.image) + '" alt="" loading="lazy" onerror="this.remove()">';
-      }
-      html += '<div class="spotlight-card-body">';
-      html += '<div class="spotlight-card-title">' + escapeHtml(a.title) + '</div>';
-      html += '<div class="spotlight-card-meta">';
-      html += '<span class="spotlight-card-section" style="background:' + color + '">' + escapeHtml(secLabel) + '</span>';
-      html += '<span>' + escapeHtml(a.domain || a.feed || '') + '</span>';
-
-      // Source engagement mini bar (5 bars)
-      var key = a.feed || a.domain || 'unknown';
-      var eng = engagement[key] || 0;
-      var engLevel = Math.round(eng * 5);
-      html += '<span class="spotlight-card-engagement">';
-      for (var bi = 0; bi < 5; bi++) {
-        var h = 3 + bi * 2;
-        html += '<span class="spotlight-card-bar' + (bi < engLevel ? ' filled' : '') + '" style="height:' + h + 'px"></span>';
-      }
-      html += '</span>';
-
-      if (a.bookmarked) html += '<span>' + timeAgo(a.bookmarked) + '</span>';
-      html += '</div>'; // meta
-      html += '</div>'; // body
-      html += '</div>'; // card
-    }
-  } else {
-    html += '<p style="color:var(--muted);padding:20px">No additional articles</p>';
-  }
-  html += '</div>'; // .spotlight-cards
-
-  html += '</div>'; // .spotlight-layout
-  html += '</div>';
-  return html;
-}
-
-var _spotlightIndex = 0;
-var _spotlightTimer = null;
-
-function spotlightGoTo(index) {
-  var deck = document.getElementById('spotlight-deck');
-  if (!deck) return;
-  var track = document.getElementById('spotlight-deck-track');
-  var dots = deck.querySelectorAll('.spotlight-deck-dot');
-  var count = dots.length;
-  if (index < 0) index = count - 1;
-  if (index >= count) index = 0;
-  _spotlightIndex = index;
-  track.style.transform = 'translateX(-' + (index * 100) + '%)';
-  for (var i = 0; i < dots.length; i++) {
-    dots[i].classList.toggle('active', i === index);
-  }
-  spotlightResetTimer();
-}
-
-function spotlightNext() { spotlightGoTo(_spotlightIndex + 1); }
-function spotlightPrev() { spotlightGoTo(_spotlightIndex - 1); }
-
-function spotlightResetTimer() {
-  clearInterval(_spotlightTimer);
-  if (window.innerWidth > 700) {
-    _spotlightTimer = setInterval(function() {
-      spotlightGoTo(_spotlightIndex + 1);
-    }, 8000);
-  }
-}
-
-function initSpotlightDeck() {
-  var deck = document.getElementById('spotlight-deck');
-  if (!deck) return;
-  _spotlightIndex = 0;
-  spotlightResetTimer();
-
-  deck.addEventListener('mouseenter', function() { clearInterval(_spotlightTimer); });
-  deck.addEventListener('mouseleave', function() { spotlightResetTimer(); });
-
-  // Swipe support
-  var startX = 0;
-  deck.addEventListener('touchstart', function(e) {
-    startX = e.touches[0].clientX;
-    clearInterval(_spotlightTimer);
-  }, { passive: true });
-  deck.addEventListener('touchend', function(e) {
-    var dx = e.changedTouches[0].clientX - startX;
-    if (Math.abs(dx) > 40) {
-      dx > 0 ? spotlightPrev() : spotlightNext();
-    } else {
-      spotlightResetTimer();
-    }
-  }, { passive: true });
-}
-
-// Rundown deck navigation (parallel to spotlight deck)
+// Rundown deck navigation
 var _rundownDeckIndex = 0;
 var _rundownDeckTimer = null;
 
@@ -551,6 +304,94 @@ function initRundownDeck() {
   }, { passive: true });
 }
 
+function briefingCacheTTL() {
+  // Apple Intelligence: 2 hours; other providers: 3 hours
+  return llmProvider === 'apple' ? 2 * 60 * 60 * 1000 : 3 * 60 * 60 * 1000;
+}
+
+function loadBriefing(forceRefresh) {
+  var body = document.getElementById('rundown-briefing-body');
+  if (!body) return;
+
+  // Check localStorage cache with TTL
+  if (!forceRefresh) {
+    try {
+      var raw = localStorage.getItem('pr-briefing-cache');
+      if (raw) {
+        var cached = JSON.parse(raw);
+        var age = Date.now() - (cached._ts || 0);
+        if (age < briefingCacheTTL()) {
+          renderBriefing(cached);
+          return;
+        }
+      }
+    } catch (e) { /* fall through to fetch */ }
+  }
+
+  // Show skeleton
+  body.innerHTML = '<div class="briefing-skeleton"><div class="skeleton-line w80"></div><div class="skeleton-line w60"></div><div class="skeleton-line w90"></div><div class="skeleton-line w70"></div></div>';
+
+  fetch('/api/briefing?days=1')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) {
+        if (data.error.indexOf('No recent') !== -1) {
+          body.innerHTML = '<p class="briefing-hint">All caught up — no articles to brief on.</p>';
+        } else {
+          body.innerHTML = '<p class="briefing-hint">Could not load briefing</p>';
+        }
+        return;
+      }
+      data._ts = Date.now();
+      localStorage.setItem('pr-briefing-cache', JSON.stringify(data));
+      renderBriefing(data);
+    })
+    .catch(function() {
+      body.innerHTML = '<p class="briefing-hint">Could not load briefing</p>';
+    });
+}
+
+function renderBriefing(data) {
+  var body = document.getElementById('rundown-briefing-body');
+  if (!body) return;
+
+  var html = sanitizeHtml(marked.parse(cleanMarkdown(data.briefing)));
+  body.innerHTML = html;
+
+  // Post-process: make bold text matching article titles clickable (on live DOM)
+  if (data.articles && data.articles.length > 0) {
+    var strongs = body.querySelectorAll('strong');
+    function normTitle(s) {
+      return s.toLowerCase().replace(/[\u2018\u2019\u201C\u201D]/g, "'").replace(/[^\w\s']/g, '').replace(/\s+/g, ' ').trim();
+    }
+    for (var si = 0; si < strongs.length; si++) {
+      var text = strongs[si].textContent;
+      var boldNorm = normTitle(text);
+      if (boldNorm.length < 4) continue;
+      var match = null;
+      for (var ai = 0; ai < data.articles.length; ai++) {
+        var art = data.articles[ai];
+        if (!art.filename) continue;
+        var titleNorm = normTitle(art.title);
+        if (titleNorm === boldNorm || titleNorm.indexOf(boldNorm) !== -1 || boldNorm.indexOf(titleNorm) !== -1) {
+          match = art;
+          break;
+        }
+      }
+      if (match) {
+        var link = document.createElement('a');
+        link.className = 'briefing-article-link';
+        link.textContent = text;
+        link.setAttribute('data-filename', match.filename);
+        link.onclick = (function(fn) {
+          return function(e) { e.preventDefault(); dashLoadArticle(fn); };
+        })(match.filename);
+        strongs[si].replaceWith(link);
+      }
+    }
+  }
+}
+
 function renderHub() {
   var dash = document.getElementById('dashboard');
   if (!dash) return;
@@ -581,13 +422,10 @@ function renderHub() {
   var activeTab = getHomeTab();
   var tabs = [
     { id: 'rundown', label: 'Rundown' },
-    { id: 'brief', label: 'Brief' },
-    { id: 'sections', label: 'Sections' },
-    { id: 'spotlight', label: 'Spotlight' },
-    { id: 'sources', label: 'Sources' },
-    { id: 'stats', label: 'Stats' },
-    { id: 'tags', label: 'Tags' }
+    { id: 'stats', label: 'Stats' }
   ];
+  // Migrate anyone who had a removed tab saved
+  if (['brief', 'tags', 'sources', 'sections', 'spotlight'].indexOf(activeTab) !== -1) { activeTab = 'rundown'; setHomeTab('rundown'); }
   html += '<div class="explore-tabs">';
   for (var ti = 0; ti < tabs.length; ti++) {
     var isActive = tabs[ti].id === activeTab;
@@ -600,19 +438,11 @@ function renderHub() {
   var engagement = computeSourceEngagement();
   var mc = getMixerConfig();
 
-  // Build Home variant tabs
+  // Build tab content
   var rundownHtml = buildRundownTab(engagement, mc);
-  var briefHtml = buildBriefTab(engagement, mc);
-  var sectionsHtml = buildSectionsTab(engagement, mc);
-  var spotlightHtml = buildSpotlightTab(engagement, mc);
 
   html += '<div id="explore-rundown" class="explore-tab-panel' + (activeTab === 'rundown' ? ' active' : '') + '">' + rundownHtml + '</div>';
-  html += '<div id="explore-brief" class="explore-tab-panel' + (activeTab === 'brief' ? ' active' : '') + '">' + briefHtml + '</div>';
-  html += '<div id="explore-sections" class="explore-tab-panel' + (activeTab === 'sections' ? ' active' : '') + '">' + sectionsHtml + '</div>';
-  html += '<div id="explore-spotlight" class="explore-tab-panel' + (activeTab === 'spotlight' ? ' active' : '') + '">' + spotlightHtml + '</div>';
-  html += '<div id="explore-sources" class="explore-tab-panel' + (activeTab === 'sources' ? ' active' : '') + '">' + buildSourcesHtml(data) + '</div>';
   html += '<div id="explore-stats" class="explore-tab-panel' + (activeTab === 'stats' ? ' active' : '') + '">' + buildStatsTabHtml(data) + '</div>';
-  html += '<div id="explore-tags" class="explore-tab-panel' + (activeTab === 'tags' ? ' active' : '') + '">' + buildTagsTabHtml(data) + '</div>';
 
   dash.innerHTML = html;
 
@@ -625,17 +455,15 @@ function renderHub() {
       var tabId = btn.dataset.tab;
       document.getElementById('explore-' + tabId).classList.add('active');
       setHomeTab(tabId);
-      // Manage auto-advance timers
-      if (tabId === 'spotlight') spotlightResetTimer();
-      else if (_spotlightTimer) { clearInterval(_spotlightTimer); _spotlightTimer = null; }
+      // Manage auto-advance timer
       if (tabId === 'rundown') rundownDeckResetTimer();
       else if (_rundownDeckTimer) { clearInterval(_rundownDeckTimer); _rundownDeckTimer = null; }
     });
   });
 
   requestAnimationFrame(initDashChevrons);
-  requestAnimationFrame(initSpotlightDeck);
   requestAnimationFrame(initRundownDeck);
+  requestAnimationFrame(function() { loadBriefing(false); });
 
   // If audio is queued, switch to mini player so controls stay visible in sidebar
   if (typeof ttsQueue !== 'undefined' && ttsQueue.length > 0) {

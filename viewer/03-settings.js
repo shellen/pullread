@@ -1191,6 +1191,30 @@ function showSettingsPage(scrollToSection) {
       h += '<div class="setting-control"><input type="checkbox" id="sp-autotag"' + (data.autoTag ? ' checked' : '') + ' onchange="settingsPageSaveAutoTag()" style="width:18px;height:18px;accent-color:var(--link)"></div>';
       h += '</div>';
 
+      // Batch tagging actions
+      var taggedCount = allFiles.filter(function(f) { var n = allNotesIndex[f.filename]; return n && ((n.tags && n.tags.length) || (n.machineTags && n.machineTags.length)); }).length;
+      var totalArticles = allFiles.length;
+      var untaggedCount = totalArticles - taggedCount;
+      h += '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">';
+      h += '<div class="setting-label"><label>Batch Tagging</label><div class="setting-desc">' + taggedCount + ' of ' + totalArticles + ' articles tagged';
+      if (untaggedCount > 0) h += ', ' + untaggedCount + ' remaining';
+      h += '</div></div>';
+      h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">';
+      h += '<button class="tag-pill" id="batch-tag-btn" onclick="batchAutotagAll(false)" title="Tag untagged articles using AI"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-wand"/></svg> Tag Untagged</button>';
+      h += '<button class="tag-pill" onclick="batchAutotagAll(true)" title="Re-tag all articles, replacing existing AI tags"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-refresh"/></svg> Retag All</button>';
+      h += '</div></div>';
+
+      // Blocked tags
+      if (typeof blockedTags !== 'undefined' && blockedTags.size > 0) {
+        h += '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">';
+        h += '<div class="setting-label"><label>Blocked Tags</label><div class="setting-desc">These tags are hidden from your tag views</div></div>';
+        h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">';
+        blockedTags.forEach(function(tag) {
+          h += '<button class="tag-pill tag-pill-blocked" onclick="unblockTag(\'' + escapeJsStr(tag) + '\');showSettingsPage(\'reading\')">' + escapeHtml(tag) + ' <span style="opacity:0.6">unblock</span></button>';
+        });
+        h += '</div></div>';
+      }
+
       sec.innerHTML = h;
     }).catch(function() {
       var sec = document.getElementById('settings-ai');

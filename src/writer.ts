@@ -276,7 +276,7 @@ export interface Notebook {
   id: string;
   title: string;
   content?: string;
-  notes?: Array<{ text: string; source?: string }>;
+  notes?: Array<{ id: string; content: string; sourceArticle?: string; createdAt: string; updatedAt: string }>;
   sources?: string[];
   tags?: string[];
   createdAt: string;
@@ -285,7 +285,11 @@ export interface Notebook {
 
 /** Export a notebook as markdown to outputPath/notebooks/{slug}.md */
 export function exportNotebook(outputPath: string, notebook: Notebook): string {
-  const slug = (notebook.title || notebook.id)
+  const dir = join(outputPath, 'notebooks');
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+
+  // Clean up any stale export files from previous title
+  const slugify = (s: string) => s
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\u00df/g, 'ss')
@@ -293,9 +297,17 @@ export function exportNotebook(outputPath: string, notebook: Notebook): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 60);
+
+  // Use "notebook" as the canonical filename for the single shared notebook
+  const slug = 'notebook';
   const filename = `${slug}.md`;
-  const dir = join(outputPath, 'notebooks');
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+
+  // Remove old file if title-based slug differs
+  const oldSlug = slugify(notebook.title || notebook.id);
+  if (oldSlug !== slug) {
+    const oldPath = join(dir, `${oldSlug}.md`);
+    try { if (existsSync(oldPath)) unlinkSync(oldPath); } catch {}
+  }
 
   const tags = (notebook.tags && notebook.tags.length > 0)
     ? `\ntags: [${notebook.tags.map(t => `"${t}"`).join(', ')}]`
@@ -303,13 +315,10 @@ export function exportNotebook(outputPath: string, notebook: Notebook): string {
 
   let body = '';
   if (notebook.notes && notebook.notes.length > 0) {
-    body += '## Notes\n\n';
     for (const note of notebook.notes) {
-      body += `- ${note.text}`;
-      if (note.source) body += ` *(${note.source})*`;
-      body += '\n';
+      if (!note.content || !note.content.trim()) continue;
+      body += note.content.trim() + '\n\n---\n\n';
     }
-    body += '\n';
   }
   if (notebook.content) {
     body += notebook.content + '\n';
@@ -322,7 +331,7 @@ export function exportNotebook(outputPath: string, notebook: Notebook): string {
   }
 
   const md = `---
-title: "${notebook.title.replace(/"/g, '\\"')}"
+title: "Notebook"
 created: ${notebook.createdAt}
 updated: ${notebook.updatedAt}${tags}
 ---
@@ -335,7 +344,12 @@ ${body}`;
 
 /** Remove an exported notebook markdown file */
 export function removeExportedNotebook(outputPath: string, notebook: Notebook): void {
-  const slug = (notebook.title || notebook.id)
+  const dir = join(outputPath, 'notebooks');
+  // Remove canonical file
+  const filepath = join(dir, 'notebook.md');
+  try { if (existsSync(filepath)) unlinkSync(filepath); } catch {}
+  // Also remove any stale title-based file
+  const oldSlug = (notebook.title || notebook.id)
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\u00df/g, 'ss')
@@ -343,8 +357,10 @@ export function removeExportedNotebook(outputPath: string, notebook: Notebook): 
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 60);
-  const filepath = join(outputPath, 'notebooks', `${slug}.md`);
-  try { if (existsSync(filepath)) unlinkSync(filepath); } catch {}
+  if (oldSlug !== 'notebook') {
+    const oldPath = join(dir, `${oldSlug}.md`);
+    try { if (existsSync(oldPath)) unlinkSync(oldPath); } catch {}
+  }
 }
 
 /** Download a site's favicon and save it locally for privacy */

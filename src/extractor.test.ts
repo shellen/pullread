@@ -281,6 +281,17 @@ describe('stripEmbedNoise', () => {
     expect(result).toBe(md);
   });
 
+  test('cleans up broken Instagram embed blockquotes', () => {
+    const md = 'Some text.\n\n> [\n> \n> View this post on Instagram\n> \n> ](https://www.instagram.com/reel/DU6T0f4jOEX/?utm_source=ig_embed&utm_campaign=loading)\n> \n> [A post shared by 404 Media (@404mediaco)](https://www.instagram.com/reel/DU6T0f4jOEX/?utm_source=ig_embed&utm_campaign=loading)\n\nMore text.';
+    const result = stripEmbedNoise(md);
+    expect(result).not.toContain('> [');
+    expect(result).not.toContain('> ]');
+    expect(result).toContain('[View this post on Instagram](https://www.instagram.com/reel/DU6T0f4jOEX/');
+    expect(result).toContain('A post shared by 404 Media');
+    expect(result).toContain('Some text.');
+    expect(result).toContain('More text.');
+  });
+
   test('strips Google AdSense script remnants', () => {
     const md = 'Article content.\n\n(adsbygoogle = window.adsbygoogle || []).push({});\n\nMore content.';
     const result = stripEmbedNoise(md);

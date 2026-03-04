@@ -1162,6 +1162,23 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
       return;
     }
 
+    // AI briefing
+    if (url.pathname === '/api/briefing' && req.method === 'GET') {
+      try {
+        const days = parseInt(url.searchParams.get('days') || '1', 10);
+        const { generateBriefing } = await import('./review');
+        const result = await generateBriefing(outputPath, days);
+        if (!result) {
+          sendJson(res, { error: 'No recent articles for a briefing' });
+        } else {
+          sendJson(res, result);
+        }
+      } catch (err: any) {
+        sendJson(res, { error: err.message || 'Failed to generate briefing' });
+      }
+      return;
+    }
+
     // Feed title discovery
     if (url.pathname === '/api/feed-title' && req.method === 'GET') {
       const feedUrl = url.searchParams.get('url');
