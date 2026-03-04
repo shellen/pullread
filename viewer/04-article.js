@@ -8,7 +8,120 @@ function setHomeTab(tab) {
 }
 
 function buildBriefTab(engagement, mc) {
-  return '<div class="brief-tab"><p style="color:var(--muted);padding:20px">Brief tab — coming soon</p></div>';
+  var html = '<div class="brief-tab">';
+
+  // Count unread articles per section
+  var sectionUnread = {};
+  var totalUnread = 0;
+  for (var i = 0; i < allFiles.length; i++) {
+    var f = allFiles[i];
+    if (readArticles.has(f.filename)) continue;
+    if (f.feed === 'weekly-review' || f.feed === 'daily-review' || f.domain === 'pullread') continue;
+    var sec = resolveSection(f.filename);
+    sectionUnread[sec] = (sectionUnread[sec] || 0) + 1;
+    totalUnread++;
+  }
+
+  // Sort sections by unread count descending
+  var sortedSections = Object.keys(sectionUnread).sort(function(a, b) {
+    return sectionUnread[b] - sectionUnread[a];
+  });
+
+  if (totalUnread === 0) {
+    html += '<p style="color:var(--muted);padding:20px;text-align:center">All caught up</p>';
+    html += '</div>';
+    return html;
+  }
+
+  // Mini treemap — colored blocks proportional to unread count
+  html += '<div class="brief-treemap">';
+  for (var si = 0; si < sortedSections.length; si++) {
+    var sec = sortedSections[si];
+    var count = sectionUnread[sec];
+    var grow = Math.max(Math.round(count / totalUnread * 20), 1);
+    var color = sectionColor(sec);
+    var label = SECTION_LABELS[sec] || sec;
+    html += '<div class="brief-treemap-block" style="flex-grow:' + grow + ';background:' + color + '" onclick="document.getElementById(\'search\').value=\'section:' + escapeJsStr(sec) + '\';filterFiles()">';
+    html += '<span class="brief-treemap-label">' + escapeHtml(label) + '</span>';
+    html += '<span class="brief-treemap-count">' + count + '</span>';
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // Score all unread articles
+  var unreadArticles = allFiles.filter(function(f) {
+    return !readArticles.has(f.filename) && f.feed !== 'weekly-review' && f.feed !== 'daily-review' && f.domain !== 'pullread';
+  });
+  unreadArticles.sort(function(a, b) {
+    return magicScore(b, engagement, mc) - magicScore(a, engagement, mc);
+  });
+
+  // Lead story — highest scoring unread article
+  if (unreadArticles.length > 0) {
+    var lead = unreadArticles[0];
+    html += '<div class="brief-lead" onclick="dashLoadArticle(\'' + escapeJsStr(lead.filename) + '\')">';
+    if (lead.image) {
+      html += '<img src="' + escapeHtml(lead.image) + '" alt="" loading="eager" onerror="this.remove()">';
+    }
+    html += '<div class="brief-lead-body">';
+    html += '<div class="brief-lead-title">' + escapeHtml(lead.title) + '</div>';
+    html += '<div class="brief-lead-meta">' + escapeHtml(lead.domain || lead.feed || '') + (lead.bookmarked ? ' &middot; ' + timeAgo(lead.bookmarked) : '') + '</div>';
+    if (lead.excerpt) {
+      html += '<div class="brief-lead-excerpt">' + escapeHtml(lead.excerpt) + '</div>';
+    }
+    html += '</div></div>';
+  }
+
+  // Section headlines — group unread articles by section, up to 3 per section
+  var sectionArticles = {};
+  for (var ai = 0; ai < unreadArticles.length; ai++) {
+    var a = unreadArticles[ai];
+    var sec = resolveSection(a.filename);
+    if (!sectionArticles[sec]) sectionArticles[sec] = [];
+    if (sectionArticles[sec].length < 3) sectionArticles[sec].push(a);
+  }
+
+  for (var si2 = 0; si2 < sortedSections.length; si2++) {
+    var sec = sortedSections[si2];
+    var articles = sectionArticles[sec];
+    if (!articles || articles.length === 0) continue;
+    var color = sectionColor(sec);
+    var label = SECTION_LABELS[sec] || sec;
+
+    html += '<div class="brief-section-group">';
+    html += '<div class="brief-section-name"><span class="brief-section-dot" style="background:' + color + '"></span>' + escapeHtml(label) + '</div>';
+    for (var hi = 0; hi < articles.length; hi++) {
+      var a = articles[hi];
+      html += '<div class="brief-headline-row" onclick="dashLoadArticle(\'' + escapeJsStr(a.filename) + '\')">';
+      html += '<span class="brief-headline-title">' + escapeHtml(a.title) + '</span>';
+      html += '<span class="brief-headline-source">' + escapeHtml(a.domain || a.feed || '') + '</span>';
+      if (a.bookmarked) html += '<span class="brief-headline-time">' + timeAgo(a.bookmarked) + '</span>';
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+
+  // Continue reading
+  var positions = JSON.parse(localStorage.getItem('pr-scroll-positions') || '{}');
+  var continueReading = allFiles.filter(function(f) {
+    var pos = positions[f.filename];
+    return pos && pos.pct > 0.05 && pos.pct < 0.9;
+  }).sort(function(a, b) {
+    return (positions[b.filename].ts || 0) - (positions[a.filename].ts || 0);
+  }).slice(0, 3);
+
+  if (continueReading.length > 0) {
+    html += '<div class="dash-section">';
+    html += '<div class="dash-section-header"><span class="dash-section-title">Continue Reading</span></div>';
+    html += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards">';
+    for (var ci = 0; ci < continueReading.length; ci++) {
+      html += dashCardHtml(continueReading[ci], positions[continueReading[ci].filename] ? positions[continueReading[ci].filename].pct : undefined, ci === 0 ? 'featured' : 'standard');
+    }
+    html += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
+  }
+
+  html += '</div>';
+  return html;
 }
 
 function buildSectionsTab(engagement, mc) {
