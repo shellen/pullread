@@ -2247,6 +2247,10 @@
         .querySelectorAll(".sidebar-tab")
         .forEach((t) => t.classList.remove("active"));
       el.classList.add("active");
+      // Clear nav-item active state when switching tabs
+      document
+        .querySelectorAll(".nav-item")
+        .forEach((n) => n.classList.remove("active"));
     }
 
     function openMobileSidebar() {
