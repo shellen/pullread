@@ -1068,6 +1068,8 @@
   }
   .toolbar-action-btn.active-fav { color: #d97706; }
   .toolbar-action-btn.active-fav:hover { color: #b45309; }
+  .toolbar-action-btn.active-read { opacity: 0.45; }
+  .toolbar-action-btn.active-read:hover { opacity: 0.7; }
   .reader-toolbar-right {
     display: flex;
     align-items: center;

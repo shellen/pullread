@@ -899,7 +899,8 @@ function renderArticle(text, filename) {
   var toolbarActions = '';
   const isFav = articleNotes.isFavorite;
   toolbarActions += '<button onclick="toggleFavoriteFromHeader(this)" class="toolbar-action-btn' + (isFav ? ' active-fav' : '') + '" aria-label="' + (isFav ? 'Remove star' : 'Star article') + '" aria-pressed="' + isFav + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg><span class="toolbar-action-label"> Star</span></button>';
-  toolbarActions += '<button onclick="markCurrentAsRead()" class="toolbar-action-btn" aria-label="Mark read"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-eye-slash"/></svg><span class="toolbar-action-label"> Mark read</span></button>';
+  var isRead = activeFile && readArticles.has(activeFile);
+  toolbarActions += '<button onclick="toggleReadFromHeader(this)" class="toolbar-action-btn' + (isRead ? ' active-read' : '') + '" aria-label="' + (isRead ? 'Mark unread' : 'Mark read') + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-eye-slash"/></svg><span class="toolbar-action-label"> ' + (isRead ? 'Unread' : 'Read') + '</span></button>';
   var isPodcast = meta && meta.enclosure_url && isMediaEnclosure(meta.enclosure_type);
   var isVideo = meta && isVideoEnclosure(meta.enclosure_type);
   var listenLabel = isVideo ? 'Watch' : isPodcast ? 'Play' : 'Listen';
