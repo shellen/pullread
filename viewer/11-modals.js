@@ -232,7 +232,7 @@ ln -sf "/Applications/Pull Read.app/Contents/Resources/binaries/pullread-cli-x86
       </tbody>
     </table>
 
-    <h2>FAQ</h2>
+    <h2 id="guide-faq">FAQ</h2>
 
     <h3>Where are my articles stored?</h3>
     <p>Articles are saved as Markdown files in the output folder you configure in Settings (e.g., <code>~/Dropbox/Articles</code>). They're plain text files you can open in any editor. Highlights, notes, and settings are stored in <code>~/.config/pullread/</code>.</p>
