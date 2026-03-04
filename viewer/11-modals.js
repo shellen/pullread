@@ -160,41 +160,6 @@ function showGuideModal() {
     <h2>Importing Bookmarks</h2>
     <p>Import bookmarks.html files exported from Chrome, Safari, Firefox, or Pocket directly from Settings or via the CLI with <code>pullread import &lt;file&gt;</code>.</p>
 
-    <h2>Command-Line Interface (CLI)</h2>
-    <p>PullRead bundles a CLI that the app uses behind the scenes to sync feeds, generate reviews, run auto-tagging, and more. You can also run it directly from Terminal to script or automate tasks.</p>
-
-    <h3>Running from Terminal</h3>
-    <p>The CLI binary lives inside the app bundle. To use it, create a symlink or alias. The binary name includes your Mac's architecture:</p>
-    <pre><code># Apple Silicon (M1/M2/M3/M4)
-ln -sf "/Applications/Pull Read.app/Contents/Resources/binaries/pullread-cli-aarch64-apple-darwin" /usr/local/bin/pullread
-
-# Intel
-ln -sf "/Applications/Pull Read.app/Contents/Resources/binaries/pullread-cli-x86_64-apple-darwin" /usr/local/bin/pullread</code></pre>
-    <p>Then run <code>pullread</code> with no arguments to see available commands.</p>
-
-    <h3>Commands</h3>
-    <table>
-      <thead><tr><th>Command</th><th>Description</th></tr></thead>
-      <tbody>
-        <tr><td><code>pullread sync</code></td><td>Sync all configured feeds</td></tr>
-        <tr><td><code>pullread sync --feed &lt;name&gt;</code></td><td>Sync a single feed by name</td></tr>
-        <tr><td><code>pullread sync --retry-failed</code></td><td>Retry previously failed URLs</td></tr>
-        <tr><td><code>pullread view</code></td><td>Open the article viewer in your browser</td></tr>
-        <tr><td><code>pullread view --port &lt;n&gt;</code></td><td>Use a custom port (default: 7777)</td></tr>
-        <tr><td><code>pullread summarize --batch</code></td><td>Summarize articles that don't have summaries yet</td></tr>
-        <tr><td><code>pullread summarize --min-size N</code></td><td>Skip articles under N characters (default: 500)</td></tr>
-        <tr><td><code>pullread autotag --batch</code></td><td>Generate machine tags for untagged articles</td></tr>
-        <tr><td><code>pullread autotag --batch --force</code></td><td>Re-tag all articles, including already tagged ones</td></tr>
-        <tr><td><code>pullread autotag --min-size N</code></td><td>Skip articles under N characters (default: 500)</td></tr>
-        <tr><td><code>pullread import &lt;file.html&gt;</code></td><td>Import bookmarks from an HTML file (Netscape format)</td></tr>
-        <tr><td><code>pullread review</code></td><td>Generate a weekly review of recent articles</td></tr>
-        <tr><td><code>pullread review --days N</code></td><td>Review the past N days (default: 7)</td></tr>
-      </tbody>
-    </table>
-
-    <h3>Configuration</h3>
-    <p>Feed configuration is stored at <code>~/.config/pullread/feeds.json</code> and articles are saved to the output folder specified in your config (default: <code>~/Documents/PullRead</code>). AI features (summarize, autotag, review) require a provider and API key configured in Settings or in <code>~/.config/pullread/settings.json</code>.</p>
-
     <h2>Keyboard Shortcuts</h2>
     <p>Shortcuts follow Google Reader conventions where possible.</p>
     <table>
@@ -232,31 +197,43 @@ ln -sf "/Applications/Pull Read.app/Contents/Resources/binaries/pullread-cli-x86
       </tbody>
     </table>
 
+    <h2>Command-Line Interface (CLI)</h2>
+    <p>PullRead bundles a CLI that the app uses behind the scenes to sync feeds, generate reviews, run auto-tagging, and more. You can also run it directly from Terminal to script or automate tasks.</p>
+
+    <h3>Running from Terminal</h3>
+    <p>The CLI binary lives inside the app bundle. To use it, create a symlink or alias. The binary name includes your Mac's architecture:</p>
+    <pre><code># Apple Silicon (M1/M2/M3/M4)
+ln -sf "/Applications/Pull Read.app/Contents/Resources/binaries/pullread-cli-aarch64-apple-darwin" /usr/local/bin/pullread
+
+# Intel
+ln -sf "/Applications/Pull Read.app/Contents/Resources/binaries/pullread-cli-x86_64-apple-darwin" /usr/local/bin/pullread</code></pre>
+    <p>Then run <code>pullread</code> with no arguments to see available commands.</p>
+
+    <h3>Commands</h3>
+    <table>
+      <thead><tr><th>Command</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>pullread sync</code></td><td>Sync all configured feeds</td></tr>
+        <tr><td><code>pullread sync --feed &lt;name&gt;</code></td><td>Sync a single feed by name</td></tr>
+        <tr><td><code>pullread sync --retry-failed</code></td><td>Retry previously failed URLs</td></tr>
+        <tr><td><code>pullread view</code></td><td>Open the article viewer in your browser</td></tr>
+        <tr><td><code>pullread view --port &lt;n&gt;</code></td><td>Use a custom port (default: 7777)</td></tr>
+        <tr><td><code>pullread summarize --batch</code></td><td>Summarize articles that don't have summaries yet</td></tr>
+        <tr><td><code>pullread summarize --min-size N</code></td><td>Skip articles under N characters (default: 500)</td></tr>
+        <tr><td><code>pullread autotag --batch</code></td><td>Generate machine tags for untagged articles</td></tr>
+        <tr><td><code>pullread autotag --batch --force</code></td><td>Re-tag all articles, including already tagged ones</td></tr>
+        <tr><td><code>pullread autotag --min-size N</code></td><td>Skip articles under N characters (default: 500)</td></tr>
+        <tr><td><code>pullread import &lt;file.html&gt;</code></td><td>Import bookmarks from an HTML file (Netscape format)</td></tr>
+        <tr><td><code>pullread review</code></td><td>Generate a weekly review of recent articles</td></tr>
+        <tr><td><code>pullread review --days N</code></td><td>Review the past N days (default: 7)</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Configuration</h3>
+    <p>Feed configuration is stored at <code>~/.config/pullread/feeds.json</code> and articles are saved to the output folder specified in your config (default: <code>~/Documents/PullRead</code>). AI features (summarize, autotag, review) require a provider and API key configured in Settings or in <code>~/.config/pullread/settings.json</code>.</p>
+
     <h2 id="guide-faq">FAQ</h2>
-
-    <h3>Where are my articles stored?</h3>
-    <p>Articles are saved as Markdown files in the output folder you configure in Settings (e.g., <code>~/Dropbox/Articles</code>). They're plain text files you can open in any editor. Highlights, notes, and settings are stored in <code>~/.config/pullread/</code>.</p>
-
-    <h3>Do I need an API key?</h3>
-    <p>Only for AI features (summaries, auto-tagging, reviews, and paid TTS). Reading, highlighting, searching, and browser TTS are all free with no API key. Apple Intelligence (macOS 26+) works without a key too.</p>
-
-    <h3>Is my data sent anywhere?</h3>
-    <p>Articles stay on your Mac. Data is only sent to an API when you explicitly use summaries, auto-tagging, or cloud TTS providers (OpenAI/ElevenLabs). Browser TTS is fully local. API keys are stored locally and never shared between features (your Summaries key is separate from your TTS key).</p>
-
-    <h3>Why can't PullRead extract some articles?</h3>
-    <p>Some sites use paywalls, bot detection, or JavaScript-only rendering that blocks extraction. Try enabling browser cookies in Settings to use your existing login sessions. You can also retry failed articles with <code>pullread sync --retry-failed</code>.</p>
-
-    <h3>How do I reset my reading history?</h3>
-    <p>Reading history is stored in your browser's localStorage. Clear it by opening developer tools (Cmd+Option+I), going to Application &rarr; Local Storage, and removing the <code>pr-read-articles</code> key.</p>
-
-    <h3>Can I script PullRead from Terminal?</h3>
-    <p>Yes. The app bundles a CLI binary that you can invoke directly. See the Command-Line Interface section above for the full list of commands.</p>
-
-    <h3>Am I allowed to save articles?</h3>
-    <p>Pull Read is intended for personal reading and archival. You are responsible for ensuring your use complies with applicable copyright laws and the terms of service of any websites you access. Only sync content you are authorized to copy. Do not use Pull Read to redistribute or commercially exploit content you do not have rights to.</p>
-
-    <h3>What happens when I use AI summaries?</h3>
-    <p>When you click Summarize, article text is sent to your selected LLM provider (Anthropic, OpenAI, Gemini, or OpenRouter) using your own API key. Apple Intelligence processes entirely on-device. Summaries are saved locally in the article's frontmatter. The same applies to auto-tagging and weekly reviews.</p>
+    <p>Have questions? See the <a href="#" onclick="prOpenExternal('https://pullread.com/faq');return false">FAQ on our website</a> for answers about storage, privacy, API keys, and more.</p>
 
     <h2>Support</h2>
     <p>Need help? Email us at <a href="#" onclick="prOpenExternal('mailto:support@alittledrive.com');return false">support@alittledrive.com</a> and we'll get back to you as soon as we can.</p>
