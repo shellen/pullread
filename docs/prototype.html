@@ -2253,6 +2253,16 @@
         .forEach((n) => n.classList.remove("active"));
     }
 
+    // Update active nav item on click
+    document.querySelector(".sidebar-nav").addEventListener("click", (e) => {
+      const item = e.target.closest(".nav-item");
+      if (!item) return;
+      document
+        .querySelectorAll(".nav-item")
+        .forEach((n) => n.classList.remove("active"));
+      item.classList.add("active");
+    });
+
     function openMobileSidebar() {
       const sidebar = document.querySelector(".sidebar");
       sidebar.classList.remove("collapsed");
