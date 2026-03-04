@@ -659,6 +659,8 @@ function writeSummaryToFile(filePath: string, summary: string, provider?: string
   writeFileSync(filePath, `${match[1]}${frontmatter}${match[3]}${match[4]}`);
 }
 
+let reimportActive = false;
+
 export async function reprocessFile(filePath: string, options?: { force?: boolean }): Promise<{ ok: boolean; title?: string; error?: string }> {
   try {
     assertWritablePath(filePath);
@@ -1780,64 +1782,75 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
 
     // Reimport all articles — SSE progress stream
     if (url.pathname === '/api/reimport-all' && req.method === 'POST') {
+      if (reimportActive) {
+        res.writeHead(409, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Reimport already in progress' }));
+        return;
+      }
+      reimportActive = true;
+
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
       });
 
-      const allFilePaths = listMarkdownFiles(outputPath);
+      try {
+        const allFilePaths = listMarkdownFiles(outputPath);
 
-      // Parse frontmatter to get URLs; skip files without a source URL
-      const filesWithUrls: { name: string; fullPath: string; domain: string }[] = [];
-      for (const fullPath of allFilePaths) {
-        const name = require('path').basename(fullPath);
-        try {
-          const content = readFileSync(fullPath, 'utf-8');
-          const meta = parseFrontmatter(content);
-          if (meta.url) {
-            let domain = '';
-            try { domain = new URL(meta.url).hostname; } catch {}
-            filesWithUrls.push({ name, fullPath, domain });
+        // Parse frontmatter to get URLs; skip files without a source URL
+        const filesWithUrls: { name: string; fullPath: string; domain: string }[] = [];
+        for (const fullPath of allFilePaths) {
+          const name = require('path').basename(fullPath);
+          try {
+            const content = readFileSync(fullPath, 'utf-8');
+            const meta = parseFrontmatter(content);
+            if (meta.url) {
+              let domain = '';
+              try { domain = new URL(meta.url).hostname; } catch {}
+              filesWithUrls.push({ name, fullPath, domain });
+            }
+          } catch {}
+        }
+
+        // Sort by domain to batch same-host requests
+        filesWithUrls.sort((a, b) => a.domain.localeCompare(b.domain));
+
+        const total = filesWithUrls.length;
+        let succeeded = 0;
+        let failed = 0;
+        let skipped = 0;
+        let lastDomain = '';
+
+        for (let i = 0; i < filesWithUrls.length; i++) {
+          const { name, fullPath, domain } = filesWithUrls[i];
+
+          // 1-second delay between requests to the same host
+          if (domain && domain === lastDomain) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
           }
-        } catch {}
-      }
+          lastDomain = domain;
 
-      // Sort by domain to batch same-host requests
-      filesWithUrls.sort((a, b) => a.domain.localeCompare(b.domain));
+          const result = await reprocessFile(fullPath);
+          const done = i + 1;
 
-      const total = filesWithUrls.length;
-      let succeeded = 0;
-      let failed = 0;
-      let skipped = 0;
-      let lastDomain = '';
-
-      for (let i = 0; i < filesWithUrls.length; i++) {
-        const { name, fullPath, domain } = filesWithUrls[i];
-
-        // 1-second delay between requests to the same host
-        if (domain && domain === lastDomain) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          if (result.ok) {
+            succeeded++;
+            res.write(`data: ${JSON.stringify({ done, total, current: name, ok: true })}\n\n`);
+          } else if (result.error?.includes('feed-sourced')) {
+            skipped++;
+            res.write(`data: ${JSON.stringify({ done, total, current: name, ok: true, skipped: true })}\n\n`);
+          } else {
+            failed++;
+            res.write(`data: ${JSON.stringify({ done, total, current: name, ok: false, error: result.error })}\n\n`);
+          }
         }
-        lastDomain = domain;
 
-        const result = await reprocessFile(fullPath);
-        const done = i + 1;
-
-        if (result.ok) {
-          succeeded++;
-          res.write(`data: ${JSON.stringify({ done, total, current: name, ok: true })}\n\n`);
-        } else if (result.error?.includes('feed-sourced')) {
-          skipped++;
-          res.write(`data: ${JSON.stringify({ done, total, current: name, ok: true, skipped: true })}\n\n`);
-        } else {
-          failed++;
-          res.write(`data: ${JSON.stringify({ done, total, current: name, ok: false, error: result.error })}\n\n`);
-        }
+        res.write(`data: ${JSON.stringify({ complete: true, succeeded, failed, skipped })}\n\n`);
+      } finally {
+        reimportActive = false;
+        res.end();
       }
-
-      res.write(`data: ${JSON.stringify({ complete: true, succeeded, failed, skipped })}\n\n`);
-      res.end();
       return;
     }
 

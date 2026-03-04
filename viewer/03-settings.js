@@ -1835,6 +1835,11 @@ function reimportAllArticles() {
     if (status) status.textContent = 'Reimporting... 0/' + count;
 
     fetch('/api/reimport-all', { method: 'POST' }).then(function(response) {
+      if (response.status === 409) {
+        if (status) status.textContent = 'Reimport already in progress.';
+        if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+        return;
+      }
       var reader = response.body.getReader();
       var decoder = new TextDecoder();
       var buffer = '';
