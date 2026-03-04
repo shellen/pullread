@@ -4703,7 +4703,7 @@
     align-items: center;
     gap: 5px;
     padding: 7px 14px;
-    border-radius: 20px;
+    border-radius: 8px;
     border: 1px solid var(--border);
     background: var(--bg);
     color: var(--fg);

@@ -359,8 +359,14 @@ function buildDiscoverTab(data) {
 
   var html = '<div class="discover-tab">';
 
-  // Filter chips
+  // Filter + tools chips (single row)
   html += '<div class="discover-chips">';
+  if (serverMode && llmConfigured) {
+    html += '<button class="discover-chip" onclick="dashGenerateReview(1)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Daily Review</button>';
+    html += '<button class="discover-chip" onclick="dashGenerateReview(7)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Weekly Review</button>';
+  }
+  html += '<button class="discover-chip" onclick="showGuideModal()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-book"/></svg> Guide</button>';
+  html += '<button class="discover-chip" onclick="showGuideModal();setTimeout(function(){var f=document.getElementById(\'guide-faq\');if(f)f.scrollIntoView({behavior:\'smooth\'})},100)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-comment"/></svg> FAQ</button>';
   for (var i = 0; i < chips.length; i++) {
     var c = chips[i];
     html += '<button class="discover-chip" onclick="document.getElementById(\'search\').value=\'' + escapeJsStr(c.query) + '\';filterFiles()">';
@@ -410,19 +416,6 @@ function buildDiscoverTab(data) {
     html += '</div>';
     html += '</div>';
   }
-
-  // Tools section: reviews, guide, FAQ
-  html += '<div class="discover-section">';
-  html += '<h3 class="discover-section-heading">Tools</h3>';
-  html += '<div class="discover-chips">';
-  if (serverMode && llmConfigured) {
-    html += '<button class="discover-chip" onclick="dashGenerateReview(1)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Daily Review</button>';
-    html += '<button class="discover-chip" onclick="dashGenerateReview(7)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Weekly Review</button>';
-  }
-  html += '<button class="discover-chip" onclick="showGuideModal()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-book"/></svg> Guide</button>';
-  html += '<button class="discover-chip" onclick="showGuideModal();setTimeout(function(){var f=document.getElementById(\'guide-faq\');if(f)f.scrollIntoView({behavior:\'smooth\'})},100)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-comment"/></svg> FAQ</button>';
-  html += '</div>';
-  html += '</div>';
 
   html += '</div>';
   return html;
