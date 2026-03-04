@@ -52,10 +52,6 @@
           <button class="toolbar-icon-btn" onclick="collapseSidebar()" aria-label="Collapse sidebar" title="Collapse ([)" id="sidebar-collapse-btn"><svg class="icon" aria-hidden="true"><use href="#i-chevron-left"/></svg></button>
         </div>
       </div>
-      <div class="sidebar-tabs" id="sidebar-tabs">
-        <button class="sidebar-tab active" data-tab="home" onclick="switchSidebarView('home')"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-home"/></svg> Explore</button>
-        <button class="sidebar-tab" data-tab="notebooks" onclick="switchSidebarView('notebooks')"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-pen"/></svg> Notebook</button>
-      </div>
       <div class="sidebar-search" role="search">
         <label for="search" class="sr-only">Search</label>
         <input type="text" id="search" placeholder="Search..." oninput="filterFiles()" />
@@ -66,10 +62,12 @@
       </div>
       <div class="pinned-filters" id="pinned-filters"></div>
       <nav class="sidebar-nav" id="sidebar-nav">
+        <button class="sidebar-nav-item" data-nav="explore" onclick="sidebarNavFilter('explore')"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-home"/></svg><span class="sidebar-nav-label">Explore</span></button>
         <button class="sidebar-nav-item active" data-nav="all" onclick="sidebarNavFilter('all')"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-inbox"/></svg><span class="sidebar-nav-label">All Items</span><span class="sidebar-nav-count" id="nav-count-all"></span></button>
         <button class="sidebar-nav-item" data-nav="sources" onclick="sidebarNavFilter('sources')"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-squares"/></svg><span class="sidebar-nav-label">Sources</span><span class="sidebar-nav-count" id="nav-count-sources"></span><svg class="icon icon-xs sidebar-nav-chevron" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
         <button class="sidebar-nav-item" data-nav="tags" onclick="sidebarNavFilter('tags')"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-tags"/></svg><span class="sidebar-nav-label">Tags</span><span class="sidebar-nav-count" id="nav-count-tags"></span><svg class="icon icon-xs sidebar-nav-chevron" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
         <button class="sidebar-nav-item" data-nav="starred" onclick="sidebarNavFilter('starred')"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-heart"/></svg><span class="sidebar-nav-label">Starred</span><span class="sidebar-nav-count" id="nav-count-starred"></span></button>
+        <button class="sidebar-nav-item" data-nav="notebook" onclick="sidebarNavFilter('notebook')"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-pen"/></svg><span class="sidebar-nav-label">Notebook</span></button>
       </nav>
       <div class="quick-add-row" id="quick-add-row" style="display:none">
         <input type="url" id="quick-add-input" placeholder="Paste article URL and press Enter" onkeydown="if(event.key==='Enter')quickAddUrl()" />

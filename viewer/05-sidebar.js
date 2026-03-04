@@ -763,14 +763,18 @@ function openSingleNotebook() {
 }
 
 function syncSidebarTabs() {
-  document.querySelectorAll('.sidebar-tab[data-tab]').forEach(function(t) {
-    t.classList.toggle('active', t.dataset.tab === _sidebarView);
-  });
+  // When switching to notebooks view, highlight notebook nav and dim others
+  if (_sidebarView === 'notebooks') {
+    document.querySelectorAll('.sidebar-nav-item').forEach(function(item) {
+      item.classList.toggle('active', item.dataset.nav === 'notebook');
+    });
+  }
 
-  // File list always visible; sort bar only on articles tab
+  // File list always visible; sort bar only on articles view
+  var isArticles = _sidebarView === 'home';
   var fileCount = document.getElementById('file-count');
   var fileList = document.getElementById('file-list');
-  if (fileCount) fileCount.style.display = _sidebarView === 'home' ? '' : 'none';
+  if (fileCount) fileCount.style.display = isArticles ? '' : 'none';
   if (fileList) fileList.style.display = '';
 
   // Update search placeholder contextually
@@ -780,17 +784,11 @@ function syncSidebarTabs() {
     else search.placeholder = 'Search...';
   }
 
-  // Pinned filters only apply to articles (home view)
+  // Pinned filters only apply to articles
   var pinnedContainer = document.getElementById('pinned-filters');
-  if (pinnedContainer) pinnedContainer.style.display = _sidebarView === 'home' ? '' : 'none';
+  if (pinnedContainer) pinnedContainer.style.display = isArticles ? '' : 'none';
   var pinBtn = document.getElementById('search-pin');
-  if (pinBtn && _sidebarView !== 'home') pinBtn.style.display = 'none';
-
-  // Sort toggles visibility handled by file-count container above
-
-  // Nav items only visible on home tab
-  var navEl = document.getElementById('sidebar-nav');
-  if (navEl) navEl.style.display = _sidebarView === 'home' ? '' : 'none';
+  if (pinBtn && !isArticles) pinBtn.style.display = 'none';
 }
 
 // ---- Sidebar nav filter (All Items / Sources / Tags / Unread / Starred) ----
@@ -801,16 +799,19 @@ function sidebarNavFilter(filter) {
   });
 
   var search = document.getElementById('search');
-  if (filter === 'all') {
+  if (filter === 'explore') {
+    closeDrawer();
+    switchSidebarView('home');
+    return;
+  } else if (filter === 'notebook') {
+    closeDrawer();
+    switchSidebarView('notebooks');
+    return;
+  } else if (filter === 'all') {
     if (search) search.value = '';
     clearSourceFilter();
     filterFiles();
     closeDrawer();
-    if (displayFiles.length > 0) loadFile(0);
-  } else if (filter === 'unread') {
-    if (search) search.value = 'is:unread';
-    closeDrawer();
-    filterFiles();
     if (displayFiles.length > 0) loadFile(0);
   } else if (filter === 'starred') {
     if (search) search.value = 'is:starred';

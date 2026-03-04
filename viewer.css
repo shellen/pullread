@@ -378,36 +378,6 @@
     gap: 2px;
   }
 
-  /* Sidebar tabs */
-  .sidebar-tabs {
-    display: flex;
-    flex-shrink: 0;
-    border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
-  }
-  .sidebar-tab {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    padding: 8px 4px;
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    color: var(--muted);
-    font-size: 12px;
-    font-weight: 500;
-    font-family: inherit;
-    cursor: pointer;
-    transition: color 0.12s, border-color 0.12s;
-  }
-  .sidebar-tab:hover { color: var(--fg); }
-  .sidebar-tab.active {
-    color: var(--fg);
-    border-bottom-color: var(--accent);
-  }
-  .sidebar-tab .icon { width: 14px; height: 14px; }
-
   /* Sidebar nav items */
   .sidebar-nav {
     display: flex;

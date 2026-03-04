@@ -711,6 +711,10 @@ function dashGenerateReview(days) {
 function goHome() {
   if (_markAsReadDelayTimer) { console.debug('[PR] goHome clearing markAsRead timer'); clearTimeout(_markAsReadDelayTimer); _markAsReadDelayTimer = null; }
   _sidebarView = 'home'; syncSidebarTabs();
+  // Highlight explore nav item
+  document.querySelectorAll('.sidebar-nav-item').forEach(function(item) {
+    item.classList.toggle('active', item.dataset.nav === 'explore');
+  });
   activeFile = null;
   _activeDrawerSource = null;
   updateDrawerActiveState();
