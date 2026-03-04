@@ -1,6 +1,24 @@
 // ABOUTME: Hub landing page (merged Home + Explore) and article rendering.
 // ABOUTME: renderHub() builds the tabbed hub; loadFile() renders individual articles.
-var _reviewGenInFlight = false;
+function getHomeTab() {
+  return localStorage.getItem('pr-home-tab') || 'brief';
+}
+function setHomeTab(tab) {
+  localStorage.setItem('pr-home-tab', tab);
+}
+
+function buildBriefTab(engagement, mc) {
+  return '<div class="brief-tab"><p style="color:var(--muted);padding:20px">Brief tab — coming soon</p></div>';
+}
+
+function buildSectionsTab(engagement, mc) {
+  return '<div class="sections-tab"><p style="color:var(--muted);padding:20px">Sections tab — coming soon</p></div>';
+}
+
+function buildSpotlightTab(engagement, mc) {
+  return '<div class="spotlight-tab"><p style="color:var(--muted);padding:20px">Spotlight tab — coming soon</p></div>';
+}
+
 function renderHub() {
   var dash = document.getElementById('dashboard');
   if (!dash) return;
@@ -22,150 +40,44 @@ function renderHub() {
   // --- Greeting ---
   var hour = new Date().getHours();
   var greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-  var unreadCount = allFiles.filter(function(f) { return !readArticles.has(f.filename); }).length;
 
   html += '<div class="dash-greeting">';
   html += '<h1>' + greeting + '</h1>';
   html += '</div>';
 
   // --- Tab bar ---
+  var activeTab = getHomeTab();
+  var tabs = [
+    { id: 'brief', label: 'Brief' },
+    { id: 'sections', label: 'Sections' },
+    { id: 'spotlight', label: 'Spotlight' },
+    { id: 'sources', label: 'Sources' },
+    { id: 'stats', label: 'Stats' },
+    { id: 'tags', label: 'Tags' }
+  ];
   html += '<div class="explore-tabs">';
-  html += '<button class="explore-tab active" data-tab="for-you">For You</button>';
-  html += '<button class="explore-tab" data-tab="sources">Sources</button>';
-  html += '<button class="explore-tab" data-tab="stats">Stats</button>';
-  html += '<button class="explore-tab" data-tab="tags">Tags</button>';
+  for (var ti = 0; ti < tabs.length; ti++) {
+    var isActive = tabs[ti].id === activeTab;
+    html += '<button class="explore-tab' + (isActive ? ' active' : '') + '" data-tab="' + tabs[ti].id + '">' + tabs[ti].label + '</button>';
+  }
   html += '</div>';
 
   // --- Tab content ---
   var data = collectExploreData();
+  var engagement = computeSourceEngagement();
+  var mc = getMixerConfig();
 
-  // For You tab
-  var forYouHtml = '';
+  // Build Home variant tabs
+  var briefHtml = buildBriefTab(engagement, mc);
+  var sectionsHtml = buildSectionsTab(engagement, mc);
+  var spotlightHtml = buildSpotlightTab(engagement, mc);
 
-  // Daily Rundown — topic briefing cards
-  forYouHtml += buildDailyRundownHtml();
-
-  // Section Rundown — articles grouped by editorial section
-  forYouHtml += buildSectionRundownHtml();
-
-  // Continue Reading
-  var positions = JSON.parse(localStorage.getItem('pr-scroll-positions') || '{}');
-  var continueReading = allFiles.filter(function(f) {
-    var pos = positions[f.filename];
-    return pos && pos.pct > 0.05 && pos.pct < 0.9;
-  }).sort(function(a, b) { return (positions[b.filename].ts || 0) - (positions[a.filename].ts || 0); }).slice(0, 3);
-
-  if (continueReading.length > 0) {
-    forYouHtml += '<div class="dash-section">';
-    forYouHtml += '<div class="dash-section-header">';
-    forYouHtml += '<span class="dash-section-title"><svg viewBox="0 0 384 512"><use href="#i-book"/></svg> Continue Reading</span>';
-    forYouHtml += '</div>';
-    forYouHtml += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards">';
-    for (var ci = 0; ci < continueReading.length; ci++) {
-      var crVariant = (ci === 0) ? 'featured' : 'standard';
-      forYouHtml += dashCardHtml(continueReading[ci], positions[continueReading[ci].filename] ? positions[continueReading[ci].filename].pct : undefined, crVariant);
-    }
-    forYouHtml += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
-  }
-
-  // Suggested Feeds
-  forYouHtml += '<div id="hub-suggested-feeds"></div>';
-
-  // Reviews
-  var reviews = allFiles.filter(function(f) { return f.feed === 'weekly-review' || f.feed === 'daily-review' || f.domain === 'pullread'; }).slice(0, 3);
-  var todayStr = new Date().toISOString().slice(0, 10);
-  var hasDaily = allFiles.some(function(f) { return f.filename && f.filename.indexOf('_daily-review-' + todayStr) >= 0; });
-  var threeDaysAgo = new Date(); threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-  var hasWeekly = allFiles.some(function(f) {
-    return f.feed === 'weekly-review' && f.bookmarked && new Date(f.bookmarked) >= threeDaysAgo;
-  });
-  var _missingDaily = !hasDaily;
-  var _missingWeekly = !hasWeekly;
-
-  if (reviews.length > 0 || (serverMode && (_missingDaily || _missingWeekly))) {
-    forYouHtml += '<div class="dash-section">';
-    forYouHtml += '<div class="dash-section-header"><span class="dash-section-title"><svg viewBox="0 0 512 512"><use href="#i-wand"/></svg> Reviews</span></div>';
-    forYouHtml += '<div class="dash-cards" style="overflow:visible;flex-wrap:wrap">';
-    for (var ri = 0; ri < reviews.length; ri++) {
-      var rf = reviews[ri];
-      var isWeekly = rf.feed === 'weekly-review';
-      var typeLabel = isWeekly ? 'Weekly' : 'Daily';
-      var rdate = rf.bookmarked ? rf.bookmarked.slice(0, 10) : '';
-      forYouHtml += '<div class="dash-review-card" onclick="dashLoadArticle(\'' + escapeHtml(rf.filename) + '\')">';
-      forYouHtml += '<div class="dash-review-title">' + escapeHtml(rf.title) + '</div>';
-      forYouHtml += '<div class="dash-review-meta">' + typeLabel + ' Review' + (rdate ? ' &middot; ' + rdate : '') + '</div>';
-      if (rf.excerpt) forYouHtml += '<div class="dash-review-excerpt">' + escapeHtml(rf.excerpt) + '</div>';
-      forYouHtml += '</div>';
-    }
-    if (serverMode && _missingDaily) {
-      forYouHtml += '<div class="dash-review-card dash-review-generating" id="daily-review-placeholder">';
-      forYouHtml += '<div class="dash-review-title">Generating Daily Review\u2026</div>';
-      forYouHtml += '<div class="dash-review-meta">Daily Review</div>';
-      forYouHtml += '</div>';
-    }
-    if (serverMode && _missingWeekly) {
-      forYouHtml += '<div class="dash-review-card dash-review-generating" id="weekly-review-placeholder">';
-      forYouHtml += '<div class="dash-review-title">Generating Weekly Review\u2026</div>';
-      forYouHtml += '<div class="dash-review-meta">Weekly Review</div>';
-      forYouHtml += '</div>';
-    }
-    forYouHtml += '</div></div>';
-  }
-
-  // Connections between articles via shared tags
-  var connectionsHtml = buildConnectionsHtml(data.tagArticles, data.sortedTags);
-  if (connectionsHtml) {
-    forYouHtml += '<div class="dash-section">';
-    forYouHtml += '<div class="dash-section-header"><span class="dash-section-title">Connections</span></div>';
-    forYouHtml += connectionsHtml;
-    forYouHtml += '</div>';
-  }
-
-  // Recent Unread
-  var recent = allFiles.filter(function(f) { return !readArticles.has(f.filename) && f.feed !== 'weekly-review' && f.feed !== 'daily-review' && f.domain !== 'pullread'; }).slice(0, 20);
-  if (recent.length > 0) {
-    forYouHtml += '<div class="dash-section">';
-    forYouHtml += '<div class="dash-section-header">';
-    forYouHtml += '<span class="dash-section-title"><svg viewBox="0 0 448 512"><use href="#i-calendar"/></svg> Recent <span class="dash-section-count">(' + recent.length + ')</span></span>';
-    if (unreadCount > recent.length) {
-      forYouHtml += '<button class="dash-view-all" onclick="document.getElementById(\'search\').focus()">View all ' + unreadCount + ' &rsaquo;</button>';
-    }
-    forYouHtml += '</div>';
-    forYouHtml += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards dash-cards-compact">';
-    for (var rci = 0; rci < recent.length; rci++) {
-      forYouHtml += dashCardHtml(recent[rci], undefined, 'compact');
-    }
-    forYouHtml += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
-  }
-
-  // Your Topics — top machine tags by frequency
-  var topTopics = data.sortedTags.filter(function(t) { return !blockedTags.has(t[0]); }).slice(0, 15);
-  if (topTopics.length > 0) {
-    forYouHtml += '<div class="dash-section">';
-    forYouHtml += '<div class="dash-section-header">';
-    forYouHtml += '<span class="dash-section-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-tag"/></svg> Your Topics</span>';
-    forYouHtml += '</div>';
-    forYouHtml += '<div class="your-topics">';
-    for (var ti = 0; ti < topTopics.length; ti++) {
-      var tagName = topTopics[ti][0];
-      var tagCount = topTopics[ti][1];
-      forYouHtml += '<button class="tag-pill" onclick="document.getElementById(\'search\').value=\'tag:\\x22' + escapeJsStr(tagName) + '\\x22\';filterFiles()">' + escapeHtml(tagName) + ' <span class="tag-count">' + tagCount + '</span></button>';
-    }
-    forYouHtml += '</div></div>';
-  }
-
-  // Quick actions at bottom of For You
-  forYouHtml += '<div class="dash-actions">';
-  forYouHtml += '<button onclick="dashGenerateReview(1)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Daily Review</button>';
-  forYouHtml += '<button onclick="dashGenerateReview(7)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Weekly Review</button>';
-  forYouHtml += '<button onclick="showGuideModal()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-book"/></svg> Guide</button>';
-  forYouHtml += '<button onclick="showTour()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-comment"/></svg> Tour</button>';
-  forYouHtml += '</div>';
-
-  html += '<div id="explore-for-you" class="explore-tab-panel active">' + forYouHtml + '</div>';
-  html += '<div id="explore-sources" class="explore-tab-panel">' + buildSourcesHtml(data) + '</div>';
-  html += '<div id="explore-stats" class="explore-tab-panel">' + buildStatsTabHtml(data) + '</div>';
-  html += '<div id="explore-tags" class="explore-tab-panel">' + buildTagsTabHtml(data) + '</div>';
+  html += '<div id="explore-brief" class="explore-tab-panel' + (activeTab === 'brief' ? ' active' : '') + '">' + briefHtml + '</div>';
+  html += '<div id="explore-sections" class="explore-tab-panel' + (activeTab === 'sections' ? ' active' : '') + '">' + sectionsHtml + '</div>';
+  html += '<div id="explore-spotlight" class="explore-tab-panel' + (activeTab === 'spotlight' ? ' active' : '') + '">' + spotlightHtml + '</div>';
+  html += '<div id="explore-sources" class="explore-tab-panel' + (activeTab === 'sources' ? ' active' : '') + '">' + buildSourcesHtml(data) + '</div>';
+  html += '<div id="explore-stats" class="explore-tab-panel' + (activeTab === 'stats' ? ' active' : '') + '">' + buildStatsTabHtml(data) + '</div>';
+  html += '<div id="explore-tags" class="explore-tab-panel' + (activeTab === 'tags' ? ' active' : '') + '">' + buildTagsTabHtml(data) + '</div>';
 
   dash.innerHTML = html;
 
@@ -175,7 +87,9 @@ function renderHub() {
       dash.querySelectorAll('.explore-tab').forEach(function(b) { b.classList.remove('active'); });
       dash.querySelectorAll('.explore-tab-panel').forEach(function(p) { p.classList.remove('active'); });
       btn.classList.add('active');
-      document.getElementById('explore-' + btn.dataset.tab).classList.add('active');
+      var tabId = btn.dataset.tab;
+      document.getElementById('explore-' + tabId).classList.add('active');
+      setHomeTab(tabId);
     });
   });
 
@@ -185,32 +99,6 @@ function renderHub() {
   // If audio is queued, switch to mini player so controls stay visible in sidebar
   if (typeof ttsQueue !== 'undefined' && ttsQueue.length > 0) {
     setPlayerMode('mini');
-  }
-
-  // Async: load suggested feeds
-  loadSuggestedFeedsSection();
-
-  // Background review generation
-  if (serverMode && !_reviewGenInFlight && (_missingDaily || _missingWeekly)) {
-    _reviewGenInFlight = true;
-    var jobs = [];
-    if (_missingDaily) jobs.push({ days: 1, id: 'daily-review-placeholder' });
-    if (_missingWeekly) jobs.push({ days: 7, id: 'weekly-review-placeholder' });
-    var promises = jobs.map(function(job) {
-      return fetch('/api/review', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ days: job.days })
-      }).then(function(r) { return r.json(); }).then(function(data) {
-        var el = document.getElementById(job.id);
-        if (el) el.remove();
-        if (!data.error) refreshArticleList(true);
-      }).catch(function() {
-        var el = document.getElementById(job.id);
-        if (el) el.remove();
-      });
-    });
-    Promise.allSettled(promises).then(function() { _reviewGenInFlight = false; });
   }
 }
 
