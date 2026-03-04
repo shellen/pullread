@@ -198,7 +198,172 @@ function buildSectionsTab(engagement, mc) {
 }
 
 function buildSpotlightTab(engagement, mc) {
-  return '<div class="spotlight-tab"><p style="color:var(--muted);padding:20px">Spotlight tab — coming soon</p></div>';
+  var html = '<div class="spotlight-tab">';
+
+  // Get top articles with images for story deck
+  var unreadWithImages = allFiles.filter(function(f) {
+    return !readArticles.has(f.filename) && f.image && f.feed !== 'weekly-review' && f.feed !== 'daily-review' && f.domain !== 'pullread';
+  });
+  unreadWithImages.sort(function(a, b) {
+    return magicScore(b, engagement, mc) - magicScore(a, engagement, mc);
+  });
+
+  var deckArticles = unreadWithImages.slice(0, 7);
+  var restArticles = unreadWithImages.slice(7, 25);
+
+  // Also include articles without images in the cards grid
+  var unreadNoImages = allFiles.filter(function(f) {
+    return !readArticles.has(f.filename) && !f.image && f.feed !== 'weekly-review' && f.feed !== 'daily-review' && f.domain !== 'pullread';
+  });
+  unreadNoImages.sort(function(a, b) {
+    return magicScore(b, engagement, mc) - magicScore(a, engagement, mc);
+  });
+  restArticles = restArticles.concat(unreadNoImages.slice(0, 10));
+
+  if (deckArticles.length === 0 && restArticles.length === 0) {
+    html += '<p style="color:var(--muted);padding:20px;text-align:center">No unread articles</p></div>';
+    return html;
+  }
+
+  html += '<div class="spotlight-layout">';
+
+  // Story deck (left column)
+  if (deckArticles.length > 0) {
+    html += '<div class="spotlight-deck" id="spotlight-deck">';
+
+    // Dots
+    html += '<div class="spotlight-deck-dots">';
+    for (var di = 0; di < deckArticles.length; di++) {
+      html += '<span class="spotlight-deck-dot' + (di === 0 ? ' active' : '') + '" onclick="spotlightGoTo(' + di + ')"></span>';
+    }
+    html += '</div>';
+
+    // Nav buttons
+    html += '<button class="spotlight-deck-nav prev" onclick="spotlightPrev()" aria-label="Previous">&#8249;</button>';
+    html += '<button class="spotlight-deck-nav next" onclick="spotlightNext()" aria-label="Next">&#8250;</button>';
+
+    // Slide track
+    html += '<div class="spotlight-deck-track" id="spotlight-deck-track">';
+    for (var si = 0; si < deckArticles.length; si++) {
+      var a = deckArticles[si];
+      var sec = resolveSection(a.filename);
+      var color = sectionColor(sec);
+      var secLabel = SECTION_LABELS[sec] || sec;
+
+      html += '<div class="spotlight-slide" onclick="dashLoadArticle(\'' + escapeJsStr(a.filename) + '\')">';
+      html += '<img src="' + escapeHtml(a.image) + '" alt="" loading="' + (si === 0 ? 'eager' : 'lazy') + '" onerror="this.style.display=\'none\'">';
+      html += '<div class="spotlight-slide-body">';
+      html += '<span class="spotlight-slide-section" style="background:' + color + '">' + escapeHtml(secLabel) + '</span>';
+      html += '<div class="spotlight-slide-title">' + escapeHtml(a.title) + '</div>';
+      html += '<div class="spotlight-slide-meta">' + escapeHtml(a.domain || a.feed || '') + (a.bookmarked ? ' &middot; ' + timeAgo(a.bookmarked) : '') + '</div>';
+      html += '</div></div>';
+    }
+    html += '</div>'; // track
+    html += '</div>'; // deck
+  }
+
+  // Media cards grid (right area)
+  html += '<div class="spotlight-cards" id="spotlight-cards">';
+  if (restArticles.length > 0) {
+    for (var ri = 0; ri < restArticles.length; ri++) {
+      var a = restArticles[ri];
+      var sec = resolveSection(a.filename);
+      var color = sectionColor(sec);
+      var secLabel = SECTION_LABELS[sec] || sec;
+      // First 2 cards are large if they have images
+      var isLarge = ri < 2 && a.image;
+      var sizeClass = isLarge ? ' spotlight-card-large' : '';
+
+      html += '<div class="spotlight-card' + sizeClass + '" onclick="dashLoadArticle(\'' + escapeJsStr(a.filename) + '\')">';
+      if (a.image) {
+        html += '<img src="' + escapeHtml(a.image) + '" alt="" loading="lazy" onerror="this.remove()">';
+      }
+      html += '<div class="spotlight-card-body">';
+      html += '<div class="spotlight-card-title">' + escapeHtml(a.title) + '</div>';
+      html += '<div class="spotlight-card-meta">';
+      html += '<span class="spotlight-card-section" style="background:' + color + '">' + escapeHtml(secLabel) + '</span>';
+      html += '<span>' + escapeHtml(a.domain || a.feed || '') + '</span>';
+
+      // Source engagement mini bar (5 bars)
+      var key = a.feed || a.domain || 'unknown';
+      var eng = engagement[key] || 0;
+      var engLevel = Math.round(eng * 5);
+      html += '<span class="spotlight-card-engagement">';
+      for (var bi = 0; bi < 5; bi++) {
+        var h = 3 + bi * 2;
+        html += '<span class="spotlight-card-bar' + (bi < engLevel ? ' filled' : '') + '" style="height:' + h + 'px"></span>';
+      }
+      html += '</span>';
+
+      if (a.bookmarked) html += '<span>' + timeAgo(a.bookmarked) + '</span>';
+      html += '</div>'; // meta
+      html += '</div>'; // body
+      html += '</div>'; // card
+    }
+  } else {
+    html += '<p style="color:var(--muted);padding:20px">No additional articles</p>';
+  }
+  html += '</div>'; // .spotlight-cards
+
+  html += '</div>'; // .spotlight-layout
+  html += '</div>';
+  return html;
+}
+
+var _spotlightIndex = 0;
+var _spotlightTimer = null;
+
+function spotlightGoTo(index) {
+  var deck = document.getElementById('spotlight-deck');
+  if (!deck) return;
+  var track = document.getElementById('spotlight-deck-track');
+  var dots = deck.querySelectorAll('.spotlight-deck-dot');
+  var count = dots.length;
+  if (index < 0) index = count - 1;
+  if (index >= count) index = 0;
+  _spotlightIndex = index;
+  track.style.transform = 'translateX(-' + (index * 100) + '%)';
+  for (var i = 0; i < dots.length; i++) {
+    dots[i].classList.toggle('active', i === index);
+  }
+  spotlightResetTimer();
+}
+
+function spotlightNext() { spotlightGoTo(_spotlightIndex + 1); }
+function spotlightPrev() { spotlightGoTo(_spotlightIndex - 1); }
+
+function spotlightResetTimer() {
+  clearInterval(_spotlightTimer);
+  if (window.innerWidth > 700) {
+    _spotlightTimer = setInterval(function() {
+      spotlightGoTo(_spotlightIndex + 1);
+    }, 8000);
+  }
+}
+
+function initSpotlightDeck() {
+  var deck = document.getElementById('spotlight-deck');
+  if (!deck) return;
+  _spotlightIndex = 0;
+  spotlightResetTimer();
+
+  deck.addEventListener('mouseenter', function() { clearInterval(_spotlightTimer); });
+  deck.addEventListener('mouseleave', function() { spotlightResetTimer(); });
+
+  // Swipe support
+  var startX = 0;
+  deck.addEventListener('touchstart', function(e) {
+    startX = e.touches[0].clientX;
+    clearInterval(_spotlightTimer);
+  }, { passive: true });
+  deck.addEventListener('touchend', function(e) {
+    var dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 40) {
+      dx > 0 ? spotlightPrev() : spotlightNext();
+    } else {
+      spotlightResetTimer();
+    }
+  }, { passive: true });
 }
 
 function renderHub() {
@@ -277,6 +442,7 @@ function renderHub() {
 
   requestAnimationFrame(initDashChevrons);
   requestAnimationFrame(initRundown);
+  requestAnimationFrame(initSpotlightDeck);
 
   // If audio is queued, switch to mini player so controls stay visible in sidebar
   if (typeof ttsQueue !== 'undefined' && ttsQueue.length > 0) {
