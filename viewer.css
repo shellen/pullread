@@ -635,6 +635,14 @@
     letter-spacing: 0.8px;
     color: var(--muted);
   }
+  .drawer-show-all {
+    padding: 8px 10px;
+    font-size: 12px;
+    color: var(--link);
+    cursor: pointer;
+    text-align: center;
+  }
+  .drawer-show-all:hover { text-decoration: underline; }
   .drawer-footer {
     padding: 10px;
     border-top: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
