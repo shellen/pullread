@@ -189,6 +189,7 @@
     <a href="#ai">AI Features</a>
     <a href="#data">Data & Privacy</a>
     <a href="#obsidian">Obsidian</a>
+    <a href="#cli">Command Line</a>
     <a href="#troubleshooting">Troubleshooting</a>
   </div>
 </div>
@@ -488,6 +489,32 @@ SORT bookmarked DESC
       <h3 class="faq-question">Do I need an Obsidian plugin?</h3>
       <div class="faq-answer">
         <p>No. Pull Read's output is standard Markdown with standard YAML frontmatter. No plugin required. Dataview is recommended for querying your reading library but isn't necessary for basic use.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Command Line -->
+  <div class="faq-section reveal" id="cli">
+    <h2 class="faq-section-title">Command Line</h2>
+
+    <div class="faq-item">
+      <h3 class="faq-question">Can I use Pull Read without the macOS app?</h3>
+      <div class="faq-answer">
+        <p>Yes. Pull Read includes a standalone CLI that runs on any platform with Node.js or Bun. Clone the <a href="https://github.com/shellen/pullread">GitHub repo</a>, run <code>npm install</code>, and use commands like <code>pullread sync</code>, <code>pullread view</code>, and <code>pullread review</code>. The in-app Guide has the full command reference.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <h3 class="faq-question">What can the CLI do?</h3>
+      <div class="faq-answer">
+        <p>Everything the app does for content processing: sync feeds, open the reader in your browser, generate AI summaries and tags, import bookmarks, and create reading reviews. Run <code>pullread</code> with no arguments to see all available commands.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <h3 class="faq-question">Where does the CLI store its configuration?</h3>
+      <div class="faq-answer">
+        <p>Feed configuration lives at <code>~/.config/pullread/feeds.json</code>. Articles are saved to the output folder specified in your config (default: <code>~/Documents/PullRead</code>). Both paths can be overridden with <code>--config-path</code> and <code>--data-path</code> flags.</p>
       </div>
     </div>
   </div>

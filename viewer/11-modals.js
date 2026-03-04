@@ -160,6 +160,39 @@ function showGuideModal() {
     <h2>Importing Bookmarks</h2>
     <p>Import bookmarks.html files exported from Chrome, Safari, Firefox, or Pocket directly from Settings or via the CLI with <code>pullread import &lt;file&gt;</code>.</p>
 
+    <h2>Command-Line Interface (CLI)</h2>
+    <p>PullRead includes a standalone CLI that runs on any platform with Node.js or Bun — no macOS app required. Install from the <a href="https://github.com/shellen/pullread" target="_blank" rel="noopener">GitHub repo</a> and run commands directly from your terminal.</p>
+
+    <h3>Getting Started</h3>
+    <pre><code>git clone https://github.com/shellen/pullread.git
+cd pullread
+npm install
+npx pullread --help</code></pre>
+
+    <h3>Commands</h3>
+    <table>
+      <thead><tr><th>Command</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>pullread sync</code></td><td>Sync all configured feeds</td></tr>
+        <tr><td><code>pullread sync --feed &lt;name&gt;</code></td><td>Sync a single feed by name</td></tr>
+        <tr><td><code>pullread sync --retry-failed</code></td><td>Retry previously failed URLs</td></tr>
+        <tr><td><code>pullread view</code></td><td>Open the article viewer in your browser</td></tr>
+        <tr><td><code>pullread view --port &lt;n&gt;</code></td><td>Use a custom port (default: 7777)</td></tr>
+        <tr><td><code>pullread summarize --batch</code></td><td>Summarize articles that don't have summaries yet</td></tr>
+        <tr><td><code>pullread summarize --min-size N</code></td><td>Skip articles under N characters (default: 500)</td></tr>
+        <tr><td><code>pullread autotag --batch</code></td><td>Generate machine tags for untagged articles</td></tr>
+        <tr><td><code>pullread autotag --batch --force</code></td><td>Re-tag all articles, including already tagged ones</td></tr>
+        <tr><td><code>pullread autotag --min-size N</code></td><td>Skip articles under N characters (default: 500)</td></tr>
+        <tr><td><code>pullread import &lt;file.html&gt;</code></td><td>Import bookmarks from an HTML file (Netscape format)</td></tr>
+        <tr><td><code>pullread review</code></td><td>Generate a weekly review of recent articles</td></tr>
+        <tr><td><code>pullread review --days N</code></td><td>Review the past N days (default: 7)</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Configuration</h3>
+    <p>The CLI reads feed configuration from <code>~/.config/pullread/feeds.json</code>. You can override paths with <code>--config-path</code> and <code>--data-path</code> flags. Articles are saved to the output folder specified in your config (default: <code>~/Documents/PullRead</code>).</p>
+    <p>AI features (summarize, autotag, review) require a provider and API key configured in your feeds.json under the <code>llm</code> section.</p>
+
     <h2>Keyboard Shortcuts</h2>
     <p>Shortcuts follow Google Reader conventions where possible.</p>
     <table>
