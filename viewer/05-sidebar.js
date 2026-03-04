@@ -330,18 +330,13 @@ function magicScore(f, engagement, mixerConfig) {
 
   var rawScore = 100 * (wR * recency + wS * source + wU * unread + wSig * Math.min(signals, 1));
 
-  // Tag boost multiplier — match against machineTags from AI auto-tagging
+  // Section boost multiplier — match against editorial section from AI auto-tagging
   var boosts = mixerConfig.tagBoosts;
-  if (boosts && Object.keys(boosts).length > 0) {
-    var articleTags = (notes && notes.machineTags) || [];
-    var bestBoost = 0;
-    for (var ci = 0; ci < articleTags.length; ci++) {
-      var b = boosts[articleTags[ci]];
-      if (b !== undefined && Math.abs(b) > Math.abs(bestBoost)) bestBoost = b;
-    }
-    if (bestBoost !== 0) {
+  if (boosts && Object.keys(boosts).length > 0 && notes && notes.section) {
+    var sectionBoost = boosts[notes.section];
+    if (sectionBoost !== undefined && sectionBoost !== 0) {
       var multipliers = { '-2': 0.25, '-1': 0.5, '1': 1.5, '2': 2 };
-      rawScore *= (multipliers[String(bestBoost)] || 1);
+      rawScore *= (multipliers[String(sectionBoost)] || 1);
     }
   }
 
@@ -473,6 +468,12 @@ function filterFiles() {
         if (tl.startsWith('domain:')) {
           const domQ = tl.slice(7).replace(/^"(.*)"$/, '$1');
           return f.domain.toLowerCase().includes(domQ);
+        }
+        // Operator: section:value — filter by editorial section
+        if (tl.startsWith('section:')) {
+          const secQ = tl.slice(8).replace(/^"(.*)"$/, '$1');
+          var resolved = resolveSection(f.filename);
+          return resolved === secQ || resolved.toLowerCase() === secQ;
         }
         // Operator: author:value (supports author:"First Last")
         if (tl.startsWith('author:')) {
@@ -883,17 +884,16 @@ function openSourcesDrawer() {
   function renderSources() {
     var html = '';
 
-    // Search/filter input
+    // Search/filter input + sort bar (sticky toolbar)
+    html += '<div class="drawer-toolbar">';
     html += '<div class="drawer-search">';
     html += '<input type="text" id="drawer-filter-input" placeholder="Filter sources\u2026" value="' + escapeHtml(_drawerFilter) + '">';
     html += '</div>';
-
-    // Sort bar
     html += '<div class="drawer-sort-bar">';
     html += '<button class="drawer-sort-btn' + (sortMode === 'recent' ? ' active' : '') + '" data-sort="recent" title="Sort by most recent article">Recent</button>';
     html += '<button class="drawer-sort-btn' + (sortMode === 'az' ? ' active' : '') + '" data-sort="az" title="Sort alphabetically by name">A\u2013Z</button>';
     html += '<button class="drawer-sort-btn' + (sortMode === 'count' ? ' active' : '') + '" data-sort="count" title="Sort by number of articles">Count</button>';
-    html += '</div>';
+    html += '</div></div>';
 
     var filterLower = _drawerFilter.toLowerCase();
 
@@ -1041,16 +1041,15 @@ function openTagsDrawer() {
   function renderTags() {
     var html = '';
 
-    // Search/filter input
+    // Search/filter input + sort bar (sticky toolbar)
+    html += '<div class="drawer-toolbar">';
     html += '<div class="drawer-search">';
     html += '<input type="text" id="drawer-tag-filter" placeholder="Filter tags\u2026" value="' + escapeHtml(_tagFilter) + '">';
     html += '</div>';
-
-    // Sort bar
     html += '<div class="drawer-sort-bar">';
     html += '<button class="drawer-sort-btn' + (sortMode === 'count' ? ' active' : '') + '" data-sort="count" title="Sort by frequency">Count</button>';
     html += '<button class="drawer-sort-btn' + (sortMode === 'az' ? ' active' : '') + '" data-sort="az" title="Sort alphabetically">A\u2013Z</button>';
-    html += '</div>';
+    html += '</div></div>';
 
     var filterLower = _tagFilter.toLowerCase();
     sortEntries(sortMode);

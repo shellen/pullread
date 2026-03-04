@@ -12,7 +12,7 @@ import { autotagText, autotagBatch, saveMachineTags, hasMachineTags, migrateDash
 import { initAnnotations, loadAnnotation, saveAnnotation, allHighlights, allNotes, migrateMonolithicFiles } from './annotations';
 import { APP_ICON } from './app-icon';
 import { fetchAndExtract } from './extractor';
-import { generateMarkdown, writeArticle, ArticleData, downloadFavicon, resolveFilePath, listMarkdownFiles, listEpubFiles, migrateToDateFolders, exportNotebook, removeExportedNotebook } from './writer';
+import { generateMarkdown, writeArticle, ArticleData, downloadFavicon, resolveFilePath, listMarkdownFiles, listEpubFiles, migrateToDateFolders, exportNotebook, removeExportedNotebook, assertWritablePath, setOutputPath } from './writer';
 import { loadTTSConfig, saveTTSConfig, generateSpeech, getAudioContentType, getCachedAudioPath, createTtsSession, generateSessionChunk, TTS_VOICES, TTS_MODELS } from './tts';
 import { deleteFromKeychain } from './keychain';
 import { listSiteLogins, removeSiteLogin, saveSiteLoginCookies } from './cookies';
@@ -574,6 +574,7 @@ function loadJsonFile(path: string): Record<string, unknown> {
 }
 
 function saveJsonFile(path: string, data: unknown): void {
+  assertWritablePath(path);
   const dir = dirname(path);
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
@@ -650,6 +651,8 @@ function writeSummaryToFile(filePath: string, summary: string, provider?: string
 
 export async function reprocessFile(filePath: string, options?: { force?: boolean }): Promise<{ ok: boolean; title?: string; error?: string }> {
   try {
+    assertWritablePath(filePath);
+
     if (!existsSync(filePath)) {
       return { ok: false, error: 'File not found' };
     }
@@ -709,6 +712,8 @@ export async function reprocessFile(filePath: string, options?: { force?: boolea
 }
 
 export function startViewer(outputPath: string, port = 7777, openBrowser = true): void {
+  setOutputPath(outputPath);
+
   // Watch output directory for .md file changes
   let filesChangedAt = Date.now();
   try {
@@ -1157,6 +1162,24 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
       return;
     }
 
+    // AI briefing
+    if (url.pathname === '/api/briefing' && req.method === 'GET') {
+      try {
+        const days = parseInt(url.searchParams.get('days') || '1', 10);
+        const exclude = url.searchParams.get('exclude')?.split(',').filter(Boolean) || [];
+        const { generateBriefing } = await import('./review');
+        const result = await generateBriefing(outputPath, days, exclude);
+        if (!result) {
+          sendJson(res, { error: 'No recent articles for a briefing' });
+        } else {
+          sendJson(res, result);
+        }
+      } catch (err: any) {
+        sendJson(res, { error: err.message || 'Failed to generate briefing' });
+      }
+      return;
+    }
+
     // Feed title discovery
     if (url.pathname === '/api/feed-title' && req.method === 'GET') {
       const feedUrl = url.searchParams.get('url');
@@ -1256,6 +1279,8 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
           // Create output directory if it doesn't exist
           if (existing.outputPath) {
             const expandedPath = (existing.outputPath as string).replace(/^~/, homedir());
+            assertWritablePath(expandedPath);
+            setOutputPath(expandedPath);
             if (!existsSync(expandedPath)) {
               mkdirSync(expandedPath, { recursive: true });
             }
@@ -2271,6 +2296,7 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
           res.end(JSON.stringify({ error: 'Missing path' }));
           return;
         }
+        assertWritablePath(filePath);
         const dir = dirname(filePath);
         if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
         writeFileSync(filePath, content, 'utf-8');

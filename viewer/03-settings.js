@@ -236,25 +236,12 @@ function settingsBtnSelect(btn, hiddenId, val) {
 }
 
 // Magic Mixer helpers and event handlers
-function mixerFormatTopic(tag) {
-  // Format machineTag for display: "artificialintelligence" → "Artificial Intelligence"
-  // Insert space before uppercase letters, then title-case the first letter
-  var spaced = tag.replace(/([a-z])([A-Z])/g, '$1 $2');
-  // If all lowercase (no camelCase), try splitting known compound words
-  if (spaced === tag && tag.length > 12) {
-    // Common suffixes to split on
-    spaced = tag.replace(/(intelligence|learning|science|change|policy|security|computing|technology|development|management|engineering)$/i, ' $1');
-  }
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-}
-
-function mixerTagRow(tag, val, labels) {
-  var safeId = tag.replace(/[^a-zA-Z0-9]/g, '_');
-  var displayName = mixerFormatTopic(tag);
+function mixerSectionRow(section, val, labels) {
+  var displayName = SECTION_LABELS[section] || section;
   var h = '<div class="mixer-tag-row">';
-  h += '<span class="mixer-tag-name" title="' + escapeHtml(tag) + '">' + escapeHtml(displayName) + '</span>';
-  h += '<input type="range" min="-2" max="2" value="' + val + '" class="mixer-range mixer-tag-range" oninput="mixerTagChanged(\'' + escapeJsStr(tag) + '\',this.value)">';
-  h += '<span class="mixer-tag-label" id="mixer-tag-label-' + safeId + '">' + labels[val + 2] + '</span>';
+  h += '<span class="mixer-tag-name">' + escapeHtml(displayName) + '</span>';
+  h += '<input type="range" min="-2" max="2" value="' + val + '" class="mixer-range mixer-tag-range" oninput="mixerTagChanged(\'' + escapeJsStr(section) + '\',this.value)">';
+  h += '<span class="mixer-tag-label" id="mixer-tag-label-' + section + '">' + labels[val + 2] + '</span>';
   h += '</div>';
   return h;
 }
@@ -723,44 +710,26 @@ function showSettingsPage(scrollToSection) {
     html += '<input type="range" min="1" max="5" value="' + mc.diversity + '" class="mixer-range" id="mixer-diversity" oninput="mixerDiversityChanged(this.value)">';
     html += '<div class="mixer-slider-desc">Maximum articles from one feed before mixing in others</div>';
     html += '</div>';
-    // Content Mix — use AI-generated machineTags as topic categories
-    var topicCounts = {};
+    // Content Mix — use editorial sections from AI auto-tagging
+    var sectionCounts = {};
     for (var mti = 0; mti < allFiles.length; mti++) {
       var fn = allFiles[mti].filename;
       var notes = allNotesIndex[fn];
-      if (notes && notes.machineTags) {
-        for (var mtj = 0; mtj < notes.machineTags.length; mtj++) {
-          var mt = notes.machineTags[mtj];
-          topicCounts[mt] = (topicCounts[mt] || 0) + 1;
-        }
+      if (notes && notes.section) {
+        sectionCounts[notes.section] = (sectionCounts[notes.section] || 0) + 1;
       }
     }
-    var topicEntries = Object.keys(topicCounts).map(function(t) { return { tag: t, count: topicCounts[t] }; });
-    topicEntries.sort(function(a, b) { return b.count - a.count; });
-    // Show only topics that appear in 2+ articles (actual categories, not one-offs)
-    topicEntries = topicEntries.filter(function(e) { return e.count >= 2; });
-    if (topicEntries.length > 0) {
+    var sectionEntries = Object.keys(sectionCounts)
+      .filter(function(s) { return SECTION_LABELS[s]; })
+      .sort(function(a, b) { return sectionCounts[b] - sectionCounts[a]; });
+    if (sectionEntries.length > 0) {
       html += '<div class="mixer-section-label">Content Mix</div>';
-      html += '<div class="mixer-slider-desc" style="margin-bottom:8px">Boost or reduce topics based on AI-generated tags. Only articles that have been auto-tagged appear here.</div>';
+      html += '<div class="mixer-slider-desc" style="margin-bottom:8px">Boost or reduce editorial sections. Only auto-tagged articles appear here.</div>';
       var boostLabels = ['Reduce', 'Less', 'Neutral', 'More', 'Boost'];
-      var showAllTopics = topicEntries.length <= 10;
-      var visibleTopics = showAllTopics ? topicEntries : topicEntries.slice(0, 10);
-      html += '<div id="mixer-tags-visible">';
-      for (var mvt = 0; mvt < visibleTopics.length; mvt++) {
-        var mtag = visibleTopics[mvt].tag;
-        var bVal = (mc.tagBoosts && mc.tagBoosts[mtag]) || 0;
-        html += mixerTagRow(mtag, bVal, boostLabels);
-      }
-      html += '</div>';
-      if (!showAllTopics) {
-        html += '<div id="mixer-tags-hidden" style="display:none">';
-        for (var mht = 10; mht < topicEntries.length; mht++) {
-          var htag = topicEntries[mht].tag;
-          var hbVal = (mc.tagBoosts && mc.tagBoosts[htag]) || 0;
-          html += mixerTagRow(htag, hbVal, boostLabels);
-        }
-        html += '</div>';
-        html += '<a href="#" onclick="document.getElementById(\'mixer-tags-hidden\').style.display=\'\';this.style.display=\'none\';return false" style="font-size:12px;color:var(--link);text-decoration:none">Show all ' + topicEntries.length + ' topics</a>';
+      for (var msi2 = 0; msi2 < sectionEntries.length; msi2++) {
+        var sec = sectionEntries[msi2];
+        var bVal = (mc.tagBoosts && mc.tagBoosts[sec]) || 0;
+        html += mixerSectionRow(sec, bVal, boostLabels);
       }
     }
     html += '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">';
@@ -845,7 +814,7 @@ function showSettingsPage(scrollToSection) {
   html += '</div>';
   html += '<div style="display:flex;gap:12px;flex-wrap:wrap;padding:8px 0">';
   html += '<a href="https://pullread.com" target="_blank" rel="noopener" style="font-size:13px;color:var(--link)">pullread.com</a>';
-  html += '<a href="#" onclick="prOpenExternal(\'https://pullread.com/releases#v\' + (window._prCurrentVersion || \'0.4.1\'));return false" style="font-size:13px;color:var(--link)">What\'s New</a>';
+  html += '<a href="#" onclick="prOpenExternal(\'https://pullread.com/releases#v\' + (window._prCurrentVersion || \'0.4.2\'));return false" style="font-size:13px;color:var(--link)">What\'s New</a>';
   html += '<a href="/api/log" target="_blank" style="font-size:13px;color:var(--link)">View Logs</a>';
   html += '<button style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit" onclick="showTour()">Show Tour</button>';
   html += '</div>';
@@ -1221,6 +1190,30 @@ function showSettingsPage(scrollToSection) {
       h += '<div class="setting-label"><label>Auto-tag on sync</label><div class="setting-desc">Automatically tag new articles when feeds sync</div></div>';
       h += '<div class="setting-control"><input type="checkbox" id="sp-autotag"' + (data.autoTag ? ' checked' : '') + ' onchange="settingsPageSaveAutoTag()" style="width:18px;height:18px;accent-color:var(--link)"></div>';
       h += '</div>';
+
+      // Batch tagging actions
+      var taggedCount = allFiles.filter(function(f) { var n = allNotesIndex[f.filename]; return n && ((n.tags && n.tags.length) || (n.machineTags && n.machineTags.length)); }).length;
+      var totalArticles = allFiles.length;
+      var untaggedCount = totalArticles - taggedCount;
+      h += '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">';
+      h += '<div class="setting-label"><label>Batch Tagging</label><div class="setting-desc">' + taggedCount + ' of ' + totalArticles + ' articles tagged';
+      if (untaggedCount > 0) h += ', ' + untaggedCount + ' remaining';
+      h += '</div></div>';
+      h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">';
+      h += '<button class="tag-pill" id="batch-tag-btn" onclick="batchAutotagAll(false)" title="Tag untagged articles using AI"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-wand"/></svg> Tag Untagged</button>';
+      h += '<button class="tag-pill" onclick="batchAutotagAll(true)" title="Re-tag all articles, replacing existing AI tags"><svg class="icon icon-sm" aria-hidden="true" style="vertical-align:-1px;margin-right:3px"><use href="#i-refresh"/></svg> Retag All</button>';
+      h += '</div></div>';
+
+      // Blocked tags
+      if (typeof blockedTags !== 'undefined' && blockedTags.size > 0) {
+        h += '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">';
+        h += '<div class="setting-label"><label>Blocked Tags</label><div class="setting-desc">These tags are hidden from your tag views</div></div>';
+        h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">';
+        blockedTags.forEach(function(tag) {
+          h += '<button class="tag-pill tag-pill-blocked" onclick="unblockTag(\'' + escapeJsStr(tag) + '\');showSettingsPage(\'reading\')">' + escapeHtml(tag) + ' <span style="opacity:0.6">unblock</span></button>';
+        });
+        h += '</div></div>';
+      }
 
       sec.innerHTML = h;
     }).catch(function() {

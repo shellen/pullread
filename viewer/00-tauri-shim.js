@@ -77,12 +77,7 @@ window.prOpenExternal = async function (url) {
   }
   // Protocol URLs (sms:, mailto:, tel:) don't work with window.open
   if (/^(sms|mailto|tel):/.test(url)) {
-    var a = document.createElement('a');
-    a.href = url;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    window.location.href = url;
   } else {
     window.open(url, '_blank');
   }

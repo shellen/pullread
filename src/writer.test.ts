@@ -1,9 +1,10 @@
-// ABOUTME: Tests for markdown file generation
-// ABOUTME: Verifies filename slugification, frontmatter, and enclosure formatting
+// ABOUTME: Tests for markdown file generation and filesystem write guard
+// ABOUTME: Verifies filename slugification, frontmatter, enclosure formatting, and path restrictions
 
-import { generateFilename, generateMarkdown, fileSubpath, resolveFilePath, listMarkdownFiles, listEpubFiles, writeArticle, migrateToDateFolders, exportNotebook } from './writer';
+import { generateFilename, generateMarkdown, fileSubpath, resolveFilePath, listMarkdownFiles, listEpubFiles, writeArticle, migrateToDateFolders, exportNotebook, assertWritablePath, setOutputPath, resetWriteGuard } from './writer';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'fs';
-import { join } from 'path';
+import { join, resolve, sep } from 'path';
+import { homedir } from 'os';
 
 describe('generateFilename', () => {
   test('creates date-prefixed slug', () => {
@@ -496,11 +497,14 @@ describe('exportNotebook', () => {
   });
   afterAll(cleanTestDir);
 
-  test('exports notebook as markdown with frontmatter', () => {
+  test('exports notebook with note content and frontmatter', () => {
     const notebook: import('./writer').Notebook = {
       id: 'nb-abc123',
       title: 'My Research Notes',
-      notes: [{ text: 'Key finding', source: 'article.md' }],
+      notes: [
+        { id: 'note-1', content: '# Key Finding\n\nImportant discovery here.', sourceArticle: 'article.md', createdAt: '2024-01-15T10:00:00Z', updatedAt: '2024-01-15T10:00:00Z' },
+        { id: 'note-2', content: '# Second Note\n\nAnother insight.', createdAt: '2024-01-16T10:00:00Z', updatedAt: '2024-01-16T10:00:00Z' },
+      ],
       sources: ['https://example.com'],
       tags: ['research', 'ai'],
       createdAt: '2024-01-15T10:00:00Z',
@@ -508,14 +512,122 @@ describe('exportNotebook', () => {
     };
 
     const filename = exportNotebook(TEST_DIR, notebook);
-    expect(filename).toBe('my-research-notes.md');
+    expect(filename).toBe('notebook.md');
 
     const content = readFileSync(join(TEST_DIR, 'notebooks', filename), 'utf-8');
-    expect(content).toContain('title: "My Research Notes"');
+    expect(content).toContain('title: "Notebook"');
     expect(content).toContain('created: 2024-01-15T10:00:00Z');
     expect(content).toContain('tags: ["research", "ai"]');
-    expect(content).toContain('Key finding');
-    expect(content).toContain('*(article.md)*');
+    expect(content).toContain('# Key Finding');
+    expect(content).toContain('Important discovery here.');
+    expect(content).toContain('# Second Note');
     expect(content).toContain('https://example.com');
+  });
+
+  test('cleans up stale title-based export file', () => {
+    // Simulate an old export with a title-based filename
+    const dir = join(TEST_DIR, 'notebooks');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'testing.md'), 'old export');
+
+    const notebook: import('./writer').Notebook = {
+      id: 'nb-shared',
+      title: 'Testing',
+      notes: [{ id: 'note-1', content: '# Real Note', createdAt: '2024-01-15T10:00:00Z', updatedAt: '2024-01-15T10:00:00Z' }],
+      createdAt: '2024-01-15T10:00:00Z',
+      updatedAt: '2024-01-16T14:00:00Z',
+    };
+
+    const filename = exportNotebook(TEST_DIR, notebook);
+    expect(filename).toBe('notebook.md');
+
+    // New canonical file exists
+    expect(existsSync(join(dir, 'notebook.md'))).toBe(true);
+    const content = readFileSync(join(dir, 'notebook.md'), 'utf-8');
+    expect(content).toContain('# Real Note');
+
+    // Old title-based file cleaned up
+    expect(existsSync(join(dir, 'testing.md'))).toBe(false);
+  });
+
+  test('skips empty notes in export', () => {
+    const notebook: import('./writer').Notebook = {
+      id: 'nb-shared',
+      title: 'Notebook',
+      notes: [
+        { id: 'note-1', content: '# Has Content', createdAt: '2024-01-15T10:00:00Z', updatedAt: '2024-01-15T10:00:00Z' },
+        { id: 'note-2', content: '', createdAt: '2024-01-15T10:00:00Z', updatedAt: '2024-01-15T10:00:00Z' },
+        { id: 'note-3', content: '   ', createdAt: '2024-01-15T10:00:00Z', updatedAt: '2024-01-15T10:00:00Z' },
+      ],
+      createdAt: '2024-01-15T10:00:00Z',
+      updatedAt: '2024-01-16T14:00:00Z',
+    };
+
+    exportNotebook(TEST_DIR, notebook);
+    const content = readFileSync(join(TEST_DIR, 'notebooks', 'notebook.md'), 'utf-8');
+    expect(content).toContain('# Has Content');
+    // Only one --- separator (from the single non-empty note)
+    const separators = content.split('---').length - 1;
+    // frontmatter has 2 ---, plus one note separator = 3
+    expect(separators).toBe(3);
+  });
+});
+
+describe('assertWritablePath', () => {
+  const configDir = resolve(join(homedir(), '.config', 'pullread'));
+
+  beforeEach(() => {
+    resetWriteGuard();
+  });
+
+  test('allows paths within config dir', () => {
+    expect(() => assertWritablePath(join(configDir, 'feeds.json'))).not.toThrow();
+  });
+
+  test('allows paths in nested config subdirectories', () => {
+    expect(() => assertWritablePath(join(configDir, 'sub', 'deep', 'file.json'))).not.toThrow();
+  });
+
+  test('blocks paths outside allowed directories', () => {
+    expect(() => assertWritablePath('/etc/passwd')).toThrow('Write blocked');
+  });
+
+  test('blocks traversal via ..', () => {
+    expect(() => assertWritablePath(join(configDir, '..', '..', 'etc', 'passwd'))).toThrow('Write blocked');
+  });
+
+  test('blocks prefix collisions', () => {
+    // /Users/x/.config/pullread-evil should NOT match /Users/x/.config/pullread
+    expect(() => assertWritablePath(configDir + '-evil/file.txt')).toThrow('Write blocked');
+  });
+
+  test('allows paths within registered output path', () => {
+    setOutputPath('/tmp/pullread-output');
+    expect(() => assertWritablePath('/tmp/pullread-output/2024/01/article.md')).not.toThrow();
+  });
+
+  test('allows the output directory itself', () => {
+    setOutputPath('/tmp/pullread-output');
+    expect(() => assertWritablePath('/tmp/pullread-output')).not.toThrow();
+  });
+
+  test('registers multiple output paths', () => {
+    setOutputPath('/tmp/output-a');
+    setOutputPath('/tmp/output-b');
+    expect(() => assertWritablePath('/tmp/output-a/file.md')).not.toThrow();
+    expect(() => assertWritablePath('/tmp/output-b/file.md')).not.toThrow();
+  });
+
+  test('does not duplicate already-registered paths', () => {
+    setOutputPath('/tmp/pullread-output');
+    setOutputPath('/tmp/pullread-output');
+    // No error — just verifying it doesn't break
+    expect(() => assertWritablePath('/tmp/pullread-output/file.md')).not.toThrow();
+  });
+
+  test('expands tilde in setOutputPath', () => {
+    setOutputPath('~/Documents/pullread-test');
+    const expanded = resolve(join(homedir(), 'Documents', 'pullread-test'));
+    expect(() => assertWritablePath(join(expanded, 'article.md'))).not.toThrow();
   });
 });

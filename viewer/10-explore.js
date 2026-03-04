@@ -168,7 +168,7 @@ function buildTagsTabHtml(data) {
       for (var csKey in clusterSections) {
         if (clusterSections[csKey] > bestSC) { clusterSection = csKey; bestSC = clusterSections[csKey]; }
       }
-      html += '<span class="section-badge">' + escapeHtml(SECTION_LABELS[clusterSection] || 'Other') + '</span>';
+      html += '<span class="section-badge">' + escapeHtml(SECTION_LABELS[clusterSection] || 'More') + '</span>';
       html += '<div class="topic-cluster-tags">';
       for (var cti = 0; cti < cluster.tags.length; cti++) {
         html += '<span class="tag-pill tag-pill-sm">' + escapeHtml(cluster.tags[cti]) + '</span>';
@@ -209,7 +209,7 @@ function buildTagsTabHtml(data) {
 
     html += '<div class="section-group">';
     html += '<div class="section-header section-collapse" onclick="this.parentNode.classList.toggle(\'collapsed\')">';
-    html += '<h3 class="section-title">' + escapeHtml(SECTION_LABELS[sec] || 'Other') + '</h3>';
+    html += '<h3 class="section-title">' + escapeHtml(SECTION_LABELS[sec] || 'More') + '</h3>';
     html += '<span class="section-count">' + totalInSection + ' article' + (totalInSection !== 1 ? 's' : '') + '</span>';
     html += '<svg class="icon icon-sm section-chevron" aria-hidden="true"><use href="#i-chevron-down"/></svg>';
     html += '</div>';

@@ -225,8 +225,8 @@ function toggleShareDropdown(e) {
   panel.onclick = function(ev) { ev.stopPropagation(); };
 
   const encodedUrl = encodeURIComponent(data.url);
-  const encodedTitle = encodeURIComponent(data.title);
-  const encodedText = encodeURIComponent(data.title + ' ' + data.url);
+  const encodedTitle = encodeURIComponent(data.title).replace(/'/g, '%27');
+  const encodedText = encodeURIComponent(data.title + ' ' + data.url).replace(/'/g, '%27');
 
   panel.innerHTML = `
     <div class="share-group-label">Actions</div>
@@ -656,7 +656,7 @@ function showQuoteSharePanel(quote, title, url) {
 
   var attribution = title ? ('\n\n\u2014 ' + title + (url ? ' ' + url : '')) : (url ? '\n\n' + url : '');
   var shareText = '\u201c' + quote + '\u201d' + attribution;
-  var encodedText = encodeURIComponent(shareText);
+  var encodedText = encodeURIComponent(shareText).replace(/'/g, '%27');
   var clipboardText = '\u201c' + quote + '\u201d' + (title ? ' \u2014 ' + title : '') + (url ? ' ' + url : '');
 
   var panel = document.createElement('div');

@@ -6,7 +6,7 @@ import { join, basename } from 'path';
 import { homedir } from 'os';
 import { fetchFeed, FeedEntry } from './feed';
 import { fetchAndExtract, FetchOptions, shouldSkipUrl, isBinaryUrl, classifyFetchError, htmlToMarkdown } from './extractor';
-import { writeArticle, listMarkdownFiles, resolveFilePath } from './writer';
+import { writeArticle, listMarkdownFiles, resolveFilePath, setOutputPath } from './writer';
 import { Storage } from './storage';
 import { startViewer, reprocessFile, parseFrontmatter } from './viewer';
 import { summarizeText, loadLLMConfig } from './summarizer';
@@ -326,6 +326,8 @@ async function sync(feedFilter?: string, retryFailed = false): Promise<void> {
   if (!existsSync(config.outputPath)) {
     mkdirSync(config.outputPath, { recursive: true });
   }
+
+  setOutputPath(config.outputPath);
 
   const storage = new Storage(DB_PATH, config.outputPath);
 

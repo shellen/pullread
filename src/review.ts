@@ -12,6 +12,7 @@ export interface ArticleMeta {
   url: string;
   bookmarked: string;
   domain: string;
+  filename?: string;
   feed?: string;
   summary?: string;
   excerpt?: string;
@@ -124,6 +125,7 @@ export function getRecentArticles(outputPath: string, days: number = 7): Article
       const meta = parseFrontmatter(text);
       if (!meta) continue;
 
+      meta.filename = file.name;
       const bookmarkDate = new Date(meta.bookmarked);
       if (bookmarkDate >= cutoff) {
         articles.push(meta);
@@ -237,4 +239,75 @@ ${clusterSection}`;
   writeFileSync(fullPath, markdown, 'utf-8');
 
   return { filename, review };
+}
+
+export async function generateBriefing(outputPath: string, days: number = 1, excludeFilenames: string[] = []): Promise<{
+  briefing: string;
+  articles: Array<{ title: string; filename: string; domain: string }>;
+} | null> {
+  const allArticles = getRecentArticles(outputPath, days);
+  if (allArticles.length === 0) return null;
+
+  // Exclude articles already surfaced elsewhere (e.g. story deck)
+  const excludeSet = new Set(excludeFilenames);
+  const filtered = allArticles.filter(a => !excludeSet.has(a.filename || ''));
+  if (filtered.length === 0) return null;
+
+  // Cap at 25 for context window safety
+  const articles = filtered.slice(0, 25);
+
+  // Compute trending categories (sorted by frequency)
+  const catCounts = new Map<string, number>();
+  for (const a of articles) {
+    if (a.categories) {
+      for (const cat of a.categories) {
+        catCounts.set(cat, (catCounts.get(cat) || 0) + 1);
+      }
+    }
+  }
+  const trending = [...catCounts.entries()]
+    .filter(([, count]) => count >= 2)
+    .sort((a, b) => b[1] - a[1])
+    .map(([cat, count]) => `${cat} (${count} articles)`);
+
+  const articleList = articles.map((a, i) => {
+    let entry = `${i + 1}. "${a.title}" (${a.domain})`;
+    if (a.summary) entry += `\n   Summary: ${a.summary}`;
+    else if (a.excerpt) entry += `\n   Excerpt: ${a.excerpt}`;
+    return entry;
+  }).join('\n');
+
+  let trendHint = '';
+  if (trending.length > 0) {
+    trendHint = `\n\nTrending topics today: ${trending.join(', ')}. Prioritize these themes and the unseen articles within them.\n`;
+  }
+
+  const prompt = `You are a sharp, well-read friend giving an overview of what's in the reading queue. Below are ${articles.length} articles bookmarked in the past ${days === 1 ? 'day' : days + ' days'}.
+
+Write about two paragraphs of flowing prose with no headings — no #, no ##. Keep it concise and specific.
+
+LINKING RULE — THIS IS CRITICAL: Every article you mention MUST be a markdown link in this exact format: [exact title](#article-N) where N is the article's number from the list below. Copy the title exactly. Example: if article 3 is "Apple Does Fusion", write [Apple Does Fusion](#article-3) in your text. Do NOT use bold, quotes, or any other format for article titles — always use this link format. This creates clickable links in the UI.
+
+When articles share a theme, group them naturally. Name the author or publication when it adds credibility (e.g., "Om Malik digs into fusion energy in [Apple Does Fusion](#article-3)").
+
+If there's a video, podcast, or other media item, call out the type — e.g., "there's a Daily Show clip, [Episode Title Here](#article-5)".
+
+Tone: be somber and respectful when mentioning death, tragedy, or loss. Never sound excited about bad news.
+
+Do NOT use generic summarizing language like "underscoring the human impact" or "highlighting broader themes." Be specific — say what the article is actually about.
+
+Articles:
+${articleList}${trendHint}
+
+Briefing:`;
+
+  const result = await summarizeText(prompt);
+
+  const articleMeta = articles.map(a => ({
+    title: a.title,
+    filename: a.filename || '',
+    domain: a.domain,
+  }));
+
+  return { briefing: result.summary, articles: articleMeta };
 }

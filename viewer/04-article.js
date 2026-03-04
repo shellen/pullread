@@ -1,6 +1,384 @@
 // ABOUTME: Hub landing page (merged Home + Explore) and article rendering.
 // ABOUTME: renderHub() builds the tabbed hub; loadFile() renders individual articles.
-var _reviewGenInFlight = false;
+function getHomeTab() {
+  return localStorage.getItem('pr-home-tab') || 'rundown';
+}
+function setHomeTab(tab) {
+  localStorage.setItem('pr-home-tab', tab);
+}
+
+function buildRundownTab(engagement, mc) {
+  var html = '<div class="rundown-tab">';
+
+  // Gather unread articles, scored and sorted
+  var unread = allFiles.filter(function(f) {
+    return !readArticles.has(f.filename) && f.feed !== 'weekly-review' && f.feed !== 'daily-review' && f.domain !== 'pullread';
+  });
+  unread.sort(function(a, b) {
+    return magicScore(b, engagement, mc) - magicScore(a, engagement, mc);
+  });
+
+  if (unread.length === 0) {
+    html += '<p style="color:var(--muted);padding:20px;text-align:center">All caught up</p></div>';
+    return html;
+  }
+
+  // Pick top articles with images for story deck (up to 7)
+  var withImages = unread.filter(function(f) { return f.image; });
+  var deckArticles = withImages.slice(0, 7);
+
+  // Store deck filenames so loadBriefing can exclude them
+  window._deckFilenames = deckArticles.map(function(f) { return f.filename; });
+
+  // Track used filenames so we don't repeat in feed columns
+  var usedSet = {};
+  for (var di = 0; di < deckArticles.length; di++) usedSet[deckArticles[di].filename] = true;
+
+  // --- Top row: story deck + briefing ---
+  html += '<div class="rundown-top">';
+
+  // Story deck
+  if (deckArticles.length > 0) {
+    html += '<div class="rundown-deck" id="rundown-deck">';
+
+    // Dots
+    html += '<div class="spotlight-deck-dots">';
+    for (var di = 0; di < deckArticles.length; di++) {
+      html += '<span class="spotlight-deck-dot' + (di === 0 ? ' active' : '') + '" onclick="rundownDeckGoTo(' + di + ')"></span>';
+    }
+    html += '</div>';
+
+    // Nav buttons
+    html += '<button class="spotlight-deck-nav prev" onclick="rundownDeckPrev()" aria-label="Previous">&#8249;</button>';
+    html += '<button class="spotlight-deck-nav next" onclick="rundownDeckNext()" aria-label="Next">&#8250;</button>';
+
+    // Slide track
+    html += '<div class="rundown-deck-track" id="rundown-deck-track">';
+    for (var si = 0; si < deckArticles.length; si++) {
+      var a = deckArticles[si];
+      var sec = resolveSection(a.filename);
+      var color = sectionColor(sec);
+      var secLabel = SECTION_LABELS[sec] || sec;
+
+      html += '<div class="spotlight-slide" onclick="dashLoadArticle(\'' + escapeJsStr(a.filename) + '\')">';
+      html += '<img src="' + escapeHtml(a.image) + '" alt="" loading="' + (si === 0 ? 'eager' : 'lazy') + '" onerror="this.style.display=\'none\'">';
+      html += '<div class="spotlight-slide-body">';
+      html += '<span class="spotlight-slide-section" style="background:' + color + '">' + escapeHtml(secLabel) + '</span>';
+      html += '<div class="spotlight-slide-title">' + escapeHtml(a.title) + '</div>';
+      html += '<div class="spotlight-slide-meta">' + escapeHtml(a.domain || a.feed || '') + (a.bookmarked ? ' &middot; ' + timeAgo(a.bookmarked) : '') + '</div>';
+      html += '</div></div>';
+    }
+    html += '</div>'; // track
+    html += '</div>'; // deck
+  }
+
+  // Briefing area: AI prose when available, reading suggestions otherwise
+  if (serverMode && llmConfigured) {
+    html += '<div class="rundown-briefing" id="rundown-briefing">';
+    html += '<button class="rundown-briefing-refresh" onclick="loadBriefing(true)" aria-label="Refresh briefing" title="Refresh">';
+    html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M21 21v-5h-5"/></svg>';
+    html += '</button>';
+    html += '<div class="rundown-briefing-body" id="rundown-briefing-body">';
+    html += '<div class="briefing-skeleton"><div class="skeleton-line w80"></div><div class="skeleton-line w60"></div><div class="skeleton-line w90"></div><div class="skeleton-line w70"></div></div>';
+    html += '</div>';
+    html += '</div>';
+  } else {
+    // Fallback: show top unread articles as reading suggestions
+    var suggestions = unread.filter(function(f) { return !usedSet[f.filename]; }).slice(0, 3);
+    if (suggestions.length > 0) {
+      html += '<div class="rundown-briefing">';
+      for (var si = 0; si < suggestions.length; si++) {
+        var sg = suggestions[si];
+        html += '<div class="sections-headline" onclick="dashLoadArticle(\'' + escapeJsStr(sg.filename) + '\')">';
+        html += '<span class="sections-headline-title">' + escapeHtml(sg.title) + '</span>';
+        html += '<span class="sections-headline-time">' + escapeHtml(sg.domain || sg.feed || '') + '</span>';
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+  }
+
+  html += '</div>'; // end rundown-top
+
+  // --- Continue Reading card (partially-read articles with progress bars) ---
+  var positions = JSON.parse(localStorage.getItem('pr-scroll-positions') || '{}');
+  var continueReading = allFiles.filter(function(f) {
+    var pos = positions[f.filename];
+    return pos && pos.pct > 0.05 && pos.pct < 0.95 && !usedSet[f.filename];
+  });
+  continueReading.sort(function(a, b) {
+    return (positions[b.filename].ts || 0) - (positions[a.filename].ts || 0);
+  });
+  continueReading = continueReading.slice(0, 4);
+  for (var ci = 0; ci < continueReading.length; ci++) usedSet[continueReading[ci].filename] = true;
+
+  // --- Latest card (newest unread articles) ---
+  var latestUnread = unread.filter(function(f) { return !usedSet[f.filename]; });
+  latestUnread.sort(function(a, b) {
+    return new Date(b.bookmarked || 0).getTime() - new Date(a.bookmarked || 0).getTime();
+  });
+  var latestArticles = latestUnread.slice(0, 5);
+  for (var li = 0; li < latestArticles.length; li++) usedSet[latestArticles[li].filename] = true;
+
+  // --- Section modules (12 editorial categories only) ---
+  var secMap = {};
+  for (var i = 0; i < unread.length; i++) {
+    var f = unread[i];
+    if (usedSet[f.filename]) continue;
+    var sec = resolveSection(f.filename);
+    if (SECTIONS.indexOf(sec) === -1) continue;
+    if (!secMap[sec]) secMap[sec] = [];
+    secMap[sec].push(f);
+  }
+  var sectionKeys = Object.keys(secMap).sort(function(a, b) {
+    return secMap[b].length - secMap[a].length;
+  });
+
+  var hasCards = continueReading.length > 0 || latestArticles.length > 0 || sectionKeys.length > 0;
+  if (hasCards) {
+
+    html += '<div class="rundown-sections">';
+
+    // Continue Reading card (featured first article + headline rows with progress)
+    if (continueReading.length > 0) {
+      html += '<div class="sections-block">';
+      html += '<div class="sections-block-header">';
+      html += '<div class="sections-block-color" style="background:var(--accent)"></div>';
+      html += '<span class="sections-block-name">Continue Reading</span>';
+      html += '</div>';
+      // Featured article (first one)
+      var crFeat = continueReading[0];
+      var crFeatPct = Math.round((positions[crFeat.filename].pct || 0) * 100);
+      html += '<div class="sections-featured" onclick="dashLoadArticle(\'' + escapeJsStr(crFeat.filename) + '\')">';
+      if (crFeat.image) {
+        html += '<img src="' + escapeHtml(crFeat.image) + '" alt="" loading="lazy" onerror="this.remove()">';
+      }
+      html += '<div class="sections-featured-body">';
+      html += '<div class="sections-featured-title">' + escapeHtml(crFeat.title) + '</div>';
+      html += '<div class="sections-featured-meta">' + escapeHtml(crFeat.domain || crFeat.feed || '') + ' &middot; ' + crFeatPct + '% read</div>';
+      html += '<div class="sections-progress"><div class="sections-progress-bar" style="width:' + crFeatPct + '%"></div></div>';
+      html += '</div></div>';
+      // Remaining as headline rows (matching section card style)
+      for (var ci = 1; ci < continueReading.length; ci++) {
+        var cr = continueReading[ci];
+        var pct = Math.round((positions[cr.filename].pct || 0) * 100);
+        html += '<div class="sections-headline" onclick="dashLoadArticle(\'' + escapeJsStr(cr.filename) + '\')">';
+        html += '<span class="sections-headline-title">' + escapeHtml(cr.title) + '</span>';
+        html += '<span class="sections-headline-time">' + pct + '% read</span>';
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+
+    // Latest card
+    if (latestArticles.length > 0) {
+      html += '<div class="sections-block">';
+      html += '<div class="sections-block-header">';
+      html += '<div class="sections-block-color" style="background:var(--link)"></div>';
+      html += '<span class="sections-block-name">Latest</span>';
+      html += '</div>';
+      // Featured article (first with thumb)
+      var latFeat = latestArticles[0];
+      html += '<div class="sections-featured" onclick="dashLoadArticle(\'' + escapeJsStr(latFeat.filename) + '\')">';
+      if (latFeat.image) {
+        html += '<img src="' + escapeHtml(latFeat.image) + '" alt="" loading="lazy" onerror="this.remove()">';
+      }
+      html += '<div class="sections-featured-body">';
+      html += '<div class="sections-featured-title">' + escapeHtml(latFeat.title) + '</div>';
+      html += '<div class="sections-featured-meta">' + escapeHtml(latFeat.domain || latFeat.feed || '') + (latFeat.bookmarked ? ' &middot; ' + timeAgo(latFeat.bookmarked) : '') + '</div>';
+      html += '</div></div>';
+      // Headline list (up to 4 more)
+      for (var li = 1; li < latestArticles.length; li++) {
+        var la = latestArticles[li];
+        html += '<div class="sections-headline" onclick="dashLoadArticle(\'' + escapeJsStr(la.filename) + '\')">';
+        html += '<span class="sections-headline-title">' + escapeHtml(la.title) + '</span>';
+        if (la.bookmarked) html += '<span class="sections-headline-time">' + timeAgo(la.bookmarked) + '</span>';
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+
+    // Section modules
+    for (var ski = 0; ski < sectionKeys.length; ski++) {
+      var secId = sectionKeys[ski];
+      var arts = secMap[secId];
+      var color = sectionColor(secId);
+      var label = SECTION_LABELS[secId] || secId;
+      var totalCount = arts.length;
+
+      html += '<div class="sections-block">';
+
+      // Header with color accent, label, count
+      html += '<div class="sections-block-header">';
+      html += '<div class="sections-block-color" style="background:' + color + '"></div>';
+      html += '<span class="sections-block-name">' + escapeHtml(label) + '</span>';
+      html += '<span class="sections-block-count">' + totalCount + '</span>';
+      html += '</div>';
+
+      // Featured article with thumbnail
+      var feat = arts[0];
+      html += '<div class="sections-featured" onclick="dashLoadArticle(\'' + escapeJsStr(feat.filename) + '\')">';
+      if (feat.image) {
+        html += '<img src="' + escapeHtml(feat.image) + '" alt="" loading="lazy" onerror="this.remove()">';
+      }
+      html += '<div class="sections-featured-body">';
+      html += '<div class="sections-featured-title">' + escapeHtml(feat.title) + '</div>';
+      html += '<div class="sections-featured-meta">' + escapeHtml(feat.domain || feat.feed || '') + (feat.bookmarked ? ' &middot; ' + timeAgo(feat.bookmarked) : '') + '</div>';
+      html += '</div></div>';
+
+      // Headline list (up to 4 more)
+      for (var hi = 1; hi < Math.min(arts.length, 5); hi++) {
+        var a = arts[hi];
+        html += '<div class="sections-headline" onclick="dashLoadArticle(\'' + escapeJsStr(a.filename) + '\')">';
+        html += '<span class="sections-headline-title">' + escapeHtml(a.title) + '</span>';
+        if (a.bookmarked) html += '<span class="sections-headline-time">' + timeAgo(a.bookmarked) + '</span>';
+        html += '</div>';
+      }
+
+      // "More in Section" — open the first unseen article and filter sidebar to section
+      if (totalCount > 5) {
+        var nextArt = arts[5];
+        html += '<a class="sections-more" onclick="dashLoadArticle(\'' + escapeJsStr(nextArt.filename) + '\');document.getElementById(\'search\').value=\'section:&quot;' + escapeJsStr(secId) + '&quot;\';filterFiles()">More in ' + escapeHtml(label) + ' (' + totalCount + ') &rsaquo;</a>';
+      }
+
+      html += '</div>';
+    }
+    html += '</div>'; // end rundown-sections
+  }
+
+  html += '</div>'; // end rundown-tab
+  return html;
+}
+
+// Rundown deck navigation
+var _rundownDeckIndex = 0;
+var _rundownDeckTimer = null;
+
+function rundownDeckGoTo(index) {
+  var deck = document.getElementById('rundown-deck');
+  if (!deck) return;
+  var track = document.getElementById('rundown-deck-track');
+  var dots = deck.querySelectorAll('.spotlight-deck-dot');
+  var count = dots.length;
+  if (index < 0) index = count - 1;
+  if (index >= count) index = 0;
+  _rundownDeckIndex = index;
+  track.style.transform = 'translateX(-' + (index * 100) + '%)';
+  for (var i = 0; i < dots.length; i++) {
+    dots[i].classList.toggle('active', i === index);
+  }
+  rundownDeckResetTimer();
+}
+
+function rundownDeckNext() { rundownDeckGoTo(_rundownDeckIndex + 1); }
+function rundownDeckPrev() { rundownDeckGoTo(_rundownDeckIndex - 1); }
+
+function rundownDeckResetTimer() {
+  clearInterval(_rundownDeckTimer);
+  if (window.innerWidth > 700) {
+    _rundownDeckTimer = setInterval(function() {
+      rundownDeckGoTo(_rundownDeckIndex + 1);
+    }, 8000);
+  }
+}
+
+function initRundownDeck() {
+  var deck = document.getElementById('rundown-deck');
+  if (!deck) return;
+  _rundownDeckIndex = 0;
+  rundownDeckResetTimer();
+
+  deck.addEventListener('mouseenter', function() { clearInterval(_rundownDeckTimer); });
+  deck.addEventListener('mouseleave', function() { rundownDeckResetTimer(); });
+
+  var startX = 0;
+  deck.addEventListener('touchstart', function(e) {
+    startX = e.touches[0].clientX;
+    clearInterval(_rundownDeckTimer);
+  }, { passive: true });
+  deck.addEventListener('touchend', function(e) {
+    var dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 40) {
+      dx > 0 ? rundownDeckPrev() : rundownDeckNext();
+    } else {
+      rundownDeckResetTimer();
+    }
+  }, { passive: true });
+}
+
+function briefingCacheTTL() {
+  // Apple Intelligence: 2 hours; other providers: 3 hours
+  return llmProvider === 'apple' ? 2 * 60 * 60 * 1000 : 3 * 60 * 60 * 1000;
+}
+
+function loadBriefing(forceRefresh) {
+  var body = document.getElementById('rundown-briefing-body');
+  if (!body) return;
+
+  // Check localStorage cache with TTL
+  if (!forceRefresh) {
+    try {
+      var raw = localStorage.getItem('pr-briefing-cache');
+      if (raw) {
+        var cached = JSON.parse(raw);
+        var age = Date.now() - (cached._ts || 0);
+        if (age < briefingCacheTTL()) {
+          renderBriefing(cached);
+          return;
+        }
+      }
+    } catch (e) { /* fall through to fetch */ }
+  }
+
+  // Show skeleton
+  body.innerHTML = '<div class="briefing-skeleton"><div class="skeleton-line w80"></div><div class="skeleton-line w60"></div><div class="skeleton-line w90"></div><div class="skeleton-line w70"></div></div>';
+
+  var excludeParam = (window._deckFilenames || []).join(',');
+  fetch('/api/briefing?days=1' + (excludeParam ? '&exclude=' + encodeURIComponent(excludeParam) : ''))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) {
+        if (data.error.indexOf('No recent') !== -1) {
+          body.innerHTML = '<p class="briefing-hint">All caught up — no articles to brief on.</p>';
+        } else {
+          body.innerHTML = '<p class="briefing-hint">Could not load briefing</p>';
+        }
+        return;
+      }
+      data._ts = Date.now();
+      localStorage.setItem('pr-briefing-cache', JSON.stringify(data));
+      renderBriefing(data);
+    })
+    .catch(function() {
+      body.innerHTML = '<p class="briefing-hint">Could not load briefing</p>';
+    });
+}
+
+function renderBriefing(data) {
+  var body = document.getElementById('rundown-briefing-body');
+  if (!body) return;
+
+  var html = sanitizeHtml(marked.parse(cleanMarkdown(data.briefing)));
+  body.innerHTML = html;
+
+  // Post-process: convert article:N links to clickable article openers
+  if (data.articles && data.articles.length > 0) {
+    var links = body.querySelectorAll('a[href^="#article-"]');
+    for (var li = 0; li < links.length; li++) {
+      var href = links[li].getAttribute('href');
+      var idx = parseInt(href.replace('#article-', ''), 10) - 1;
+      if (idx >= 0 && idx < data.articles.length && data.articles[idx].filename) {
+        links[li].className = 'briefing-article-link';
+        links[li].setAttribute('data-filename', data.articles[idx].filename);
+        links[li].removeAttribute('href');
+        links[li].onclick = (function(fn) {
+          return function(e) { e.preventDefault(); dashLoadArticle(fn); };
+        })(data.articles[idx].filename);
+      }
+    }
+  }
+}
+
 function renderHub() {
   var dash = document.getElementById('dashboard');
   if (!dash) return;
@@ -22,150 +400,36 @@ function renderHub() {
   // --- Greeting ---
   var hour = new Date().getHours();
   var greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-  var unreadCount = allFiles.filter(function(f) { return !readArticles.has(f.filename); }).length;
 
   html += '<div class="dash-greeting">';
   html += '<h1>' + greeting + '</h1>';
   html += '</div>';
 
   // --- Tab bar ---
+  var activeTab = getHomeTab();
+  var tabs = [
+    { id: 'rundown', label: 'Rundown' },
+    { id: 'stats', label: 'Stats' }
+  ];
+  // Migrate anyone who had a removed tab saved
+  if (['brief', 'tags', 'sources', 'sections', 'spotlight'].indexOf(activeTab) !== -1) { activeTab = 'rundown'; setHomeTab('rundown'); }
   html += '<div class="explore-tabs">';
-  html += '<button class="explore-tab active" data-tab="for-you">For You</button>';
-  html += '<button class="explore-tab" data-tab="sources">Sources</button>';
-  html += '<button class="explore-tab" data-tab="stats">Stats</button>';
-  html += '<button class="explore-tab" data-tab="tags">Tags</button>';
+  for (var ti = 0; ti < tabs.length; ti++) {
+    var isActive = tabs[ti].id === activeTab;
+    html += '<button class="explore-tab' + (isActive ? ' active' : '') + '" data-tab="' + tabs[ti].id + '">' + tabs[ti].label + '</button>';
+  }
   html += '</div>';
 
   // --- Tab content ---
   var data = collectExploreData();
+  var engagement = computeSourceEngagement();
+  var mc = getMixerConfig();
 
-  // For You tab
-  var forYouHtml = '';
+  // Build tab content
+  var rundownHtml = buildRundownTab(engagement, mc);
 
-  // Daily Rundown — topic briefing cards
-  forYouHtml += buildDailyRundownHtml();
-
-  // Section Rundown — articles grouped by editorial section
-  forYouHtml += buildSectionRundownHtml();
-
-  // Continue Reading
-  var positions = JSON.parse(localStorage.getItem('pr-scroll-positions') || '{}');
-  var continueReading = allFiles.filter(function(f) {
-    var pos = positions[f.filename];
-    return pos && pos.pct > 0.05 && pos.pct < 0.9;
-  }).sort(function(a, b) { return (positions[b.filename].ts || 0) - (positions[a.filename].ts || 0); }).slice(0, 3);
-
-  if (continueReading.length > 0) {
-    forYouHtml += '<div class="dash-section">';
-    forYouHtml += '<div class="dash-section-header">';
-    forYouHtml += '<span class="dash-section-title"><svg viewBox="0 0 384 512"><use href="#i-book"/></svg> Continue Reading</span>';
-    forYouHtml += '</div>';
-    forYouHtml += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards">';
-    for (var ci = 0; ci < continueReading.length; ci++) {
-      var crVariant = (ci === 0) ? 'featured' : 'standard';
-      forYouHtml += dashCardHtml(continueReading[ci], positions[continueReading[ci].filename] ? positions[continueReading[ci].filename].pct : undefined, crVariant);
-    }
-    forYouHtml += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
-  }
-
-  // Suggested Feeds
-  forYouHtml += '<div id="hub-suggested-feeds"></div>';
-
-  // Reviews
-  var reviews = allFiles.filter(function(f) { return f.feed === 'weekly-review' || f.feed === 'daily-review' || f.domain === 'pullread'; }).slice(0, 3);
-  var todayStr = new Date().toISOString().slice(0, 10);
-  var hasDaily = allFiles.some(function(f) { return f.filename && f.filename.indexOf('_daily-review-' + todayStr) >= 0; });
-  var threeDaysAgo = new Date(); threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-  var hasWeekly = allFiles.some(function(f) {
-    return f.feed === 'weekly-review' && f.bookmarked && new Date(f.bookmarked) >= threeDaysAgo;
-  });
-  var _missingDaily = !hasDaily;
-  var _missingWeekly = !hasWeekly;
-
-  if (reviews.length > 0 || (serverMode && (_missingDaily || _missingWeekly))) {
-    forYouHtml += '<div class="dash-section">';
-    forYouHtml += '<div class="dash-section-header"><span class="dash-section-title"><svg viewBox="0 0 512 512"><use href="#i-wand"/></svg> Reviews</span></div>';
-    forYouHtml += '<div class="dash-cards" style="overflow:visible;flex-wrap:wrap">';
-    for (var ri = 0; ri < reviews.length; ri++) {
-      var rf = reviews[ri];
-      var isWeekly = rf.feed === 'weekly-review';
-      var typeLabel = isWeekly ? 'Weekly' : 'Daily';
-      var rdate = rf.bookmarked ? rf.bookmarked.slice(0, 10) : '';
-      forYouHtml += '<div class="dash-review-card" onclick="dashLoadArticle(\'' + escapeHtml(rf.filename) + '\')">';
-      forYouHtml += '<div class="dash-review-title">' + escapeHtml(rf.title) + '</div>';
-      forYouHtml += '<div class="dash-review-meta">' + typeLabel + ' Review' + (rdate ? ' &middot; ' + rdate : '') + '</div>';
-      if (rf.excerpt) forYouHtml += '<div class="dash-review-excerpt">' + escapeHtml(rf.excerpt) + '</div>';
-      forYouHtml += '</div>';
-    }
-    if (serverMode && _missingDaily) {
-      forYouHtml += '<div class="dash-review-card dash-review-generating" id="daily-review-placeholder">';
-      forYouHtml += '<div class="dash-review-title">Generating Daily Review\u2026</div>';
-      forYouHtml += '<div class="dash-review-meta">Daily Review</div>';
-      forYouHtml += '</div>';
-    }
-    if (serverMode && _missingWeekly) {
-      forYouHtml += '<div class="dash-review-card dash-review-generating" id="weekly-review-placeholder">';
-      forYouHtml += '<div class="dash-review-title">Generating Weekly Review\u2026</div>';
-      forYouHtml += '<div class="dash-review-meta">Weekly Review</div>';
-      forYouHtml += '</div>';
-    }
-    forYouHtml += '</div></div>';
-  }
-
-  // Connections between articles via shared tags
-  var connectionsHtml = buildConnectionsHtml(data.tagArticles, data.sortedTags);
-  if (connectionsHtml) {
-    forYouHtml += '<div class="dash-section">';
-    forYouHtml += '<div class="dash-section-header"><span class="dash-section-title">Connections</span></div>';
-    forYouHtml += connectionsHtml;
-    forYouHtml += '</div>';
-  }
-
-  // Recent Unread
-  var recent = allFiles.filter(function(f) { return !readArticles.has(f.filename) && f.feed !== 'weekly-review' && f.feed !== 'daily-review' && f.domain !== 'pullread'; }).slice(0, 20);
-  if (recent.length > 0) {
-    forYouHtml += '<div class="dash-section">';
-    forYouHtml += '<div class="dash-section-header">';
-    forYouHtml += '<span class="dash-section-title"><svg viewBox="0 0 448 512"><use href="#i-calendar"/></svg> Recent <span class="dash-section-count">(' + recent.length + ')</span></span>';
-    if (unreadCount > recent.length) {
-      forYouHtml += '<button class="dash-view-all" onclick="document.getElementById(\'search\').focus()">View all ' + unreadCount + ' &rsaquo;</button>';
-    }
-    forYouHtml += '</div>';
-    forYouHtml += '<div class="dash-cards-wrap"><button class="dash-chevron left" onclick="dashScrollLeft(this)" aria-label="Scroll left">&#8249;</button><div class="dash-cards dash-cards-compact">';
-    for (var rci = 0; rci < recent.length; rci++) {
-      forYouHtml += dashCardHtml(recent[rci], undefined, 'compact');
-    }
-    forYouHtml += '</div><button class="dash-chevron right" onclick="dashScrollRight(this)" aria-label="Scroll right">&#8250;</button></div></div>';
-  }
-
-  // Your Topics — top machine tags by frequency
-  var topTopics = data.sortedTags.filter(function(t) { return !blockedTags.has(t[0]); }).slice(0, 15);
-  if (topTopics.length > 0) {
-    forYouHtml += '<div class="dash-section">';
-    forYouHtml += '<div class="dash-section-header">';
-    forYouHtml += '<span class="dash-section-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-tag"/></svg> Your Topics</span>';
-    forYouHtml += '</div>';
-    forYouHtml += '<div class="your-topics">';
-    for (var ti = 0; ti < topTopics.length; ti++) {
-      var tagName = topTopics[ti][0];
-      var tagCount = topTopics[ti][1];
-      forYouHtml += '<button class="tag-pill" onclick="document.getElementById(\'search\').value=\'tag:\\x22' + escapeJsStr(tagName) + '\\x22\';filterFiles()">' + escapeHtml(tagName) + ' <span class="tag-count">' + tagCount + '</span></button>';
-    }
-    forYouHtml += '</div></div>';
-  }
-
-  // Quick actions at bottom of For You
-  forYouHtml += '<div class="dash-actions">';
-  forYouHtml += '<button onclick="dashGenerateReview(1)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Daily Review</button>';
-  forYouHtml += '<button onclick="dashGenerateReview(7)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Weekly Review</button>';
-  forYouHtml += '<button onclick="showGuideModal()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-book"/></svg> Guide</button>';
-  forYouHtml += '<button onclick="showTour()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-comment"/></svg> Tour</button>';
-  forYouHtml += '</div>';
-
-  html += '<div id="explore-for-you" class="explore-tab-panel active">' + forYouHtml + '</div>';
-  html += '<div id="explore-sources" class="explore-tab-panel">' + buildSourcesHtml(data) + '</div>';
-  html += '<div id="explore-stats" class="explore-tab-panel">' + buildStatsTabHtml(data) + '</div>';
-  html += '<div id="explore-tags" class="explore-tab-panel">' + buildTagsTabHtml(data) + '</div>';
+  html += '<div id="explore-rundown" class="explore-tab-panel' + (activeTab === 'rundown' ? ' active' : '') + '">' + rundownHtml + '</div>';
+  html += '<div id="explore-stats" class="explore-tab-panel' + (activeTab === 'stats' ? ' active' : '') + '">' + buildStatsTabHtml(data) + '</div>';
 
   dash.innerHTML = html;
 
@@ -175,42 +439,22 @@ function renderHub() {
       dash.querySelectorAll('.explore-tab').forEach(function(b) { b.classList.remove('active'); });
       dash.querySelectorAll('.explore-tab-panel').forEach(function(p) { p.classList.remove('active'); });
       btn.classList.add('active');
-      document.getElementById('explore-' + btn.dataset.tab).classList.add('active');
+      var tabId = btn.dataset.tab;
+      document.getElementById('explore-' + tabId).classList.add('active');
+      setHomeTab(tabId);
+      // Manage auto-advance timer
+      if (tabId === 'rundown') rundownDeckResetTimer();
+      else if (_rundownDeckTimer) { clearInterval(_rundownDeckTimer); _rundownDeckTimer = null; }
     });
   });
 
   requestAnimationFrame(initDashChevrons);
-  requestAnimationFrame(initRundown);
+  requestAnimationFrame(initRundownDeck);
+  requestAnimationFrame(function() { loadBriefing(false); });
 
   // If audio is queued, switch to mini player so controls stay visible in sidebar
   if (typeof ttsQueue !== 'undefined' && ttsQueue.length > 0) {
     setPlayerMode('mini');
-  }
-
-  // Async: load suggested feeds
-  loadSuggestedFeedsSection();
-
-  // Background review generation
-  if (serverMode && !_reviewGenInFlight && (_missingDaily || _missingWeekly)) {
-    _reviewGenInFlight = true;
-    var jobs = [];
-    if (_missingDaily) jobs.push({ days: 1, id: 'daily-review-placeholder' });
-    if (_missingWeekly) jobs.push({ days: 7, id: 'weekly-review-placeholder' });
-    var promises = jobs.map(function(job) {
-      return fetch('/api/review', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ days: job.days })
-      }).then(function(r) { return r.json(); }).then(function(data) {
-        var el = document.getElementById(job.id);
-        if (el) el.remove();
-        if (!data.error) refreshArticleList(true);
-      }).catch(function() {
-        var el = document.getElementById(job.id);
-        if (el) el.remove();
-      });
-    });
-    Promise.allSettled(promises).then(function() { _reviewGenInFlight = false; });
   }
 }
 

@@ -400,8 +400,36 @@ var SECTION_LABELS = {
   tech: 'Tech', news: 'News & Politics', science: 'Science', health: 'Health',
   business: 'Business', culture: 'Culture', sports: 'Sports', food: 'Food & Drink',
   lifestyle: 'Lifestyle', environment: 'Environment', education: 'Education',
-  opinion: 'Opinion', other: 'Other'
+  opinion: 'Opinion', other: 'More'
 };
+
+var SECTION_COLORS = {
+  tech: '#3b82f6',
+  news: '#ef4444',
+  science: '#8b5cf6',
+  health: '#22c55e',
+  business: '#f59e0b',
+  culture: '#ec4899',
+  sports: '#f97316',
+  food: '#14b8a6',
+  lifestyle: '#d946ef',
+  environment: '#10b981',
+  education: '#06b6d4',
+  opinion: '#6366f1',
+  other: '#6b7280'
+};
+
+function sectionColor(section) {
+  return SECTION_COLORS[section] || SECTION_COLORS.other;
+}
+
+function formatTopicLabel(tag) {
+  var spaced = tag.replace(/([a-z])([A-Z])/g, '$1 $2');
+  if (spaced === tag && tag.length > 12) {
+    spaced = tag.replace(/(intelligence|learning|science|change|policy|security|computing|technology|development|management|engineering)$/i, ' $1');
+  }
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
 
 function resolveSection(filename) {
   var notes = allNotesIndex[filename];

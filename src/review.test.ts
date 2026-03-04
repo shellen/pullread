@@ -1,7 +1,27 @@
-// ABOUTME: Tests for review generation — category parsing, article clustering, and review output
-// ABOUTME: Verifies groupByCategories clusters articles and review markdown contains anchor links
+// ABOUTME: Tests for review generation — category parsing, article clustering, and briefing output
+// ABOUTME: Verifies groupByCategories clusters articles, generateBriefing returns linked articles
 
-import { groupByCategories, type ArticleMeta } from './review';
+jest.mock('./summarizer', () => ({
+  summarizeText: jest.fn(),
+}));
+jest.mock('./writer', () => ({
+  listMarkdownFiles: jest.fn(),
+  resolveFilePath: jest.fn((p: string) => p),
+}));
+
+import { groupByCategories, generateBriefing, type ArticleMeta } from './review';
+import { summarizeText } from './summarizer';
+import { listMarkdownFiles } from './writer';
+import { readFileSync } from 'fs';
+
+const mockSummarize = summarizeText as jest.MockedFunction<typeof summarizeText>;
+const mockListFiles = listMarkdownFiles as jest.MockedFunction<typeof listMarkdownFiles>;
+
+jest.mock('fs', () => {
+  const actual = jest.requireActual('fs');
+  return { ...actual, readFileSync: jest.fn(), existsSync: jest.fn().mockReturnValue(true) };
+});
+const mockReadFile = readFileSync as jest.MockedFunction<typeof readFileSync>;
 
 describe('groupByCategories', () => {
   const articles: ArticleMeta[] = [
@@ -66,5 +86,110 @@ describe('groupByCategories', () => {
     const groups = groupByCategories(arts);
     expect(groups[0].slug).toBe('cluster-law-enforcement');
     expect(groups[0].slug).toMatch(/^cluster-[a-z0-9-]+$/);
+  });
+});
+
+describe('generateBriefing', () => {
+  const today = new Date().toISOString().slice(0, 10);
+
+  function makeFrontmatter(title: string, domain: string, bookmarked: string) {
+    return `---\ntitle: "${title}"\nurl: "https://${domain}/article"\nbookmarked: ${bookmarked}\ndomain: ${domain}\n---\nBody text`;
+  }
+
+  beforeEach(() => {
+    mockSummarize.mockReset();
+    mockListFiles.mockReset();
+    mockReadFile.mockReset();
+  });
+
+  test('returns null when no recent articles', async () => {
+    mockListFiles.mockReturnValue([]);
+    const result = await generateBriefing('/tmp/test', 1);
+    expect(result).toBeNull();
+  });
+
+  test('returns briefing text and article metadata with filenames', async () => {
+    mockListFiles.mockReturnValue(['/tmp/test/article-one.md', '/tmp/test/article-two.md']);
+    // Files sorted by name descending: article-two before article-one
+    mockReadFile
+      .mockReturnValueOnce(makeFrontmatter('Second Article', 'other.com', today) as any)
+      .mockReturnValueOnce(makeFrontmatter('First Article', 'example.com', today) as any);
+    mockSummarize.mockResolvedValue({ summary: '**First Article** is great. **Second Article** too.', model: 'test' });
+
+    const result = await generateBriefing('/tmp/test', 1);
+    expect(result).not.toBeNull();
+    expect(result!.briefing).toContain('First Article');
+    expect(result!.articles).toHaveLength(2);
+    const first = result!.articles.find(a => a.title === 'First Article');
+    expect(first).toEqual({
+      title: 'First Article',
+      filename: 'article-one.md',
+      domain: 'example.com',
+    });
+  });
+
+  test('caps articles at 25', async () => {
+    const paths = Array.from({ length: 30 }, (_, i) => `/tmp/test/art-${i}.md`);
+    mockListFiles.mockReturnValue(paths);
+    for (let i = 0; i < 30; i++) {
+      mockReadFile.mockReturnValueOnce(makeFrontmatter(`Article ${i}`, 'example.com', today) as any);
+    }
+    mockSummarize.mockResolvedValue({ summary: 'Briefing text.', model: 'test' });
+
+    const result = await generateBriefing('/tmp/test', 1);
+    expect(result).not.toBeNull();
+    expect(result!.articles.length).toBeLessThanOrEqual(25);
+    // Prompt should have been called with at most 25 articles
+    expect(mockSummarize).toHaveBeenCalledTimes(1);
+  });
+
+  test('calls summarizeText with markdown link format and tone guidance', async () => {
+    mockListFiles.mockReturnValue(['/tmp/test/a.md']);
+    mockReadFile.mockReturnValueOnce(makeFrontmatter('Test Title', 'test.com', today) as any);
+    mockSummarize.mockResolvedValue({ summary: 'Brief', model: 'test' });
+
+    await generateBriefing('/tmp/test', 1);
+    const prompt = mockSummarize.mock.calls[0][0];
+    expect(prompt).toContain('no headings');
+    expect(prompt).toContain('#article-');
+    expect(prompt).toContain('[exact title](#article-');
+    expect(prompt).toContain('author');
+    expect(prompt).toContain('video');
+    expect(prompt).toContain('podcast');
+    expect(prompt).toContain('two paragraphs');
+    expect(prompt).toContain('somber');
+    expect(prompt).toContain('generic');
+    expect(prompt).not.toContain('biggest');
+  });
+
+  test('excludes articles by filename when excludeFilenames provided', async () => {
+    mockListFiles.mockReturnValue(['/tmp/test/keep.md', '/tmp/test/exclude-me.md']);
+    mockReadFile
+      .mockReturnValueOnce(makeFrontmatter('Keep Article', 'keep.com', today) as any)
+      .mockReturnValueOnce(makeFrontmatter('Excluded Article', 'excluded.com', today) as any);
+    mockSummarize.mockResolvedValue({ summary: 'Brief', model: 'test' });
+
+    const result = await generateBriefing('/tmp/test', 1, ['exclude-me.md']);
+    expect(result).not.toBeNull();
+    expect(result!.articles).toHaveLength(1);
+    expect(result!.articles[0].title).toBe('Keep Article');
+    const prompt = mockSummarize.mock.calls[0][0];
+    expect(prompt).not.toContain('Excluded Article');
+  });
+
+  test('includes trending categories in prompt when articles have categories', async () => {
+    const fm = (title: string, domain: string, cats: string[]) =>
+      `---\ntitle: "${title}"\nurl: "https://${domain}/article"\nbookmarked: ${today}\ndomain: ${domain}\ncategories: ${JSON.stringify(cats)}\n---\nBody`;
+    mockListFiles.mockReturnValue(['/tmp/test/a.md', '/tmp/test/b.md', '/tmp/test/c.md']);
+    mockReadFile
+      .mockReturnValueOnce(fm('Tech Article 1', 'tech.com', ['Technology']) as any)
+      .mockReturnValueOnce(fm('Tech Article 2', 'verge.com', ['Technology']) as any)
+      .mockReturnValueOnce(fm('Solo Article', 'other.com', ['Sports']) as any);
+    mockSummarize.mockResolvedValue({ summary: 'Brief', model: 'test' });
+
+    await generateBriefing('/tmp/test', 1);
+    const prompt = mockSummarize.mock.calls[0][0];
+    expect(prompt).toContain('Technology');
+    expect(prompt).toMatch(/trending|trend/i);
   });
 });
