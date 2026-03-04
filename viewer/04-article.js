@@ -437,11 +437,13 @@ function renderHub() {
       var tabId = btn.dataset.tab;
       document.getElementById('explore-' + tabId).classList.add('active');
       setHomeTab(tabId);
+      // Manage spotlight auto-advance timer
+      if (tabId === 'spotlight') spotlightResetTimer();
+      else if (_spotlightTimer) { clearInterval(_spotlightTimer); _spotlightTimer = null; }
     });
   });
 
   requestAnimationFrame(initDashChevrons);
-  requestAnimationFrame(initRundown);
   requestAnimationFrame(initSpotlightDeck);
 
   // If audio is queued, switch to mini player so controls stay visible in sidebar

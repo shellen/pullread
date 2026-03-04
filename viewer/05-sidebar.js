@@ -472,7 +472,8 @@ function filterFiles() {
         // Operator: section:value — filter by editorial section
         if (tl.startsWith('section:')) {
           const secQ = tl.slice(8).replace(/^"(.*)"$/, '$1');
-          return resolveSection(f.filename) === secQ;
+          var resolved = resolveSection(f.filename);
+          return resolved === secQ || resolved.toLowerCase() === secQ;
         }
         // Operator: author:value (supports author:"First Last")
         if (tl.startsWith('author:')) {
