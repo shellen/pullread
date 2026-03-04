@@ -347,7 +347,7 @@ function buildStatsTabHtml(data) {
 
 function buildDiscoverTab(data) {
   var chips = [
-    { label: 'Favorites', query: 'is:starred', icon: '#i-heart' },
+    { label: 'Starred', query: 'is:starred', icon: '#i-heart' },
     { label: 'Unread', query: 'is:unread', icon: '#i-eye-slash' },
     { label: 'Has Summary', query: 'has:summary', icon: '#i-wand' },
     { label: 'Has Highlights', query: 'has:highlights', icon: '#i-book' },

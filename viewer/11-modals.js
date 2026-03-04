@@ -69,7 +69,7 @@ function showGuideModal() {
     <p>PullRead syncs your bookmarks and RSS feeds into clean Markdown files you can read, search, highlight, and keep forever. Articles are stored locally on your Mac.</p>
 
     <h2>Dashboard</h2>
-    <p>When you first open PullRead, the dashboard shows a personalized overview of your reading: articles you're in the middle of, recent reviews, favorites, and the latest additions. Click any card to jump straight to that article, or click the PullRead logo to return to the dashboard.</p>
+    <p>When you first open PullRead, the dashboard shows a personalized overview of your reading: articles you're in the middle of, recent reviews, starred articles, and the latest additions. Click any card to jump straight to that article, or click the PullRead logo to return to the dashboard.</p>
 
     <h2>How does syncing work?</h2>
     <p>PullRead fetches new items from your configured feeds (Instapaper, Pinboard, Raindrop, RSS, etc.) and extracts the article content into Markdown. You can sync manually from the menu bar, or set an automatic interval in Settings (every 30 min, 1 hour, 4 hours, or 12 hours).</p>
@@ -82,7 +82,7 @@ function showGuideModal() {
     <table>
       <thead><tr><th>Operator</th><th>Description</th></tr></thead>
       <tbody>
-        <tr><td><code>is:starred</code></td><td>Starred articles (also <code>is:favorite</code>, <code>is:fav</code>)</td></tr>
+        <tr><td><code>is:starred</code></td><td>Starred articles (also <code>is:star</code>, <code>is:fav</code>)</td></tr>
         <tr><td><code>is:read</code> / <code>is:unread</code></td><td>Filter by read status</td></tr>
         <tr><td><code>has:summary</code></td><td>Articles with AI summaries</td></tr>
         <tr><td><code>has:highlights</code></td><td>Articles with highlights</td></tr>
@@ -97,7 +97,7 @@ function showGuideModal() {
     <p>Combine operators with spaces for AND logic (<code>is:fav tag:tech</code>), or use <code>OR</code> between groups (<code>tag:ai OR tag:ml</code>). Wrap multi-word searches in quotes (<code>"machine learning"</code>). Plain text searches title, domain, feed, and tags.</p>
 
     <h2>Highlights &amp; Notes</h2>
-    <p>Select any text and press <strong>h</strong> to highlight it, or use the floating toolbar to choose a color. Click a highlight to add a note. Press <strong>n</strong> to open the notes panel for article-level notes, tags, and favorites.</p>
+    <p>Select any text and press <strong>h</strong> to highlight it, or use the floating toolbar to choose a color. Click a highlight to add a note. Press <strong>n</strong> to open the notes panel for article-level notes, tags, and starring.</p>
 
     <h2>Voice Notes</h2>
     <p>Click the microphone icon next to the notes textarea to dictate notes hands-free. Speech is transcribed in real-time using the Web Speech API and automatically saved to your article notes when you stop recording.</p>
@@ -479,7 +479,7 @@ function renderStepSearch() {
     + '<div class="ob-glass-card">'
     + '<div class="ob-method"><div class="ob-method-icon"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg></div><div><div class="ob-method-title">Search Operators</div><div class="ob-method-desc">Type <code>is:unread</code>, <code>tag:tech</code>, <code>feed:NYT</code>, <code>has:highlights</code> and more in the search bar.</div></div></div>'
     + '<div class="ob-method"><div class="ob-method-icon"><svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg></div><div><div class="ob-method-title">Pinned Filters</div><div class="ob-method-desc">Pin up to 3 frequent searches as quick-access buttons below the search bar.</div></div></div>'
-    + '<div class="ob-method"><div class="ob-method-icon"><svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg></div><div><div class="ob-method-title">Favorites</div><div class="ob-method-desc">Heart any article. Find them with <code>is:favorite</code>.</div></div></div>'
+    + '<div class="ob-method"><div class="ob-method-icon"><svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg></div><div><div class="ob-method-title">Starred</div><div class="ob-method-desc">Star any article. Find them with <code>is:starred</code>.</div></div></div>'
     + '<div class="ob-method"><div class="ob-method-icon"><svg class="icon" aria-hidden="true"><use href="#i-tags"/></svg></div><div><div class="ob-method-title">Explore</div><div class="ob-method-desc">Tag cloud and topic connections across your entire library.</div></div></div>'
     + '</div>';
 }
