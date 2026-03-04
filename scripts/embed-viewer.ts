@@ -99,6 +99,7 @@ const ICON_MAP: Array<{ id: string; file: string; variant?: 'solid' | 'chevron' 
   { id: 'i-comment', file: 'chat-bubble-oval-left-ellipsis.svg' },
   { id: 'i-ellipsis', file: 'ellipsis-horizontal.svg' },
   { id: 'i-envelope', file: 'envelope.svg' },
+  { id: 'i-envelope-open', file: 'envelope-open.svg' },
   { id: 'i-external', file: 'arrow-top-right-on-square.svg' },
   { id: 'i-eye-slash', file: 'eye-slash.svg' },
   { id: 'i-focus', file: 'bars-2.svg' },
