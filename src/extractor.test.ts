@@ -1,5 +1,5 @@
 // ABOUTME: Tests for article content extraction
-// ABOUTME: Verifies Readability extracts clean content from HTML pages
+// ABOUTME: Verifies Defuddle/Readability extracts clean content from HTML pages
 
 import {
   extractArticle, resolveRelativeUrls, simplifySubstackUrl, isYouTubeUrl, extractYouTubeId,
@@ -27,8 +27,8 @@ const SAMPLE_HTML = `
 `;
 
 describe('extractArticle', () => {
-  test('extracts article content from HTML', () => {
-    const result = extractArticle(SAMPLE_HTML, 'https://example.com/test');
+  test('extracts article content from HTML', async () => {
+    const result = await extractArticle(SAMPLE_HTML, 'https://example.com/test');
 
     expect(result).not.toBeNull();
     expect(result!.title).toBe('Test Page');
@@ -37,56 +37,56 @@ describe('extractArticle', () => {
     expect(result!.content).not.toContain('Footer');
   });
 
-  test('extracts content from minimal pages', () => {
+  test('extracts content from minimal pages', async () => {
     const minimal = '<html><body><p>Short content here</p></body></html>';
-    const result = extractArticle(minimal, 'https://example.com/short');
+    const result = await extractArticle(minimal, 'https://example.com/short');
 
     expect(result).not.toBeNull();
     expect(result!.content).toContain('Short content');
   });
 
-  test('converts content to markdown', () => {
-    const result = extractArticle(SAMPLE_HTML, 'https://example.com/test');
+  test('converts content to markdown', async () => {
+    const result = await extractArticle(SAMPLE_HTML, 'https://example.com/test');
 
     expect(result).not.toBeNull();
-    // Turndown converts <p> to plain text with newlines, not HTML
+    // Content converted to plain text with newlines, not HTML
     expect(result!.markdown).not.toContain('<p>');
     expect(result!.markdown).toContain('first paragraph');
   });
 });
 
 describe('extractArticle — language detection', () => {
-  test('extracts lang attribute from html element', () => {
+  test('extracts lang attribute from html element', async () => {
     const html = `<html lang="fr"><head><title>Article en français</title></head>
       <body><article><p>Ceci est le premier paragraphe de l'article avec assez de contenu.</p>
       <p>Voici le deuxième paragraphe avec plus de contenu substantiel.</p>
       <p>Et un troisième paragraphe pour s'assurer que Readability fonctionne correctement.</p>
       </article></body></html>`;
-    const result = extractArticle(html, 'https://example.fr/article');
+    const result = await extractArticle(html, 'https://example.fr/article');
     expect(result).not.toBeNull();
     expect(result!.lang).toBe('fr');
   });
 
-  test('extracts base language from lang with region', () => {
+  test('extracts base language from lang with region', async () => {
     const html = `<html lang="de-DE"><head><title>Deutscher Artikel</title></head>
       <body><article><p>Dies ist der erste Absatz des Artikels mit genug Inhalt.</p>
       <p>Hier ist der zweite Absatz mit mehr inhaltlichem Material für die Extraktion.</p>
       <p>Und ein dritter Absatz, um sicherzustellen, dass alles korrekt funktioniert.</p>
       </article></body></html>`;
-    const result = extractArticle(html, 'https://example.de/artikel');
+    const result = await extractArticle(html, 'https://example.de/artikel');
     expect(result).not.toBeNull();
     expect(result!.lang).toBe('de');
   });
 
-  test('returns undefined lang when html has no lang attribute', () => {
-    const result = extractArticle(SAMPLE_HTML, 'https://example.com/test');
+  test('returns undefined lang when html has no lang attribute', async () => {
+    const result = await extractArticle(SAMPLE_HTML, 'https://example.com/test');
     expect(result).not.toBeNull();
     expect(result!.lang).toBeUndefined();
   });
 });
 
 describe('extractArticle — X.com/Twitter handling', () => {
-  test('generates title from og:description for X.com posts', () => {
+  test('generates title from og:description for X.com posts', async () => {
     const html = `<html><head>
       <meta property="og:description" content="Just shipped the new feature! Really excited about this one." />
     </head><body>
@@ -94,31 +94,31 @@ describe('extractArticle — X.com/Twitter handling', () => {
       <p>More content here for readability to pick up properly in extraction.</p>
       <p>Even more content to make sure readability considers this an article.</p></article>
     </body></html>`;
-    const result = extractArticle(html, 'https://x.com/johndoe/status/123456789');
+    const result = await extractArticle(html, 'https://x.com/johndoe/status/123456789');
     expect(result).not.toBeNull();
     // Should NOT be "Untitled"
     expect(result!.title).not.toBe('Untitled');
     expect(result!.title).toContain('shipped');
   });
 
-  test('generates username-based title when no description available', () => {
+  test('generates username-based title when no description available', async () => {
     const html = `<html><head><title></title></head><body>
       <article><p>Some tweet content that readability will extract from the page.</p>
       <p>Additional content to make readability happy with extraction length.</p>
       <p>Third paragraph for good measure to ensure extraction works properly.</p></article>
     </body></html>`;
-    const result = extractArticle(html, 'https://x.com/janedoe/status/987654321');
+    const result = await extractArticle(html, 'https://x.com/janedoe/status/987654321');
     expect(result).not.toBeNull();
     expect(result!.title).not.toBe('Untitled');
   });
 
-  test('does not alter titles for non-Twitter URLs', () => {
+  test('does not alter titles for non-Twitter URLs', async () => {
     const html = `<html><head><title></title></head><body>
       <article><p>Content of the page without a proper title set in head.</p>
       <p>More content here for the readability algorithm to extract properly.</p>
       <p>And even more substantial content for good extraction results.</p></article>
     </body></html>`;
-    const result = extractArticle(html, 'https://example.com/article');
+    const result = await extractArticle(html, 'https://example.com/article');
     // For non-Twitter, "Untitled" is still the default
     if (result) {
       // Either has a title or is Untitled — but NOT Twitter-specific
@@ -126,7 +126,7 @@ describe('extractArticle — X.com/Twitter handling', () => {
     }
   });
 
-  test('handles long tweet descriptions by truncating', () => {
+  test('handles long tweet descriptions by truncating', async () => {
     const longDesc = 'A'.repeat(100);
     const html = `<html><head>
       <meta property="og:description" content="${longDesc}" />
@@ -135,7 +135,7 @@ describe('extractArticle — X.com/Twitter handling', () => {
       <p>Second paragraph of tweet content for readability extraction to work.</p>
       <p>Third paragraph to ensure there is enough content for extraction.</p></article>
     </body></html>`;
-    const result = extractArticle(html, 'https://x.com/user/status/111');
+    const result = await extractArticle(html, 'https://x.com/user/status/111');
     expect(result).not.toBeNull();
     expect(result!.title.length).toBeLessThanOrEqual(80);
   });
@@ -393,7 +393,7 @@ describe('resolveRelativeUrls — Substack CDN simplification', () => {
 });
 
 describe('extractArticle — Substack image handling', () => {
-  test('extracts images from Substack-style linked image with wrapper div', () => {
+  test('extracts images from Substack-style linked image with wrapper div', async () => {
     const html = `<html><head><title>Test Post</title></head><body>
       <article>
         <p>This is a paragraph with enough content for readability to extract it properly.</p>
@@ -406,7 +406,7 @@ describe('extractArticle — Substack image handling', () => {
         <p>And a third paragraph to ensure we have enough content for extraction to work properly.</p>
       </article>
     </body></html>`;
-    const result = extractArticle(html, 'https://example.substack.com/p/test-post');
+    const result = await extractArticle(html, 'https://example.substack.com/p/test-post');
     expect(result).not.toBeNull();
     // Should contain a proper image, not raw URL text
     expect(result!.markdown).toContain('![');
@@ -416,7 +416,7 @@ describe('extractArticle — Substack image handling', () => {
     expect(result!.markdown).toContain('substack-post-media.s3.amazonaws.com');
   });
 
-  test('extracts images from direct Substack img tags', () => {
+  test('extracts images from direct Substack img tags', async () => {
     const html = `<html><head><title>Direct Image Post</title></head><body>
       <article>
         <p>This article has a direct image tag from substack without a link wrapper around it.</p>
@@ -425,7 +425,7 @@ describe('extractArticle — Substack image handling', () => {
         <p>And a third paragraph to ensure we have enough content for extraction to work properly.</p>
       </article>
     </body></html>`;
-    const result = extractArticle(html, 'https://example.substack.com/p/direct-image');
+    const result = await extractArticle(html, 'https://example.substack.com/p/direct-image');
     expect(result).not.toBeNull();
     expect(result!.markdown).toContain('![');
     expect(result!.markdown).not.toContain('substackcdn.com/image/fetch');
@@ -1053,7 +1053,7 @@ describe('fetchAndExtract — binary content safeguards', () => {
   });
 
   test('rejects audio content-type responses', async () => {
-    globalThis.fetch = async () => new Response('binary garbage', {
+    (globalThis as any).fetch = async () => new Response('binary garbage', {
       status: 200,
       headers: { 'content-type': 'audio/mpeg' },
     }) as any;
@@ -1064,7 +1064,7 @@ describe('fetchAndExtract — binary content safeguards', () => {
   });
 
   test('rejects video content-type responses', async () => {
-    globalThis.fetch = async () => new Response('binary garbage', {
+    (globalThis as any).fetch = async () => new Response('binary garbage', {
       status: 200,
       headers: { 'content-type': 'video/mp4' },
     }) as any;
