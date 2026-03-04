@@ -1197,6 +1197,23 @@
     color: var(--muted);
     font-size: 13px;
   }
+  /* Section color palette — shared across Brief, Sections, Spotlight tabs */
+  :root {
+    --section-tech: #3b82f6;
+    --section-news: #ef4444;
+    --section-science: #8b5cf6;
+    --section-health: #22c55e;
+    --section-business: #f59e0b;
+    --section-culture: #ec4899;
+    --section-sports: #f97316;
+    --section-food: #14b8a6;
+    --section-lifestyle: #d946ef;
+    --section-environment: #10b981;
+    --section-education: #06b6d4;
+    --section-opinion: #6366f1;
+    --section-other: #6b7280;
+  }
+
   .section-rundown {
     margin: 16px 0;
   }

@@ -403,6 +403,26 @@ var SECTION_LABELS = {
   opinion: 'Opinion', other: 'Other'
 };
 
+var SECTION_COLORS = {
+  tech: '#3b82f6',
+  news: '#ef4444',
+  science: '#8b5cf6',
+  health: '#22c55e',
+  business: '#f59e0b',
+  culture: '#ec4899',
+  sports: '#f97316',
+  food: '#14b8a6',
+  lifestyle: '#d946ef',
+  environment: '#10b981',
+  education: '#06b6d4',
+  opinion: '#6366f1',
+  other: '#6b7280'
+};
+
+function sectionColor(section) {
+  return SECTION_COLORS[section] || SECTION_COLORS.other;
+}
+
 function formatTopicLabel(tag) {
   var spaced = tag.replace(/([a-z])([A-Z])/g, '$1 $2');
   if (spaced === tag && tag.length > 12) {
