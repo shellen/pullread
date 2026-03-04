@@ -125,7 +125,76 @@ function buildBriefTab(engagement, mc) {
 }
 
 function buildSectionsTab(engagement, mc) {
-  return '<div class="sections-tab"><p style="color:var(--muted);padding:20px">Sections tab — coming soon</p></div>';
+  var html = '<div class="sections-tab">';
+
+  var sections = buildSectionRundown();
+  if (sections.length === 0) {
+    html += '<p style="color:var(--muted);padding:20px;text-align:center">No unread articles</p>';
+    html += '</div>';
+    return html;
+  }
+
+  // Sort sections by engagement weight
+  sections.sort(function(a, b) {
+    var engA = 0, engB = 0;
+    for (var i = 0; i < a.articles.length; i++) {
+      var key = a.articles[i].feed || a.articles[i].domain || 'unknown';
+      engA += engagement[key] || 0;
+    }
+    for (var i = 0; i < b.articles.length; i++) {
+      var key = b.articles[i].feed || b.articles[i].domain || 'unknown';
+      engB += engagement[key] || 0;
+    }
+    return engB - engA;
+  });
+
+  html += '<div class="sections-grid">';
+  for (var si = 0; si < sections.length; si++) {
+    var sec = sections[si];
+    var color = sectionColor(sec.section);
+
+    html += '<div class="sections-block">';
+
+    // Header
+    html += '<div class="sections-block-header">';
+    html += '<div class="sections-block-color" style="background:' + color + '"></div>';
+    html += '<span class="sections-block-name">' + escapeHtml(sec.label) + '</span>';
+    html += '<span class="sections-block-count">' + sec.totalCount + '</span>';
+    html += '</div>';
+
+    // Featured article (first one)
+    if (sec.articles.length > 0) {
+      var feat = sec.articles[0];
+      html += '<div class="sections-featured" onclick="dashLoadArticle(\'' + escapeJsStr(feat.filename) + '\')">';
+      if (feat.image) {
+        html += '<img src="' + escapeHtml(feat.image) + '" alt="" loading="lazy" onerror="this.remove()">';
+      }
+      html += '<div class="sections-featured-body">';
+      html += '<div class="sections-featured-title">' + escapeHtml(feat.title) + '</div>';
+      html += '<div class="sections-featured-meta">' + escapeHtml(feat.domain || feat.feed || '') + (feat.bookmarked ? ' &middot; ' + timeAgo(feat.bookmarked) : '') + '</div>';
+      html += '</div></div>';
+    }
+
+    // Headline list (remaining articles, up to 4)
+    for (var hi = 1; hi < Math.min(sec.articles.length, 5); hi++) {
+      var a = sec.articles[hi];
+      html += '<div class="sections-headline" onclick="dashLoadArticle(\'' + escapeJsStr(a.filename) + '\')">';
+      html += '<span class="sections-headline-title">' + escapeHtml(a.title) + '</span>';
+      if (a.bookmarked) html += '<span class="sections-headline-time">' + timeAgo(a.bookmarked) + '</span>';
+      html += '</div>';
+    }
+
+    // "More in Section" link
+    if (sec.totalCount > sec.articles.length) {
+      html += '<a class="sections-more" onclick="document.getElementById(\'search\').value=\'section:' + escapeJsStr(sec.section) + '\';filterFiles()">More in ' + escapeHtml(sec.label) + ' (' + sec.totalCount + ') &rsaquo;</a>';
+    }
+
+    html += '</div>';
+  }
+  html += '</div>';
+
+  html += '</div>';
+  return html;
 }
 
 function buildSpotlightTab(engagement, mc) {

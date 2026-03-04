@@ -1349,6 +1349,114 @@
     white-space: nowrap;
   }
 
+  /* Sections tab — portal grid */
+  .sections-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    padding: 0 4px;
+  }
+  @media (max-width: 700px) {
+    .sections-grid { grid-template-columns: 1fr; }
+  }
+  .sections-block {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--code-bg);
+  }
+  .sections-block-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sections-block-color {
+    width: 4px;
+    height: 20px;
+    border-radius: 2px;
+  }
+  .sections-block-name {
+    font-size: 14px;
+    font-weight: 600;
+    flex: 1;
+  }
+  .sections-block-count {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .sections-featured {
+    display: flex;
+    gap: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: background 0.1s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .sections-featured:hover { background: var(--hover); }
+  .sections-featured img {
+    width: 80px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 6px;
+    flex-shrink: 0;
+  }
+  .sections-featured-body {
+    flex: 1;
+    min-width: 0;
+  }
+  .sections-featured-title {
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-bottom: 2px;
+  }
+  .sections-featured-meta {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .sections-headline {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 5px 12px;
+    cursor: pointer;
+    transition: background 0.1s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .sections-headline:hover { background: var(--hover); }
+  .sections-headline-title {
+    flex: 1;
+    font-size: 13px;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .sections-headline-time {
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .sections-more {
+    display: block;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--link);
+    text-decoration: none;
+    cursor: pointer;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    transition: background 0.1s;
+  }
+  .sections-more:hover { background: var(--hover); }
+
   .section-rundown {
     margin: 16px 0;
   }
