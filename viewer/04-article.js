@@ -27,6 +27,9 @@ function buildRundownTab(engagement, mc) {
   var withImages = unread.filter(function(f) { return f.image; });
   var deckArticles = withImages.slice(0, 7);
 
+  // Store deck filenames so loadBriefing can exclude them
+  window._deckFilenames = deckArticles.map(function(f) { return f.filename; });
+
   // Track used filenames so we don't repeat in feed columns
   var usedSet = {};
   for (var di = 0; di < deckArticles.length; di++) usedSet[deckArticles[di].filename] = true;
@@ -153,16 +156,15 @@ function buildRundownTab(engagement, mc) {
       html += '<div class="sections-featured-body">';
       html += '<div class="sections-featured-title">' + escapeHtml(crFeat.title) + '</div>';
       html += '<div class="sections-featured-meta">' + escapeHtml(crFeat.domain || crFeat.feed || '') + ' &middot; ' + crFeatPct + '% read</div>';
-      html += '</div></div>';
       html += '<div class="sections-progress"><div class="sections-progress-bar" style="width:' + crFeatPct + '%"></div></div>';
-      // Remaining as headline rows with progress
+      html += '</div></div>';
+      // Remaining as headline rows (matching section card style)
       for (var ci = 1; ci < continueReading.length; ci++) {
         var cr = continueReading[ci];
         var pct = Math.round((positions[cr.filename].pct || 0) * 100);
         html += '<div class="sections-headline" onclick="dashLoadArticle(\'' + escapeJsStr(cr.filename) + '\')">';
         html += '<span class="sections-headline-title">' + escapeHtml(cr.title) + '</span>';
-        html += '<span class="sections-headline-time">' + pct + '%</span>';
-        html += '<div class="sections-progress"><div class="sections-progress-bar" style="width:' + pct + '%"></div></div>';
+        html += '<span class="sections-headline-time">' + pct + '% read</span>';
         html += '</div>';
       }
       html += '</div>';
@@ -331,7 +333,8 @@ function loadBriefing(forceRefresh) {
   // Show skeleton
   body.innerHTML = '<div class="briefing-skeleton"><div class="skeleton-line w80"></div><div class="skeleton-line w60"></div><div class="skeleton-line w90"></div><div class="skeleton-line w70"></div></div>';
 
-  fetch('/api/briefing?days=1')
+  var excludeParam = (window._deckFilenames || []).join(',');
+  fetch('/api/briefing?days=1' + (excludeParam ? '&exclude=' + encodeURIComponent(excludeParam) : ''))
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.error) {
@@ -358,35 +361,19 @@ function renderBriefing(data) {
   var html = sanitizeHtml(marked.parse(cleanMarkdown(data.briefing)));
   body.innerHTML = html;
 
-  // Post-process: make bold text matching article titles clickable (on live DOM)
+  // Post-process: convert article:N links to clickable article openers
   if (data.articles && data.articles.length > 0) {
-    var strongs = body.querySelectorAll('strong');
-    function normTitle(s) {
-      return s.toLowerCase().replace(/[\u2018\u2019\u201C\u201D]/g, "'").replace(/[^\w\s']/g, '').replace(/\s+/g, ' ').trim();
-    }
-    for (var si = 0; si < strongs.length; si++) {
-      var text = strongs[si].textContent;
-      var boldNorm = normTitle(text);
-      if (boldNorm.length < 4) continue;
-      var match = null;
-      for (var ai = 0; ai < data.articles.length; ai++) {
-        var art = data.articles[ai];
-        if (!art.filename) continue;
-        var titleNorm = normTitle(art.title);
-        if (titleNorm === boldNorm || titleNorm.indexOf(boldNorm) !== -1 || boldNorm.indexOf(titleNorm) !== -1) {
-          match = art;
-          break;
-        }
-      }
-      if (match) {
-        var link = document.createElement('a');
-        link.className = 'briefing-article-link';
-        link.textContent = text;
-        link.setAttribute('data-filename', match.filename);
-        link.onclick = (function(fn) {
+    var links = body.querySelectorAll('a[href^="#article-"]');
+    for (var li = 0; li < links.length; li++) {
+      var href = links[li].getAttribute('href');
+      var idx = parseInt(href.replace('#article-', ''), 10) - 1;
+      if (idx >= 0 && idx < data.articles.length && data.articles[idx].filename) {
+        links[li].className = 'briefing-article-link';
+        links[li].setAttribute('data-filename', data.articles[idx].filename);
+        links[li].removeAttribute('href');
+        links[li].onclick = (function(fn) {
           return function(e) { e.preventDefault(); dashLoadArticle(fn); };
-        })(match.filename);
-        strongs[si].replaceWith(link);
+        })(data.articles[idx].filename);
       }
     }
   }

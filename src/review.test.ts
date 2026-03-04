@@ -143,7 +143,7 @@ describe('generateBriefing', () => {
     expect(mockSummarize).toHaveBeenCalledTimes(1);
   });
 
-  test('calls summarizeText with overview prompt including links, media, and tone guidance', async () => {
+  test('calls summarizeText with markdown link format and tone guidance', async () => {
     mockListFiles.mockReturnValue(['/tmp/test/a.md']);
     mockReadFile.mockReturnValueOnce(makeFrontmatter('Test Title', 'test.com', today) as any);
     mockSummarize.mockResolvedValue({ summary: 'Brief', model: 'test' });
@@ -151,7 +151,8 @@ describe('generateBriefing', () => {
     await generateBriefing('/tmp/test', 1);
     const prompt = mockSummarize.mock.calls[0][0];
     expect(prompt).toContain('no headings');
-    expect(prompt).toContain('**exact title**');
+    expect(prompt).toContain('#article-');
+    expect(prompt).toContain('[exact title](#article-');
     expect(prompt).toContain('author');
     expect(prompt).toContain('video');
     expect(prompt).toContain('podcast');
@@ -159,8 +160,36 @@ describe('generateBriefing', () => {
     expect(prompt).toContain('somber');
     expect(prompt).toContain('generic');
     expect(prompt).not.toContain('biggest');
-    expect(prompt).not.toContain('The Big Picture');
-    expect(prompt).not.toContain('Worth Your Attention');
-    expect(prompt).not.toContain('Deep Cut');
+  });
+
+  test('excludes articles by filename when excludeFilenames provided', async () => {
+    mockListFiles.mockReturnValue(['/tmp/test/keep.md', '/tmp/test/exclude-me.md']);
+    mockReadFile
+      .mockReturnValueOnce(makeFrontmatter('Keep Article', 'keep.com', today) as any)
+      .mockReturnValueOnce(makeFrontmatter('Excluded Article', 'excluded.com', today) as any);
+    mockSummarize.mockResolvedValue({ summary: 'Brief', model: 'test' });
+
+    const result = await generateBriefing('/tmp/test', 1, ['exclude-me.md']);
+    expect(result).not.toBeNull();
+    expect(result!.articles).toHaveLength(1);
+    expect(result!.articles[0].title).toBe('Keep Article');
+    const prompt = mockSummarize.mock.calls[0][0];
+    expect(prompt).not.toContain('Excluded Article');
+  });
+
+  test('includes trending categories in prompt when articles have categories', async () => {
+    const fm = (title: string, domain: string, cats: string[]) =>
+      `---\ntitle: "${title}"\nurl: "https://${domain}/article"\nbookmarked: ${today}\ndomain: ${domain}\ncategories: ${JSON.stringify(cats)}\n---\nBody`;
+    mockListFiles.mockReturnValue(['/tmp/test/a.md', '/tmp/test/b.md', '/tmp/test/c.md']);
+    mockReadFile
+      .mockReturnValueOnce(fm('Tech Article 1', 'tech.com', ['Technology']) as any)
+      .mockReturnValueOnce(fm('Tech Article 2', 'verge.com', ['Technology']) as any)
+      .mockReturnValueOnce(fm('Solo Article', 'other.com', ['Sports']) as any);
+    mockSummarize.mockResolvedValue({ summary: 'Brief', model: 'test' });
+
+    await generateBriefing('/tmp/test', 1);
+    const prompt = mockSummarize.mock.calls[0][0];
+    expect(prompt).toContain('Technology');
+    expect(prompt).toMatch(/trending|trend/i);
   });
 });

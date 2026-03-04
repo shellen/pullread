@@ -1166,8 +1166,9 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
     if (url.pathname === '/api/briefing' && req.method === 'GET') {
       try {
         const days = parseInt(url.searchParams.get('days') || '1', 10);
+        const exclude = url.searchParams.get('exclude')?.split(',').filter(Boolean) || [];
         const { generateBriefing } = await import('./review');
-        const result = await generateBriefing(outputPath, days);
+        const result = await generateBriefing(outputPath, days, exclude);
         if (!result) {
           sendJson(res, { error: 'No recent articles for a briefing' });
         } else {
