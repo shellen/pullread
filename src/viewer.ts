@@ -1800,7 +1800,7 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
     if (url.pathname === '/api/ask' && req.method === 'POST') {
       try {
         const body = JSON.parse(await readBody(req));
-        const { question } = body;
+        const { question, previousSources } = body;
         if (!question || typeof question !== 'string') {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'question is required' }));
@@ -1817,8 +1817,17 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
         const isApple = config.provider === 'apple';
         const articleLimit = isApple ? 3 : 8;
         const wordLimit = isApple ? 300 : 600;
-        const articles = listFiles(outputPath);
-        const relevant = findRelevantArticles(question, articles, articleLimit);
+
+        // Reuse previous sources for follow-up questions; fall back to keyword search
+        let relevant: FileMeta[];
+        if (Array.isArray(previousSources) && previousSources.length > 0) {
+          const articles = listFiles(outputPath);
+          const prevSet = new Set(previousSources as string[]);
+          relevant = articles.filter(a => prevSet.has(a.filename)).slice(0, articleLimit);
+        } else {
+          const articles = listFiles(outputPath);
+          relevant = findRelevantArticles(question, articles, articleLimit);
+        }
 
         // Build article context
         const articleContext = relevant.map(a => {

@@ -155,10 +155,19 @@ function _askSend() {
   var btn = ta.parentElement.querySelector('.ask-send-btn');
   if (btn) btn.disabled = true;
 
+  // Gather previous sources so follow-ups reuse the same articles
+  var prevSources = [];
+  for (var j = _askMessages.length - 1; j >= 0; j--) {
+    if (_askMessages[j].sources && _askMessages[j].sources.length) {
+      prevSources = _askMessages[j].sources.map(function(s) { return s.filename; });
+      break;
+    }
+  }
+
   fetch('/api/ask', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ question: question })
+    body: JSON.stringify({ question: question, previousSources: prevSources })
   }).then(function(res) { return res.json(); }).then(function(data) {
     _askBusy = false;
     if (data.error) {
