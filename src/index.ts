@@ -210,7 +210,7 @@ async function syncFeed(
       let lang: string | undefined;
       let source: string | undefined;
 
-      if (entry.enclosure) {
+      if (entry.enclosure && /^(audio|video)\//.test(entry.enclosure.type || '')) {
         content = entry.annotation || 'No description available.';
       } else if (entry.contentHtml) {
         // Feed has content — use it directly, skip extraction
