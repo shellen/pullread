@@ -84,6 +84,15 @@ jobs:
       - name: Build Bun sidecar
         run: bun build src/index.ts --compile --target=${{ matrix.bun_target }} --outfile dist/pullread
 
+      - name: Verify no jsdom in compiled binary
+        run: |
+          if strings dist/pullread | grep -q 'xhr-sync-worker'; then
+            echo "ERROR: jsdom's xhr-sync-worker found in compiled binary"
+            echo "This will crash at runtime on user machines."
+            exit 1
+          fi
+          echo "OK: no xhr-sync-worker references in binary"
+
       - name: Prepare sidecar
         run: bash scripts/prepare-sidecar.sh ${{ matrix.target }}
 
