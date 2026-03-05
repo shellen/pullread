@@ -36,7 +36,7 @@ function summaryBlockHtml(provider, model, text) {
     + '<div class="summary-label">Summary</div>'
     + '<p class="summary-text" id="summary-text">' + escapeHtml(text) + '</p>'
     + '<div class="summary-footer"><div class="summary-footer-left">'
-    + '<div class="attribution">' + sparkle + '<span>' + escapeHtml(label) + '</span></div>'
+    + '<div class="attribution" title="' + escapeHtml((label || '') + (model ? ' \u00B7 ' + model : '')) + '">' + sparkle + '<span>' + escapeHtml(label) + '</span></div>'
     + '</div><div class="summary-actions">'
     + '<button class="summary-icon-btn" onclick="regenerateSummary(this)" title="Regenerate">'
     + '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5M8 2.5V5.5M8 2.5L10.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
