@@ -557,7 +557,7 @@ function showSettingsPage(scrollToSection) {
   var html = '';
 
   // Header
-  html += '<div class="settings-header"><h1>Settings</h1></div>';
+  html += '<div class="article-header"><h1>Settings</h1></div>';
 
   // Segmented control
   html += '<div class="segmented-control-wrapper">';
@@ -1450,6 +1450,14 @@ function settingsPageSaveLLM(skipRefresh) {
     if (Object.keys(entry).length > 0) providers[p] = entry;
   }
 
+  // Read the active provider's model for updating globals
+  var activeModelSelect = document.getElementById('sp-llm-model-' + defaultProvider);
+  var activeCustomInput = document.getElementById('sp-llm-custom-input-' + defaultProvider);
+  var activeModel = '';
+  if (activeModelSelect) {
+    activeModel = activeModelSelect.value === '__custom' ? (activeCustomInput ? activeCustomInput.value.trim() : '') : activeModelSelect.value;
+  }
+
   return fetch('/api/settings', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1457,7 +1465,9 @@ function settingsPageSaveLLM(skipRefresh) {
   }).then(function(r) {
     if (r.ok) {
       llmProvider = defaultProvider;
+      llmModel = activeModel;
       llmConfigured = true;
+      showToast('AI settings saved');
       if (!skipRefresh) showSettingsPage();
     } else {
       alert('Failed to save AI settings.');
