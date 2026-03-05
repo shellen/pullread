@@ -95,6 +95,7 @@ const ICON_MAP: Array<{ id: string; file: string; variant?: 'solid' | 'chevron' 
   { id: 'i-chevron-left', file: 'chevron-left.svg', variant: 'chevron' },
   { id: 'i-chevron-right', file: 'chevron-right.svg', variant: 'chevron' },
   { id: 'i-chevron-up', file: 'chevron-up.svg', variant: 'chevron' },
+  { id: 'i-clipboard', file: 'clipboard.svg' },
   { id: 'i-cloud-download', file: 'cloud-arrow-down.svg' },
   { id: 'i-comment', file: 'chat-bubble-oval-left-ellipsis.svg' },
   { id: 'i-ellipsis', file: 'ellipsis-horizontal.svg' },
