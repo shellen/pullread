@@ -920,6 +920,9 @@ function renderArticle(text, filename) {
   if (toolbarEl) toolbarEl.innerHTML = toolbarActions;
   var toolbar = document.getElementById('reader-toolbar');
   if (toolbar) toolbar.style.display = '';
+  // Restore article-specific toolbar-right items (hidden by note view)
+  var toolbarRight = toolbar ? toolbar.querySelector('.reader-toolbar-right') : null;
+  if (toolbarRight) toolbarRight.style.display = '';
   // Show notebook back-references
   var nbRefs = Object.values(_notebooks || {}).filter(function(nb) { return nb.sources && nb.sources.indexOf(filename) >= 0; });
   if (nbRefs.length) {
