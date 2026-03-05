@@ -116,12 +116,12 @@ function renderFileItem(f, i) {
   const isPodcast = !!(f.enclosureUrl && isMediaEnclosure(f.enclosureType));
   const isVideo = !!(f.enclosureUrl && isVideoEnclosure(f.enclosureType));
 
-  // Social post: use platform icon and handle instead of generic title
+  // Social post: use display name + excerpt instead of generic title
   var socialPlatform = detectSocialPlatform(f);
   var socialAuthor = socialPlatform ? parseSocialAuthor(f, socialPlatform) : null;
   var displayTitle = f.title;
   if (socialAuthor && (f.title === 'Untitled' || /\(@[^)]+\)$/.test(f.title))) {
-    displayTitle = '@' + socialAuthor.handle;
+    displayTitle = socialAuthor.displayName || socialAuthor.handle;
     if (f.excerpt) {
       var excerptClean = f.excerpt.replace(/\n+/g, ' ').slice(0, 60);
       if (f.excerpt.length > 60) excerptClean += '\u2026';
@@ -501,12 +501,15 @@ function filterFiles() {
           return (f.author || '').toLowerCase().includes(authQ);
         }
 
-        // Plain text search — match against title, domain, feed, tags
+        // Plain text search — match against title, domain, feed, tags, social platform
         // Use accent-folded comparison so "cafe" matches "café" etc.
         var folded = foldAccents(t);
+        var sp = detectSocialPlatform(f);
+        var spName = sp ? (SOCIAL_PLATFORM_NAMES[sp] || '') : '';
         return foldAccents(f.title).includes(folded) ||
           foldAccents(f.domain).includes(folded) ||
           foldAccents(f.feed).includes(folded) ||
+          (spName && foldAccents(spName).includes(folded)) ||
           (notes?.tags || []).some(tg => foldAccents(tg).includes(folded)) ||
           (notes?.machineTags || []).some(tg => foldAccents(tg).includes(folded));
       });
