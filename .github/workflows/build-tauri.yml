@@ -269,6 +269,18 @@ jobs:
           find ./artifacts/x64 -name '*.dmg' -exec cp {} ./release/PullRead_Intel.dmg \;
           ls -la ./release/
 
+      - name: Delete stale assets from latest release
+        run: |
+          # Remove any assets that aren't PullRead.dmg or PullRead_Intel.dmg
+          gh release view latest --json assets --jq '.assets[].name' 2>/dev/null | while read -r name; do
+            if [ "$name" != "PullRead.dmg" ] && [ "$name" != "PullRead_Intel.dmg" ]; then
+              echo "Deleting stale asset: $name"
+              gh release delete-asset latest "$name" --yes
+            fi
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Update latest release
         uses: softprops/action-gh-release@v2
         with:
