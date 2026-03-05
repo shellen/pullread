@@ -364,6 +364,9 @@ function buildDiscoverTab(data) {
   if (serverMode && llmConfigured) {
     html += '<button class="discover-chip" onclick="dashGenerateReview(1)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Daily Review</button>';
     html += '<button class="discover-chip" onclick="dashGenerateReview(7)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Weekly Review</button>';
+    if (localStorage.getItem('pr-beta-features') === 'true') {
+      html += '<button class="discover-chip" onclick="renderAskPage()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Ask</button>';
+    }
   }
   html += '<button class="discover-chip" onclick="showGuideModal()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-book"/></svg> Guide</button>';
   html += '<button class="discover-chip" onclick="showGuideModal();setTimeout(function(){var f=document.getElementById(\'guide-faq\');if(f)f.scrollIntoView({behavior:\'smooth\'})},100)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-comment"/></svg> FAQ</button>';
@@ -421,6 +424,106 @@ function buildDiscoverTab(data) {
   return html;
 }
 
+function buildDiscoverCatalogHtml() {
+  var html = '<div id="discover-catalog-content">';
+  html += '<p style="color:var(--muted);font-size:13px">Loading feed catalog...</p>';
+  html += '</div>';
+  return html;
+}
+
+function renderDiscoverCatalog() {
+  var container = document.getElementById('discover-catalog-content');
+  if (!container) return;
+  fetchFeedCatalog(function(catalog) {
+    var filtered = filterCatalogFeeds(catalog);
+    var userUrls = getUserFeedUrls();
+    var userNames = new Set();
+    for (var i = 0; i < allFiles.length; i++) {
+      if (allFiles[i].feed) userNames.add(allFiles[i].feed.toLowerCase());
+    }
+
+    var html = '';
+    for (var ci = 0; ci < filtered.collections.length; ci++) {
+      var col = filtered.collections[ci];
+      var origCol = catalog.collections[ci];
+      var allSubscribed = origCol.feeds.length > 0 && col.feeds.length === 0;
+
+      html += '<div class="catalog-collection-row">';
+      html += '<div class="catalog-collection-header">';
+      html += '<svg class="icon icon-sm" aria-hidden="true"><use href="#' + col.icon + '"/></svg>';
+      html += '<div>';
+      html += '<h3>' + escapeHtml(col.name) + '</h3>';
+      html += '<p style="color:var(--muted);font-size:12px;margin:0">' + escapeHtml(col.description) + '</p>';
+      html += '</div>';
+      html += '</div>';
+
+      if (allSubscribed) {
+        html += '<p style="color:var(--muted);font-size:12px;padding:8px 0">All subscribed</p>';
+      } else {
+        html += '<div class="catalog-feed-cards">';
+        for (var fi = 0; fi < col.feeds.length; fi++) {
+          var feed = col.feeds[fi];
+          html += '<div class="catalog-feed-card">';
+          html += '<div class="catalog-feed-name">' + escapeHtml(feed.name) + '</div>';
+          html += '<div class="catalog-feed-desc">' + escapeHtml(feed.description) + '</div>';
+          html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto">';
+          html += '<span class="platform-badge">' + escapeHtml(feed.platform) + '</span>';
+          html += '<button class="btn-primary" style="font-size:11px;padding:3px 10px" onclick="addCatalogFeed(this,\'' + escapeHtml(feed.name.replace(/'/g, "\\'")) + '\',\'' + escapeHtml(feed.url.replace(/'/g, "\\'")) + '\')">Add</button>';
+          html += '</div>';
+          html += '</div>';
+        }
+        for (var si = 0; si < origCol.feeds.length; si++) {
+          var origFeed = origCol.feeds[si];
+          var isSubscribed = false;
+          if (userUrls.has(origFeed.url)) isSubscribed = true;
+          if (userNames.has(origFeed.name.toLowerCase())) isSubscribed = true;
+          if (isSubscribed) {
+            html += '<div class="catalog-feed-card subscribed">';
+            html += '<div class="catalog-feed-name">' + escapeHtml(origFeed.name) + '</div>';
+            html += '<div class="catalog-feed-desc">' + escapeHtml(origFeed.description) + '</div>';
+            html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto">';
+            html += '<span class="platform-badge">' + escapeHtml(origFeed.platform) + '</span>';
+            html += '<span style="font-size:11px;color:var(--muted)">Subscribed</span>';
+            html += '</div>';
+            html += '</div>';
+          }
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+    container.innerHTML = html;
+  });
+}
+
+function addCatalogFeed(btn, name, url) {
+  btn.disabled = true;
+  btn.textContent = 'Adding\u2026';
+  fetch('/api/config').then(function(r) { return r.json(); }).then(function(cfg) {
+    var feeds = cfg.feeds || {};
+    feeds[name] = url;
+    cfg.feeds = feeds;
+    return fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cfg)
+    });
+  }).then(function(r) {
+    if (r.ok) {
+      btn.textContent = '\u2713 Added';
+      btn.style.opacity = '0.5';
+      btn.disabled = true;
+      showToast('Added ' + name);
+    } else {
+      btn.textContent = 'Add';
+      btn.disabled = false;
+    }
+  }).catch(function() {
+    btn.textContent = 'Add';
+    btn.disabled = false;
+  });
+}
+
 // ---- Standalone Explore page (renders as inline page like Guide) ----
 function showTagCloud() {
   _sidebarView = 'home'; syncSidebarTabs();
@@ -439,14 +542,29 @@ function showTagCloud() {
 
   var data = collectExploreData();
 
+  var discoverFirst = allFiles.length < 10;
+  var tabsHtml = '<div class="explore-tabs">';
+  if (discoverFirst) {
+    tabsHtml += '<button class="explore-tab active" data-tab="discover">Discover</button>';
+    tabsHtml += '<button class="explore-tab" data-tab="sources">Sources</button>';
+  } else {
+    tabsHtml += '<button class="explore-tab active" data-tab="sources">Sources</button>';
+  }
+  tabsHtml += '<button class="explore-tab" data-tab="stats">Stats</button>';
+  tabsHtml += '<button class="explore-tab" data-tab="tags">Tags</button>';
+  if (!discoverFirst) {
+    tabsHtml += '<button class="explore-tab" data-tab="discover">Discover</button>';
+  }
+  tabsHtml += '</div>';
+
+  var discoverPanel = '<div id="explore-discover" class="explore-tab-panel' + (discoverFirst ? ' active' : '') + '">' + buildDiscoverCatalogHtml() + '</div>';
+  var sourcesPanel = '<div id="explore-sources" class="explore-tab-panel' + (!discoverFirst ? ' active' : '') + '">' + buildSourcesHtml(data) + '</div>';
+
   content.innerHTML =
     '<div class="article-header"><h1>Explore</h1></div>' +
-    '<div class="explore-tabs">' +
-      '<button class="explore-tab active" data-tab="sources">Sources</button>' +
-      '<button class="explore-tab" data-tab="stats">Stats</button>' +
-      '<button class="explore-tab" data-tab="tags">Tags</button>' +
-    '</div>' +
-    '<div id="explore-sources" class="explore-tab-panel active">' + buildSourcesHtml(data) + '</div>' +
+    tabsHtml +
+    discoverPanel +
+    sourcesPanel +
     '<div id="explore-stats" class="explore-tab-panel">' + buildStatsTabHtml(data) + '</div>' +
     '<div id="explore-tags" class="explore-tab-panel">' + buildTagsTabHtml(data) + '</div>';
 
@@ -458,6 +576,8 @@ function showTagCloud() {
       document.getElementById('explore-' + btn.dataset.tab).classList.add('active');
     });
   });
+
+  renderDiscoverCatalog();
 
   document.title = 'Explore Your Library';
   document.getElementById('content-scroll').scrollTop = 0;

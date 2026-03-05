@@ -1159,3 +1159,34 @@ describe('Feed catalog', () => {
     expect(js).not.toContain('filterSuggestedFeeds');
   });
 });
+
+describe('Explore Discover tab', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('showTagCloud renders a Discover tab', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '10-explore.js'), 'utf-8');
+    expect(js).toContain("data-tab=\"discover\"");
+    expect(js).toContain('Discover');
+  });
+
+  test('buildDiscoverCatalogHtml function exists', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '10-explore.js'), 'utf-8');
+    expect(js).toMatch(/function\s+buildDiscoverCatalogHtml/);
+  });
+
+  test('Discover tab renders catalog collection rows', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '10-explore.js'), 'utf-8');
+    expect(js).toContain('catalog-collection-row');
+    expect(js).toContain('catalog-feed-card');
+  });
+
+  test('feed cards show platform badge', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '10-explore.js'), 'utf-8');
+    expect(js).toContain('platform-badge');
+  });
+
+  test('Discover tab position depends on article count', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '10-explore.js'), 'utf-8');
+    expect(js).toContain('allFiles.length');
+  });
+});
