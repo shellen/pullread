@@ -647,6 +647,9 @@ function stubBrowserApis(doc: any): void {
   if (!win.matchMedia) {
     win.matchMedia = () => ({ matches: false, media: '', addListener: () => {}, removeListener: () => {} });
   }
+  if (!doc.styleSheets) {
+    Object.defineProperty(doc, 'styleSheets', { value: [], configurable: true });
+  }
 }
 
 /**
