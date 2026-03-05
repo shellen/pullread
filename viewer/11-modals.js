@@ -241,7 +241,7 @@ ln -sf "/Applications/Pull Read.app/Contents/Resources/binaries/pullread-cli-x86
     <h2>Acknowledgements</h2>
 
     <h3>Open Source Software</h3>
-    <p>PullRead uses open-source software including <strong>Mozilla Readability</strong> (Apache 2.0), <strong>Turndown</strong> (MIT), <strong>marked</strong> (MIT), <strong>highlight.js</strong> (BSD 3-Clause), <strong>Mermaid</strong> (MIT), and <strong>DOMPurify</strong> (Apache 2.0 / MPL 2.0).</p>
+    <p>PullRead uses open-source software including <strong>Defuddle</strong> (MIT), <strong>Mozilla Readability</strong> (Apache 2.0), <strong>Turndown</strong> (MIT), <strong>marked</strong> (MIT), <strong>highlight.js</strong> (BSD 3-Clause), <strong>Mermaid</strong> (MIT), <strong>DOMPurify</strong> (Apache 2.0 / MPL 2.0), <strong>hls.js</strong> (Apache 2.0), and <strong>unpdf</strong> (MIT).</p>
 
     <h3>Fonts</h3>
     <p>PullRead bundles the following typefaces for offline reading, all under the <strong>SIL Open Font License 1.1</strong>:</p>
@@ -256,7 +256,7 @@ ln -sf "/Applications/Pull Read.app/Contents/Resources/binaries/pullread-cli-x86
     <p>The SIL Open Font License permits free use, redistribution, and bundling of these fonts with software. Font files are sourced via <a href="https://fontsource.org" target="_blank" rel="noopener">Fontsource</a>.</p>
 
     <h3>Icons</h3>
-    <p>UI icons are based on <strong>Font Awesome Free</strong> (CC BY 4.0 / SIL OFL 1.1) by Fonticons, Inc.</p>
+    <p>UI icons are based on <strong>Heroicons</strong> (MIT) by Tailwind Labs. Brand icons (social sharing) from <strong>Font Awesome Free</strong> (CC BY 4.0) by Fonticons, Inc.</p>
 
     <p style="margin-top:16px">Full license texts are included in the app bundle at <code>Contents/Resources/Licenses/</code>.</p>
   `;

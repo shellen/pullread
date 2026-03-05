@@ -42,7 +42,7 @@ function showManageSourcesPage() {
   updateSidebarActiveState(prevActive);
 
   var html = '';
-  html += '<div class="sources-header"><h1>Manage Sources</h1>';
+  html += '<div class="article-header"><h1>Manage Sources</h1>';
   html += '<p class="sources-desc">Add, remove, and discover feeds</p></div>';
 
   // Feed container — loaded async
