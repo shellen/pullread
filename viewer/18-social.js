@@ -157,7 +157,6 @@ function renderSocialCard(meta, body, filename, platform) {
 
   // Build toolbar (same as articles — star, read, share)
   var toolbarActions = '';
-  var articleNotes = getAnnotations(filename);
   var isFav = articleNotes.isFavorite;
   toolbarActions += '<button onclick="toggleFavoriteFromHeader(this)" class="toolbar-action-btn' + (isFav ? ' active-fav' : '') + '" aria-label="' + (isFav ? 'Remove star' : 'Star article') + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg><span class="toolbar-action-label"> Star</span></button>';
   var isRead = activeFile && readArticles.has(activeFile);
@@ -228,7 +227,7 @@ function renderSocialCard(meta, body, filename, platform) {
   el.scrollTop = 0;
 
   // Populate header tags
-  renderHeaderTags(filename);
+  renderNotesPanel();
 
   // Async: fetch real avatar and replace fallback
   if (author && author.handle) {
