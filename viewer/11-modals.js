@@ -586,11 +586,23 @@ function renderPickerScreen() {
 }
 
 function renderPickerCollections() {
+  var nonEmpty = [];
+  for (var i = 0; i < _pickerCatalog.collections.length; i++) {
+    if (_pickerCatalog.collections[i].feeds.length > 0) nonEmpty.push(_pickerCatalog.collections[i]);
+  }
+  if (nonEmpty.length === 0) {
+    var html = '<h2>You\u2019re all caught up</h2>';
+    html += '<p class="ob-subtitle">You\u2019re already subscribed to all suggested feeds.</p>';
+    html += '<div class="feed-picker-actions">';
+    html += '<button onclick="closeFeedPicker()" style="padding:8px 20px;background:var(--link);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-family:inherit">Done</button>';
+    html += '</div>';
+    return html;
+  }
   var html = '<h2>What are you into?</h2>';
   html += '<p class="ob-subtitle">Pick a few to get started.</p>';
   html += '<div class="collection-cards">';
-  for (var i = 0; i < _pickerCatalog.collections.length; i++) {
-    var col = _pickerCatalog.collections[i];
+  for (var i = 0; i < nonEmpty.length; i++) {
+    var col = nonEmpty[i];
     var isSelected = _pickerSelectedCollections.indexOf(col.id) >= 0;
     html += '<div class="collection-card' + (isSelected ? ' selected' : '') + '" onclick="togglePickerCollection(\'' + col.id + '\')">';
     html += '<svg class="icon" aria-hidden="true"><use href="#' + col.icon + '"/></svg>';

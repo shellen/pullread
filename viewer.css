@@ -5548,7 +5548,7 @@
   .sources-add-row {
     display: flex;
     gap: 8px;
-    margin-bottom: 16px;
+    margin-bottom: 2px;
   }
   .sources-add-row .input-field {
     padding: 6px 10px;
@@ -5561,6 +5561,35 @@
     outline: none;
   }
   .sources-add-row .input-field:focus { border-color: var(--link); }
+  .sources-shortcuts {
+    margin-top: 4px;
+    margin-bottom: 8px;
+    padding: 12px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .sources-shortcut {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 5px 0;
+  }
+  .sources-shortcut-example {
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    font-size: 12px;
+    color: var(--fg);
+    background: var(--border);
+    padding: 3px 10px;
+    border-radius: 4px;
+    white-space: nowrap;
+    min-width: 180px;
+  }
+  .sources-shortcut-desc {
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
   .sources-list-header {
     display: flex;
     align-items: center;

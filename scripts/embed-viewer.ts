@@ -111,6 +111,7 @@ const ICON_MAP: Array<{ id: string; file: string; variant?: 'solid' | 'chevron' 
   { id: 'i-heart-o', file: 'heart.svg' },
   { id: 'i-home', file: 'home.svg' },
   { id: 'i-inbox', file: 'inbox.svg' },
+  { id: 'i-light-bulb', file: 'light-bulb.svg', variant: 'solid' },
   { id: 'i-link', file: 'link.svg' },
   { id: 'i-mic', file: 'microphone.svg' },
   { id: 'i-pause', file: 'pause.svg' },

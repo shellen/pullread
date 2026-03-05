@@ -1246,6 +1246,12 @@ describe('Onboarding feed picker', () => {
     const js = readFileSync(join(rootDir, 'viewer', '11-modals.js'), 'utf-8');
     expect(js).toContain('feedPickerSubscribe');
   });
+
+  test('feed picker hides empty collections and shows all-subscribed message', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '11-modals.js'), 'utf-8');
+    expect(js).toContain('already subscribed to all');
+    expect(js).toContain('feeds.length > 0');
+  });
 });
 
 describe('Hub and Manage Sources consolidation', () => {
@@ -1261,10 +1267,60 @@ describe('Hub and Manage Sources consolidation', () => {
     expect(js).not.toMatch(/function\s+renderSourcesDiscover/);
   });
 
-  test('manage-sources links to hub Discover tab', () => {
+  test('manage-sources links to feed picker', () => {
     const js = readFileSync(join(rootDir, 'viewer', '16-manage-sources.js'), 'utf-8');
-    expect(js).toContain('setHomeTab');
-    expect(js).toContain('renderHub');
+    expect(js).toContain('showFeedPicker');
+    expect(js).not.toContain('setHomeTab');
+  });
+
+  test('manage-sources has feed error container', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '16-manage-sources.js'), 'utf-8');
+    expect(js).toContain('sp-feed-error');
+  });
+
+  test('manage-sources has shortcuts section with platform examples', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '16-manage-sources.js'), 'utf-8');
+    expect(js).toContain('sources-shortcuts');
+    expect(js).toContain('r/subreddit');
+    expect(js).toContain('youtube.com');
+    expect(js).toContain('@user.bsky.social');
+    expect(js).toContain('substack.com');
+  });
+
+  test('manage-sources OPML is a text link not a button', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '16-manage-sources.js'), 'utf-8');
+    // OPML trigger should be an <a> tag, not inside sources-add-row as a button
+    expect(js).toMatch(/Import OPML<\/a>/);
+  });
+
+  test('viewer.css has sources-shortcuts styles', () => {
+    const css = readFileSync(join(rootDir, 'viewer.css'), 'utf-8');
+    expect(css).toContain('.sources-shortcuts');
+    expect(css).toContain('.sources-shortcut-example');
+  });
+
+  test('sourcesAddFeed shows success toast', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '16-manage-sources.js'), 'utf-8');
+    // Should show toast on successful add
+    expect(js).toMatch(/showToast\(.*Added/);
+  });
+
+  test('sourcesAddFeed expands Reddit shorthand before discovery', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '16-manage-sources.js'), 'utf-8');
+    // Shorthand expansion: r/sub → https://www.reddit.com/r/sub
+    expect(js).toContain("'https://www.reddit.com/'");
+  });
+
+  test('sourcesAddFeed expands Bluesky handle shorthand before discovery', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '16-manage-sources.js'), 'utf-8');
+    // Should detect @handle.bsky.social and expand to full bsky.app URL
+    expect(js).toMatch(/@.*bsky\.app/);
+  });
+
+  test('sourcesAddFeed checks for duplicate feeds before adding', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '16-manage-sources.js'), 'utf-8');
+    // Should check existing feeds and show error if already subscribed
+    expect(js).toContain('already subscribed');
   });
 
   test('hub no longer contains loadSuggestedFeedsSection', () => {
