@@ -914,6 +914,125 @@ describe('ask page structure', () => {
     expect(viewer).toContain('findRelevantArticles');
     expect(viewer).toContain('promptLLM');
   });
+
+  test('17-ask.js defines _askClear function', () => {
+    const ask = readFileSync(join(rootDir, 'viewer', '17-ask.js'), 'utf-8');
+    expect(ask).toMatch(/function\s+_askClear/);
+  });
+
+  test('17-ask.js defines _askSaveToNotebook function', () => {
+    const ask = readFileSync(join(rootDir, 'viewer', '17-ask.js'), 'utf-8');
+    expect(ask).toMatch(/function\s+_askSaveToNotebook/);
+  });
+
+  test('17-ask.js has clear button with ask-clear-btn class', () => {
+    const ask = readFileSync(join(rootDir, 'viewer', '17-ask.js'), 'utf-8');
+    expect(ask).toContain('ask-clear-btn');
+  });
+
+  test('17-ask.js has save button with ask-save-btn class', () => {
+    const ask = readFileSync(join(rootDir, 'viewer', '17-ask.js'), 'utf-8');
+    expect(ask).toContain('ask-save-btn');
+  });
+
+  test('17-ask.js shows LLM provider label', () => {
+    const ask = readFileSync(join(rootDir, 'viewer', '17-ask.js'), 'utf-8');
+    expect(ask).toContain('providerLabel');
+  });
+
+  test('viewer.css has ask-clear-btn and ask-save-btn styles', () => {
+    const css = readFileSync(join(rootDir, 'viewer.css'), 'utf-8');
+    expect(css).toContain('.ask-clear-btn');
+    expect(css).toContain('.ask-save-btn');
+  });
+});
+
+describe('page headers use article-header pattern', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('settings page uses article-header h1', () => {
+    const settings = readFileSync(join(rootDir, 'viewer', '03-settings.js'), 'utf-8');
+    expect(settings).toContain('article-header');
+  });
+
+  test('ask page uses article-header h1', () => {
+    const ask = readFileSync(join(rootDir, 'viewer', '17-ask.js'), 'utf-8');
+    expect(ask).toContain('article-header');
+  });
+
+  test('manage sources page uses article-header h1', () => {
+    const sources = readFileSync(join(rootDir, 'viewer', '16-manage-sources.js'), 'utf-8');
+    expect(sources).toContain('article-header');
+  });
+});
+
+describe('note page improvements', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('exportNotebook uses active note title for filename', () => {
+    const nb = readFileSync(join(rootDir, 'viewer', '09-notebooks.js'), 'utf-8');
+    // The exportNotebook function itself should derive filename from note, not nb.title
+    const exportFn = nb.match(/function exportNotebook\(\)[\s\S]*?^}/m);
+    expect(exportFn).toBeTruthy();
+    expect(exportFn![0]).toContain('_activeNoteId');
+  });
+
+  test('note preview strips first heading to avoid title duplication', () => {
+    const nb = readFileSync(join(rootDir, 'viewer', '09-notebooks.js'), 'utf-8');
+    // openNoteInPane should strip leading # heading from preview content
+    const openFn = nb.match(/function openNoteInPane[\s\S]*?^}/m);
+    expect(openFn).toBeTruthy();
+    expect(openFn![0]).toMatch(/replace.*\\n/);
+  });
+
+  test('note actions use reader-toolbar instead of article-actions', () => {
+    const nb = readFileSync(join(rootDir, 'viewer', '09-notebooks.js'), 'utf-8');
+    expect(nb).toContain('reader-toolbar-actions');
+  });
+
+  test('note toolbar has overflow menu with Delete and Highlights', () => {
+    const nb = readFileSync(join(rootDir, 'viewer', '09-notebooks.js'), 'utf-8');
+    // Extract all toolbarActions += lines
+    const toolbarLines = nb.match(/toolbarActions\s*\+=.*/g) || [];
+    const directButtons = toolbarLines.join('\n');
+    // Delete and Highlights should NOT be direct toolbar buttons
+    expect(directButtons).not.toContain('confirmDeleteNote');
+    expect(directButtons).not.toContain('showHighlightPicker');
+    // They should be in a more-dropdown menu function instead
+    expect(nb).toContain('toggleNoteMoreMenu');
+    const menuFn = nb.match(/function toggleNoteMoreMenu[\s\S]*?^\}/m);
+    expect(menuFn).toBeTruthy();
+    expect(menuFn![0]).toContain('confirmDeleteNote');
+    expect(menuFn![0]).toContain('showHighlightPicker');
+  });
+
+  test('note toolbar does not have Grammar as direct button', () => {
+    const nb = readFileSync(join(rootDir, 'viewer', '09-notebooks.js'), 'utf-8');
+    const openFn = nb.match(/function openNoteInPane[\s\S]*?^}/m);
+    expect(openFn).toBeTruthy();
+    // No grammar button in direct toolbar actions
+    expect(openFn![0]).not.toMatch(/toolbarActions\s*\+=.*grammar-check-btn/);
+  });
+
+  test('export uses note sourceArticle for single-note export', () => {
+    const nb = readFileSync(join(rootDir, 'viewer', '09-notebooks.js'), 'utf-8');
+    const exportFn = nb.match(/function exportNotebook\(\)[\s\S]*?^}/m);
+    expect(exportFn).toBeTruthy();
+    // Should use note.sourceArticle for single-note export
+    expect(exportFn![0]).toContain('sourceArticle');
+    // Should have conditional logic that limits sources per note
+    expect(exportFn![0]).toContain('exportSources');
+  });
+
+  test('note buttons use rounded-md (6px border-radius)', () => {
+    const css = readFileSync(join(rootDir, 'viewer.css'), 'utf-8');
+    const newNoteBtn = css.match(/\.new-note-btn\s*\{[^}]+\}/);
+    expect(newNoteBtn).toBeTruthy();
+    expect(newNoteBtn![0]).toContain('border-radius: 6px');
+    const suggestPill = css.match(/\.nb-suggest-pill\s*\{[^}]+\}/);
+    expect(suggestPill).toBeTruthy();
+    expect(suggestPill![0]).toContain('border-radius: 6px');
+  });
 });
 
 describe('discovered sections', () => {
