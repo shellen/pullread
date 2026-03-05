@@ -425,6 +425,7 @@ var _settingsTabMap = {
   'settings-breaks': 'reading',
   'settings-backup': 'advanced',
   'settings-site-logins': 'advanced',
+  'settings-beta': 'advanced',
   'settings-about': 'advanced',
 };
 
@@ -500,6 +501,11 @@ function settingsSaveBreakActivity(input) {
   localStorage.setItem('pr-break-activity', input.value);
   var indicator = input.parentNode.querySelector('.save-indicator');
   if (indicator) indicator.classList.add('visible');
+}
+
+function settingsSaveBeta(enabled) {
+  if (enabled) localStorage.setItem('pr-beta-features', 'true');
+  else localStorage.removeItem('pr-beta-features');
 }
 
 function settingsAutoSaveSync(input) {
@@ -801,6 +807,17 @@ function showSettingsPage(scrollToSection) {
     html += '</div>';
     html += '</div>';
   }
+
+  // -- Beta features card --
+  var betaOn = localStorage.getItem('pr-beta-features') === 'true';
+  html += '<div class="card" id="settings-beta">';
+  html += '<div class="card-title">Beta Features</div>';
+  html += '<div class="card-desc">Try experimental features before they\'re ready for everyone.</div>';
+  html += '<div class="setting-row">';
+  html += '<div class="setting-label"><label for="sp-beta-toggle">Enable beta features</label></div>';
+  html += '<div class="setting-control"><input type="checkbox" id="sp-beta-toggle"' + (betaOn ? ' checked' : '') + ' onchange="settingsSaveBeta(this.checked)"></div>';
+  html += '</div>';
+  html += '</div>';
 
   // -- About card --
   html += '<div class="card" id="settings-about">';

@@ -25,7 +25,7 @@ function renderAskPage() {
 
   var html = '<div class="article-header ask-header"><h1>Ask Your Library</h1>';
   if (_askMessages.length > 0) {
-    html += '<button class="ask-clear-btn" onclick="_askClear()" title="New conversation"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-refresh"/></svg></button>';
+    html += '<button class="ask-clear-btn" onclick="_askClear()" title="New conversation"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-plus"/></svg></button>';
   }
   html += '</div>';
   html += '<div class="ask-messages" id="ask-messages">';
@@ -207,8 +207,10 @@ function _askOpenArticle(filename) {
 function _askCopyResponse(btn) {
   var msgEl = btn.closest('.ask-msg-ai');
   if (!msgEl) return;
-  var text = msgEl.textContent || '';
-  navigator.clipboard.writeText(text).then(function() {
+  var clone = msgEl.cloneNode(true);
+  clone.querySelectorAll('button').forEach(function(b) { b.remove(); });
+  var text = clone.textContent || '';
+  navigator.clipboard.writeText(text.trim()).then(function() {
     showToast('Copied to clipboard');
   });
 }
@@ -217,6 +219,7 @@ function _askClear() {
   _askMessages = [];
   _askBusy = false;
   renderAskPage();
+  showToast('Conversation cleared');
 }
 
 function _askSaveToNotebook(btn) {

@@ -6177,12 +6177,13 @@
   .ask-copy-btn {
     position: absolute;
     top: 0;
-    right: 0;
-    background: none;
-    border: none;
+    right: 30px;
+    background: var(--sidebar-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
     color: var(--muted);
     cursor: pointer;
-    padding: 4px;
+    padding: 2px 4px;
     opacity: 0;
     transition: opacity 0.15s;
   }
@@ -6201,8 +6202,8 @@
   .ask-clear-btn:hover { color: var(--fg); border-color: var(--fg); }
   .ask-save-btn {
     position: absolute;
-    top: 6px;
-    right: 30px;
+    top: 0;
+    right: 0;
     opacity: 0;
     background: var(--sidebar-bg);
     border: 1px solid var(--border);

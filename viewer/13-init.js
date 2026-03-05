@@ -330,7 +330,7 @@ function handleHashNavigation() {
   if ('tab' in params && params.tab === 'settings') {
     showSettingsPage();
     history.replaceState(null, '', location.pathname);
-  } else if ('tab' in params && params.tab === 'ask') {
+  } else if ('tab' in params && params.tab === 'ask' && localStorage.getItem('pr-beta-features') === 'true') {
     renderAskPage();
     history.replaceState(null, '', location.pathname);
   } else if ('file' in params) {
