@@ -1,7 +1,7 @@
 // ABOUTME: Extracts article content from web pages using Defuddle (with Readability fallback)
 // ABOUTME: Converts HTML to clean markdown for storage, with retry and fallback extraction
 
-import { Defuddle } from 'defuddle/node';
+import DefuddleCore from 'defuddle';
 import { parseHTML } from 'linkedom';
 import { Readability } from '@mozilla/readability';
 import TurndownService from 'turndown';
@@ -165,12 +165,17 @@ export function stripEmbedNoise(markdown: string): string {
   // (only when they appear as bare bullets with no meaningful content after)
   markdown = markdown.replace(/^\*\s+\*?\*?Download\*?\*?\s*$/gm, '');
 
-  // Fix broken Instagram/social embed blockquotes: Turndown produces multi-line
+  // Fix broken Instagram embed blockquotes: Turndown produces multi-line
   // links from <blockquote class="instagram-media"> where [text](url) spans lines.
-  // Convert to a clean blockquote with working link.
+  // Match the broken link + optional attribution, convert to clean links.
   markdown = markdown.replace(
-    /^> \[\s*\n(?:> ?\n)*> (.+?)\n(?:> ?\n)*> \]\((https:\/\/www\.instagram\.com\/[^)]+)\)/gm,
-    '> [$1]($2)'
+    /^> \[\s*\n(?:> ?\n)*> (.+?)\n(?:> ?\n)*> \]\((https:\/\/www\.instagram\.com\/[^)]+)\)(?:\n> ?\n> \[([^\]]+)\]\([^)]+\))?/gm,
+    (_match, text, url, attribution) => {
+      const cleanUrl = url.replace(/[?&]utm_[^&)]+/g, '');
+      let result = `[${text}](${cleanUrl})`;
+      if (attribution) result += `\n\n${attribution}`;
+      return result;
+    }
   );
 
   // Remove ad network script remnants (Google AdSense, etc.)
@@ -626,6 +631,28 @@ function generateSocialTitle(html: string, url: string): string {
 
 
 /**
+ * Add browser API stubs to a linkedom document so Defuddle's content
+ * scoring works. linkedom lacks getComputedStyle and matchMedia which
+ * Defuddle uses for hidden-element detection and responsive layout.
+ */
+function stubBrowserApis(doc: any): void {
+  const win = doc.defaultView;
+  if (!win) return;
+  if (!win.getComputedStyle) {
+    win.getComputedStyle = () => new Proxy({}, {
+      get: (_: any, prop: string) =>
+        prop === 'display' ? 'block' : prop === 'visibility' ? 'visible' : ''
+    });
+  }
+  if (!win.matchMedia) {
+    win.matchMedia = () => ({ matches: false, media: '', addListener: () => {}, removeListener: () => {} });
+  }
+  if (!doc.styleSheets) {
+    Object.defineProperty(doc, 'styleSheets', { value: [], configurable: true });
+  }
+}
+
+/**
  * Extract article using Defuddle. If that fails, fall back to Readability,
  * then to OpenGraph/meta tags + JSON-LD structured data.
  */
@@ -634,14 +661,16 @@ export async function extractArticle(html: string, url: string): Promise<Extract
   const langMatch = html.match(/<html[^>]*\slang=["']([^"']+)["']/i);
   const lang = langMatch ? langMatch[1].split('-')[0] : undefined;
 
-  // Try Defuddle first
+  // Try Defuddle first (using core class with linkedom to avoid jsdom's
+  // xhr-sync-worker.js issue in Bun-compiled binaries)
   try {
-    const result = await Defuddle(html, url, { separateMarkdown: true });
-    if (result && result.content && result.contentMarkdown) {
-      const markdown = stripEmbedNoise(resolveRelativeUrls(
-        result.contentMarkdown,
-        url
-      ));
+    const { document: defuddleDoc } = parseHTML(html);
+    Object.defineProperty(defuddleDoc, 'URL', { value: url });
+    stubBrowserApis(defuddleDoc);
+    const defuddle = new DefuddleCore(defuddleDoc as unknown as Document, { url });
+    const result = defuddle.parse();
+    if (result && result.content) {
+      const markdown = htmlToMarkdown(result.content, url);
       let title = result.title || 'Untitled';
 
       // For social posts, "Untitled" is common — generate a better title

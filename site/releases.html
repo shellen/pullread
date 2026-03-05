@@ -133,6 +133,20 @@
 <!-- Releases -->
 <div class="releases">
 
+  <div class="release-card reveal" id="v0.4.5">
+    <div class="release-header">
+      <span class="release-version">0.4.5</span>
+      <span class="release-subtitle">"The Defuddler"</span>
+    </div>
+    <div class="release-date">March 2026</div>
+    <ul>
+      <li>Fixed a crash on launch caused by a build-time dependency (jsdom) that broke in compiled binaries &mdash; replaced with a lightweight alternative</li>
+      <li>Fixed feeds with image thumbnails (like BrooklynVegan) showing only the RSS summary instead of the full article</li>
+      <li>Fixed duplicate articles appearing in the dashboard and sidebar when the same file existed in multiple locations</li>
+      <li>Added a CI safeguard to prevent the jsdom crash from recurring in future builds</li>
+    </ul>
+  </div>
+
   <div class="release-card reveal" id="v0.4.4">
     <div class="release-header">
       <span class="release-version">0.4.4</span>
