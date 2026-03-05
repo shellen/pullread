@@ -89,7 +89,7 @@ function showManageSourcesPage() {
         + '</div>';
 
       fh += '<div style="margin-top:16px;text-align:center">';
-      fh += '<a href="#" onclick="showTagCloud();return false" style="color:var(--link);font-size:13px;text-decoration:none">Browse more feeds in Explore</a>';
+      fh += '<a href="#" onclick="setHomeTab(\'discover\');activeFile=null;renderHub();renderFileList();return false" style="color:var(--link);font-size:13px;text-decoration:none">Browse more feeds in Explore</a>';
       fh += '</div>';
 
       feedSec.innerHTML = fh;

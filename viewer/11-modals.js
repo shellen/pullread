@@ -601,8 +601,8 @@ function renderPickerCollections() {
   html += '</div>';
   html += '<div class="feed-picker-actions">';
   var canNext = _pickerSelectedCollections.length > 0;
-  html += '<button class="btn-primary" onclick="pickerNext()"' + (canNext ? '' : ' disabled') + '>Next</button>';
-  html += '<button style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;font-family:inherit" onclick="closeFeedPicker()">Skip</button>';
+  html += '<button onclick="closeFeedPicker()" style="padding:8px 20px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:14px;font-family:inherit">Skip</button>';
+  html += '<button onclick="pickerNext()" style="padding:8px 20px;background:var(--link);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-family:inherit' + (canNext ? '' : ';opacity:0.4;pointer-events:none') + '">Next</button>';
   html += '</div>';
   return html;
 }
@@ -659,8 +659,8 @@ function renderPickerFeeds() {
   }
 
   html += '<div class="feed-picker-actions">';
-  html += '<button class="btn-primary" onclick="feedPickerSubscribe()"' + (checkedCount === 0 ? ' disabled' : '') + '>Subscribe to ' + checkedCount + ' feed' + (checkedCount !== 1 ? 's' : '') + '</button>';
-  html += '<button style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;font-family:inherit" onclick="_pickerScreen=1;renderPickerScreen()">Back</button>';
+  html += '<button onclick="_pickerScreen=1;renderPickerScreen()" style="padding:8px 20px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:14px;font-family:inherit">Back</button>';
+  html += '<button onclick="feedPickerSubscribe()" style="padding:8px 20px;background:var(--link);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-family:inherit' + (checkedCount === 0 ? ';opacity:0.4;pointer-events:none' : '') + '">Subscribe to ' + checkedCount + ' feed' + (checkedCount !== 1 ? 's' : '') + '</button>';
   html += '</div>';
   return html;
 }

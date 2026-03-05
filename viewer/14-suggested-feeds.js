@@ -8,7 +8,7 @@ var FEED_CATALOG_FALLBACK = {
       id: 'stay-informed',
       name: 'Stay Informed',
       description: 'Breaking news and daily briefings',
-      icon: 'i-newspaper',
+      icon: 'i-calendar',
       feeds: [
         { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index', description: 'Technology, science, and culture reporting', platform: 'web', tags: ['tech', 'science'] },
         { name: 'The Verge', url: 'https://www.theverge.com/rss/index.xml', description: 'Technology and culture news', platform: 'web', tags: ['tech', 'culture'] },
@@ -28,8 +28,7 @@ var FEED_CATALOG_FALLBACK = {
         { name: 'Longreads', url: 'https://longreads.com/feed/', description: 'The best longform writing on the web', platform: 'web', tags: ['longform', 'culture'] },
         { name: 'Astral Codex Ten', url: 'https://www.astralcodexten.com/feed', description: 'Essays on science, philosophy, and rationality', platform: 'web', tags: ['essays', 'science'] },
         { name: 'The Atlantic Ideas', url: 'https://www.theatlantic.com/feed/channel/ideas/', description: 'Ideas and commentary from The Atlantic', platform: 'web', tags: ['essays', 'politics'] },
-        { name: 'Wait But Why', url: 'https://waitbutwhy.com/feed', description: 'Deep dives into big topics', platform: 'web', tags: ['essays', 'science'] },
-        { name: 'Stratechery', url: 'https://stratechery.com/feed/', description: 'Analysis of tech strategy and business', platform: 'web', tags: ['tech', 'business'] }
+        { name: 'Wait But Why', url: 'https://waitbutwhy.com/feed', description: 'Deep dives into big topics', platform: 'web', tags: ['essays', 'science'] }
       ]
     },
     {
@@ -50,7 +49,7 @@ var FEED_CATALOG_FALLBACK = {
       id: 'learn-something',
       name: 'Learn Something',
       description: 'Science, history, and how things work',
-      icon: 'i-lightbulb',
+      icon: 'i-wand',
       feeds: [
         { name: 'Quanta Magazine', url: 'https://api.quantamagazine.org/feed/', description: 'Illuminating science and mathematics', platform: 'web', tags: ['science', 'math'] },
         { name: '99% Invisible', url: 'https://feeds.simplecast.com/BqbsxVfO', description: 'Stories about design and architecture', platform: 'podcast', tags: ['design', 'architecture'] },

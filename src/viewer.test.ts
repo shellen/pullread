@@ -1172,10 +1172,10 @@ describe('Feed catalog', () => {
 describe('Explore Discover tab', () => {
   const rootDir = join(__dirname, '..');
 
-  test('showTagCloud renders a Discover tab', () => {
+  test('hub Discover tab includes feed catalog section', () => {
     const js = readFileSync(join(rootDir, 'viewer', '10-explore.js'), 'utf-8');
-    expect(js).toContain("data-tab=\"discover\"");
-    expect(js).toContain('Discover');
+    expect(js).toContain('discover-catalog-content');
+    expect(js).toContain('Browse Feeds');
   });
 
   test('buildDiscoverCatalogHtml function exists', () => {
@@ -1261,9 +1261,10 @@ describe('Hub and Manage Sources consolidation', () => {
     expect(js).not.toMatch(/function\s+renderSourcesDiscover/);
   });
 
-  test('manage-sources links to Explore Discover', () => {
+  test('manage-sources links to hub Discover tab', () => {
     const js = readFileSync(join(rootDir, 'viewer', '16-manage-sources.js'), 'utf-8');
-    expect(js).toContain('showTagCloud');
+    expect(js).toContain('setHomeTab');
+    expect(js).toContain('renderHub');
   });
 
   test('hub no longer contains loadSuggestedFeedsSection', () => {

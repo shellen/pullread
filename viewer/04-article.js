@@ -453,6 +453,7 @@ function renderHub() {
   requestAnimationFrame(initDashChevrons);
   requestAnimationFrame(initRundownDeck);
   requestAnimationFrame(function() { loadBriefing(false); });
+  if (serverMode) requestAnimationFrame(renderDiscoverCatalog);
 
   // If audio is queued, switch to mini player so controls stay visible in sidebar
   if (typeof ttsQueue !== 'undefined' && ttsQueue.length > 0) {

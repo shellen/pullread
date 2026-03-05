@@ -420,6 +420,16 @@ function buildDiscoverTab(data) {
     html += '</div>';
   }
 
+  // Feed catalog (loaded async)
+  if (serverMode) {
+    html += '<div class="discover-section">';
+    html += '<h3 class="discover-section-heading">Browse Feeds</h3>';
+    html += '<div id="discover-catalog-content">';
+    html += '<p style="color:var(--muted);font-size:13px">Loading feed catalog\u2026</p>';
+    html += '</div>';
+    html += '</div>';
+  }
+
   html += '</div>';
   return html;
 }
@@ -542,28 +552,17 @@ function showTagCloud() {
 
   var data = collectExploreData();
 
-  var discoverFirst = allFiles.length < 10;
   var tabsHtml = '<div class="explore-tabs">';
-  if (discoverFirst) {
-    tabsHtml += '<button class="explore-tab active" data-tab="discover">Discover</button>';
-    tabsHtml += '<button class="explore-tab" data-tab="sources">Sources</button>';
-  } else {
-    tabsHtml += '<button class="explore-tab active" data-tab="sources">Sources</button>';
-  }
+  tabsHtml += '<button class="explore-tab active" data-tab="sources">Sources</button>';
   tabsHtml += '<button class="explore-tab" data-tab="stats">Stats</button>';
   tabsHtml += '<button class="explore-tab" data-tab="tags">Tags</button>';
-  if (!discoverFirst) {
-    tabsHtml += '<button class="explore-tab" data-tab="discover">Discover</button>';
-  }
   tabsHtml += '</div>';
 
-  var discoverPanel = '<div id="explore-discover" class="explore-tab-panel' + (discoverFirst ? ' active' : '') + '">' + buildDiscoverCatalogHtml() + '</div>';
-  var sourcesPanel = '<div id="explore-sources" class="explore-tab-panel' + (!discoverFirst ? ' active' : '') + '">' + buildSourcesHtml(data) + '</div>';
+  var sourcesPanel = '<div id="explore-sources" class="explore-tab-panel active">' + buildSourcesHtml(data) + '</div>';
 
   content.innerHTML =
     '<div class="article-header"><h1>Explore</h1></div>' +
     tabsHtml +
-    discoverPanel +
     sourcesPanel +
     '<div id="explore-stats" class="explore-tab-panel">' + buildStatsTabHtml(data) + '</div>' +
     '<div id="explore-tags" class="explore-tab-panel">' + buildTagsTabHtml(data) + '</div>';
@@ -576,8 +575,6 @@ function showTagCloud() {
       document.getElementById('explore-' + btn.dataset.tab).classList.add('active');
     });
   });
-
-  renderDiscoverCatalog();
 
   document.title = 'Explore Your Library';
   document.getElementById('content-scroll').scrollTop = 0;
