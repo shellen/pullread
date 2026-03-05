@@ -474,6 +474,7 @@
     cursor: pointer;
     transition: background 0.12s, color 0.12s;
   }
+  a.sidebar-footer-btn { text-decoration: none; }
   .sidebar-footer-btn .icon { width: 13px; height: 13px; }
   .sidebar-footer-btn:hover { background: var(--sidebar-hover); color: var(--fg); }
   .sidebar-footer-btn.active { color: var(--fg); background: var(--sidebar-active); }

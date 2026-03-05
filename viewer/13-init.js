@@ -227,11 +227,9 @@ async function init() {
   const savedSpacing = localStorage.getItem('pr-spacing');
   const savedWidth = localStorage.getItem('pr-width');
 
-  // Auto-detect OS dark mode on first visit
+  // Apply saved preferences (HTML defaults: light theme, Instrument Serif, medium size)
   if (savedTheme) {
     setTheme(savedTheme);
-  } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    setTheme('dark');
   }
   if (savedFont) {
     setFont(savedFont);
