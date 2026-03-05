@@ -190,7 +190,25 @@ export function listMarkdownFiles(dir: string): string[] {
   }
 
   walk(dir);
-  return results;
+
+  // Deduplicate: when the same basename exists in root and a dated subfolder,
+  // keep only the subfolder version (the root copy is a stale migration leftover)
+  const seen = new Map<string, string>();
+  for (const fullPath of results) {
+    const base = basename(fullPath);
+    const existing = seen.get(base);
+    if (!existing) {
+      seen.set(base, fullPath);
+    } else {
+      // Prefer the deeper (dated subfolder) path
+      const existingDepth = existing.split(sep).length;
+      const currentDepth = fullPath.split(sep).length;
+      if (currentDepth > existingDepth) {
+        seen.set(base, fullPath);
+      }
+    }
+  }
+  return Array.from(seen.values());
 }
 
 /** Recursively list all .epub files, skipping favicons/ and notebooks/ directories. */
@@ -263,7 +281,11 @@ export function migrateToDateFolders(outputPath: string): number {
 
     const destDir = join(outputPath, m[1], m[2]);
     const dest = join(destDir, name);
-    if (existsSync(dest)) continue; // already migrated
+    if (existsSync(dest)) {
+      unlinkSync(src);
+      moved++;
+      continue;
+    }
 
     if (!existsSync(destDir)) mkdirSync(destDir, { recursive: true });
     renameSync(src, dest);

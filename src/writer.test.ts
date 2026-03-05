@@ -357,6 +357,22 @@ describe('listMarkdownFiles', () => {
   test('returns empty array for non-existent directory', () => {
     expect(listMarkdownFiles('/tmp/does-not-exist-pullread')).toEqual([]);
   });
+
+  test('deduplicates when same file exists in root and dated subfolder', () => {
+    // Simulate the bug: flat copy left behind after migration
+    writeFileSync(join(TEST_DIR, '2024-01-15-article.md'), 'stale flat copy');
+    const subdir = join(TEST_DIR, '2024', '01');
+    mkdirSync(subdir, { recursive: true });
+    writeFileSync(join(subdir, '2024-01-15-article.md'), 'dated copy');
+
+    const files = listMarkdownFiles(TEST_DIR);
+    const basenames = files.map(f => require('path').basename(f));
+    // Should only appear once
+    expect(basenames.filter(b => b === '2024-01-15-article.md')).toHaveLength(1);
+    // Should prefer the dated subfolder version
+    expect(files).toContain(join(subdir, '2024-01-15-article.md'));
+    expect(files).not.toContain(join(TEST_DIR, '2024-01-15-article.md'));
+  });
 });
 
 describe('listEpubFiles', () => {
@@ -487,6 +503,19 @@ describe('migrateToDateFolders', () => {
 
     const moved = migrateToDateFolders(TEST_DIR);
     expect(moved).toBe(0);
+  });
+
+  test('deletes stale flat copy when dated copy already exists', () => {
+    const subdir = join(TEST_DIR, '2024', '01');
+    mkdirSync(subdir, { recursive: true });
+    writeFileSync(join(subdir, '2024-01-15-article.md'), 'dated copy');
+    writeFileSync(join(TEST_DIR, '2024-01-15-article.md'), 'stale flat copy');
+
+    const moved = migrateToDateFolders(TEST_DIR);
+    // Flat copy should be cleaned up
+    expect(existsSync(join(TEST_DIR, '2024-01-15-article.md'))).toBe(false);
+    // Dated copy should remain untouched
+    expect(readFileSync(join(subdir, '2024-01-15-article.md'), 'utf-8')).toBe('dated copy');
   });
 });
 
