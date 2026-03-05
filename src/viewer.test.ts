@@ -1071,3 +1071,91 @@ describe('discovered sections', () => {
     expect(discoverIdx).toBeGreaterThan(rundownIdx);
   });
 });
+
+describe('Feedback button', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('Feedback button calls showFeedbackModal', () => {
+    const html = readFileSync(join(rootDir, 'viewer.html'), 'utf-8');
+    expect(html).toContain('showFeedbackModal()');
+    expect(html).not.toMatch(/<a\s+href="mailto:/);
+  });
+
+  test('showFeedbackModal is defined in 11-modals.js', () => {
+    const modals = readFileSync(join(rootDir, 'viewer', '11-modals.js'), 'utf-8');
+    expect(modals).toMatch(/function\s+showFeedbackModal/);
+    expect(modals).toContain('support@alittledrive.com');
+    expect(modals).toContain('navigator.clipboard.writeText');
+  });
+});
+
+describe('Beta features gate', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('settings has beta features toggle in advanced tab', () => {
+    const settings = readFileSync(join(rootDir, 'viewer', '03-settings.js'), 'utf-8');
+    expect(settings).toContain('pr-beta-features');
+  });
+
+  test('Discover area gates Ask chip behind beta flag', () => {
+    const explore = readFileSync(join(rootDir, 'viewer', '10-explore.js'), 'utf-8');
+    expect(explore).toContain('pr-beta-features');
+    expect(explore).toContain('renderAskPage');
+  });
+
+  test('#tab=ask deep link is gated behind beta flag', () => {
+    const init = readFileSync(join(rootDir, 'viewer', '13-init.js'), 'utf-8');
+    expect(init).toContain('pr-beta-features');
+  });
+});
+
+describe('Feed catalog', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('14-suggested-feeds.js defines FEED_CATALOG_FALLBACK with collections', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '14-suggested-feeds.js'), 'utf-8');
+    expect(js).toContain('FEED_CATALOG_FALLBACK');
+    expect(js).toContain('collections');
+  });
+
+  test('each catalog collection has id, name, description, icon, and feeds array', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '14-suggested-feeds.js'), 'utf-8');
+    expect(js).toMatch(/id:\s*'/);
+    expect(js).toMatch(/icon:\s*'/);
+    expect(js).toContain('.feeds');
+  });
+
+  test('each catalog feed has name, url, description, platform', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '14-suggested-feeds.js'), 'utf-8');
+    expect(js).toMatch(/platform:\s*'/);
+  });
+
+  test('fetchFeedCatalog function exists', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '14-suggested-feeds.js'), 'utf-8');
+    expect(js).toMatch(/function\s+fetchFeedCatalog/);
+  });
+
+  test('fetchFeedCatalog uses pr-feed-catalog sessionStorage key', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '14-suggested-feeds.js'), 'utf-8');
+    expect(js).toContain('pr-feed-catalog');
+  });
+
+  test('fetches from pullread.com/api/feed-catalog.json', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '14-suggested-feeds.js'), 'utf-8');
+    expect(js).toContain('pullread.com/api/feed-catalog.json');
+  });
+
+  test('filterCatalogFeeds function removes already-subscribed feeds', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '14-suggested-feeds.js'), 'utf-8');
+    expect(js).toMatch(/function\s+filterCatalogFeeds/);
+  });
+
+  test('no longer contains SUGGESTED_FEEDS_FALLBACK or isFeedsDismissed', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '14-suggested-feeds.js'), 'utf-8');
+    expect(js).not.toContain('SUGGESTED_FEEDS_FALLBACK');
+    expect(js).not.toContain('isFeedsDismissed');
+    expect(js).not.toContain('dismissSuggestedFeeds');
+    expect(js).not.toContain('fetchSuggestedFeeds');
+    expect(js).not.toContain('filterSuggestedFeeds');
+  });
+});
