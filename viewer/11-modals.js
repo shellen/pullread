@@ -279,6 +279,11 @@ let _obOutputPath = '~/Documents/PullRead';
 let _obFeedLoading = false;
 let _tourMode = false;
 
+var _pickerCatalog = null;
+var _pickerSelectedCollections = [];
+var _pickerScreen = 1;
+var _pickerFeedSelections = {};
+
 function dismissOnboarding() {
   document.getElementById('onboarding').style.display = 'none';
   localStorage.setItem('pr-onboarded', '1');
@@ -549,7 +554,180 @@ async function obFinish() {
   }
   dismissOnboarding();
   if (!_tourMode) {
-    setTimeout(function() { refreshArticleList(); }, 500);
+    showFeedPicker();
   }
+}
+
+function showFeedPicker() {
+  _pickerSelectedCollections = [];
+  _pickerScreen = 1;
+  _pickerFeedSelections = {};
+
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'feed-picker-overlay';
+  overlay.innerHTML = '<div class="onboarding-modal"><div class="feed-picker" id="feed-picker-body">Loading...</div></div>';
+  document.body.appendChild(overlay);
+
+  fetchFeedCatalog(function(catalog) {
+    _pickerCatalog = filterCatalogFeeds(catalog);
+    renderPickerScreen();
+  });
+}
+
+function renderPickerScreen() {
+  var body = document.getElementById('feed-picker-body');
+  if (!body) return;
+  if (_pickerScreen === 1) {
+    body.innerHTML = renderPickerCollections();
+  } else {
+    body.innerHTML = renderPickerFeeds();
+  }
+}
+
+function renderPickerCollections() {
+  var html = '<h2>What are you into?</h2>';
+  html += '<p class="ob-subtitle">Pick a few to get started.</p>';
+  html += '<div class="collection-cards">';
+  for (var i = 0; i < _pickerCatalog.collections.length; i++) {
+    var col = _pickerCatalog.collections[i];
+    var isSelected = _pickerSelectedCollections.indexOf(col.id) >= 0;
+    html += '<div class="collection-card' + (isSelected ? ' selected' : '') + '" onclick="togglePickerCollection(\'' + col.id + '\')">';
+    html += '<svg class="icon" aria-hidden="true"><use href="#' + col.icon + '"/></svg>';
+    html += '<div class="collection-card-name">' + escapeHtml(col.name) + '</div>';
+    html += '<div class="collection-card-desc">' + escapeHtml(col.description) + '</div>';
+    html += '</div>';
+  }
+  html += '</div>';
+  html += '<div class="feed-picker-actions">';
+  var canNext = _pickerSelectedCollections.length > 0;
+  html += '<button class="btn-primary" onclick="pickerNext()"' + (canNext ? '' : ' disabled') + '>Next</button>';
+  html += '<button style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;font-family:inherit" onclick="closeFeedPicker()">Skip</button>';
+  html += '</div>';
+  return html;
+}
+
+function togglePickerCollection(id) {
+  var idx = _pickerSelectedCollections.indexOf(id);
+  if (idx >= 0) {
+    _pickerSelectedCollections.splice(idx, 1);
+  } else {
+    _pickerSelectedCollections.push(id);
+  }
+  renderPickerScreen();
+}
+
+function pickerNext() {
+  _pickerFeedSelections = {};
+  for (var i = 0; i < _pickerCatalog.collections.length; i++) {
+    var col = _pickerCatalog.collections[i];
+    if (_pickerSelectedCollections.indexOf(col.id) >= 0) {
+      for (var fi = 0; fi < col.feeds.length; fi++) {
+        _pickerFeedSelections[col.feeds[fi].url] = { name: col.feeds[fi].name, checked: true };
+      }
+    }
+  }
+  _pickerScreen = 2;
+  renderPickerScreen();
+}
+
+function renderPickerFeeds() {
+  var html = '<h2>Pick your feeds</h2>';
+  html += '<p class="ob-subtitle">Uncheck any you don\'t want.</p>';
+  html += '<div class="feed-picker-list">';
+  for (var i = 0; i < _pickerCatalog.collections.length; i++) {
+    var col = _pickerCatalog.collections[i];
+    if (_pickerSelectedCollections.indexOf(col.id) < 0) continue;
+    html += '<h3>' + escapeHtml(col.name) + '</h3>';
+    for (var fi = 0; fi < col.feeds.length; fi++) {
+      var feed = col.feeds[fi];
+      var sel = _pickerFeedSelections[feed.url];
+      var checked = sel ? sel.checked : false;
+      html += '<div class="feed-picker-item">';
+      html += '<input type="checkbox"' + (checked ? ' checked' : '') + ' onchange="togglePickerFeed(\'' + escapeHtml(feed.url.replace(/'/g, "\\'")) + '\')">';
+      html += '<span class="feed-picker-item-name">' + escapeHtml(feed.name) + '</span>';
+      html += '<span class="platform-badge">' + escapeHtml(feed.platform) + '</span>';
+      html += '<span class="feed-picker-item-desc">' + escapeHtml(feed.description) + '</span>';
+      html += '</div>';
+    }
+  }
+  html += '</div>';
+
+  var checkedCount = 0;
+  for (var url in _pickerFeedSelections) {
+    if (_pickerFeedSelections[url].checked) checkedCount++;
+  }
+
+  html += '<div class="feed-picker-actions">';
+  html += '<button class="btn-primary" onclick="feedPickerSubscribe()"' + (checkedCount === 0 ? ' disabled' : '') + '>Subscribe to ' + checkedCount + ' feed' + (checkedCount !== 1 ? 's' : '') + '</button>';
+  html += '<button style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;font-family:inherit" onclick="_pickerScreen=1;renderPickerScreen()">Back</button>';
+  html += '</div>';
+  return html;
+}
+
+function togglePickerFeed(url) {
+  if (_pickerFeedSelections[url]) {
+    _pickerFeedSelections[url].checked = !_pickerFeedSelections[url].checked;
+  }
+  renderPickerScreen();
+}
+
+function feedPickerSubscribe() {
+  var feedsToAdd = {};
+  for (var url in _pickerFeedSelections) {
+    if (_pickerFeedSelections[url].checked) {
+      feedsToAdd[_pickerFeedSelections[url].name] = url;
+    }
+  }
+  var count = Object.keys(feedsToAdd).length;
+  if (count === 0) { closeFeedPicker(); return; }
+
+  fetch('/api/config').then(function(r) { return r.json(); }).then(function(cfg) {
+    var feeds = cfg.feeds || {};
+    for (var name in feedsToAdd) {
+      feeds[name] = feedsToAdd[name];
+    }
+    cfg.feeds = feeds;
+    return fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cfg)
+    });
+  }).then(function(r) {
+    if (r.ok) {
+      showToast('Added ' + count + ' feed' + (count !== 1 ? 's' : ''));
+      closeFeedPicker();
+      setTimeout(function() { refreshArticleList(); }, 500);
+    }
+  }).catch(function() {
+    showToast('Failed to add feeds');
+  });
+}
+
+function closeFeedPicker() {
+  var overlay = document.getElementById('feed-picker-overlay');
+  if (overlay) overlay.remove();
+  _pickerCatalog = null;
+}
+
+function showFeedbackModal() {
+  var email = 'support@alittledrive.com';
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Send Feedback');
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML =
+    '<div class="modal-card" onclick="event.stopPropagation()" style="max-width:400px">' +
+      '<h2>Send Feedback</h2>' +
+      '<p>We\'d love to hear from you! Send us an email at:</p>' +
+      '<p style="font-size:15px;font-weight:600;text-align:center;padding:8px 0">' + escapeHtml(email) + '</p>' +
+      '<div class="modal-actions">' +
+        '<button class="btn-secondary" onclick="this.closest(\'.modal-overlay\').remove()">Close</button>' +
+        '<button class="btn-primary" onclick="navigator.clipboard.writeText(\'' + email + '\').then(function(){showToast(\'Copied to clipboard\')});this.closest(\'.modal-overlay\').remove()">Copy Address</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
 }
 

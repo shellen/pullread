@@ -925,9 +925,18 @@ describe('ask page structure', () => {
     expect(ask).toMatch(/function\s+_askSaveToNotebook/);
   });
 
-  test('17-ask.js has clear button with ask-clear-btn class', () => {
+  test('17-ask.js has clear button with plus icon and toast', () => {
     const ask = readFileSync(join(rootDir, 'viewer', '17-ask.js'), 'utf-8');
     expect(ask).toContain('ask-clear-btn');
+    expect(ask).toContain('#i-plus');
+    expect(ask).not.toContain('#i-refresh');
+    expect(ask).toContain('Conversation cleared');
+  });
+
+  test('17-ask.js copy excludes button text', () => {
+    const ask = readFileSync(join(rootDir, 'viewer', '17-ask.js'), 'utf-8');
+    expect(ask).toContain('cloneNode');
+    expect(ask).toMatch(/querySelectorAll.*button.*remove/);
   });
 
   test('17-ask.js has save button with ask-save-btn class', () => {
@@ -1205,5 +1214,36 @@ describe('Catalog CSS', () => {
     const css = readFileSync(join(rootDir, 'viewer.css'), 'utf-8');
     expect(css).toContain('.feed-picker');
     expect(css).toContain('.collection-card');
+  });
+});
+
+describe('Onboarding feed picker', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('showFeedPicker function exists in modals', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '11-modals.js'), 'utf-8');
+    expect(js).toMatch(/function\s+showFeedPicker/);
+  });
+
+  test('feed picker has collection selection screen', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '11-modals.js'), 'utf-8');
+    expect(js).toContain('What are you into');
+    expect(js).toContain('collection-card');
+  });
+
+  test('feed picker has feed cherry-pick screen', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '11-modals.js'), 'utf-8');
+    expect(js).toContain('Pick your feeds');
+    expect(js).toContain('feed-picker-list');
+  });
+
+  test('obFinish triggers feed picker for new users', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '11-modals.js'), 'utf-8');
+    expect(js).toContain('showFeedPicker');
+  });
+
+  test('feed picker subscribe button calls /api/config', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '11-modals.js'), 'utf-8');
+    expect(js).toContain('feedPickerSubscribe');
   });
 });
