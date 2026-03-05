@@ -1247,3 +1247,32 @@ describe('Onboarding feed picker', () => {
     expect(js).toContain('feedPickerSubscribe');
   });
 });
+
+describe('Hub and Manage Sources consolidation', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('manage-sources no longer contains FEED_BUNDLES', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '16-manage-sources.js'), 'utf-8');
+    expect(js).not.toContain('FEED_BUNDLES');
+  });
+
+  test('manage-sources no longer contains renderSourcesDiscover', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '16-manage-sources.js'), 'utf-8');
+    expect(js).not.toMatch(/function\s+renderSourcesDiscover/);
+  });
+
+  test('manage-sources links to Explore Discover', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '16-manage-sources.js'), 'utf-8');
+    expect(js).toContain('showTagCloud');
+  });
+
+  test('hub no longer contains loadSuggestedFeedsSection', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '04-article.js'), 'utf-8');
+    expect(js).not.toMatch(/function\s+loadSuggestedFeedsSection/);
+  });
+
+  test('hub no longer contains addSuggestedFeed', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '04-article.js'), 'utf-8');
+    expect(js).not.toMatch(/function\s+addSuggestedFeed/);
+  });
+});

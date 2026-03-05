@@ -460,69 +460,6 @@ function renderHub() {
   }
 }
 
-function loadSuggestedFeedsSection() {
-  var container = document.getElementById('hub-suggested-feeds');
-  if (!container) return;
-
-  fetchSuggestedFeeds(function(allFeeds) {
-    var feeds = filterSuggestedFeeds(allFeeds);
-    if (feeds.length === 0) return;
-
-    var userFeedCount = new Set(allFiles.map(function(f) { return f.feed; }).filter(Boolean)).size;
-    var isNewUser = userFeedCount < 5;
-    var dismissed = isFeedsDismissed();
-
-    if (!isNewUser && dismissed) return;
-
-    var html = '<div class="hub-feeds-section' + (isNewUser ? ' hub-feeds-hero' : '') + '">';
-
-    if (isNewUser) {
-      html += '<div class="hub-feeds-heading">Build your reading list</div>';
-      html += '<p class="hub-feeds-desc">Subscribe to feeds to get articles delivered to Pull Read.</p>';
-    } else {
-      html += '<div class="hub-feeds-heading" style="display:flex;align-items:center;justify-content:space-between">Discover new feeds';
-      html += '<button class="hub-feeds-dismiss" onclick="dismissSuggestedFeeds()" title="Dismiss">&times;</button>';
-      html += '</div>';
-    }
-
-    html += '<div class="hub-feeds-pills">';
-    for (var i = 0; i < feeds.length; i++) {
-      var f = feeds[i];
-      html += '<button class="tag-pill" onclick="addSuggestedFeed(this,\'' + escapeHtml(f.name.replace(/'/g, "\\'")) + '\',\'' + escapeHtml(f.url.replace(/'/g, "\\'")) + '\')">' + escapeHtml(f.name) + '</button>';
-    }
-    html += '<button class="tag-pill" onclick="toggleQuickAdd()" style="opacity:0.7">+ Add custom</button>';
-    html += '</div></div>';
-
-    container.innerHTML = html;
-  });
-}
-
-function addSuggestedFeed(btn, name, url) {
-  btn.disabled = true;
-  btn.textContent = 'Adding\u2026';
-  fetch('/api/config').then(function(r) { return r.json(); }).then(function(cfg) {
-    var feeds = cfg.feeds || {};
-    feeds[name] = url;
-    return fetch('/api/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ outputPath: cfg.outputPath, feeds: feeds, syncInterval: cfg.syncInterval, useBrowserCookies: cfg.useBrowserCookies, maxAgeDays: cfg.maxAgeDays })
-    });
-  }).then(function(r) {
-    if (r.ok) {
-      btn.textContent = '\u2713 Added';
-      btn.style.opacity = '0.5';
-      showToast('Added ' + name);
-    } else {
-      btn.textContent = name;
-      btn.disabled = false;
-    }
-  }).catch(function() {
-    btn.textContent = name;
-    btn.disabled = false;
-  });
-}
-
 function buildDailyRundownHtml() {
   var clusters = buildDailyRundown(7);
   if (clusters.length === 0) return '';
