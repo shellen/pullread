@@ -14,20 +14,24 @@ pub async fn open_viewer_at(app: &AppHandle, hash: Option<&str>) -> Result<(), S
     let port_result = sidecar::ensure_viewer_running(app).await;
     let fragment = hash.map(|h| format!("#{}", h)).unwrap_or_default();
 
-    // If server failed to start, show a notification and fall back to browser
+    // If server failed to start, retry once then show error
     let port = match port_result {
         Ok(p) => p,
         Err(e) => {
-            log::error!("Sidecar failed: {}", e);
-            notifications::notify(
-                app,
-                "PullRead Server Error",
-                "The server couldn't start. Try quitting and reopening.",
-            );
-            // Try opening in browser anyway — server may come up late
-            let fallback_url = "http://127.0.0.1:7777";
-            let _ = open::that(fallback_url);
-            return Ok(());
+            log::warn!("Sidecar failed on first attempt: {}, retrying...", e);
+            // State was cleared by ensure_viewer_running on failure, so retry
+            match sidecar::ensure_viewer_running(app).await {
+                Ok(p) => p,
+                Err(e2) => {
+                    log::error!("Sidecar failed on retry: {}", e2);
+                    notifications::notify(
+                        app,
+                        "PullRead Server Error",
+                        "The viewer server couldn't start. Try quitting and reopening the app.",
+                    );
+                    return Err(format!("Server failed to start: {}", e2));
+                }
+            }
         }
     };
 

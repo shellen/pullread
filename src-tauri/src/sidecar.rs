@@ -113,6 +113,14 @@ impl SidecarState {
         self.viewer_child.lock().unwrap().is_some()
     }
 
+    /// Clear the viewer state so it can be restarted
+    pub fn clear_viewer(&self) {
+        if let Some(child) = self.viewer_child.lock().unwrap().take() {
+            let _ = child.kill();
+        }
+        *self.viewer_port.lock().unwrap() = 0;
+    }
+
     /// Stop all sidecar processes
     pub fn stop_all(&self) {
         if let Some(child) = self.viewer_child.lock().unwrap().take() {
@@ -316,11 +324,19 @@ pub async fn run_sync(app: &AppHandle, retry_failed: bool) -> Result<String, Str
 pub async fn ensure_viewer_running(app: &AppHandle) -> Result<u16, String> {
     let state = app.state::<SidecarState>();
 
-    // If viewer is already running, return existing port
+    // If viewer is already running, verify it's actually responsive
     if state.is_viewer_running() {
         let port = state.get_viewer_port();
         if port > 0 {
-            return Ok(port);
+            let url = format!("http://127.0.0.1:{}", port);
+            if let Ok(resp) = reqwest::get(&url).await {
+                if resp.status().is_success() {
+                    return Ok(port);
+                }
+            }
+            // Server handle exists but is not responding — clear and restart
+            log::warn!("Viewer process on port {} is not responding, restarting", port);
+            state.clear_viewer();
         }
     }
 
@@ -391,7 +407,9 @@ pub async fn ensure_viewer_running(app: &AppHandle) -> Result<u16, String> {
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     }
 
+    // Health check failed — clear state so the next attempt can restart fresh
     log::warn!("Viewer health check timed out on port {}", port);
+    state.clear_viewer();
     Err(format!(
         "Server failed to start within 10 seconds on port {}",
         port
