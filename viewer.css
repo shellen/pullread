@@ -6309,6 +6309,203 @@
     .ask-msg-user { max-width: 90%; }
   }
 
+  /* ---- Catalog discovery (Explore Discover tab + Onboarding picker) ---- */
+
+  .catalog-collection-row {
+    margin-bottom: 24px;
+  }
+
+  .catalog-collection-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .catalog-collection-header h3 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .catalog-feed-cards {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .catalog-feed-cards::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .catalog-feed-cards::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
+  }
+
+  .catalog-feed-card {
+    min-width: 200px;
+    max-width: 220px;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    scroll-snap-align: start;
+    background: var(--bg);
+  }
+
+  .catalog-feed-card.subscribed {
+    opacity: 0.5;
+  }
+
+  .catalog-feed-name {
+    font-size: 13px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .catalog-feed-desc {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .platform-badge {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: var(--border);
+    color: var(--muted);
+    text-transform: capitalize;
+  }
+
+  /* ---- Feed picker modal (onboarding) ---- */
+
+  .feed-picker {
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+
+  .feed-picker h2 {
+    margin: 0 0 4px;
+    font-size: 20px;
+    text-align: center;
+  }
+
+  .feed-picker .ob-subtitle {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+
+  .collection-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .collection-card {
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    text-align: center;
+  }
+
+  .collection-card:hover {
+    border-color: var(--link);
+  }
+
+  .collection-card.selected {
+    border-color: var(--link);
+    background: color-mix(in srgb, var(--link) 8%, transparent);
+  }
+
+  .collection-card .icon {
+    width: 24px;
+    height: 24px;
+    margin-bottom: 6px;
+    color: var(--link);
+  }
+
+  .collection-card-name {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .collection-card-desc {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .feed-picker-list {
+    max-height: 350px;
+    overflow-y: auto;
+    margin-bottom: 16px;
+  }
+
+  .feed-picker-list h3 {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    margin: 16px 0 8px;
+  }
+
+  .feed-picker-list h3:first-child {
+    margin-top: 0;
+  }
+
+  .feed-picker-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+  }
+
+  .feed-picker-item input[type="checkbox"] {
+    flex-shrink: 0;
+  }
+
+  .feed-picker-item-name {
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .feed-picker-item-desc {
+    font-size: 11px;
+    color: var(--muted);
+    margin-left: auto;
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 180px;
+  }
+
+  .feed-picker-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 16px;
+  }
+
   /* Print styles */
   @media print {
     .toolbar, .sidebar, .drawer, .mobile-header, .sidebar-overlay, .skip-link, .margin-notes, .toc-container,

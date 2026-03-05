@@ -1190,3 +1190,20 @@ describe('Explore Discover tab', () => {
     expect(js).toContain('allFiles.length');
   });
 });
+
+describe('Catalog CSS', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('viewer.css has catalog collection styles', () => {
+    const css = readFileSync(join(rootDir, 'viewer.css'), 'utf-8');
+    expect(css).toContain('.catalog-collection-row');
+    expect(css).toContain('.catalog-feed-card');
+    expect(css).toContain('.platform-badge');
+  });
+
+  test('viewer.css has feed picker modal styles', () => {
+    const css = readFileSync(join(rootDir, 'viewer.css'), 'utf-8');
+    expect(css).toContain('.feed-picker');
+    expect(css).toContain('.collection-card');
+  });
+});
