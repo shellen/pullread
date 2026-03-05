@@ -920,9 +920,14 @@ function renderArticle(text, filename) {
   if (toolbarEl) toolbarEl.innerHTML = toolbarActions;
   var toolbar = document.getElementById('reader-toolbar');
   if (toolbar) toolbar.style.display = '';
-  // Restore article-specific toolbar-right items (hidden by note view)
+  // Restore article-specific toolbar-right items (customized by note view)
   var toolbarRight = toolbar ? toolbar.querySelector('.reader-toolbar-right') : null;
-  if (toolbarRight) toolbarRight.style.display = '';
+  if (toolbarRight) {
+    toolbarRight.style.display = '';
+    toolbarRight.querySelectorAll('.toolbar-nav-btn, .toolbar-divider').forEach(function(el) { el.style.display = ''; });
+    var moreBtn = toolbarRight.querySelector('#more-dropdown button');
+    if (moreBtn) moreBtn.setAttribute('onclick', 'toggleMoreMenu(event)');
+  }
   // Show notebook back-references
   var nbRefs = Object.values(_notebooks || {}).filter(function(nb) { return nb.sources && nb.sources.indexOf(filename) >= 0; });
   if (nbRefs.length) {

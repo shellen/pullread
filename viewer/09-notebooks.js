@@ -234,17 +234,23 @@ function openNoteInPane(noteId) {
   toolbarActions += '<button onclick="toggleNotebookPreview()" class="toolbar-action-btn' + (_notebookPreviewMode ? ' active-fav' : '') + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-pen"/></svg><span class="toolbar-action-label"> ' + previewLabel + '</span></button>';
   toolbarActions += '<button onclick="toggleWritingFocus()" class="toolbar-action-btn' + (_writingFocusActive ? ' active-fav' : '') + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-focus"/></svg><span class="toolbar-action-label"> Focus</span></button>';
   toolbarActions += '<button onclick="toggleNotebookVoice(this)" id="nb-voice-btn" class="toolbar-action-btn" title="Dictate note"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-mic"/></svg><span class="toolbar-action-label"> Dictate</span></button>';
-  toolbarActions += '<div class="share-dropdown"><button onclick="toggleNotebookExportDropdown(event)" class="toolbar-action-btn"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg><span class="toolbar-action-label"> Export\u2026</span></button></div>';
-  toolbarActions += '<div class="more-dropdown"><button onclick="toggleNoteMoreMenu(event)" class="toolbar-action-btn" title="More actions"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-ellipsis"/></svg></button></div>';
+  toolbarActions += '<div class="share-dropdown"><button onclick="toggleNotebookExportDropdown(event)" class="toolbar-action-btn"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg><span class="toolbar-action-label"> Export</span></button></div>';
   toolbarActions += '<span class="save-hint" id="notebook-save-hint" style="font-size:11px;color:var(--muted);margin-left:auto">Saved</span>';
 
   var toolbarEl = document.getElementById('reader-toolbar-actions');
   if (toolbarEl) toolbarEl.innerHTML = toolbarActions;
   var toolbar = document.getElementById('reader-toolbar');
   if (toolbar) toolbar.style.display = '';
-  // Hide article-specific toolbar-right items (more menu, prev/next nav)
+  // Show toolbar-right with Aa and note more menu; hide article-specific prev/next nav
   var toolbarRight = toolbar ? toolbar.querySelector('.reader-toolbar-right') : null;
-  if (toolbarRight) toolbarRight.style.display = 'none';
+  if (toolbarRight) {
+    toolbarRight.style.display = '';
+    // Hide prev/next article nav and divider
+    toolbarRight.querySelectorAll('.toolbar-nav-btn[onclick*="navigateArticle"], .toolbar-divider').forEach(function(el) { el.style.display = 'none'; });
+    // Rewire the more-dropdown to note actions
+    var moreBtn = toolbarRight.querySelector('#more-dropdown button');
+    if (moreBtn) moreBtn.setAttribute('onclick', 'toggleNoteMoreMenu(event)');
+  }
 
   // Full-page editor or preview
   if (_notebookPreviewMode) {
