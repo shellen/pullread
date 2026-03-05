@@ -5,7 +5,9 @@
 ```bash
 bun scripts/bump-version.ts 0.4.0    # update all version locations
 # update site/releases.html with release notes
-# commit and merge to main
+# commit, push, create PR → wait for CI ✓
+# merge PR to main → wait for CI ✓
+git checkout main && git pull
 git tag v0.4.0 && git push origin v0.4.0
 # CI builds, signs, notarizes, and publishes — no manual steps after tagging
 ```
@@ -29,16 +31,33 @@ bun test
 
 Add a new entry at the top of `site/releases.html` with the version, subtitle, date, and bullet points. Update the fallback version in `viewer/03-settings.js` (search for `_prCurrentVersion`).
 
-### 3. Commit, merge, and tag
+### 3. Create PR and wait for CI
 
 ```bash
 git add -p    # stage the version bump + release notes
 git commit -m "Bump version to X.Y.Z"
-git checkout main && git merge <branch> && git push origin main
+git push -u origin <branch>
+gh pr create --title "Release X.Y.Z" --body "Version bump and release notes"
+```
+
+Wait for CI checks to pass on the PR before merging.
+
+### 4. Merge to main and wait for CI
+
+```bash
+gh pr merge --merge
+```
+
+Wait for the main branch build to succeed. This ensures the `latest` rolling build is healthy before tagging.
+
+### 5. Tag the release
+
+```bash
+git checkout main && git pull
 git tag vX.Y.Z && git push origin vX.Y.Z
 ```
 
-### 4. Wait for CI
+### 6. Wait for release CI
 
 The tag push triggers three jobs:
 
@@ -52,7 +71,7 @@ Monitor with `gh run list --limit 5`. The whole pipeline takes ~12 minutes.
 
 **There is no manual publish step.** The `publish-updater` job calls `gh release edit --draft=false` automatically.
 
-### 5. Verify
+### 7. Verify
 
 - [ ] `gh release view vX.Y.Z` shows both DMGs + `latest.json`
 - [ ] Auto-updater: open an older version of Pull Read, check for update prompt

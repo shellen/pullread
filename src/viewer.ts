@@ -7,7 +7,7 @@ import { join, extname, dirname } from 'path';
 import { exec, execFile, execFileSync } from 'child_process';
 import { homedir } from 'os';
 import { VIEWER_HTML } from './viewer-html';
-import { summarizeText, loadLLMConfig, saveLLMConfig, loadLLMSettings, saveLLMSettings, getDefaultModel, isAppleAvailable, KNOWN_MODELS, LLMConfig, LLMSettings } from './summarizer';
+import { summarizeText, promptLLM, loadLLMConfig, saveLLMConfig, loadLLMSettings, saveLLMSettings, getDefaultModel, isAppleAvailable, KNOWN_MODELS, LLMConfig, LLMSettings } from './summarizer';
 import { autotagText, autotagBatch, saveMachineTags, hasMachineTags, migrateDashedTags } from './autotagger';
 import { initAnnotations, loadAnnotation, saveAnnotation, allHighlights, allNotes, migrateMonolithicFiles } from './annotations';
 import { APP_ICON } from './app-icon';
@@ -567,6 +567,50 @@ function listFiles(outputPath: string): FileMeta[] {
   return files;
 }
 
+const STOP_WORDS = new Set([
+  'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+  'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+  'should', 'may', 'might', 'can', 'shall', 'to', 'of', 'in', 'for',
+  'on', 'with', 'at', 'by', 'from', 'as', 'into', 'about', 'between',
+  'through', 'during', 'before', 'after', 'above', 'below', 'and', 'but',
+  'or', 'nor', 'not', 'so', 'yet', 'both', 'either', 'neither', 'each',
+  'every', 'all', 'any', 'few', 'more', 'most', 'other', 'some', 'such',
+  'no', 'only', 'own', 'same', 'than', 'too', 'very', 'just', 'because',
+  'it', 'its', 'this', 'that', 'these', 'those', 'i', 'me', 'my', 'we',
+  'our', 'you', 'your', 'he', 'him', 'his', 'she', 'her', 'they', 'them',
+  'their', 'what', 'which', 'who', 'whom', 'how', 'when', 'where', 'why',
+]);
+
+export function findRelevantArticles(question: string, articles: FileMeta[], limit: number): FileMeta[] {
+  const keywords = question.toLowerCase().split(/\s+/)
+    .map(w => w.replace(/[^a-z0-9]/g, ''))
+    .filter(w => w.length > 1 && !STOP_WORDS.has(w));
+
+  if (keywords.length === 0) return [];
+
+  const scored: { article: FileMeta; score: number }[] = [];
+
+  for (const article of articles) {
+    let score = 0;
+    const titleLower = (article.title || '').toLowerCase();
+    const excerptLower = (article.excerpt || '').toLowerCase();
+    const domainLower = (article.domain || '').toLowerCase();
+    const catsLower = (article.categories || []).join(' ').toLowerCase();
+
+    for (const kw of keywords) {
+      if (titleLower.includes(kw)) score += 3;
+      if (excerptLower.includes(kw)) score += 2;
+      if (catsLower.includes(kw)) score += 2;
+      if (domainLower.includes(kw)) score += 1;
+    }
+
+    if (score > 0) scored.push({ article, score });
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, limit).map(s => s.article);
+}
+
 // App config and data paths
 const CONFIG_DIR = join(homedir(), '.config', 'pullread');
 const FEEDS_PATH = join(CONFIG_DIR, 'feeds.json');
@@ -658,6 +702,8 @@ function writeSummaryToFile(filePath: string, summary: string, provider?: string
 
   writeFileSync(filePath, `${match[1]}${frontmatter}${match[3]}${match[4]}`);
 }
+
+let reimportActive = false;
 
 export async function reprocessFile(filePath: string, options?: { force?: boolean }): Promise<{ ok: boolean; title?: string; error?: string }> {
   try {
@@ -1719,6 +1765,12 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
 
         const result = await summarizeText(articleText);
 
+        if (!result.summary || !result.summary.trim()) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Model returned an empty summary. Try again or switch to a different provider.' }));
+          return;
+        }
+
         // If summarized by filename, write the summary into the markdown frontmatter
         if (name) {
           writeSummaryToFile(resolveFilePath(outputPath, name), result.summary, provider, result.model);
@@ -1727,6 +1779,7 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
         sendJson(res, { summary: result.summary, model: result.model, provider });
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Summarization failed';
+        console.error(`[Summarize] ${msg}`);
         // Provide user-friendly error messages
         let userMsg = msg;
         if (msg.includes('FoundationModels not found')) {
@@ -1746,6 +1799,68 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
         }
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: userMsg }));
+      }
+      return;
+    }
+
+    // Ask API — RAG chat over reading collection
+    if (url.pathname === '/api/ask' && req.method === 'POST') {
+      try {
+        const body = JSON.parse(await readBody(req));
+        const { question, previousSources } = body;
+        if (!question || typeof question !== 'string') {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'question is required' }));
+          return;
+        }
+
+        const config = loadLLMConfig();
+        if (!config) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'No LLM configured. Open Settings to add a provider.' }));
+          return;
+        }
+
+        const isApple = config.provider === 'apple';
+        const articleLimit = isApple ? 3 : 8;
+        const wordLimit = isApple ? 300 : 600;
+
+        // Reuse previous sources for follow-up questions; fall back to keyword search
+        let relevant: FileMeta[];
+        if (Array.isArray(previousSources) && previousSources.length > 0) {
+          const articles = listFiles(outputPath);
+          const prevSet = new Set(previousSources as string[]);
+          relevant = articles.filter(a => prevSet.has(a.filename)).slice(0, articleLimit);
+        } else {
+          const articles = listFiles(outputPath);
+          relevant = findRelevantArticles(question, articles, articleLimit);
+        }
+
+        // Build article context
+        const articleContext = relevant.map(a => {
+          let body = '';
+          try {
+            const filePath = resolveFilePath(outputPath, a.filename);
+            const content = readFileSync(filePath, 'utf-8');
+            const match = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
+            const fullBody = match ? match[1] : content;
+            body = fullBody.split(/\s+/).slice(0, wordLimit).join(' ');
+          } catch {}
+          const summary = a.hasSummary ? a.excerpt : '';
+          return `## ${a.title}\nURL: ${a.url}\nDomain: ${a.domain}\n${summary ? 'Summary: ' + summary + '\n' : ''}${body}`;
+        }).join('\n\n---\n\n');
+
+        const systemPrompt = `You are a reading assistant for a personal article library. Answer the user's question using the articles provided below. Be specific and cite article titles in **bold** when referencing them. If the articles don't fully answer the question, say what you can and note what's missing. Keep responses concise and useful.`;
+
+        const fullPrompt = `${systemPrompt}\n\n# Articles\n\n${articleContext}\n\n# Question\n\n${question}`;
+
+        const result = await promptLLM(fullPrompt, config);
+        const sources = relevant.map(a => ({ title: a.title, filename: a.filename, url: a.url, domain: a.domain }));
+        sendJson(res, { answer: result.text, model: result.model, sources });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Ask failed';
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: msg }));
       }
       return;
     }
@@ -1780,64 +1895,75 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
 
     // Reimport all articles — SSE progress stream
     if (url.pathname === '/api/reimport-all' && req.method === 'POST') {
+      if (reimportActive) {
+        res.writeHead(409, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Reimport already in progress' }));
+        return;
+      }
+      reimportActive = true;
+
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
       });
 
-      const allFilePaths = listMarkdownFiles(outputPath);
+      try {
+        const allFilePaths = listMarkdownFiles(outputPath);
 
-      // Parse frontmatter to get URLs; skip files without a source URL
-      const filesWithUrls: { name: string; fullPath: string; domain: string }[] = [];
-      for (const fullPath of allFilePaths) {
-        const name = require('path').basename(fullPath);
-        try {
-          const content = readFileSync(fullPath, 'utf-8');
-          const meta = parseFrontmatter(content);
-          if (meta.url) {
-            let domain = '';
-            try { domain = new URL(meta.url).hostname; } catch {}
-            filesWithUrls.push({ name, fullPath, domain });
+        // Parse frontmatter to get URLs; skip files without a source URL
+        const filesWithUrls: { name: string; fullPath: string; domain: string }[] = [];
+        for (const fullPath of allFilePaths) {
+          const name = require('path').basename(fullPath);
+          try {
+            const content = readFileSync(fullPath, 'utf-8');
+            const meta = parseFrontmatter(content);
+            if (meta.url) {
+              let domain = '';
+              try { domain = new URL(meta.url).hostname; } catch {}
+              filesWithUrls.push({ name, fullPath, domain });
+            }
+          } catch {}
+        }
+
+        // Sort by domain to batch same-host requests
+        filesWithUrls.sort((a, b) => a.domain.localeCompare(b.domain));
+
+        const total = filesWithUrls.length;
+        let succeeded = 0;
+        let failed = 0;
+        let skipped = 0;
+        let lastDomain = '';
+
+        for (let i = 0; i < filesWithUrls.length; i++) {
+          const { name, fullPath, domain } = filesWithUrls[i];
+
+          // 1-second delay between requests to the same host
+          if (domain && domain === lastDomain) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
           }
-        } catch {}
-      }
+          lastDomain = domain;
 
-      // Sort by domain to batch same-host requests
-      filesWithUrls.sort((a, b) => a.domain.localeCompare(b.domain));
+          const result = await reprocessFile(fullPath);
+          const done = i + 1;
 
-      const total = filesWithUrls.length;
-      let succeeded = 0;
-      let failed = 0;
-      let skipped = 0;
-      let lastDomain = '';
-
-      for (let i = 0; i < filesWithUrls.length; i++) {
-        const { name, fullPath, domain } = filesWithUrls[i];
-
-        // 1-second delay between requests to the same host
-        if (domain && domain === lastDomain) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          if (result.ok) {
+            succeeded++;
+            res.write(`data: ${JSON.stringify({ done, total, current: name, ok: true })}\n\n`);
+          } else if (result.error?.includes('feed-sourced')) {
+            skipped++;
+            res.write(`data: ${JSON.stringify({ done, total, current: name, ok: true, skipped: true })}\n\n`);
+          } else {
+            failed++;
+            res.write(`data: ${JSON.stringify({ done, total, current: name, ok: false, error: result.error })}\n\n`);
+          }
         }
-        lastDomain = domain;
 
-        const result = await reprocessFile(fullPath);
-        const done = i + 1;
-
-        if (result.ok) {
-          succeeded++;
-          res.write(`data: ${JSON.stringify({ done, total, current: name, ok: true })}\n\n`);
-        } else if (result.error?.includes('feed-sourced')) {
-          skipped++;
-          res.write(`data: ${JSON.stringify({ done, total, current: name, ok: true, skipped: true })}\n\n`);
-        } else {
-          failed++;
-          res.write(`data: ${JSON.stringify({ done, total, current: name, ok: false, error: result.error })}\n\n`);
-        }
+        res.write(`data: ${JSON.stringify({ complete: true, succeeded, failed, skipped })}\n\n`);
+      } finally {
+        reimportActive = false;
+        res.end();
       }
-
-      res.write(`data: ${JSON.stringify({ complete: true, succeeded, failed, skipped })}\n\n`);
-      res.end();
       return;
     }
 

@@ -838,6 +838,212 @@ describe('Explore section badges', () => {
   });
 });
 
+describe('findRelevantArticles', () => {
+  const { findRelevantArticles } = require('./viewer');
+
+  test('scores articles by keyword matches in title, excerpt, summary, categories, domain', () => {
+    const articles: any[] = [
+      { filename: 'ai-article.md', title: 'AI Revolution in Healthcare', url: 'https://example.com/1', domain: 'techblog.com', bookmarked: '', feed: '', author: '', mtime: '', hasSummary: true, summaryProvider: '', summaryModel: '', excerpt: 'Artificial intelligence transforms medical diagnosis', image: '', enclosureUrl: '', enclosureType: '', enclosureDuration: '', videoEnclosureUrl: '', videoEnclosureType: '', commentsUrl: '', commentCount: 0, categories: ['Technology', 'Health'] },
+      { filename: 'cooking.md', title: 'Best Pasta Recipes', url: 'https://food.com/pasta', domain: 'food.com', bookmarked: '', feed: '', author: '', mtime: '', hasSummary: false, summaryProvider: '', summaryModel: '', excerpt: 'Easy pasta dishes for weeknights', image: '', enclosureUrl: '', enclosureType: '', enclosureDuration: '', videoEnclosureUrl: '', videoEnclosureType: '', commentsUrl: '', commentCount: 0, categories: ['Food'] },
+      { filename: 'ai-ethics.md', title: 'Ethics of AI', url: 'https://example.com/2', domain: 'example.com', bookmarked: '', feed: '', author: '', mtime: '', hasSummary: true, summaryProvider: '', summaryModel: '', excerpt: 'Should AI make decisions about healthcare?', image: '', enclosureUrl: '', enclosureType: '', enclosureDuration: '', videoEnclosureUrl: '', videoEnclosureType: '', commentsUrl: '', commentCount: 0, categories: ['Technology'] },
+    ];
+
+    const result = findRelevantArticles('What does AI mean for healthcare?', articles, 3);
+    expect(result.length).toBe(2);
+    // Both AI articles should appear; cooking should not
+    const filenames = result.map((a: any) => a.filename);
+    expect(filenames).toContain('ai-article.md');
+    expect(filenames).toContain('ai-ethics.md');
+    expect(filenames).not.toContain('cooking.md');
+  });
+
+  test('returns empty array when no articles match', () => {
+    const articles: any[] = [
+      { filename: 'cooking.md', title: 'Best Pasta Recipes', url: '', domain: 'food.com', bookmarked: '', feed: '', author: '', mtime: '', hasSummary: false, summaryProvider: '', summaryModel: '', excerpt: 'Easy pasta dishes', image: '', enclosureUrl: '', enclosureType: '', enclosureDuration: '', videoEnclosureUrl: '', videoEnclosureType: '', commentsUrl: '', commentCount: 0, categories: ['Food'] },
+    ];
+
+    const result = findRelevantArticles('quantum physics breakthroughs', articles, 3);
+    expect(result).toHaveLength(0);
+  });
+
+  test('respects limit parameter', () => {
+    const articles: any[] = [];
+    for (let i = 0; i < 10; i++) {
+      articles.push({ filename: `ai-${i}.md`, title: `AI Article ${i}`, url: '', domain: 'ai.com', bookmarked: '', feed: '', author: '', mtime: '', hasSummary: false, summaryProvider: '', summaryModel: '', excerpt: 'Artificial intelligence research', image: '', enclosureUrl: '', enclosureType: '', enclosureDuration: '', videoEnclosureUrl: '', videoEnclosureType: '', commentsUrl: '', commentCount: 0, categories: ['AI'] });
+    }
+
+    const result = findRelevantArticles('AI research', articles, 3);
+    expect(result.length).toBeLessThanOrEqual(3);
+  });
+
+  test('title matches score higher than domain matches', () => {
+    const articles: any[] = [
+      { filename: 'domain-only.md', title: 'Something Else', url: '', domain: 'ai.com', bookmarked: '', feed: '', author: '', mtime: '', hasSummary: false, summaryProvider: '', summaryModel: '', excerpt: 'Unrelated content', image: '', enclosureUrl: '', enclosureType: '', enclosureDuration: '', videoEnclosureUrl: '', videoEnclosureType: '', commentsUrl: '', commentCount: 0, categories: [] },
+      { filename: 'title-match.md', title: 'AI Transforms Everything', url: '', domain: 'blog.com', bookmarked: '', feed: '', author: '', mtime: '', hasSummary: false, summaryProvider: '', summaryModel: '', excerpt: 'About artificial intelligence', image: '', enclosureUrl: '', enclosureType: '', enclosureDuration: '', videoEnclosureUrl: '', videoEnclosureType: '', commentsUrl: '', commentCount: 0, categories: [] },
+    ];
+
+    const result = findRelevantArticles('AI', articles, 2);
+    expect(result[0].filename).toBe('title-match.md');
+  });
+});
+
+describe('ask page structure', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('17-ask.js defines renderAskPage function', () => {
+    const ask = readFileSync(join(rootDir, 'viewer', '17-ask.js'), 'utf-8');
+    expect(ask).toMatch(/function\s+renderAskPage/);
+  });
+
+  test('13-init.js handles #tab=ask hash', () => {
+    const init = readFileSync(join(rootDir, 'viewer', '13-init.js'), 'utf-8');
+    expect(init).toContain("params.tab === 'ask'");
+    expect(init).toContain('renderAskPage');
+  });
+
+  test('viewer.css has ask-view styles', () => {
+    const css = readFileSync(join(rootDir, 'viewer.css'), 'utf-8');
+    expect(css).toContain('.ask-view');
+    expect(css).toContain('.ask-messages');
+    expect(css).toContain('.ask-input-area');
+  });
+
+  test('viewer.ts has /api/ask endpoint', () => {
+    const viewer = readFileSync(join(rootDir, 'src', 'viewer.ts'), 'utf-8');
+    expect(viewer).toContain("/api/ask");
+    expect(viewer).toContain('findRelevantArticles');
+    expect(viewer).toContain('promptLLM');
+  });
+
+  test('17-ask.js defines _askClear function', () => {
+    const ask = readFileSync(join(rootDir, 'viewer', '17-ask.js'), 'utf-8');
+    expect(ask).toMatch(/function\s+_askClear/);
+  });
+
+  test('17-ask.js defines _askSaveToNotebook function', () => {
+    const ask = readFileSync(join(rootDir, 'viewer', '17-ask.js'), 'utf-8');
+    expect(ask).toMatch(/function\s+_askSaveToNotebook/);
+  });
+
+  test('17-ask.js has clear button with plus icon and toast', () => {
+    const ask = readFileSync(join(rootDir, 'viewer', '17-ask.js'), 'utf-8');
+    expect(ask).toContain('ask-clear-btn');
+    expect(ask).toContain('#i-plus');
+    expect(ask).not.toContain('#i-refresh');
+    expect(ask).toContain('Conversation cleared');
+  });
+
+  test('17-ask.js copy excludes button text', () => {
+    const ask = readFileSync(join(rootDir, 'viewer', '17-ask.js'), 'utf-8');
+    expect(ask).toContain('cloneNode');
+    expect(ask).toMatch(/querySelectorAll.*button.*remove/);
+  });
+
+  test('17-ask.js has save button with ask-save-btn class', () => {
+    const ask = readFileSync(join(rootDir, 'viewer', '17-ask.js'), 'utf-8');
+    expect(ask).toContain('ask-save-btn');
+  });
+
+  test('17-ask.js shows LLM provider label', () => {
+    const ask = readFileSync(join(rootDir, 'viewer', '17-ask.js'), 'utf-8');
+    expect(ask).toContain('providerLabel');
+  });
+
+  test('viewer.css has ask-clear-btn and ask-save-btn styles', () => {
+    const css = readFileSync(join(rootDir, 'viewer.css'), 'utf-8');
+    expect(css).toContain('.ask-clear-btn');
+    expect(css).toContain('.ask-save-btn');
+  });
+});
+
+describe('page headers use article-header pattern', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('settings page uses article-header h1', () => {
+    const settings = readFileSync(join(rootDir, 'viewer', '03-settings.js'), 'utf-8');
+    expect(settings).toContain('article-header');
+  });
+
+  test('ask page uses article-header h1', () => {
+    const ask = readFileSync(join(rootDir, 'viewer', '17-ask.js'), 'utf-8');
+    expect(ask).toContain('article-header');
+  });
+
+  test('manage sources page uses article-header h1', () => {
+    const sources = readFileSync(join(rootDir, 'viewer', '16-manage-sources.js'), 'utf-8');
+    expect(sources).toContain('article-header');
+  });
+});
+
+describe('note page improvements', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('exportNotebook uses active note title for filename', () => {
+    const nb = readFileSync(join(rootDir, 'viewer', '09-notebooks.js'), 'utf-8');
+    // The exportNotebook function itself should derive filename from note, not nb.title
+    const exportFn = nb.match(/function exportNotebook\(\)[\s\S]*?^}/m);
+    expect(exportFn).toBeTruthy();
+    expect(exportFn![0]).toContain('_activeNoteId');
+  });
+
+  test('note preview strips first heading to avoid title duplication', () => {
+    const nb = readFileSync(join(rootDir, 'viewer', '09-notebooks.js'), 'utf-8');
+    // openNoteInPane should strip leading # heading from preview content
+    const openFn = nb.match(/function openNoteInPane[\s\S]*?^}/m);
+    expect(openFn).toBeTruthy();
+    expect(openFn![0]).toMatch(/replace.*\\n/);
+  });
+
+  test('note actions use reader-toolbar instead of article-actions', () => {
+    const nb = readFileSync(join(rootDir, 'viewer', '09-notebooks.js'), 'utf-8');
+    expect(nb).toContain('reader-toolbar-actions');
+  });
+
+  test('note toolbar has overflow menu with Delete and Highlights', () => {
+    const nb = readFileSync(join(rootDir, 'viewer', '09-notebooks.js'), 'utf-8');
+    // Extract all toolbarActions += lines
+    const toolbarLines = nb.match(/toolbarActions\s*\+=.*/g) || [];
+    const directButtons = toolbarLines.join('\n');
+    // Delete and Highlights should NOT be direct toolbar buttons
+    expect(directButtons).not.toContain('confirmDeleteNote');
+    expect(directButtons).not.toContain('showHighlightPicker');
+    // They should be in a more-dropdown menu function instead
+    expect(nb).toContain('toggleNoteMoreMenu');
+    const menuFn = nb.match(/function toggleNoteMoreMenu[\s\S]*?^\}/m);
+    expect(menuFn).toBeTruthy();
+    expect(menuFn![0]).toContain('confirmDeleteNote');
+    expect(menuFn![0]).toContain('showHighlightPicker');
+  });
+
+  test('note toolbar does not have Grammar as direct button', () => {
+    const nb = readFileSync(join(rootDir, 'viewer', '09-notebooks.js'), 'utf-8');
+    const openFn = nb.match(/function openNoteInPane[\s\S]*?^}/m);
+    expect(openFn).toBeTruthy();
+    // No grammar button in direct toolbar actions
+    expect(openFn![0]).not.toMatch(/toolbarActions\s*\+=.*grammar-check-btn/);
+  });
+
+  test('export uses note sourceArticle for single-note export', () => {
+    const nb = readFileSync(join(rootDir, 'viewer', '09-notebooks.js'), 'utf-8');
+    const exportFn = nb.match(/function exportNotebook\(\)[\s\S]*?^}/m);
+    expect(exportFn).toBeTruthy();
+    // Should use note.sourceArticle for single-note export
+    expect(exportFn![0]).toContain('sourceArticle');
+    // Should have conditional logic that limits sources per note
+    expect(exportFn![0]).toContain('exportSources');
+  });
+
+  test('note buttons use rounded-md (6px border-radius)', () => {
+    const css = readFileSync(join(rootDir, 'viewer.css'), 'utf-8');
+    const newNoteBtn = css.match(/\.new-note-btn\s*\{[^}]+\}/);
+    expect(newNoteBtn).toBeTruthy();
+    expect(newNoteBtn![0]).toContain('border-radius: 6px');
+    const suggestPill = css.match(/\.nb-suggest-pill\s*\{[^}]+\}/);
+    expect(suggestPill).toBeTruthy();
+    expect(suggestPill![0]).toContain('border-radius: 6px');
+  });
+});
+
 describe('discovered sections', () => {
   const rootDir = join(__dirname, '..');
 
@@ -872,5 +1078,258 @@ describe('discovered sections', () => {
     var rundownIdx = graph.indexOf('function buildSectionRundown');
     var discoverIdx = graph.indexOf('discoverSections', rundownIdx);
     expect(discoverIdx).toBeGreaterThan(rundownIdx);
+  });
+});
+
+describe('Feedback button', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('Feedback button calls showFeedbackModal', () => {
+    const html = readFileSync(join(rootDir, 'viewer.html'), 'utf-8');
+    expect(html).toContain('showFeedbackModal()');
+    expect(html).not.toMatch(/<a\s+href="mailto:/);
+  });
+
+  test('showFeedbackModal is defined in 11-modals.js', () => {
+    const modals = readFileSync(join(rootDir, 'viewer', '11-modals.js'), 'utf-8');
+    expect(modals).toMatch(/function\s+showFeedbackModal/);
+    expect(modals).toContain('support@alittledrive.com');
+    expect(modals).toContain('navigator.clipboard.writeText');
+  });
+});
+
+describe('Beta features gate', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('settings has beta features toggle in advanced tab', () => {
+    const settings = readFileSync(join(rootDir, 'viewer', '03-settings.js'), 'utf-8');
+    expect(settings).toContain('pr-beta-features');
+  });
+
+  test('Discover area gates Ask chip behind beta flag', () => {
+    const explore = readFileSync(join(rootDir, 'viewer', '10-explore.js'), 'utf-8');
+    expect(explore).toContain('pr-beta-features');
+    expect(explore).toContain('renderAskPage');
+  });
+
+  test('#tab=ask deep link is gated behind beta flag', () => {
+    const init = readFileSync(join(rootDir, 'viewer', '13-init.js'), 'utf-8');
+    expect(init).toContain('pr-beta-features');
+  });
+});
+
+describe('Feed catalog', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('14-suggested-feeds.js defines FEED_CATALOG_FALLBACK with collections', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '14-suggested-feeds.js'), 'utf-8');
+    expect(js).toContain('FEED_CATALOG_FALLBACK');
+    expect(js).toContain('collections');
+  });
+
+  test('each catalog collection has id, name, description, icon, and feeds array', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '14-suggested-feeds.js'), 'utf-8');
+    expect(js).toMatch(/id:\s*'/);
+    expect(js).toMatch(/icon:\s*'/);
+    expect(js).toContain('.feeds');
+  });
+
+  test('each catalog feed has name, url, description, platform', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '14-suggested-feeds.js'), 'utf-8');
+    expect(js).toMatch(/platform:\s*'/);
+  });
+
+  test('fetchFeedCatalog function exists', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '14-suggested-feeds.js'), 'utf-8');
+    expect(js).toMatch(/function\s+fetchFeedCatalog/);
+  });
+
+  test('fetchFeedCatalog uses pr-feed-catalog sessionStorage key', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '14-suggested-feeds.js'), 'utf-8');
+    expect(js).toContain('pr-feed-catalog');
+  });
+
+  test('fetches from pullread.com/api/feed-catalog.json', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '14-suggested-feeds.js'), 'utf-8');
+    expect(js).toContain('pullread.com/api/feed-catalog.json');
+  });
+
+  test('filterCatalogFeeds function removes already-subscribed feeds', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '14-suggested-feeds.js'), 'utf-8');
+    expect(js).toMatch(/function\s+filterCatalogFeeds/);
+  });
+
+  test('no longer contains SUGGESTED_FEEDS_FALLBACK or isFeedsDismissed', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '14-suggested-feeds.js'), 'utf-8');
+    expect(js).not.toContain('SUGGESTED_FEEDS_FALLBACK');
+    expect(js).not.toContain('isFeedsDismissed');
+    expect(js).not.toContain('dismissSuggestedFeeds');
+    expect(js).not.toContain('fetchSuggestedFeeds');
+    expect(js).not.toContain('filterSuggestedFeeds');
+  });
+});
+
+describe('Explore Discover tab', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('hub Discover tab includes feed catalog section', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '10-explore.js'), 'utf-8');
+    expect(js).toContain('discover-catalog-content');
+    expect(js).toContain('Browse Feeds');
+  });
+
+  test('buildDiscoverCatalogHtml function exists', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '10-explore.js'), 'utf-8');
+    expect(js).toMatch(/function\s+buildDiscoverCatalogHtml/);
+  });
+
+  test('Discover tab renders catalog collection rows', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '10-explore.js'), 'utf-8');
+    expect(js).toContain('catalog-collection-row');
+    expect(js).toContain('catalog-feed-card');
+  });
+
+  test('feed cards show platform badge', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '10-explore.js'), 'utf-8');
+    expect(js).toContain('platform-badge');
+  });
+
+  test('Discover tab position depends on article count', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '10-explore.js'), 'utf-8');
+    expect(js).toContain('allFiles.length');
+  });
+});
+
+describe('Catalog CSS', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('viewer.css has catalog collection styles', () => {
+    const css = readFileSync(join(rootDir, 'viewer.css'), 'utf-8');
+    expect(css).toContain('.catalog-collection-row');
+    expect(css).toContain('.catalog-feed-card');
+    expect(css).toContain('.platform-badge');
+  });
+
+  test('viewer.css has feed picker modal styles', () => {
+    const css = readFileSync(join(rootDir, 'viewer.css'), 'utf-8');
+    expect(css).toContain('.feed-picker');
+    expect(css).toContain('.collection-card');
+  });
+});
+
+describe('Onboarding feed picker', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('showFeedPicker function exists in modals', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '11-modals.js'), 'utf-8');
+    expect(js).toMatch(/function\s+showFeedPicker/);
+  });
+
+  test('feed picker has collection selection screen', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '11-modals.js'), 'utf-8');
+    expect(js).toContain('What are you into');
+    expect(js).toContain('collection-card');
+  });
+
+  test('feed picker has feed cherry-pick screen', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '11-modals.js'), 'utf-8');
+    expect(js).toContain('Pick your feeds');
+    expect(js).toContain('feed-picker-list');
+  });
+
+  test('obFinish triggers feed picker for new users', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '11-modals.js'), 'utf-8');
+    expect(js).toContain('showFeedPicker');
+  });
+
+  test('feed picker subscribe button calls /api/config', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '11-modals.js'), 'utf-8');
+    expect(js).toContain('feedPickerSubscribe');
+  });
+
+  test('feed picker hides empty collections and shows all-subscribed message', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '11-modals.js'), 'utf-8');
+    expect(js).toContain('already subscribed to all');
+    expect(js).toContain('feeds.length > 0');
+  });
+});
+
+describe('Hub and Manage Sources consolidation', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('manage-sources no longer contains FEED_BUNDLES', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '16-manage-sources.js'), 'utf-8');
+    expect(js).not.toContain('FEED_BUNDLES');
+  });
+
+  test('manage-sources no longer contains renderSourcesDiscover', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '16-manage-sources.js'), 'utf-8');
+    expect(js).not.toMatch(/function\s+renderSourcesDiscover/);
+  });
+
+  test('manage-sources links to feed picker', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '16-manage-sources.js'), 'utf-8');
+    expect(js).toContain('showFeedPicker');
+    expect(js).not.toContain('setHomeTab');
+  });
+
+  test('manage-sources has feed error container', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '16-manage-sources.js'), 'utf-8');
+    expect(js).toContain('sp-feed-error');
+  });
+
+  test('manage-sources has shortcuts section with platform examples', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '16-manage-sources.js'), 'utf-8');
+    expect(js).toContain('sources-shortcuts');
+    expect(js).toContain('r/subreddit');
+    expect(js).toContain('youtube.com');
+    expect(js).toContain('@user.bsky.social');
+    expect(js).toContain('substack.com');
+  });
+
+  test('manage-sources OPML is a text link not a button', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '16-manage-sources.js'), 'utf-8');
+    // OPML trigger should be an <a> tag, not inside sources-add-row as a button
+    expect(js).toMatch(/Import OPML<\/a>/);
+  });
+
+  test('viewer.css has sources-shortcuts styles', () => {
+    const css = readFileSync(join(rootDir, 'viewer.css'), 'utf-8');
+    expect(css).toContain('.sources-shortcuts');
+    expect(css).toContain('.sources-shortcut-example');
+  });
+
+  test('sourcesAddFeed shows success toast', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '16-manage-sources.js'), 'utf-8');
+    // Should show toast on successful add
+    expect(js).toMatch(/showToast\(.*Added/);
+  });
+
+  test('sourcesAddFeed expands Reddit shorthand before discovery', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '16-manage-sources.js'), 'utf-8');
+    // Shorthand expansion: r/sub → https://www.reddit.com/r/sub
+    expect(js).toContain("'https://www.reddit.com/'");
+  });
+
+  test('sourcesAddFeed expands Bluesky handle shorthand before discovery', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '16-manage-sources.js'), 'utf-8');
+    // Should detect @handle.bsky.social and expand to full bsky.app URL
+    expect(js).toMatch(/@.*bsky\.app/);
+  });
+
+  test('sourcesAddFeed checks for duplicate feeds before adding', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '16-manage-sources.js'), 'utf-8');
+    // Should check existing feeds and show error if already subscribed
+    expect(js).toContain('already subscribed');
+  });
+
+  test('hub no longer contains loadSuggestedFeedsSection', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '04-article.js'), 'utf-8');
+    expect(js).not.toMatch(/function\s+loadSuggestedFeedsSection/);
+  });
+
+  test('hub no longer contains addSuggestedFeed', () => {
+    const js = readFileSync(join(rootDir, 'viewer', '04-article.js'), 'utf-8');
+    expect(js).not.toMatch(/function\s+addSuggestedFeed/);
   });
 });

@@ -287,7 +287,7 @@ async function callOpenAI(apiKey: string, model: string, articleText: string): P
 
   const call: ProviderCallFn = async (prompt, maxTokens) => {
     const body = JSON.stringify({
-      model, max_tokens: maxTokens,
+      model, max_completion_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }]
     });
     const response = await httpPost('https://api.openai.com/v1/chat/completions', {
@@ -692,6 +692,60 @@ async function callApple(articleText: string): Promise<SummarizeResult> {
   // Multi-turn conversation with section recycling for very long texts
   const summary = runAppleRLM(articleText);
   return { summary, model: 'apple-on-device' };
+}
+
+export async function promptLLM(
+  prompt: string, config?: LLMConfig, maxTokens?: number, callFn?: ProviderCallFn
+): Promise<{ text: string; model: string }> {
+  const llmConfig = config || loadLLMConfig() || { provider: 'apple' as Provider, apiKey: '' };
+  const model = llmConfig.model || getDefaultModel(llmConfig.provider);
+  const tokens = maxTokens || 1024;
+
+  if (callFn) {
+    const text = await callFn(prompt, tokens);
+    return { text, model };
+  }
+
+  if (llmConfig.provider === 'apple') {
+    return { text: runApplePrompt(prompt), model: 'apple-on-device' };
+  }
+
+  const call = makeProviderCallFn(llmConfig.provider, llmConfig.apiKey, model);
+  const text = await call(prompt, tokens);
+  return { text, model };
+}
+
+function makeProviderCallFn(provider: Provider, apiKey: string, model: string): ProviderCallFn {
+  switch (provider) {
+    case 'anthropic':
+      return async (prompt, maxTokens) => {
+        const body = JSON.stringify({ model, max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] });
+        const response = await httpPost('https://api.anthropic.com/v1/messages', { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' }, body);
+        return (JSON.parse(response).content?.[0]?.text || '').trim();
+      };
+    case 'openai':
+      return async (prompt, maxTokens) => {
+        const body = JSON.stringify({ model, max_completion_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] });
+        const response = await httpPost('https://api.openai.com/v1/chat/completions', { 'Authorization': `Bearer ${apiKey}` }, body);
+        return (JSON.parse(response).choices?.[0]?.message?.content || '').trim();
+      };
+    case 'gemini':
+      return async (prompt, maxTokens) => {
+        const body = JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: maxTokens } });
+        const response = await httpPost(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {}, body);
+        return (JSON.parse(response).candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
+      };
+    case 'openrouter':
+      return async (prompt, maxTokens) => {
+        const body = JSON.stringify({ model, max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] });
+        const response = await httpPost('https://openrouter.ai/api/v1/chat/completions', {
+          'Authorization': `Bearer ${apiKey}`, 'HTTP-Referer': 'https://github.com/shellen/pullread', 'X-Title': 'PullRead'
+        }, body);
+        return (JSON.parse(response).choices?.[0]?.message?.content || '').trim();
+      };
+    default:
+      throw new Error(`Unknown provider: ${provider}`);
+  }
 }
 
 export async function summarizeText(articleText: string, config?: LLMConfig): Promise<SummarizeResult> {

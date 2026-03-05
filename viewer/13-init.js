@@ -227,11 +227,9 @@ async function init() {
   const savedSpacing = localStorage.getItem('pr-spacing');
   const savedWidth = localStorage.getItem('pr-width');
 
-  // Auto-detect OS dark mode on first visit
+  // Apply saved preferences (HTML defaults: light theme, Instrument Serif, medium size)
   if (savedTheme) {
     setTheme(savedTheme);
-  } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    setTheme('dark');
   }
   if (savedFont) {
     setFont(savedFont);
@@ -331,6 +329,9 @@ function handleHashNavigation() {
 
   if ('tab' in params && params.tab === 'settings') {
     showSettingsPage();
+    history.replaceState(null, '', location.pathname);
+  } else if ('tab' in params && params.tab === 'ask' && localStorage.getItem('pr-beta-features') === 'true') {
+    renderAskPage();
     history.replaceState(null, '', location.pathname);
   } else if ('file' in params) {
     var idx = displayFiles.findIndex(function(f) { return f.filename === params.file; });

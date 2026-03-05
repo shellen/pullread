@@ -1,6 +1,7 @@
-// ABOUTME: Extracts article content from web pages using Readability
+// ABOUTME: Extracts article content from web pages using Defuddle (with Readability fallback)
 // ABOUTME: Converts HTML to clean markdown for storage, with retry and fallback extraction
 
+import { Defuddle } from 'defuddle/node';
 import { parseHTML } from 'linkedom';
 import { Readability } from '@mozilla/readability';
 import TurndownService from 'turndown';
@@ -238,10 +239,10 @@ export function resolveRelativeUrls(markdown: string, baseUrl: string): string {
     }
   );
 
-  // Simplify any remaining Substack CDN image URLs that survived the Turndown rules
+  // Simplify any remaining Substack CDN URLs in images and links
   markdown = markdown.replace(
-    /!\[([^\]]*)\]\((https:\/\/substackcdn\.com\/image\/fetch\/[^)]+)\)/g,
-    (_, alt, url) => `![${alt}](${simplifySubstackUrl(url)})`
+    /\(https:\/\/substackcdn\.com\/image\/fetch\/[^)]+\)/g,
+    (match) => `(${simplifySubstackUrl(match.slice(1, -1))})`
   );
 
   return markdown;
@@ -625,17 +626,55 @@ function generateSocialTitle(html: string, url: string): string {
 
 
 /**
- * Extract article using Readability. If that fails, try fallback extraction
- * from OpenGraph/meta tags + JSON-LD structured data.
+ * Extract article using Defuddle. If that fails, fall back to Readability,
+ * then to OpenGraph/meta tags + JSON-LD structured data.
  */
-export function extractArticle(html: string, url: string): ExtractedArticle | null {
-  const { document } = parseHTML(html);
-  // Set document URL for Readability
-  Object.defineProperty(document, 'URL', { value: url });
+export async function extractArticle(html: string, url: string): Promise<ExtractedArticle | null> {
+  // Extract document language before extraction (neither Defuddle nor Readability expose this)
+  const langMatch = html.match(/<html[^>]*\slang=["']([^"']+)["']/i);
+  const lang = langMatch ? langMatch[1].split('-')[0] : undefined;
 
-  // Extract document language and og:image before Readability mutates the DOM
-  const htmlEl = document.querySelector('html');
-  const lang = htmlEl?.getAttribute('lang')?.split('-')[0] || undefined;
+  // Try Defuddle first
+  try {
+    const result = await Defuddle(html, url, { separateMarkdown: true });
+    if (result && result.content && result.contentMarkdown) {
+      const markdown = stripEmbedNoise(resolveRelativeUrls(
+        result.contentMarkdown,
+        url
+      ));
+      let title = result.title || 'Untitled';
+
+      // For social posts, "Untitled" is common — generate a better title
+      if ((title === 'Untitled' || !title.trim()) && isSocialPostUrl(url)) {
+        title = generateSocialTitle(html, url);
+      }
+
+      const thumbnail = result.image || undefined;
+
+      return {
+        title,
+        content: result.content,
+        markdown,
+        byline: result.author || undefined,
+        excerpt: result.description || undefined,
+        thumbnail,
+        lang,
+      };
+    }
+  } catch {
+    // Defuddle failed — fall through to Readability
+  }
+
+  // Readability fallback
+  return extractArticleReadability(html, url, lang);
+}
+
+/**
+ * Extract article using Readability (fallback when Defuddle fails).
+ */
+function extractArticleReadability(html: string, url: string, lang?: string): ExtractedArticle | null {
+  const { document } = parseHTML(html);
+  Object.defineProperty(document, 'URL', { value: url });
 
   const getMetaContent = (prop: string): string => {
     const el = document.querySelector(`meta[property="${prop}"], meta[name="${prop}"]`);
@@ -653,7 +692,6 @@ export function extractArticle(html: string, url: string): ExtractedArticle | nu
     ));
     let title = article.title || 'Untitled';
 
-    // For social posts, "Untitled" is common — generate a better title
     if ((title === 'Untitled' || !title.trim()) && isSocialPostUrl(url)) {
       title = generateSocialTitle(html, url);
     }
@@ -1005,7 +1043,7 @@ async function fetchFromWayback(url: string): Promise<ExtractedArticle | null> {
     if (!snapRes.ok) return null;
 
     const html = await snapRes.text();
-    return extractArticle(html, url);
+    return await extractArticle(html, url);
   } catch {
     return null;
   }
@@ -1344,7 +1382,7 @@ async function extractAcademicPaper(
     const response = await fetchWithTimeout(htmlUrl, headers, FETCH_TIMEOUT_MS);
     if (response.ok) {
       const html = await response.text();
-      const article = extractArticle(html, response.url || htmlUrl);
+      const article = await extractArticle(html, response.url || htmlUrl);
       if (article && article.markdown.length > 200) {
         const metadata = await metadataPromise;
         if (metadata) {
@@ -1399,7 +1437,7 @@ async function extractAcademicPaper(
     } else {
       // Not a PDF — extract as HTML (e.g., arxiv /abs/ page)
       const html = await response.text();
-      const article = extractArticle(html, response.url || cleanUrl);
+      const article = await extractArticle(html, response.url || cleanUrl);
       if (article) {
         const metadata = await metadataPromise;
         if (metadata) {
@@ -1529,7 +1567,7 @@ export async function fetchAndExtract(
 
       const html = await response.text();
       // Use final URL after redirects for better relative URL resolution
-      return extractArticle(html, response.url || cleanUrl);
+      return await extractArticle(html, response.url || cleanUrl);
 
     } catch (err: any) {
       lastError = err;

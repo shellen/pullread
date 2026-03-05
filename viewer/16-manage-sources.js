@@ -1,26 +1,5 @@
-// ABOUTME: Dedicated view for managing feed subscriptions and discovering new sources.
-// ABOUTME: Renders in the article content area like Settings does.
-
-var FEED_BUNDLES = [
-  { name: 'Indie Web', desc: 'Personal blogs and the open web', feeds: [
-    { name: 'kottke.org', url: 'https://feeds.kottke.org/main' },
-    { name: 'Waxy.org', url: 'https://waxy.org/feed/' },
-    { name: 'Daring Fireball', url: 'https://daringfireball.net/feeds/main' },
-    { name: 'Anil Dash', url: 'https://anildash.com/feed.xml' },
-    { name: 'Pluralistic', url: 'https://pluralistic.net/feed/' }
-  ]},
-  { name: 'Comedy Podcasts', desc: 'Laugh while you commute', feeds: [
-    { name: 'Conan O\'Brien Needs a Friend', url: 'https://feeds.simplecast.com/dHoohVNH' },
-    { name: 'SmartLess', url: 'https://feeds.simplecast.com/yVaAVF_G' },
-    { name: 'The Comedy Button', url: 'https://rss.libsyn.com/shows/34195/destinations/79079.xml' },
-    { name: 'Good Hang with Amy Poehler', url: 'https://feeds.megaphone.fm/good-hang-with-amy-poehler' }
-  ]},
-  { name: 'Music News', desc: 'Album reviews, interviews, and industry', feeds: [
-    { name: 'Pitchfork', url: 'https://pitchfork.com/feed/feed-news/rss' },
-    { name: 'Stereogum', url: 'https://www.stereogum.com/feed/' },
-    { name: 'Brooklyn Vegan', url: 'https://www.brooklynvegan.com/feed/' }
-  ]}
-];
+// ABOUTME: Dedicated view for managing feed subscriptions.
+// ABOUTME: Renders in the article content area with feed validation and discovery.
 
 function showManageSourcesPage() {
   var prevActive = activeFile;
@@ -31,6 +10,7 @@ function showManageSourcesPage() {
   empty.style.display = 'none';
   content.style.display = 'block';
   content.classList.remove('settings-view');
+  content.classList.remove('ask-view');
   content.classList.add('manage-sources-view');
   document.title = 'Sources \u2014 PullRead';
   document.getElementById('margin-notes').innerHTML = '';
@@ -41,7 +21,7 @@ function showManageSourcesPage() {
   updateSidebarActiveState(prevActive);
 
   var html = '';
-  html += '<div class="sources-header"><h1>Manage Sources</h1>';
+  html += '<div class="article-header"><h1>Manage Sources</h1>';
   html += '<p class="sources-desc">Add, remove, and discover feeds</p></div>';
 
   // Feed container — loaded async
@@ -50,8 +30,6 @@ function showManageSourcesPage() {
   html += '<p style="color:var(--muted);font-size:13px">Loading sources\u2026</p>';
   html += '</div>';
 
-  // Discover section — rendered after feeds load
-  html += '<div id="sources-discover"></div>';
   html += '</div>';
 
   content.innerHTML = html;
@@ -68,9 +46,20 @@ function showManageSourcesPage() {
       var fh = '';
       // Add feed input
       fh += '<div class="sources-add-row">';
-      fh += '<input type="text" id="sp-new-feed" placeholder="Paste feed URL or web address\u2026" class="input-field" style="flex:1" onkeydown="if(event.key===\'Enter\')sourcesAddFeed()">';
-      fh += '<button class="btn-primary" onclick="sourcesAddFeed()" id="sp-add-feed-btn" style="font-size:13px;padding:6px 14px;white-space:nowrap">Add</button>';
-      fh += '<button onclick="sourcesImportOPML()" style="font-size:13px;padding:6px 14px;white-space:nowrap;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit">Import OPML</button>';
+      fh += '<div style="flex:1;position:relative">';
+      fh += '<input type="text" id="sp-new-feed" placeholder="Paste a URL, r/subreddit, or example.substack.com\u2026" class="input-field" style="width:100%;font-size:15px;padding:10px 40px 10px 14px;box-sizing:border-box" onkeydown="if(event.key===\'Enter\')sourcesAddFeed()" oninput="var e=document.getElementById(\'sp-feed-error\');if(e)e.textContent=\'\'">';
+      fh += '<button onclick="var p=document.getElementById(\'sp-shortcuts\');p.style.display=p.style.display===\'none\'?\'block\':\'none\';return false" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:4px;color:#d97706" title="Shortcuts"><svg class="icon" style="width:20px;height:20px"><use href="#i-light-bulb"/></svg></button>';
+      fh += '</div>';
+      fh += '<button class="btn-primary" onclick="sourcesAddFeed()" id="sp-add-feed-btn" style="font-size:14px;padding:10px 18px;white-space:nowrap">Add</button>';
+      fh += '</div>';
+      fh += '<div id="sp-feed-error" style="font-size:12px;color:#dc2626;min-height:18px;margin-top:4px"></div>';
+      fh += '<div id="sp-shortcuts" class="sources-shortcuts" style="display:none">';
+      fh += '<div class="sources-shortcut"><div class="sources-shortcut-example">r/subreddit</div><div class="sources-shortcut-desc">Reddit communities</div></div>';
+      fh += '<div class="sources-shortcut"><div class="sources-shortcut-example">youtube.com/@channel</div><div class="sources-shortcut-desc">YouTube channels</div></div>';
+      fh += '<div class="sources-shortcut"><div class="sources-shortcut-example">example.substack.com</div><div class="sources-shortcut-desc">Substacks &amp; newsletters</div></div>';
+      fh += '<div class="sources-shortcut"><div class="sources-shortcut-example">@user.bsky.social</div><div class="sources-shortcut-desc">Bluesky profiles</div></div>';
+      fh += '<div class="sources-shortcut"><div class="sources-shortcut-example">https://kottke.org</div><div class="sources-shortcut-desc">Any website with a feed</div></div>';
+      fh += '<div style="margin-top:2px"><a href="#" onclick="sourcesImportOPML();return false" style="color:var(--muted);font-size:11px;text-decoration:underline;text-underline-offset:2px">Import OPML</a></div>';
       fh += '</div>';
 
       if (feedNames.length > 0) {
@@ -105,10 +94,9 @@ function showManageSourcesPage() {
         fh += '<p style="color:var(--muted);font-size:13px">No feeds configured. Paste a feed URL above to get started.</p>';
       }
 
-      fh += '<div style="font-size:11px;color:var(--muted);margin-top:10px;line-height:1.6">'
-        + 'Paste a bookmark feed URL from Instapaper, Pinboard, Raindrop, or Pocket. '
-        + 'You can also subscribe to newsletters and blogs \u2014 just paste the web address.'
-        + '</div>';
+      fh += '<div style="margin-top:16px;text-align:center">';
+      fh += '<a href="#" onclick="showFeedPicker();return false" style="color:var(--link);font-size:13px;text-decoration:none">Browse suggested feeds</a>';
+      fh += '</div>';
 
       feedSec.innerHTML = fh;
       feedSec._configData = cfg;
@@ -135,9 +123,6 @@ function showManageSourcesPage() {
         }
       }).catch(function() {});
 
-      // Render discover section
-      renderSourcesDiscover(cfg);
-
     }).catch(function() {
       var feedSec = document.getElementById('settings-feeds');
       if (feedSec) {
@@ -145,63 +130,6 @@ function showManageSourcesPage() {
       }
     });
   }
-}
-
-function renderSourcesDiscover(cfg) {
-  var el = document.getElementById('sources-discover');
-  if (!el) return;
-  var userFeeds = cfg.feeds || {};
-  var userUrls = new Set();
-  for (var k in userFeeds) userUrls.add(userFeeds[k].toLowerCase());
-
-  var html = '<div class="sources-discover-header"><h2>Discover Sources</h2></div>';
-  html += '<div class="bundle-cards">';
-  for (var bi = 0; bi < FEED_BUNDLES.length; bi++) {
-    var bundle = FEED_BUNDLES[bi];
-    var unsubscribed = bundle.feeds.filter(function(f) { return !userUrls.has(f.url.toLowerCase()); });
-    html += '<div class="bundle-card">';
-    html += '<div class="bundle-card-name">' + escapeHtml(bundle.name) + '</div>';
-    html += '<div class="bundle-card-desc">' + escapeHtml(bundle.desc) + '</div>';
-    html += '<div class="bundle-card-count">' + bundle.feeds.length + ' feeds</div>';
-    html += '<div class="bundle-card-feeds">';
-    for (var fi = 0; fi < bundle.feeds.length; fi++) {
-      var f = bundle.feeds[fi];
-      var already = userUrls.has(f.url.toLowerCase());
-      if (already) {
-        html += '<span class="bundle-feed-pill subscribed">' + escapeHtml(f.name) + ' \u2713</span>';
-      } else {
-        html += '<button class="bundle-feed-pill" onclick="addBundleFeed(this,\'' + escapeHtml(f.name.replace(/'/g, "\\'")) + '\',\'' + escapeHtml(f.url.replace(/'/g, "\\'")) + '\')">' + escapeHtml(f.name) + '</button>';
-      }
-    }
-    html += '</div>';
-    if (unsubscribed.length > 0) {
-      html += '<button class="btn-primary bundle-add-all" onclick="addBundle(' + bi + ',this)">Add all ' + unsubscribed.length + '</button>';
-    } else {
-      html += '<span class="bundle-all-added">\u2713 All added</span>';
-    }
-    html += '</div>';
-  }
-  html += '</div>';
-
-  // Individual picks from suggested feeds
-  html += '<div class="sources-picks-header"><h3>Individual picks</h3></div>';
-  html += '<div id="sources-picks" class="sources-picks">';
-  html += '</div>';
-
-  el.innerHTML = html;
-
-  // Load suggested feeds for individual picks
-  fetchSuggestedFeeds(function(feeds) {
-    var filtered = filterSuggestedFeeds(feeds);
-    var picks = document.getElementById('sources-picks');
-    if (!picks || filtered.length === 0) return;
-    var ph = '';
-    for (var i = 0; i < filtered.length; i++) {
-      var f = filtered[i];
-      ph += '<button class="tag-pill" onclick="addBundleFeed(this,\'' + escapeHtml(f.name.replace(/'/g, "\\'")) + '\',\'' + escapeHtml(f.url.replace(/'/g, "\\'")) + '\')">' + escapeHtml(f.name) + '</button>';
-    }
-    picks.innerHTML = ph;
-  });
 }
 
 // Save feeds from the manage sources view (fetches fresh config, merges feeds, saves)
@@ -226,25 +154,44 @@ async function sourcesAddFeed() {
   var input = document.getElementById('sp-new-feed');
   var url = (input.value || '').trim();
   if (!url) return;
+  // Expand shorthand: /r/sub or r/sub → full reddit URL
+  if (/^\/?r\/[\w]+\/?$/.test(url)) url = 'https://www.reddit.com/' + url.replace(/^\//, '');
+  // Expand shorthand: @handle.bsky.social → full bsky.app URL
+  else if (/^@[\w.-]+\.bsky\.social$/.test(url)) url = 'https://bsky.app/profile/' + url.slice(1);
   if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url;
   var btn = document.getElementById('sp-add-feed-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Finding feed\u2026'; }
   try {
     var r = await fetch('/api/feed-discover?url=' + encodeURIComponent(url));
     var result = await r.json();
-    var feedUrl = result.feedUrl || url;
+    if (!result.feedUrl) {
+      var errEl = document.getElementById('sp-feed-error');
+      if (errEl) errEl.textContent = 'Could not find a feed at that address. Try pasting a direct feed URL.';
+      if (btn) { btn.disabled = false; btn.textContent = 'Add'; }
+      return;
+    }
+    var feedUrl = result.feedUrl;
     var title = result.title || feedUrl.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
     var sec = document.getElementById('settings-feeds');
     if (sec && sec._configData) {
       if (!sec._configData.feeds) sec._configData.feeds = {};
+      var existing = sec._configData.feeds;
+      for (var ek in existing) {
+        if (existing[ek] === feedUrl) {
+          var errEl3 = document.getElementById('sp-feed-error');
+          if (errEl3) errEl3.textContent = 'You\u2019re already subscribed to ' + ek + '.';
+          if (btn) { btn.disabled = false; btn.textContent = 'Add'; }
+          return;
+        }
+      }
       sec._configData.feeds[title] = feedUrl;
+      showToast('Added ' + title);
     }
   } catch (e) {
-    var sec2 = document.getElementById('settings-feeds');
-    if (sec2 && sec2._configData) {
-      if (!sec2._configData.feeds) sec2._configData.feeds = {};
-      sec2._configData.feeds[url] = url;
-    }
+    var errEl2 = document.getElementById('sp-feed-error');
+    if (errEl2) errEl2.textContent = 'Could not find a feed at that address. Try pasting a direct feed URL.';
+    if (btn) { btn.disabled = false; btn.textContent = 'Add'; }
+    return;
   }
   sourcesSaveConfig();
 }
@@ -355,40 +302,6 @@ function sourcesImportOPML() {
     reader.readAsText(input.files[0]);
   };
   input.click();
-}
-
-function addBundle(bundleIndex, btn) {
-  if (bundleIndex < 0 || bundleIndex >= FEED_BUNDLES.length) return;
-  var bundle = FEED_BUNDLES[bundleIndex];
-  if (btn) { btn.disabled = true; btn.textContent = 'Adding\u2026'; }
-  fetch('/api/config').then(function(r) { return r.json(); }).then(function(cfg) {
-    var feeds = cfg.feeds || {};
-    var added = 0;
-    for (var i = 0; i < bundle.feeds.length; i++) {
-      var f = bundle.feeds[i];
-      var exists = false;
-      for (var k in feeds) {
-        if (feeds[k].toLowerCase() === f.url.toLowerCase()) { exists = true; break; }
-      }
-      if (!exists) { feeds[f.name] = f.url; added++; }
-    }
-    cfg.feeds = feeds;
-    return fetch('/api/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(cfg)
-    });
-  }).then(function(r) {
-    if (r.ok) {
-      showToast('Added ' + bundle.name + ' bundle');
-      showManageSourcesPage();
-    } else {
-      if (btn) { btn.disabled = false; btn.textContent = 'Add all'; }
-      showToast('Failed to add bundle.');
-    }
-  }).catch(function() {
-    if (btn) { btn.disabled = false; btn.textContent = 'Add all'; }
-  });
 }
 
 function addBundleFeed(btn, name, url) {

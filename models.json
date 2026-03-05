@@ -1,6 +1,6 @@
 {
   "_description": "Single source of truth for LLM model dropdowns. Used by summarizer.ts (CLI) and SettingsView.swift (macOS app). Run `bun run sync:models` after editing to update Swift.",
-  "_updated": "2026-02-10",
+  "_updated": "2026-03-04",
   "_note": "Order models cheapest-first within each provider. First model in each list is the default for batch tagging. Check provider docs quarterly for new models and deprecations.",
   "providers": {
     "anthropic": {
@@ -19,12 +19,16 @@
       "label": "OpenAI",
       "keyPlaceholder": "sk-...",
       "models": [
+        "gpt-4.1-nano",
+        "gpt-4.1-mini",
+        "gpt-4.1",
         "gpt-5-nano",
         "gpt-5-mini",
         "gpt-5",
-        "o3-mini"
+        "gpt-5.1",
+        "gpt-5.2"
       ],
-      "default": "gpt-5-nano",
+      "default": "gpt-4.1-mini",
       "docsUrl": "https://platform.openai.com/docs/models"
     },
     "gemini": {

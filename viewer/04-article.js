@@ -386,7 +386,7 @@ function renderHub() {
   var empty = document.getElementById('empty-state');
   var content = document.getElementById('content');
   empty.style.display = '';
-  if (content) { content.style.display = 'none'; content.classList.remove('settings-view'); content.classList.remove('manage-sources-view'); }
+  if (content) { content.style.display = 'none'; content.classList.remove('settings-view'); content.classList.remove('manage-sources-view'); content.classList.remove('ask-view'); }
   var toolbar = document.getElementById('reader-toolbar');
   if (toolbar) toolbar.style.display = 'none';
 
@@ -453,74 +453,12 @@ function renderHub() {
   requestAnimationFrame(initDashChevrons);
   requestAnimationFrame(initRundownDeck);
   requestAnimationFrame(function() { loadBriefing(false); });
+  if (serverMode) requestAnimationFrame(renderDiscoverCatalog);
 
   // If audio is queued, switch to mini player so controls stay visible in sidebar
   if (typeof ttsQueue !== 'undefined' && ttsQueue.length > 0) {
     setPlayerMode('mini');
   }
-}
-
-function loadSuggestedFeedsSection() {
-  var container = document.getElementById('hub-suggested-feeds');
-  if (!container) return;
-
-  fetchSuggestedFeeds(function(allFeeds) {
-    var feeds = filterSuggestedFeeds(allFeeds);
-    if (feeds.length === 0) return;
-
-    var userFeedCount = new Set(allFiles.map(function(f) { return f.feed; }).filter(Boolean)).size;
-    var isNewUser = userFeedCount < 5;
-    var dismissed = isFeedsDismissed();
-
-    if (!isNewUser && dismissed) return;
-
-    var html = '<div class="hub-feeds-section' + (isNewUser ? ' hub-feeds-hero' : '') + '">';
-
-    if (isNewUser) {
-      html += '<div class="hub-feeds-heading">Build your reading list</div>';
-      html += '<p class="hub-feeds-desc">Subscribe to feeds to get articles delivered to Pull Read.</p>';
-    } else {
-      html += '<div class="hub-feeds-heading" style="display:flex;align-items:center;justify-content:space-between">Discover new feeds';
-      html += '<button class="hub-feeds-dismiss" onclick="dismissSuggestedFeeds()" title="Dismiss">&times;</button>';
-      html += '</div>';
-    }
-
-    html += '<div class="hub-feeds-pills">';
-    for (var i = 0; i < feeds.length; i++) {
-      var f = feeds[i];
-      html += '<button class="tag-pill" onclick="addSuggestedFeed(this,\'' + escapeHtml(f.name.replace(/'/g, "\\'")) + '\',\'' + escapeHtml(f.url.replace(/'/g, "\\'")) + '\')">' + escapeHtml(f.name) + '</button>';
-    }
-    html += '<button class="tag-pill" onclick="toggleQuickAdd()" style="opacity:0.7">+ Add custom</button>';
-    html += '</div></div>';
-
-    container.innerHTML = html;
-  });
-}
-
-function addSuggestedFeed(btn, name, url) {
-  btn.disabled = true;
-  btn.textContent = 'Adding\u2026';
-  fetch('/api/config').then(function(r) { return r.json(); }).then(function(cfg) {
-    var feeds = cfg.feeds || {};
-    feeds[name] = url;
-    return fetch('/api/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ outputPath: cfg.outputPath, feeds: feeds, syncInterval: cfg.syncInterval, useBrowserCookies: cfg.useBrowserCookies, maxAgeDays: cfg.maxAgeDays })
-    });
-  }).then(function(r) {
-    if (r.ok) {
-      btn.textContent = '\u2713 Added';
-      btn.style.opacity = '0.5';
-      showToast('Added ' + name);
-    } else {
-      btn.textContent = name;
-      btn.disabled = false;
-    }
-  }).catch(function() {
-    btn.textContent = name;
-    btn.disabled = false;
-  });
 }
 
 function buildDailyRundownHtml() {
@@ -797,6 +735,7 @@ function renderArticle(text, filename) {
   content.style.display = 'block';
   content.classList.remove('settings-view');
   content.classList.remove('manage-sources-view');
+  content.classList.remove('ask-view');
 
   let html = '';
 
@@ -919,6 +858,14 @@ function renderArticle(text, filename) {
   if (toolbarEl) toolbarEl.innerHTML = toolbarActions;
   var toolbar = document.getElementById('reader-toolbar');
   if (toolbar) toolbar.style.display = '';
+  // Restore article-specific toolbar-right items (customized by note view)
+  var toolbarRight = toolbar ? toolbar.querySelector('.reader-toolbar-right') : null;
+  if (toolbarRight) {
+    toolbarRight.style.display = '';
+    toolbarRight.querySelectorAll('.toolbar-nav-btn, .toolbar-divider').forEach(function(el) { el.style.display = ''; });
+    var moreBtn = toolbarRight.querySelector('#more-dropdown button');
+    if (moreBtn) moreBtn.setAttribute('onclick', 'toggleMoreMenu(event)');
+  }
   // Show notebook back-references
   var nbRefs = Object.values(_notebooks || {}).filter(function(nb) { return nb.sources && nb.sources.indexOf(filename) >= 0; });
   if (nbRefs.length) {

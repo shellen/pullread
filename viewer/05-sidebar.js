@@ -948,9 +948,11 @@ function openSourcesDrawer() {
 
     // Source rows
     sortEntries(sortMode);
+    var sourceKeys = new Set();
     html += '<div class="drawer-group-label">Sources</div>';
     for (var si = 0; si < entries.length; si++) {
       var name = entries[si][0];
+      sourceKeys.add(name.toLowerCase());
       if (filterLower && name.toLowerCase().indexOf(filterLower) === -1) continue;
       var articles = entries[si][1];
       var unread = 0;
@@ -968,6 +970,7 @@ function openSourcesDrawer() {
         + '<span class="drawer-item-name">' + escapeHtml(name) + '</span>'
         + '<span class="drawer-item-count">' + unread + '</span></div>';
     }
+    html += '<div id="drawer-pending-feeds"></div>';
 
     // By Tag section — top tags nested under sources
     var tagCounts = {};
@@ -1006,6 +1009,30 @@ function openSourcesDrawer() {
 
     if (contentEl) {
       contentEl.innerHTML = html;
+
+      // Show configured feeds that have no articles yet
+      if (serverMode) {
+        var pendingEl = document.getElementById('drawer-pending-feeds');
+        if (pendingEl) {
+          fetch('/api/config').then(function(r) { return r.json(); }).then(function(cfg) {
+            var feeds = cfg.feeds || {};
+            var names = Object.keys(feeds);
+            var ph = '';
+            for (var pi = 0; pi < names.length; pi++) {
+              if (!sourceKeys.has(names[pi].toLowerCase())) {
+                if (!filterLower || names[pi].toLowerCase().indexOf(filterLower) !== -1) {
+                  ph += '<div class="drawer-item dimmed">'
+                    + '<svg class="drawer-item-icon" aria-hidden="true"><use href="#i-globe"/></svg>'
+                    + '<span class="drawer-item-name">' + escapeHtml(names[pi]) + '</span>'
+                    + '<span class="drawer-item-count" style="font-size:10px">syncing</span></div>';
+                }
+              }
+            }
+            var target = document.getElementById('drawer-pending-feeds');
+            if (target) target.innerHTML = ph;
+          }).catch(function() {});
+        }
+      }
 
       // Wire sort buttons
       var btns = contentEl.querySelectorAll('.drawer-sort-btn');

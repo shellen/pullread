@@ -707,6 +707,14 @@ export async function transformPlatformUrl(url: string): Promise<string> {
     }
   }
 
+  // Bluesky: /profile/handle → append /rss
+  if (host === 'bsky.app') {
+    const profileMatch = parsed.pathname.match(/^\/profile\/([\w.-]+)\/?$/);
+    if (profileMatch) {
+      return `https://bsky.app/profile/${profileMatch[1]}/rss`;
+    }
+  }
+
   return url;
 }
 

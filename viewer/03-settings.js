@@ -425,6 +425,7 @@ var _settingsTabMap = {
   'settings-breaks': 'reading',
   'settings-backup': 'advanced',
   'settings-site-logins': 'advanced',
+  'settings-beta': 'advanced',
   'settings-about': 'advanced',
 };
 
@@ -502,6 +503,11 @@ function settingsSaveBreakActivity(input) {
   if (indicator) indicator.classList.add('visible');
 }
 
+function settingsSaveBeta(enabled) {
+  if (enabled) localStorage.setItem('pr-beta-features', 'true');
+  else localStorage.removeItem('pr-beta-features');
+}
+
 function settingsAutoSaveSync(input) {
   settingsPageSaveConfig(true).then(function() {
     if (input && input.parentNode) {
@@ -538,6 +544,7 @@ function showSettingsPage(scrollToSection) {
   empty.style.display = 'none';
   content.style.display = 'block';
   content.classList.remove('manage-sources-view');
+  content.classList.remove('ask-view');
   content.classList.add('settings-view');
   document.title = 'Settings \u2014 PullRead';
   document.getElementById('margin-notes').innerHTML = '';
@@ -556,7 +563,7 @@ function showSettingsPage(scrollToSection) {
   var html = '';
 
   // Header
-  html += '<div class="settings-header"><h1>Settings</h1></div>';
+  html += '<div class="article-header"><h1>Settings</h1></div>';
 
   // Segmented control
   html += '<div class="segmented-control-wrapper">';
@@ -801,6 +808,17 @@ function showSettingsPage(scrollToSection) {
     html += '</div>';
   }
 
+  // -- Beta features card --
+  var betaOn = localStorage.getItem('pr-beta-features') === 'true';
+  html += '<div class="card" id="settings-beta">';
+  html += '<div class="card-title">Beta Features</div>';
+  html += '<div class="card-desc">Try experimental features before they\'re ready for everyone.</div>';
+  html += '<div class="setting-row">';
+  html += '<div class="setting-label"><label for="sp-beta-toggle">Enable beta features</label></div>';
+  html += '<div class="setting-control"><input type="checkbox" id="sp-beta-toggle"' + (betaOn ? ' checked' : '') + ' onchange="settingsSaveBeta(this.checked)"></div>';
+  html += '</div>';
+  html += '</div>';
+
   // -- About card --
   html += '<div class="card" id="settings-about">';
   html += '<div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">';
@@ -814,7 +832,7 @@ function showSettingsPage(scrollToSection) {
   html += '</div>';
   html += '<div style="display:flex;gap:12px;flex-wrap:wrap;padding:8px 0">';
   html += '<a href="https://pullread.com" target="_blank" rel="noopener" style="font-size:13px;color:var(--link)">pullread.com</a>';
-  html += '<a href="#" onclick="prOpenExternal(\'https://pullread.com/releases#v\' + (window._prCurrentVersion || \'0.4.2\'));return false" style="font-size:13px;color:var(--link)">What\'s New</a>';
+  html += '<a href="#" onclick="prOpenExternal(\'https://pullread.com/releases#v\' + (window._prCurrentVersion || \'0.4.3\'));return false" style="font-size:13px;color:var(--link)">What\'s New</a>';
   html += '<a href="/api/log" target="_blank" style="font-size:13px;color:var(--link)">View Logs</a>';
   html += '<button style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit" onclick="showTour()">Show Tour</button>';
   html += '</div>';
@@ -1449,6 +1467,14 @@ function settingsPageSaveLLM(skipRefresh) {
     if (Object.keys(entry).length > 0) providers[p] = entry;
   }
 
+  // Read the active provider's model for updating globals
+  var activeModelSelect = document.getElementById('sp-llm-model-' + defaultProvider);
+  var activeCustomInput = document.getElementById('sp-llm-custom-input-' + defaultProvider);
+  var activeModel = '';
+  if (activeModelSelect) {
+    activeModel = activeModelSelect.value === '__custom' ? (activeCustomInput ? activeCustomInput.value.trim() : '') : activeModelSelect.value;
+  }
+
   return fetch('/api/settings', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1456,7 +1482,9 @@ function settingsPageSaveLLM(skipRefresh) {
   }).then(function(r) {
     if (r.ok) {
       llmProvider = defaultProvider;
+      llmModel = activeModel;
       llmConfigured = true;
+      showToast('AI settings saved');
       if (!skipRefresh) showSettingsPage();
     } else {
       alert('Failed to save AI settings.');
@@ -1835,6 +1863,11 @@ function reimportAllArticles() {
     if (status) status.textContent = 'Reimporting... 0/' + count;
 
     fetch('/api/reimport-all', { method: 'POST' }).then(function(response) {
+      if (response.status === 409) {
+        if (status) status.textContent = 'Reimport already in progress.';
+        if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+        return;
+      }
       var reader = response.body.getReader();
       var decoder = new TextDecoder();
       var buffer = '';

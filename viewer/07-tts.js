@@ -92,13 +92,13 @@ function startListenLoading() {
   if (!btn) return;
   btn.classList.add('listen-loading');
   _listenWordIdx = Math.floor(Math.random() * LISTEN_WORDS.length);
-  btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> ' + LISTEN_WORDS[_listenWordIdx] + '\u2026';
+  btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg><span class="toolbar-action-label"> ' + LISTEN_WORDS[_listenWordIdx] + '\u2026</span>';
   _listenTimer = setInterval(function() {
     _listenWordIdx = (_listenWordIdx + 1) % LISTEN_WORDS.length;
     if (activeFile !== _listenLoadingFile) return;
     var b = document.getElementById('listen-btn');
     if (!b) { stopListenLoading(); return; }
-    b.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> ' + LISTEN_WORDS[_listenWordIdx] + '\u2026';
+    b.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg><span class="toolbar-action-label"> ' + LISTEN_WORDS[_listenWordIdx] + '\u2026</span>';
   }, 2500);
 }
 
@@ -122,10 +122,10 @@ function updateListenButtonState() {
   var idleLabel = isVideo ? 'Watch' : isPodcast ? 'Play' : 'Listen';
   if (playingFile && playingFile === activeFile) {
     btn.classList.add('listen-playing');
-    btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> Playing';
+    btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg><span class="toolbar-action-label"> Playing</span>';
   } else {
     btn.classList.remove('listen-playing');
-    btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg> ' + idleLabel;
+    btn.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg><span class="toolbar-action-label"> ' + idleLabel + '</span>';
   }
   // Show/hide Play Next trigger when queue is active
   var trigger = document.getElementById('play-next-trigger');
