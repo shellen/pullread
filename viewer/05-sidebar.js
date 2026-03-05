@@ -115,6 +115,19 @@ function renderFileItem(f, i) {
   const hasSummary = f.hasSummary;
   const isPodcast = !!(f.enclosureUrl && isMediaEnclosure(f.enclosureType));
   const isVideo = !!(f.enclosureUrl && isVideoEnclosure(f.enclosureType));
+
+  // Social post: use platform icon and handle instead of generic title
+  var socialPlatform = detectSocialPlatform(f);
+  var socialAuthor = socialPlatform ? parseSocialAuthor(f, socialPlatform) : null;
+  var displayTitle = f.title;
+  if (socialAuthor && (f.title === 'Untitled' || /\(@[^)]+\)$/.test(f.title))) {
+    displayTitle = '@' + socialAuthor.handle;
+    if (f.excerpt) {
+      var excerptClean = f.excerpt.replace(/\n+/g, ' ').slice(0, 60);
+      if (f.excerpt.length > 60) excerptClean += '\u2026';
+      displayTitle += ' \u00b7 ' + excerptClean;
+    }
+  }
   let indicators = '';
   if (hasHl || hasNote || hasSummary || isFavorite || isPodcast) {
     indicators = '<div class="file-item-indicators">'
@@ -128,11 +141,18 @@ function renderFileItem(f, i) {
 
   // Podcasts with artwork use it instead of the domain favicon
   const podcastArt = isPodcast && f.image;
-  const favicon = podcastArt
+  let favicon = podcastArt
     ? '<img class="file-item-favicon file-item-artwork" src="' + escapeHtml(f.image) + '" alt="" loading="lazy" onerror="this.src=\'/favicons/' + encodeURIComponent(f.domain || '') + '.png\';this.classList.remove(\'file-item-artwork\');this.onerror=function(){this.src=\'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7\'}" aria-hidden="true">'
     : (f.domain && f.domain !== 'pullread'
       ? '<img class="file-item-favicon" src="/favicons/' + encodeURIComponent(f.domain) + '.png" alt="" loading="lazy" onerror="this.src=\'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7\'" aria-hidden="true">'
       : '');
+
+  // Social posts: use platform icon instead of domain favicon
+  if (socialPlatform) {
+    var pIcon = SOCIAL_PLATFORM_ICONS[socialPlatform];
+    var pColor = SOCIAL_PLATFORM_COLORS[socialPlatform];
+    favicon = '<svg class="file-item-favicon" style="width:16px;height:16px;fill:' + pColor + '" aria-hidden="true"><use href="#' + pIcon + '"/></svg>';
+  }
 
   const sourceName = (f.feed && f.domain && !feedMatchesDomain(f.feed, f.domain)) ? f.feed : (f.domain || '');
 
@@ -143,7 +163,7 @@ function renderFileItem(f, i) {
   const metaHtml = metaParts.join('');
 
   return '<div class="file-item' + isActive + (isRead && !isActive ? ' read' : '') + '" data-index="' + i + '" data-filename="' + escapeHtml(f.filename) + '" onclick="loadFile(' + i + ')" role="option" aria-selected="' + (activeFile === f.filename) + '" tabindex="0" onkeydown="if(event.key===\'Enter\')loadFile(' + i + ')">'
-    + '<div class="file-item-title">' + escapeHtml(f.title) + '</div>'
+    + '<div class="file-item-title">' + escapeHtml(displayTitle) + '</div>'
     + '<div class="file-item-meta">' + metaHtml + indicators + '</div>'
     + '</div>';
 }

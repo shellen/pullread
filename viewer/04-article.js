@@ -737,6 +737,13 @@ function renderArticle(text, filename) {
   content.classList.remove('manage-sources-view');
   content.classList.remove('ask-view');
 
+  // Social post detection: render platform-native card instead of article
+  var socialPlatform = detectSocialPlatform(meta);
+  if (socialPlatform) {
+    renderSocialCard(meta, body, filename, socialPlatform);
+    return;
+  }
+
   let html = '';
 
   // Article header: pub bar, title, author, date
