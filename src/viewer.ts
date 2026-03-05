@@ -1765,6 +1765,12 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
 
         const result = await summarizeText(articleText);
 
+        if (!result.summary || !result.summary.trim()) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Model returned an empty summary. Try again or switch to a different provider.' }));
+          return;
+        }
+
         // If summarized by filename, write the summary into the markdown frontmatter
         if (name) {
           writeSummaryToFile(resolveFilePath(outputPath, name), result.summary, provider, result.model);
@@ -1773,6 +1779,7 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
         sendJson(res, { summary: result.summary, model: result.model, provider });
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Summarization failed';
+        console.error(`[Summarize] ${msg}`);
         // Provide user-friendly error messages
         let userMsg = msg;
         if (msg.includes('FoundationModels not found')) {
