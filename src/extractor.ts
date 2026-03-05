@@ -165,12 +165,17 @@ export function stripEmbedNoise(markdown: string): string {
   // (only when they appear as bare bullets with no meaningful content after)
   markdown = markdown.replace(/^\*\s+\*?\*?Download\*?\*?\s*$/gm, '');
 
-  // Fix broken Instagram/social embed blockquotes: Turndown produces multi-line
+  // Fix broken Instagram embed blockquotes: Turndown produces multi-line
   // links from <blockquote class="instagram-media"> where [text](url) spans lines.
-  // Convert to a clean blockquote with working link.
+  // Match the broken link + optional attribution, convert to clean links.
   markdown = markdown.replace(
-    /^> \[\s*\n(?:> ?\n)*> (.+?)\n(?:> ?\n)*> \]\((https:\/\/www\.instagram\.com\/[^)]+)\)/gm,
-    '> [$1]($2)'
+    /^> \[\s*\n(?:> ?\n)*> (.+?)\n(?:> ?\n)*> \]\((https:\/\/www\.instagram\.com\/[^)]+)\)(?:\n> ?\n> \[([^\]]+)\]\([^)]+\))?/gm,
+    (_match, text, url, attribution) => {
+      const cleanUrl = url.replace(/[?&]utm_[^&)]+/g, '');
+      let result = `[${text}](${cleanUrl})`;
+      if (attribution) result += `\n\n${attribution}`;
+      return result;
+    }
   );
 
   // Remove ad network script remnants (Google AdSense, etc.)
