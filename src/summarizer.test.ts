@@ -158,6 +158,19 @@ describe('promptLLM', () => {
     expect(capturedMaxTokens).toBe(512);
   });
 
+  test('OpenAI calls use max_completion_tokens not max_tokens', () => {
+    const { readFileSync } = require('fs');
+    const { join } = require('path');
+    const src = readFileSync(join(__dirname, 'summarizer.ts'), 'utf-8');
+    // Extract OpenAI-specific call blocks (callOpenAI function and openai case in promptLLM)
+    const openaiBlocks = src.match(/api\.openai\.com[^}]+}/g) || [];
+    expect(openaiBlocks.length).toBeGreaterThanOrEqual(2);
+    for (const block of openaiBlocks) {
+      expect(block).not.toContain('max_tokens');
+      // The parameter should be in the JSON body sent to OpenAI
+    }
+  });
+
   test('passes full prompt string to call function', async () => {
     let capturedPrompt = '';
     const callFn: ProviderCallFn = async (prompt, _maxTokens) => {

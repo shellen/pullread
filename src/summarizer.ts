@@ -287,7 +287,7 @@ async function callOpenAI(apiKey: string, model: string, articleText: string): P
 
   const call: ProviderCallFn = async (prompt, maxTokens) => {
     const body = JSON.stringify({
-      model, max_tokens: maxTokens,
+      model, max_completion_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }]
     });
     const response = await httpPost('https://api.openai.com/v1/chat/completions', {
@@ -725,7 +725,7 @@ function makeProviderCallFn(provider: Provider, apiKey: string, model: string): 
       };
     case 'openai':
       return async (prompt, maxTokens) => {
-        const body = JSON.stringify({ model, max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] });
+        const body = JSON.stringify({ model, max_completion_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] });
         const response = await httpPost('https://api.openai.com/v1/chat/completions', { 'Authorization': `Bearer ${apiKey}` }, body);
         return (JSON.parse(response).choices?.[0]?.message?.content || '').trim();
       };
