@@ -679,6 +679,26 @@ describe('transformPlatformUrl', () => {
     expect(result).toBe('https://www.reddit.com/r/programming/.rss');
   });
 
+  test('transforms Bluesky profile URL to RSS', async () => {
+    const result = await transformPlatformUrl('https://bsky.app/profile/handle.bsky.social');
+    expect(result).toBe('https://bsky.app/profile/handle.bsky.social/rss');
+  });
+
+  test('transforms Bluesky profile URL with custom domain handle', async () => {
+    const result = await transformPlatformUrl('https://bsky.app/profile/shellen.com');
+    expect(result).toBe('https://bsky.app/profile/shellen.com/rss');
+  });
+
+  test('transforms Bluesky profile URL with trailing slash', async () => {
+    const result = await transformPlatformUrl('https://bsky.app/profile/jay.bsky.team/');
+    expect(result).toBe('https://bsky.app/profile/jay.bsky.team/rss');
+  });
+
+  test('passes through non-profile Bluesky URLs unchanged', async () => {
+    const result = await transformPlatformUrl('https://bsky.app/search');
+    expect(result).toBe('https://bsky.app/search');
+  });
+
   test('passes through non-matching URLs unchanged', async () => {
     const result = await transformPlatformUrl('https://example.com/blog');
     expect(result).toBe('https://example.com/blog');
