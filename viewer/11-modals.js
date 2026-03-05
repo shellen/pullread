@@ -566,7 +566,7 @@ function showFeedPicker() {
   var overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.id = 'feed-picker-overlay';
-  overlay.innerHTML = '<div class="onboarding-modal"><div class="feed-picker" id="feed-picker-body">Loading...</div></div>';
+  overlay.innerHTML = '<div class="onboarding-card"><div class="feed-picker" id="feed-picker-body">Loading...</div></div>';
   document.body.appendChild(overlay);
 
   fetchFeedCatalog(function(catalog) {
