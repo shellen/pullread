@@ -133,6 +133,20 @@
 <!-- Releases -->
 <div class="releases">
 
+  <div class="release-card reveal" id="v0.4.4">
+    <div class="release-header">
+      <span class="release-version">0.4.4</span>
+      <span class="release-subtitle">"The Reconnect"</span>
+    </div>
+    <div class="release-date">March 2026</div>
+    <ul>
+      <li>Fixed &ldquo;View Articles&rdquo; opening a blank localhost page when the viewer server failed to start</li>
+      <li>Viewer server now automatically retries on startup failure instead of opening a dead URL</li>
+      <li>Fixed a bug where a crashed viewer server could never restart without quitting the app</li>
+      <li>Server liveness check &mdash; PullRead now verifies the viewer is actually responding before reusing a cached port</li>
+    </ul>
+  </div>
+
   <div class="release-card reveal" id="v0.4.3">
     <div class="release-header">
       <span class="release-version">0.4.3</span>
