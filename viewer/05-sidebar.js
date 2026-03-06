@@ -84,6 +84,25 @@ function renderFileList() {
 
   list.innerHTML = html;
 
+  // Async-load social avatars for sidebar items
+  var socialFavicons = list.querySelectorAll('.social-favicon[data-social-handle]');
+  socialFavicons.forEach(function(el) {
+    var handle = el.getAttribute('data-social-handle');
+    var platform = el.getAttribute('data-social-platform');
+    var instance = el.getAttribute('data-social-instance');
+    if (!handle || !platform) return;
+    fetchSocialAvatar(handle, platform, instance).then(function(avatarUrl) {
+      if (!avatarUrl || !el.parentNode) return;
+      var img = document.createElement('img');
+      img.className = 'file-item-favicon file-item-avatar';
+      img.src = avatarUrl;
+      img.alt = '';
+      img.loading = 'lazy';
+      img.onerror = function() { el.parentNode.replaceChild(el.cloneNode(true), img); };
+      el.parentNode.replaceChild(img, el);
+    });
+  });
+
   // Auto-advance to next source when current feed is empty
   if (_activeDrawerSource && displayFiles.length === 0) {
     setTimeout(advanceToNextSource, 0);
@@ -115,6 +134,19 @@ function renderFileItem(f, i) {
   const hasSummary = f.hasSummary;
   const isPodcast = !!(f.enclosureUrl && isMediaEnclosure(f.enclosureType));
   const isVideo = !!(f.enclosureUrl && isVideoEnclosure(f.enclosureType));
+
+  // Social post: use display name + excerpt instead of generic title
+  var socialPlatform = detectSocialPlatform(f);
+  var socialAuthor = socialPlatform ? parseSocialAuthor(f, socialPlatform) : null;
+  var displayTitle = f.title;
+  if (socialAuthor && (f.title === 'Untitled' || /\(@[^)]+\)$/.test(f.title))) {
+    displayTitle = socialAuthor.displayName || socialAuthor.handle;
+    if (f.excerpt) {
+      var excerptClean = f.excerpt.replace(/\n+/g, ' ').slice(0, 60);
+      if (f.excerpt.length > 60) excerptClean += '\u2026';
+      displayTitle += ' \u00b7 ' + excerptClean;
+    }
+  }
   let indicators = '';
   if (hasHl || hasNote || hasSummary || isFavorite || isPodcast) {
     indicators = '<div class="file-item-indicators">'
@@ -128,11 +160,27 @@ function renderFileItem(f, i) {
 
   // Podcasts with artwork use it instead of the domain favicon
   const podcastArt = isPodcast && f.image;
-  const favicon = podcastArt
+  let favicon = podcastArt
     ? '<img class="file-item-favicon file-item-artwork" src="' + escapeHtml(f.image) + '" alt="" loading="lazy" onerror="this.src=\'/favicons/' + encodeURIComponent(f.domain || '') + '.png\';this.classList.remove(\'file-item-artwork\');this.onerror=function(){this.src=\'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7\'}" aria-hidden="true">'
     : (f.domain && f.domain !== 'pullread'
       ? '<img class="file-item-favicon" src="/favicons/' + encodeURIComponent(f.domain) + '.png" alt="" loading="lazy" onerror="this.src=\'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7\'" aria-hidden="true">'
       : '');
+
+  // Social posts: use avatar if cached, otherwise platform icon with async replacement
+  if (socialPlatform && socialAuthor && socialAuthor.handle) {
+    var pIcon = SOCIAL_PLATFORM_ICONS[socialPlatform];
+    var pColor = SOCIAL_PLATFORM_COLORS[socialPlatform];
+    var cachedAvatar = _avatarCache[socialPlatform + ':' + socialAuthor.handle];
+    if (cachedAvatar) {
+      favicon = '<img class="file-item-favicon file-item-avatar" src="' + escapeHtml(cachedAvatar) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<svg class=file-item-favicon style=width:16px;height:16px;fill:' + pColor + '><use href=#' + pIcon + '/></svg>\'" aria-hidden="true">';
+    } else {
+      favicon = '<svg class="file-item-favicon social-favicon" data-social-handle="' + escapeHtml(socialAuthor.handle) + '" data-social-platform="' + socialPlatform + '" data-social-instance="' + escapeHtml(socialAuthor.instance || '') + '" style="width:16px;height:16px;fill:' + pColor + '" aria-hidden="true"><use href="#' + pIcon + '"/></svg>';
+    }
+  } else if (socialPlatform) {
+    var pIcon2 = SOCIAL_PLATFORM_ICONS[socialPlatform];
+    var pColor2 = SOCIAL_PLATFORM_COLORS[socialPlatform];
+    favicon = '<svg class="file-item-favicon" style="width:16px;height:16px;fill:' + pColor2 + '" aria-hidden="true"><use href="#' + pIcon2 + '"/></svg>';
+  }
 
   const sourceName = (f.feed && f.domain && !feedMatchesDomain(f.feed, f.domain)) ? f.feed : (f.domain || '');
 
@@ -143,7 +191,7 @@ function renderFileItem(f, i) {
   const metaHtml = metaParts.join('');
 
   return '<div class="file-item' + isActive + (isRead && !isActive ? ' read' : '') + '" data-index="' + i + '" data-filename="' + escapeHtml(f.filename) + '" onclick="loadFile(' + i + ')" role="option" aria-selected="' + (activeFile === f.filename) + '" tabindex="0" onkeydown="if(event.key===\'Enter\')loadFile(' + i + ')">'
-    + '<div class="file-item-title">' + escapeHtml(f.title) + '</div>'
+    + '<div class="file-item-title">' + escapeHtml(displayTitle) + '</div>'
     + '<div class="file-item-meta">' + metaHtml + indicators + '</div>'
     + '</div>';
 }
@@ -441,6 +489,8 @@ function filterFiles() {
         if (tl === 'has:video') return !!(f.enclosureUrl && isVideoEnclosure(f.enclosureType));
         // Operator: is:bookmark
         if (tl === 'is:bookmark') return isBookmarkArticle(f);
+        // Operator: is:social
+        if (tl === 'is:social') return !!detectSocialPlatform(f);
         // Operator: is:epub / is:book
         if (tl === 'is:epub' || tl === 'is:book') return f.domain === 'epub';
         // Operator: has:summary
@@ -481,12 +531,15 @@ function filterFiles() {
           return (f.author || '').toLowerCase().includes(authQ);
         }
 
-        // Plain text search — match against title, domain, feed, tags
+        // Plain text search — match against title, domain, feed, tags, social platform
         // Use accent-folded comparison so "cafe" matches "café" etc.
         var folded = foldAccents(t);
+        var sp = detectSocialPlatform(f);
+        var spName = sp ? (SOCIAL_PLATFORM_NAMES[sp] || '') : '';
         return foldAccents(f.title).includes(folded) ||
           foldAccents(f.domain).includes(folded) ||
           foldAccents(f.feed).includes(folded) ||
+          (spName && foldAccents(spName).includes(folded)) ||
           (notes?.tags || []).some(tg => foldAccents(tg).includes(folded)) ||
           (notes?.machineTags || []).some(tg => foldAccents(tg).includes(folded));
       });
@@ -848,14 +901,16 @@ function openSourcesDrawer() {
 
   var entries = Object.entries(domainArticles);
 
-  // Count podcast, video, and bookmark items
+  // Count podcast, video, bookmark, and social items
   var podcastCount = 0;
   var videoCount = 0;
   var bookmarkCount = 0;
+  var socialCount = 0;
   for (var j = 0; j < allFiles.length; j++) {
     if (allFiles[j].enclosureUrl && isMediaEnclosure(allFiles[j].enclosureType)) podcastCount++;
     if (allFiles[j].enclosureUrl && isVideoEnclosure(allFiles[j].enclosureType)) videoCount++;
     if (isBookmarkArticle(allFiles[j])) bookmarkCount++;
+    if (detectSocialPlatform(allFiles[j])) socialCount++;
   }
 
   var sortMode = localStorage.getItem('pr-sources-sort') || 'recent';
@@ -898,7 +953,7 @@ function openSourcesDrawer() {
     var filterLower = _drawerFilter.toLowerCase();
 
     // Media group label (shown if any media type has articles)
-    var hasMedia = podcastCount > 0 || videoCount > 0 || bookmarkCount > 0;
+    var hasMedia = podcastCount > 0 || videoCount > 0 || bookmarkCount > 0 || socialCount > 0;
     var mediaLabelShown = false;
 
     // Podcast row
@@ -944,6 +999,21 @@ function openSourcesDrawer() {
         + '<svg class="drawer-item-icon" aria-hidden="true"><use href="#i-bookmark"/></svg>'
         + '<span class="drawer-item-name">Bookmarks</span>'
         + '<span class="drawer-item-count">' + bkUnread + '</span></div>';
+    }
+
+    // Social row
+    if (socialCount > 0 && (!filterLower || 'social'.indexOf(filterLower) !== -1)) {
+      var socUnread = 0;
+      for (var sj = 0; sj < allFiles.length; sj++) {
+        if (detectSocialPlatform(allFiles[sj]) && !readArticles.has(allFiles[sj].filename)) socUnread++;
+      }
+      var socActive = _activeDrawerSource === '__social__' ? ' active' : '';
+      var socDim = socUnread === 0 ? ' dimmed' : '';
+      if (!mediaLabelShown) { html += '<div class="drawer-group-label">Media</div>'; mediaLabelShown = true; }
+      html += '<div class="drawer-item' + socActive + socDim + '" data-source="__social__" onclick="filterBySource(\'__social__\')">'
+        + '<svg class="drawer-item-icon" aria-hidden="true"><use href="#i-chat"/></svg>'
+        + '<span class="drawer-item-name">Social</span>'
+        + '<span class="drawer-item-count">' + socUnread + '</span></div>';
     }
 
     // Source rows
@@ -1102,6 +1172,10 @@ function filterBySource(source) {
     if (search) search.value = 'is:bookmark';
     showSourceFilterBar('Bookmarks');
     _activeDrawerSource = '__bookmarks__';
+  } else if (source === '__social__') {
+    if (search) search.value = 'is:social';
+    showSourceFilterBar('Social');
+    _activeDrawerSource = '__social__';
   } else {
     if (search) search.value = 'feed:"' + source + '"';
     showSourceFilterBar(source);
@@ -1148,6 +1222,10 @@ function refreshDrawerCounts() {
       } else if (src === '__bookmarks__') {
         for (var j = 0; j < allFiles.length; j++) {
           if (isBookmarkArticle(allFiles[j]) && !readArticles.has(allFiles[j].filename)) unread++;
+        }
+      } else if (src === '__social__') {
+        for (var j = 0; j < allFiles.length; j++) {
+          if (detectSocialPlatform(allFiles[j]) && !readArticles.has(allFiles[j].filename)) unread++;
         }
       } else {
         for (var j = 0; j < allFiles.length; j++) {

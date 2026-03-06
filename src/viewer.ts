@@ -723,6 +723,14 @@ export async function reprocessFile(filePath: string, options?: { force?: boolea
       return { ok: false, error: 'Skipped feed-sourced article' };
     }
 
+    // Social posts (Bluesky, Mastodon) are SPAs that can't be extracted — skip re-fetch
+    const SOCIAL_DOMAINS = ['bsky.app', 'x.com', 'twitter.com'];
+    const isSocialUrl = SOCIAL_DOMAINS.some(d => meta.domain === d) ||
+      /^https?:\/\/[^/]+\/@[^/]+\/\d+/.test(meta.url);
+    if (isSocialUrl) {
+      return { ok: false, error: 'Social posts cannot be re-fetched' };
+    }
+
     const article = await fetchAndExtract(meta.url);
     if (!article) {
       return { ok: false, error: 'Could not extract article from URL' };

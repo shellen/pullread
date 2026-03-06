@@ -330,8 +330,8 @@ function loadBriefing(forceRefresh) {
     } catch (e) { /* fall through to fetch */ }
   }
 
-  // Show skeleton
-  body.innerHTML = '<div class="briefing-skeleton"><div class="skeleton-line w80"></div><div class="skeleton-line w60"></div><div class="skeleton-line w90"></div><div class="skeleton-line w70"></div></div>';
+  // Show generating status with skeleton
+  body.innerHTML = '<p class="briefing-generating">Generating your briefing\u2026</p><div class="briefing-skeleton"><div class="skeleton-line w80"></div><div class="skeleton-line w60"></div><div class="skeleton-line w90"></div><div class="skeleton-line w70"></div></div>';
 
   var excludeParam = (window._deckFilenames || []).join(',');
   fetch('/api/briefing?days=1' + (excludeParam ? '&exclude=' + encodeURIComponent(excludeParam) : ''))
@@ -358,16 +358,35 @@ function renderBriefing(data) {
   var body = document.getElementById('rundown-briefing-body');
   if (!body) return;
 
-  var html = sanitizeHtml(marked.parse(cleanMarkdown(data.briefing)));
+  // Strip generic preamble lines LLMs sometimes prepend
+  var briefingText = data.briefing.replace(/^(?:here\s+is|below\s+is|this\s+is)\s+(?:a\s+)?(?:summary|overview|briefing|rundown)[^\n]*\n+/i, '');
+
+  // Fix bare article-N references the LLM sometimes emits without link syntax
+  if (data.articles && data.articles.length > 0) {
+    briefingText = briefingText.replace(/(?<!\[.*?)(?<!\(#)(?<!\/#)\barticle-(\d+)\b(?![^[]*\])/gi, function(match, num) {
+      var idx = parseInt(num, 10) - 1;
+      if (idx >= 0 && idx < data.articles.length) {
+        return '[' + data.articles[idx].title + '](#article-' + num + ')';
+      }
+      return match;
+    });
+  }
+
+  var html = sanitizeHtml(marked.parse(cleanMarkdown(briefingText)));
   body.innerHTML = html;
 
-  // Post-process: convert article:N links to clickable article openers
+  // Post-process: convert article links to clickable article openers
   if (data.articles && data.articles.length > 0) {
     var links = body.querySelectorAll('a[href^="#article-"]');
     for (var li = 0; li < links.length; li++) {
       var href = links[li].getAttribute('href');
       var idx = parseInt(href.replace('#article-', ''), 10) - 1;
       if (idx >= 0 && idx < data.articles.length && data.articles[idx].filename) {
+        // Replace generic link text ("here", "this article", etc.) with the actual title
+        var text = links[li].textContent.trim().toLowerCase();
+        if (text === 'here' || text === 'this' || text === 'this article' || text === 'link') {
+          links[li].textContent = data.articles[idx].title;
+        }
         links[li].className = 'briefing-article-link';
         links[li].setAttribute('data-filename', data.articles[idx].filename);
         links[li].removeAttribute('href');
@@ -375,6 +394,62 @@ function renderBriefing(data) {
           return function(e) { e.preventDefault(); dashLoadArticle(fn); };
         })(data.articles[idx].filename);
       }
+    }
+
+    // Title matching: find unlinked article titles in text and make them clickable.
+    // Catches cases where the LLM mentions titles without link syntax (e.g. Apple Intelligence).
+    var linkedTitles = new Set();
+    body.querySelectorAll('.briefing-article-link').forEach(function(el) {
+      linkedTitles.add(el.textContent.trim().toLowerCase());
+    });
+
+    for (var ai = 0; ai < data.articles.length; ai++) {
+      var artTitle = data.articles[ai].title;
+      if (!artTitle || !data.articles[ai].filename) continue;
+      if (linkedTitles.has(artTitle.toLowerCase())) continue;
+
+      // Walk text nodes looking for this title (case-insensitive substring match)
+      var walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, null, false);
+      var titleLower = artTitle.toLowerCase();
+      var node;
+      while (node = walker.nextNode()) {
+        // Skip if already inside a link
+        if (node.parentElement && node.parentElement.closest('a')) continue;
+        var textLower = node.textContent.toLowerCase();
+        var pos = textLower.indexOf(titleLower);
+        if (pos === -1) continue;
+
+        // Split the text node and wrap the matched portion in a link
+        var before = node.textContent.slice(0, pos);
+        var matched = node.textContent.slice(pos, pos + artTitle.length);
+        var after = node.textContent.slice(pos + artTitle.length);
+
+        var link = document.createElement('a');
+        link.textContent = matched;
+        link.className = 'briefing-article-link';
+        link.setAttribute('data-filename', data.articles[ai].filename);
+        link.onclick = (function(fn) {
+          return function(e) { e.preventDefault(); dashLoadArticle(fn); };
+        })(data.articles[ai].filename);
+
+        var parent = node.parentNode;
+        if (before) parent.insertBefore(document.createTextNode(before), node);
+        parent.insertBefore(link, node);
+        if (after) parent.insertBefore(document.createTextNode(after), node);
+        parent.removeChild(node);
+
+        linkedTitles.add(artTitle.toLowerCase());
+        break; // Only link first occurrence per title
+      }
+    }
+  }
+
+  // Show LLM model on the refresh button tooltip
+  if (data.model) {
+    var refreshBtn = document.querySelector('.rundown-briefing-refresh');
+    if (refreshBtn) {
+      var label = providerLabel(llmProvider);
+      refreshBtn.title = label + (data.model ? ' \u00B7 ' + data.model : '');
     }
   }
 }
@@ -736,6 +811,13 @@ function renderArticle(text, filename) {
   content.classList.remove('settings-view');
   content.classList.remove('manage-sources-view');
   content.classList.remove('ask-view');
+
+  // Social post detection: render platform-native card instead of article
+  var socialPlatform = detectSocialPlatform(meta);
+  if (socialPlatform) {
+    renderSocialCard(meta, body, filename, socialPlatform);
+    return;
+  }
 
   let html = '';
 
