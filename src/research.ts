@@ -113,3 +113,29 @@ ${article.body.slice(0, 8000)}`;
 
   return parsed;
 }
+
+export function initResolver(
+  pds: PDS,
+  geminiApiKey: string | null,
+) {
+  if (!geminiApiKey) return null;
+
+  const { createEmbedder } = require('loxodonta-core-monorepo/packages/loxodonta-core/src/embeddings/index.js');
+  const { geminiEmbeddings } = require('loxodonta-core-monorepo/packages/loxodonta-core/src/embeddings/gemini.js');
+  const { createResolver } = require('loxodonta-core-monorepo/packages/loxodonta-core/src/resolve/index.js');
+
+  const embedder = createEmbedder({
+    provider: geminiEmbeddings({
+      apiKey: geminiApiKey,
+      model: 'gemini-embedding-001',
+    }),
+    dimensions: 768,
+  });
+
+  return createResolver({ pds, embedder, threshold: 0.5 });
+}
+
+export function createResearchGraph(pds: PDS) {
+  const { createGraph } = require('loxodonta-core-monorepo/packages/loxodonta-core/src/graph/index.js');
+  return createGraph(pds);
+}
