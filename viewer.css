@@ -1008,6 +1008,12 @@
   .file-item.active .file-item-favicon,
   .dash-card:hover .dash-card-meta img,
   .domain-group-header:hover .file-item-favicon { filter: grayscale(0%); }
+  .file-item-avatar {
+    border-radius: 50%;
+    object-fit: cover;
+    opacity: 1;
+    background: var(--border);
+  }
 
   /* Content pane */
   .content-pane {

@@ -84,6 +84,25 @@ function renderFileList() {
 
   list.innerHTML = html;
 
+  // Async-load social avatars for sidebar items
+  var socialFavicons = list.querySelectorAll('.social-favicon[data-social-handle]');
+  socialFavicons.forEach(function(el) {
+    var handle = el.getAttribute('data-social-handle');
+    var platform = el.getAttribute('data-social-platform');
+    var instance = el.getAttribute('data-social-instance');
+    if (!handle || !platform) return;
+    fetchSocialAvatar(handle, platform, instance).then(function(avatarUrl) {
+      if (!avatarUrl || !el.parentNode) return;
+      var img = document.createElement('img');
+      img.className = 'file-item-favicon file-item-avatar';
+      img.src = avatarUrl;
+      img.alt = '';
+      img.loading = 'lazy';
+      img.onerror = function() { el.parentNode.replaceChild(el.cloneNode(true), img); };
+      el.parentNode.replaceChild(img, el);
+    });
+  });
+
   // Auto-advance to next source when current feed is empty
   if (_activeDrawerSource && displayFiles.length === 0) {
     setTimeout(advanceToNextSource, 0);
@@ -147,11 +166,20 @@ function renderFileItem(f, i) {
       ? '<img class="file-item-favicon" src="/favicons/' + encodeURIComponent(f.domain) + '.png" alt="" loading="lazy" onerror="this.src=\'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7\'" aria-hidden="true">'
       : '');
 
-  // Social posts: use platform icon instead of domain favicon
-  if (socialPlatform) {
+  // Social posts: use avatar if cached, otherwise platform icon with async replacement
+  if (socialPlatform && socialAuthor && socialAuthor.handle) {
     var pIcon = SOCIAL_PLATFORM_ICONS[socialPlatform];
     var pColor = SOCIAL_PLATFORM_COLORS[socialPlatform];
-    favicon = '<svg class="file-item-favicon" style="width:16px;height:16px;fill:' + pColor + '" aria-hidden="true"><use href="#' + pIcon + '"/></svg>';
+    var cachedAvatar = _avatarCache[socialPlatform + ':' + socialAuthor.handle];
+    if (cachedAvatar) {
+      favicon = '<img class="file-item-favicon file-item-avatar" src="' + escapeHtml(cachedAvatar) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<svg class=file-item-favicon style=width:16px;height:16px;fill:' + pColor + '><use href=#' + pIcon + '/></svg>\'" aria-hidden="true">';
+    } else {
+      favicon = '<svg class="file-item-favicon social-favicon" data-social-handle="' + escapeHtml(socialAuthor.handle) + '" data-social-platform="' + socialPlatform + '" data-social-instance="' + escapeHtml(socialAuthor.instance || '') + '" style="width:16px;height:16px;fill:' + pColor + '" aria-hidden="true"><use href="#' + pIcon + '"/></svg>';
+    }
+  } else if (socialPlatform) {
+    var pIcon2 = SOCIAL_PLATFORM_ICONS[socialPlatform];
+    var pColor2 = SOCIAL_PLATFORM_COLORS[socialPlatform];
+    favicon = '<svg class="file-item-favicon" style="width:16px;height:16px;fill:' + pColor2 + '" aria-hidden="true"><use href="#' + pIcon2 + '"/></svg>';
   }
 
   const sourceName = (f.feed && f.domain && !feedMatchesDomain(f.feed, f.domain)) ? f.feed : (f.domain || '');

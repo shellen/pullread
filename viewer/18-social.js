@@ -183,12 +183,25 @@ function renderSocialCard(meta, body, filename, platform) {
     : '<div class="social-avatar-fallback" style="background:var(--muted)"></div>';
 
   var handleDisplay = author ? ('@' + author.handle) : '';
-  var timeStr = meta.bookmarked ? timeAgo(meta.bookmarked) : '';
-  var timeTitle = meta.bookmarked ? timeAgoTitle(meta.bookmarked) : '';
+  // Show actual date/time for social posts
+  var timeStr = '';
+  var timeTitle = '';
+  if (meta.bookmarked) {
+    var d = new Date(meta.bookmarked);
+    if (!isNaN(d.getTime())) {
+      timeStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+        + ' ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+      timeTitle = d.toISOString();
+    }
+  }
+
+  // Body: fall back to excerpt or annotation when body is empty
+  var bodyText = body || meta.excerpt || meta.annotation || '';
+  // Strip quote-post placeholder from Bluesky feed content
+  bodyText = bodyText.replace(/\\?\[contains quote post or other embedded content\\?\]/gi, '').trim();
 
   // Process body: escape HTML, linkify URLs, convert newlines
-  var bodyHtml = body || '';
-  bodyHtml = escapeHtml(bodyHtml).replace(
+  var bodyHtml = escapeHtml(bodyText).replace(
     /(https?:\/\/[^\s<]+)/g,
     '<a href="$1" onclick="event.stopPropagation();prOpenExternal(\'$1\');return false">$1</a>'
   );
