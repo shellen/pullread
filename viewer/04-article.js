@@ -393,6 +393,53 @@ function renderBriefing(data) {
         })(data.articles[idx].filename);
       }
     }
+
+    // Title matching: find unlinked article titles in text and make them clickable.
+    // Catches cases where the LLM mentions titles without link syntax (e.g. Apple Intelligence).
+    var linkedTitles = new Set();
+    body.querySelectorAll('.briefing-article-link').forEach(function(el) {
+      linkedTitles.add(el.textContent.trim().toLowerCase());
+    });
+
+    for (var ai = 0; ai < data.articles.length; ai++) {
+      var artTitle = data.articles[ai].title;
+      if (!artTitle || !data.articles[ai].filename) continue;
+      if (linkedTitles.has(artTitle.toLowerCase())) continue;
+
+      // Walk text nodes looking for this title (case-insensitive substring match)
+      var walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, null, false);
+      var titleLower = artTitle.toLowerCase();
+      var node;
+      while (node = walker.nextNode()) {
+        // Skip if already inside a link
+        if (node.parentElement && node.parentElement.closest('a')) continue;
+        var textLower = node.textContent.toLowerCase();
+        var pos = textLower.indexOf(titleLower);
+        if (pos === -1) continue;
+
+        // Split the text node and wrap the matched portion in a link
+        var before = node.textContent.slice(0, pos);
+        var matched = node.textContent.slice(pos, pos + artTitle.length);
+        var after = node.textContent.slice(pos + artTitle.length);
+
+        var link = document.createElement('a');
+        link.textContent = matched;
+        link.className = 'briefing-article-link';
+        link.setAttribute('data-filename', data.articles[ai].filename);
+        link.onclick = (function(fn) {
+          return function(e) { e.preventDefault(); dashLoadArticle(fn); };
+        })(data.articles[ai].filename);
+
+        var parent = node.parentNode;
+        if (before) parent.insertBefore(document.createTextNode(before), node);
+        parent.insertBefore(link, node);
+        if (after) parent.insertBefore(document.createTextNode(after), node);
+        parent.removeChild(node);
+
+        linkedTitles.add(artTitle.toLowerCase());
+        break; // Only link first occurrence per title
+      }
+    }
   }
 
   // Show LLM model on the refresh button tooltip
