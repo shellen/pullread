@@ -244,6 +244,7 @@ ${clusterSection}`;
 export async function generateBriefing(outputPath: string, days: number = 1, excludeFilenames: string[] = []): Promise<{
   briefing: string;
   articles: Array<{ title: string; filename: string; domain: string }>;
+  model: string;
 } | null> {
   const allArticles = getRecentArticles(outputPath, days);
   if (allArticles.length === 0) return null;
@@ -311,5 +312,5 @@ Briefing:`;
     domain: a.domain,
   }));
 
-  return { briefing: result.summary, articles: articleMeta };
+  return { briefing: result.summary, articles: articleMeta, model: result.model };
 }

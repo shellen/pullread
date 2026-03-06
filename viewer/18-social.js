@@ -246,6 +246,10 @@ function renderSocialCard(meta, body, filename, platform) {
   toolbarActions += '<button onclick="toggleFavoriteFromHeader(this)" class="toolbar-action-btn' + (isFav ? ' active-fav' : '') + '" aria-label="' + (isFav ? 'Remove star' : 'Star article') + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg><span class="toolbar-action-label"> Star</span></button>';
   var isRead = activeFile && readArticles.has(activeFile);
   toolbarActions += '<button onclick="toggleReadFromHeader(this)" class="toolbar-action-btn' + (isRead ? ' active-read' : '') + '" aria-label="' + (isRead ? 'Mark unread' : 'Mark read') + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isRead ? 'envelope' : 'envelope-open') + '"/></svg><span class="toolbar-action-label"> ' + (isRead ? 'Unread' : 'Read') + '</span></button>';
+  toolbarActions += '<div class="play-next-menu" id="play-next-menu">';
+  toolbarActions += '<button id="listen-btn" onclick="addCurrentToTTSQueue()" class="toolbar-action-btn" aria-label="Listen"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-volume"/></svg><span class="toolbar-action-label"> Listen</span></button>';
+  toolbarActions += '<button class="play-next-trigger" id="play-next-trigger" onclick="togglePlayNextMenu(event)" aria-label="Queue options" style="display:none"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>';
+  toolbarActions += '</div>';
   if (meta && meta.url) {
     toolbarActions += '<div class="share-dropdown"><button onclick="toggleShareDropdown(event)" class="toolbar-action-btn" aria-label="Share"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg><span class="toolbar-action-label"> Share</span></button></div>';
   }
@@ -292,7 +296,7 @@ function renderSocialCard(meta, body, filename, platform) {
   );
   bodyHtml = bodyHtml.replace(/\n/g, '<br>');
 
-  var html = '<div class="article-header"><div id="header-tags"></div></div>';
+  var html = '<div class="article-header"></div>';
   html += '<div class="social-card">';
 
   // Header: avatar + author info
@@ -319,12 +323,15 @@ function renderSocialCard(meta, body, filename, platform) {
     html += '</div>';
   }
 
+  // Tags inside the card
+  html += '<div class="social-card-tags" id="header-tags"></div>';
+
   html += '</div>';
 
   el.innerHTML = html;
   el.scrollTop = 0;
 
-  // Populate header tags
+  // Populate tags
   renderNotesPanel();
 
   // Async: fetch real avatar and replace fallback

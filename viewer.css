@@ -2314,6 +2314,33 @@
   .social-quote-body a {
     color: var(--link);
   }
+  .social-card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .social-card-tags .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--muted) 15%, transparent);
+    color: var(--muted);
+    font-size: 11px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+  }
+  .social-card-tags .tag:hover {
+    background: var(--border);
+    color: var(--fg);
+  }
+  .social-card-tags .tag-machine {
+    border: 1px dashed color-mix(in srgb, var(--muted) 40%, transparent);
+    background: transparent;
+  }
   .article-hero {
     margin: 16px 0 20px;
   }

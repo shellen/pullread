@@ -119,6 +119,7 @@ describe('generateBriefing', () => {
     const result = await generateBriefing('/tmp/test', 1);
     expect(result).not.toBeNull();
     expect(result!.briefing).toContain('First Article');
+    expect(result!.model).toBe('test');
     expect(result!.articles).toHaveLength(2);
     const first = result!.articles.find(a => a.title === 'First Article');
     expect(first).toEqual({

@@ -394,6 +394,15 @@ function renderBriefing(data) {
       }
     }
   }
+
+  // Show LLM model on the refresh button tooltip
+  if (data.model) {
+    var refreshBtn = document.querySelector('.rundown-briefing-refresh');
+    if (refreshBtn) {
+      var label = providerLabel(llmProvider);
+      refreshBtn.title = label + (data.model ? ' \u00B7 ' + data.model : '');
+    }
+  }
 }
 
 function renderHub() {
