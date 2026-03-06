@@ -6927,6 +6927,36 @@
     margin-left: 6px;
   }
 
+  .research-empty {
+    text-align: center;
+    max-width: 440px;
+    margin: 60px auto 0;
+    padding: 0 20px;
+  }
+  .research-empty-icon { margin-bottom: 16px; }
+  .research-empty h2 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 10px;
+  }
+  .research-empty p {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0 0 12px;
+  }
+  .research-empty .btn-primary {
+    margin-top: 8px;
+    font-size: 14px;
+    padding: 8px 20px;
+  }
+  .research-empty-detail strong { color: var(--fg); }
+  .research-empty-note {
+    font-size: 12px !important;
+    margin-top: 12px !important;
+    opacity: 0.7;
+  }
+
   @media (max-width: 768px) {
     .research-layout {
       grid-template-columns: 1fr;

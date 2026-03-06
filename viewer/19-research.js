@@ -42,7 +42,94 @@ function showResearch() {
   html += '</div>'; // .research-layout
 
   body.innerHTML = html;
-  researchLoadEntities();
+
+  // Check status first — show empty state or entities
+  fetch('/api/research/status')
+    .then(function(r) { return r.json(); })
+    .then(function(status) {
+      if (status.entityCount > 0) {
+        researchLoadEntities();
+      } else {
+        researchShowEmptyState(status);
+      }
+    })
+    .catch(function() {
+      researchShowEmptyState({ extractedCount: 0, entityCount: 0, totalArticles: 0 });
+    });
+}
+
+function researchShowEmptyState(status) {
+  var body = document.getElementById('article-body');
+  if (!body) return;
+
+  var html = '<div class="article-header"><h1>Research</h1></div>';
+  html += '<div class="research-empty">';
+  html += '<div class="research-empty-icon"><svg class="icon" style="width:48px;height:48px;color:var(--muted)" aria-hidden="true"><use href="#i-beaker"/></svg></div>';
+  html += '<h2>Your knowledge graph</h2>';
+  html += '<p>Research extracts people, companies, technologies, and concepts from your articles and maps the connections between them.</p>';
+
+  if (status.totalArticles === 0) {
+    html += '<p class="research-empty-detail">Add some feeds and sync to get started.</p>';
+  } else if (status.extractedCount === 0) {
+    html += '<p class="research-empty-detail">You have <strong>' + status.totalArticles + ' articles</strong> ready to analyze.</p>';
+    html += '<button class="btn-primary" onclick="researchStartExtraction()" id="research-extract-btn">Extract entities</button>';
+    html += '<p class="research-empty-note">This uses your configured LLM to analyze each article. It may take a while for large libraries.</p>';
+  } else {
+    html += '<p class="research-empty-detail">Extracted ' + status.extractedCount + ' of ' + status.totalArticles + ' articles but found no entities yet. Try extracting more articles.</p>';
+    html += '<button class="btn-primary" onclick="researchStartExtraction()" id="research-extract-btn">Continue extraction</button>';
+  }
+
+  html += '</div>';
+  body.innerHTML = html;
+}
+
+function researchStartExtraction() {
+  var btn = document.getElementById('research-extract-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Extracting\u2026';
+  }
+
+  fetch('/api/research/extract', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function() {
+      researchPollProgress();
+    })
+    .catch(function(err) {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Extract entities';
+      }
+      showToast('Extraction failed: ' + (err.message || 'unknown error'));
+    });
+}
+
+function researchPollProgress() {
+  var btn = document.getElementById('research-extract-btn');
+  var interval = setInterval(function() {
+    fetch('/api/research/status')
+      .then(function(r) { return r.json(); })
+      .then(function(status) {
+        if (btn) btn.textContent = 'Extracting\u2026 (' + status.extractedCount + '/' + status.totalArticles + ')';
+        if (status.entityCount > 0) {
+          clearInterval(interval);
+          showResearch();
+        }
+      })
+      .catch(function() {
+        clearInterval(interval);
+      });
+  }, 3000);
+
+  // Stop polling after 5 minutes
+  setTimeout(function() {
+    clearInterval(interval);
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Check results';
+      btn.onclick = function() { showResearch(); };
+    }
+  }, 300000);
 }
 
 var _researchTypeFilter = null;

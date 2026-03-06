@@ -2491,14 +2491,32 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
 
     if (url.pathname === '/api/research/status' && req.method === 'GET') {
       const { getResearchPDS } = await import('./research');
+      const { listMarkdownFiles } = await import('./writer');
       const pds = getResearchPDS();
       const extractions = pds.listRecords('app.pullread.extraction');
+      const entities = pds.listRecords('app.pullread.entity');
+      const totalArticles = listMarkdownFiles(outputPath).length;
       sendJson(res, {
         extractedCount: extractions.length,
+        entityCount: entities.length,
+        totalArticles,
         lastExtraction: extractions.length > 0
           ? extractions[extractions.length - 1].value.extractedAt
           : null,
       });
+      return;
+    }
+
+    if (url.pathname === '/api/research/extract' && req.method === 'POST') {
+      const { getResearchPDS, runBackgroundExtraction } = await import('./research');
+      const pds = getResearchPDS();
+      // Run extraction (non-blocking response — send progress via status polling)
+      runBackgroundExtraction(pds, outputPath).then(function(stats) {
+        console.log(`  Research extraction complete: ${stats.extracted} extracted, ${stats.skipped} skipped, ${stats.errors} errors`);
+      }).catch(function(err) {
+        console.log(`  Research extraction failed: ${err instanceof Error ? err.message : err}`);
+      });
+      sendJson(res, { started: true });
       return;
     }
 
