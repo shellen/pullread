@@ -3,18 +3,34 @@
 ## Quick Reference
 
 ```bash
-bun scripts/bump-version.ts 0.4.0    # update all version locations
-# update site/releases.html with release notes
-# commit, push, create PR → wait for CI ✓
-# merge PR to main → wait for CI ✓
+# Check the latest tagged version to determine the next one
+git tag --sort=-v:refname | head -1       # e.g. v0.4.5 → next is 0.4.6
+
+# 1. Review Guide, FAQ, release notes — draft user-facing bullets
+# 2. Bump version + rebuild + test
+bun scripts/bump-version.ts X.Y.Z
+bun run scripts/embed-viewer.ts && bun test
+# 3. Update site/releases.html and _prCurrentVersion fallback
+# 4. Commit, push, create PR → wait for CI ✓
+# 5. Merge PR to main → wait for CI ✓
+# 6. Tag
 git checkout main && git pull
-git tag v0.4.0 && git push origin v0.4.0
+git tag vX.Y.Z && git push origin vX.Y.Z
 # CI builds, signs, notarizes, and publishes — no manual steps after tagging
 ```
 
 ## Step by Step
 
-### 1. Prep the release
+### 1. Pre-flight review
+
+Before touching version numbers, scan these for anything that needs updating:
+- **In-app Guide** — does it cover any features being released?
+- **FAQ** (site and in-app) — are there new questions users might have?
+- **Release notes** (`site/releases.html`) — draft the bullet points first
+
+Release notes should be **user-facing**: describe what changed from the user's perspective. Skip internal details like dependency swaps, npm package changes, or refactors unless they fix a user-visible bug.
+
+### 2. Prep the release
 
 ```bash
 # Bump version everywhere (package.json → site → tauri.conf.json → Cargo.toml)
@@ -27,11 +43,11 @@ bun run scripts/embed-viewer.ts
 bun test
 ```
 
-### 2. Update release notes
+### 3. Update release notes
 
 Add a new entry at the top of `site/releases.html` with the version, subtitle, date, and bullet points. Update the fallback version in `viewer/03-settings.js` (search for `_prCurrentVersion`).
 
-### 3. Create PR and wait for CI
+### 4. Create PR and wait for CI
 
 ```bash
 git add -p    # stage the version bump + release notes
@@ -40,24 +56,24 @@ git push -u origin <branch>
 gh pr create --title "Release X.Y.Z" --body "Version bump and release notes"
 ```
 
-Wait for CI checks to pass on the PR before merging.
+**Wait for CI checks to pass** on the PR before merging. Do not merge a red build.
 
-### 4. Merge to main and wait for CI
+### 5. Merge to main and wait for CI
 
 ```bash
 gh pr merge --merge
 ```
 
-Wait for the main branch build to succeed. This ensures the `latest` rolling build is healthy before tagging.
+**Wait for the main branch build to succeed.** This ensures the `latest` rolling build is healthy before tagging. Check with `gh run list --limit 3`.
 
-### 5. Tag the release
+### 6. Tag the release
 
 ```bash
 git checkout main && git pull
 git tag vX.Y.Z && git push origin vX.Y.Z
 ```
 
-### 6. Wait for release CI
+### 7. Wait for release CI
 
 The tag push triggers three jobs:
 
@@ -71,7 +87,7 @@ Monitor with `gh run list --limit 5`. The whole pipeline takes ~12 minutes.
 
 **There is no manual publish step.** The `publish-updater` job calls `gh release edit --draft=false` automatically.
 
-### 7. Verify
+### 8. Verify
 
 - [ ] `gh release view vX.Y.Z` shows both DMGs + `latest.json`
 - [ ] Auto-updater: open an older version of Pull Read, check for update prompt
@@ -100,10 +116,9 @@ The **Build Tauri App** workflow (`.github/workflows/build-tauri.yml`) triggers 
 1. `bun install` + `bun scripts/embed-viewer.ts` (embed viewer into binary)
 2. `bun build src/index.ts --compile` (compile CLI sidecar for target arch)
 3. `bash scripts/prepare-sidecar.sh` (copy sidecar to Tauri location)
-4. `bash scripts/download-kokoro-model.sh` (fetch TTS model, ~92MB)
-5. Import Apple signing certificate from GitHub Secrets
-6. Sign sidecar with entitlements (`com.apple.security.cs.disable-library-validation`)
-7. `tauri-apps/tauri-action` builds the Rust app, signs/notarizes the bundle and DMG
+4. Import Apple signing certificate from GitHub Secrets
+5. Sign sidecar with entitlements (`com.apple.security.cs.disable-library-validation`)
+6. `tauri-apps/tauri-action` builds the Rust app, signs/notarizes the bundle and DMG
 
 ### Publish-updater job (runs after build, tags only)
 
@@ -147,7 +162,7 @@ Use `scripts/setup-signing-secrets.sh` to configure these.
 
 ## Sidecar Entitlements
 
-The CLI binary (`pullread-cli`) is signed with `src-tauri/entitlements.plist` which grants `com.apple.security.cs.disable-library-validation`. This is required because ONNX Runtime (used by Kokoro TTS) has native `.node` addons that Bun extracts to a temp directory at runtime — macOS rejects them without this entitlement.
+The CLI binary (`pullread-cli`) is signed with `src-tauri/entitlements.plist` which grants `com.apple.security.cs.disable-library-validation`. This is required because Bun may extract native addons to a temp directory at runtime — macOS rejects them without this entitlement.
 
 ## Recovering from a Failed Release
 
@@ -173,21 +188,3 @@ Provider docs:
 - [Gemini](https://ai.google.dev/gemini-api/docs/models)
 - [OpenRouter](https://openrouter.ai/models)
 
-## Keeping Kokoro TTS Up to Date
-
-Before releasing, verify the Kokoro model files are still available on HuggingFace:
-
-```bash
-# Check q8 model (default, ~92MB)
-curl -sI "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/onnx/model_quantized.onnx" | head -1
-
-# Check q4 model (high quality, ~305MB)
-curl -sI "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/onnx/model_q4.onnx" | head -1
-
-# Both should return HTTP 302 (redirect to CDN)
-```
-
-If files return 404, check the HuggingFace repo for renamed/updated models:
-https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/tree/main/onnx
-
-Update `src/tts.ts` (`kokoroModelFile` and `ensureKokoroModelCached`) and `scripts/download-kokoro-model.sh` if paths change.
