@@ -21,7 +21,22 @@ function showResearch() {
   if (toolbar) toolbar.style.display = 'none';
   updateSidebarActiveState(prevActive);
 
-  var body = document.getElementById('article-body');
+  // Check status first — show empty state or entity browser
+  fetch('/api/research/status')
+    .then(function(r) { return r.json(); })
+    .then(function(status) {
+      if (status.entityCount > 0) {
+        researchRenderBrowser();
+      } else {
+        researchShowEmptyState(status);
+      }
+    })
+    .catch(function() {
+      researchShowEmptyState({ extractedCount: 0, entityCount: 0, totalArticles: 0 });
+    });
+}
+
+function researchRenderBrowser() {
   var html = '<div class="article-header"><h1>Research</h1></div>';
   html += '<div class="research-layout">';
 
@@ -41,26 +56,15 @@ function showResearch() {
 
   html += '</div>'; // .research-layout
 
-  body.innerHTML = html;
-
-  // Check status first — show empty state or entities
-  fetch('/api/research/status')
-    .then(function(r) { return r.json(); })
-    .then(function(status) {
-      if (status.entityCount > 0) {
-        researchLoadEntities();
-      } else {
-        researchShowEmptyState(status);
-      }
-    })
-    .catch(function() {
-      researchShowEmptyState({ extractedCount: 0, entityCount: 0, totalArticles: 0 });
-    });
+  var content = document.getElementById('content');
+  content.innerHTML = html;
+  document.getElementById('content-scroll').scrollTop = 0;
+  researchLoadEntities();
 }
 
 function researchShowEmptyState(status) {
-  var body = document.getElementById('article-body');
-  if (!body) return;
+  var content = document.getElementById('content');
+  if (!content) return;
 
   var html = '<div class="article-header"><h1>Research</h1></div>';
   html += '<div class="research-empty">';
@@ -80,7 +84,8 @@ function researchShowEmptyState(status) {
   }
 
   html += '</div>';
-  body.innerHTML = html;
+  content.innerHTML = html;
+  document.getElementById('content-scroll').scrollTop = 0;
 }
 
 function researchStartExtraction() {
