@@ -489,6 +489,8 @@ function filterFiles() {
         if (tl === 'has:video') return !!(f.enclosureUrl && isVideoEnclosure(f.enclosureType));
         // Operator: is:bookmark
         if (tl === 'is:bookmark') return isBookmarkArticle(f);
+        // Operator: is:social
+        if (tl === 'is:social') return !!detectSocialPlatform(f);
         // Operator: is:epub / is:book
         if (tl === 'is:epub' || tl === 'is:book') return f.domain === 'epub';
         // Operator: has:summary
@@ -899,14 +901,16 @@ function openSourcesDrawer() {
 
   var entries = Object.entries(domainArticles);
 
-  // Count podcast, video, and bookmark items
+  // Count podcast, video, bookmark, and social items
   var podcastCount = 0;
   var videoCount = 0;
   var bookmarkCount = 0;
+  var socialCount = 0;
   for (var j = 0; j < allFiles.length; j++) {
     if (allFiles[j].enclosureUrl && isMediaEnclosure(allFiles[j].enclosureType)) podcastCount++;
     if (allFiles[j].enclosureUrl && isVideoEnclosure(allFiles[j].enclosureType)) videoCount++;
     if (isBookmarkArticle(allFiles[j])) bookmarkCount++;
+    if (detectSocialPlatform(allFiles[j])) socialCount++;
   }
 
   var sortMode = localStorage.getItem('pr-sources-sort') || 'recent';
@@ -949,7 +953,7 @@ function openSourcesDrawer() {
     var filterLower = _drawerFilter.toLowerCase();
 
     // Media group label (shown if any media type has articles)
-    var hasMedia = podcastCount > 0 || videoCount > 0 || bookmarkCount > 0;
+    var hasMedia = podcastCount > 0 || videoCount > 0 || bookmarkCount > 0 || socialCount > 0;
     var mediaLabelShown = false;
 
     // Podcast row
@@ -995,6 +999,21 @@ function openSourcesDrawer() {
         + '<svg class="drawer-item-icon" aria-hidden="true"><use href="#i-bookmark"/></svg>'
         + '<span class="drawer-item-name">Bookmarks</span>'
         + '<span class="drawer-item-count">' + bkUnread + '</span></div>';
+    }
+
+    // Social row
+    if (socialCount > 0 && (!filterLower || 'social'.indexOf(filterLower) !== -1)) {
+      var socUnread = 0;
+      for (var sj = 0; sj < allFiles.length; sj++) {
+        if (detectSocialPlatform(allFiles[sj]) && !readArticles.has(allFiles[sj].filename)) socUnread++;
+      }
+      var socActive = _activeDrawerSource === '__social__' ? ' active' : '';
+      var socDim = socUnread === 0 ? ' dimmed' : '';
+      if (!mediaLabelShown) { html += '<div class="drawer-group-label">Media</div>'; mediaLabelShown = true; }
+      html += '<div class="drawer-item' + socActive + socDim + '" data-source="__social__" onclick="filterBySource(\'__social__\')">'
+        + '<svg class="drawer-item-icon" aria-hidden="true"><use href="#i-chat"/></svg>'
+        + '<span class="drawer-item-name">Social</span>'
+        + '<span class="drawer-item-count">' + socUnread + '</span></div>';
     }
 
     // Source rows
@@ -1153,6 +1172,10 @@ function filterBySource(source) {
     if (search) search.value = 'is:bookmark';
     showSourceFilterBar('Bookmarks');
     _activeDrawerSource = '__bookmarks__';
+  } else if (source === '__social__') {
+    if (search) search.value = 'is:social';
+    showSourceFilterBar('Social');
+    _activeDrawerSource = '__social__';
   } else {
     if (search) search.value = 'feed:"' + source + '"';
     showSourceFilterBar(source);
@@ -1199,6 +1222,10 @@ function refreshDrawerCounts() {
       } else if (src === '__bookmarks__') {
         for (var j = 0; j < allFiles.length; j++) {
           if (isBookmarkArticle(allFiles[j]) && !readArticles.has(allFiles[j].filename)) unread++;
+        }
+      } else if (src === '__social__') {
+        for (var j = 0; j < allFiles.length; j++) {
+          if (detectSocialPlatform(allFiles[j]) && !readArticles.has(allFiles[j].filename)) unread++;
         }
       } else {
         for (var j = 0; j < allFiles.length; j++) {
