@@ -193,6 +193,183 @@ function fetchBskyThread(handle, postId) {
     });
 }
 
+// ---------------------------------------------------------------------------
+// <pr-social-card> Web Component
+// ---------------------------------------------------------------------------
+
+class PrSocialCard extends HTMLElement {
+  constructor() {
+    super();
+    this._meta = null;
+    this._body = '';
+    this._filename = '';
+    this._platform = '';
+    this._author = null;
+  }
+
+  /**
+   * Render the social card with the given data.
+   * Called from renderSocialCard() after toolbar setup.
+   */
+  render(meta, body, filename, platform) {
+    this._meta = meta;
+    this._body = body;
+    this._filename = filename;
+    this._platform = platform;
+    this._author = parseSocialAuthor(meta, platform);
+
+    var platformName = SOCIAL_PLATFORM_NAMES[platform] || platform;
+    var platformIcon = SOCIAL_PLATFORM_ICONS[platform] || '';
+    var platformColor = SOCIAL_PLATFORM_COLORS[platform] || 'var(--muted)';
+    var author = this._author;
+
+    // Avatar fallback: platform icon in colored circle
+    var avatarId = 'social-avatar-' + (author ? author.handle : 'unknown').replace(/[^a-zA-Z0-9-_.]/g, '_');
+    this._avatarId = avatarId;
+    this._fallbackSvg = platformIcon
+      ? '<div class="social-avatar-fallback" style="background:' + platformColor + '"><svg><use href="#' + platformIcon + '"/></svg></div>'
+      : '<div class="social-avatar-fallback" style="background:var(--muted)"></div>';
+
+    var handleDisplay = author ? ('@' + author.handle) : '';
+    var timeStr = '';
+    var timeTitle = '';
+    if (meta.bookmarked) {
+      var d = new Date(meta.bookmarked);
+      if (!isNaN(d.getTime())) {
+        timeStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+          + ' ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+        timeTitle = d.toISOString();
+      }
+    }
+
+    // Body: fall back to excerpt or annotation when body is empty
+    var bodyText = body || meta.excerpt || meta.annotation || '';
+    bodyText = bodyText.replace(/\\?\[contains quote post or other embedded content\\?\]/gi, '').trim();
+
+    // Process body: escape HTML, linkify URLs, convert newlines
+    var bodyHtml = escapeHtml(bodyText).replace(
+      /(https?:\/\/[^\s<]+)/g,
+      '<a href="$1" onclick="event.stopPropagation();prOpenExternal(\'$1\');return false">$1</a>'
+    );
+    bodyHtml = bodyHtml.replace(/\n/g, '<br>');
+
+    var html = '<div class="article-header"></div>';
+    html += '<div class="social-card">';
+
+    // Header: avatar + author info
+    html += '<div class="social-card-header">';
+    html += '<div class="social-avatar" id="' + avatarId + '">' + this._fallbackSvg + '</div>';
+    html += '<div class="social-author">';
+    html += '<div class="social-author-name">' + escapeHtml(author ? author.displayName : '') + '</div>';
+    html += '<div class="social-author-meta">';
+    html += '<span>' + escapeHtml(handleDisplay) + '</span>';
+    if (timeStr) html += '<span>&middot;</span><span title="' + escapeHtml(timeTitle) + '">' + escapeHtml(timeStr) + '</span>';
+    if (platformIcon) html += '<span>&middot;</span><svg style="fill:' + platformColor + '"><use href="#' + platformIcon + '"/></svg>';
+    html += '</div></div></div>';
+
+    // Body
+    html += '<div class="social-card-body">' + bodyHtml + '</div>';
+
+    // Footer: link to original
+    if (meta.url) {
+      html += '<div class="social-card-footer">';
+      html += '<a href="#" onclick="event.preventDefault();prOpenExternal(\'' + escapeJsStr(meta.url) + '\')">';
+      if (platformIcon) html += '<svg style="fill:' + platformColor + '"><use href="#' + platformIcon + '"/></svg>';
+      html += 'View on ' + escapeHtml(platformName);
+      html += ' <svg><use href="#i-external"/></svg></a>';
+      html += '</div>';
+    }
+
+    // Tags container
+    html += '<div class="social-card-tags" id="header-tags"></div>';
+
+    html += '</div>';
+
+    this.innerHTML = html;
+    this.scrollTop = 0;
+
+    // Populate tags
+    renderNotesPanel();
+
+    // Async: fetch real avatar and replace fallback
+    this._loadAvatar(platform);
+
+    // Async: fetch Bluesky thread data
+    this._loadThread(platform, meta);
+  }
+
+  _loadAvatar(platform) {
+    var author = this._author;
+    if (!author || !author.handle) return;
+    var self = this;
+    var avatarId = this._avatarId;
+    var fallbackSvg = this._fallbackSvg;
+
+    fetchSocialAvatar(author.handle, platform, author.instance).then(function(avatarUrl) {
+      if (!avatarUrl) return;
+      var avatarEl = document.getElementById(avatarId);
+      if (!avatarEl) return;
+      var img = document.createElement('img');
+      img.alt = '';
+      img.src = avatarUrl;
+      img.onerror = function() { avatarEl.innerHTML = fallbackSvg; };
+      avatarEl.innerHTML = '';
+      avatarEl.appendChild(img);
+    });
+  }
+
+  _loadThread(platform, meta) {
+    var author = this._author;
+    var filename = this._filename;
+    if (platform !== 'bluesky' || !author || !author.handle || !author.postId) return;
+    var self = this;
+
+    fetchBskyThread(author.handle, author.postId).then(function(thread) {
+      if (!thread) return;
+      if (activeFile !== filename) return;
+
+      // Update timestamp from API
+      if (thread.createdAt) {
+        var metaEl = self.querySelector('.social-author-meta');
+        if (metaEl) {
+          var td = new Date(thread.createdAt);
+          if (!isNaN(td.getTime())) {
+            var newTime = td.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+              + ' ' + td.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+            var spans = metaEl.querySelectorAll('span');
+            for (var si = 0; si < spans.length; si++) {
+              if (spans[si].hasAttribute('title')) {
+                spans[si].textContent = newTime;
+                spans[si].title = td.toISOString();
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      // Insert engagement bar before footer
+      var engHtml = renderEngagementBar(thread, meta.url);
+      if (engHtml) {
+        var footer = self.querySelector('.social-card-footer');
+        if (footer) {
+          footer.insertAdjacentHTML('beforebegin', engHtml);
+        }
+      }
+
+      // Insert quoted post after body
+      if (thread.quotedPost) {
+        var bodyEl = self.querySelector('.social-card-body');
+        if (bodyEl) {
+          bodyEl.insertAdjacentHTML('afterend', renderQuotedPost(thread.quotedPost));
+        }
+      }
+    });
+  }
+}
+
+customElements.define('pr-social-card', PrSocialCard);
+
 /**
  * Build HTML for a quoted post card.
  */
@@ -234,20 +411,15 @@ function renderEngagementBar(thread, postUrl) {
 }
 
 /**
- * Render a social post as a platform-native card in the article view.
+ * Set up toolbar and render social card via <pr-social-card> component.
  * Called from renderArticle() when a social platform is detected.
  */
 function renderSocialCard(meta, body, filename, platform) {
-  var author = parseSocialAuthor(meta, platform);
   var el = document.getElementById('content');
   var emptyEl = document.getElementById('empty-state');
   if (emptyEl) emptyEl.style.display = 'none';
 
-  var platformName = SOCIAL_PLATFORM_NAMES[platform] || platform;
-  var platformIcon = SOCIAL_PLATFORM_ICONS[platform] || '';
-  var platformColor = SOCIAL_PLATFORM_COLORS[platform] || 'var(--muted)';
-
-  // Build toolbar (same as articles — star, read, share)
+  // Build toolbar (star, read, listen, share)
   var toolbarActions = '';
   var isFav = articleNotes.isFavorite;
   toolbarActions += '<button onclick="toggleFavoriteFromHeader(this)" class="toolbar-action-btn' + (isFav ? ' active-fav' : '') + '" aria-label="' + (isFav ? 'Remove star' : 'Star article') + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-' + (isFav ? 'heart' : 'heart-o') + '"/></svg><span class="toolbar-action-label"> Star</span></button>';
@@ -272,134 +444,8 @@ function renderSocialCard(meta, body, filename, platform) {
     if (moreBtn) moreBtn.setAttribute('onclick', 'toggleMoreMenu(event)');
   }
 
-  // Avatar fallback: platform icon in colored circle
-  var avatarId = 'social-avatar-' + (author ? author.handle : 'unknown').replace(/[^a-zA-Z0-9-_.]/g, '_');
-  var fallbackSvg = platformIcon
-    ? '<div class="social-avatar-fallback" style="background:' + platformColor + '"><svg><use href="#' + platformIcon + '"/></svg></div>'
-    : '<div class="social-avatar-fallback" style="background:var(--muted)"></div>';
-
-  var handleDisplay = author ? ('@' + author.handle) : '';
-  // Show actual date/time for social posts
-  var timeStr = '';
-  var timeTitle = '';
-  if (meta.bookmarked) {
-    var d = new Date(meta.bookmarked);
-    if (!isNaN(d.getTime())) {
-      timeStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-        + ' ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-      timeTitle = d.toISOString();
-    }
-  }
-
-  // Body: fall back to excerpt or annotation when body is empty
-  var bodyText = body || meta.excerpt || meta.annotation || '';
-  // Strip quote-post placeholder from Bluesky feed content
-  bodyText = bodyText.replace(/\\?\[contains quote post or other embedded content\\?\]/gi, '').trim();
-
-  // Process body: escape HTML, linkify URLs, convert newlines
-  var bodyHtml = escapeHtml(bodyText).replace(
-    /(https?:\/\/[^\s<]+)/g,
-    '<a href="$1" onclick="event.stopPropagation();prOpenExternal(\'$1\');return false">$1</a>'
-  );
-  bodyHtml = bodyHtml.replace(/\n/g, '<br>');
-
-  var html = '<div class="article-header"></div>';
-  html += '<div class="social-card">';
-
-  // Header: avatar + author info
-  html += '<div class="social-card-header">';
-  html += '<div class="social-avatar" id="' + avatarId + '">' + fallbackSvg + '</div>';
-  html += '<div class="social-author">';
-  html += '<div class="social-author-name">' + escapeHtml(author ? author.displayName : '') + '</div>';
-  html += '<div class="social-author-meta">';
-  html += '<span>' + escapeHtml(handleDisplay) + '</span>';
-  if (timeStr) html += '<span>&middot;</span><span title="' + escapeHtml(timeTitle) + '">' + escapeHtml(timeStr) + '</span>';
-  if (platformIcon) html += '<span>&middot;</span><svg style="fill:' + platformColor + '"><use href="#' + platformIcon + '"/></svg>';
-  html += '</div></div></div>';
-
-  // Body
-  html += '<div class="social-card-body">' + bodyHtml + '</div>';
-
-  // Footer: link to original
-  if (meta.url) {
-    html += '<div class="social-card-footer">';
-    html += '<a href="#" onclick="event.preventDefault();prOpenExternal(\'' + escapeJsStr(meta.url) + '\')">';
-    if (platformIcon) html += '<svg style="fill:' + platformColor + '"><use href="#' + platformIcon + '"/></svg>';
-    html += 'View on ' + escapeHtml(platformName);
-    html += ' <svg><use href="#i-external"/></svg></a>';
-    html += '</div>';
-  }
-
-  // Tags inside the card
-  html += '<div class="social-card-tags" id="header-tags"></div>';
-
-  html += '</div>';
-
-  el.innerHTML = html;
-  el.scrollTop = 0;
-
-  // Populate tags
-  renderNotesPanel();
-
-  // Async: fetch real avatar and replace fallback
-  if (author && author.handle) {
-    fetchSocialAvatar(author.handle, platform, author.instance).then(function(avatarUrl) {
-      if (!avatarUrl) return;
-      var avatarEl = document.getElementById(avatarId);
-      if (!avatarEl) return;
-      var img = document.createElement('img');
-      img.alt = '';
-      img.src = avatarUrl;
-      img.onerror = function() { avatarEl.innerHTML = fallbackSvg; };
-      avatarEl.innerHTML = '';
-      avatarEl.appendChild(img);
-    });
-  }
-
-  // Async: fetch Bluesky thread data for engagement metrics and quoted posts
-  if (platform === 'bluesky' && author && author.handle && author.postId) {
-    fetchBskyThread(author.handle, author.postId).then(function(thread) {
-      if (!thread) return;
-      // Verify we're still viewing this article
-      if (activeFile !== filename) return;
-
-      // Update timestamp from API if available (more accurate than bookmarked date)
-      if (thread.createdAt) {
-        var metaEl = el.querySelector('.social-author-meta');
-        if (metaEl) {
-          var td = new Date(thread.createdAt);
-          if (!isNaN(td.getTime())) {
-            var newTime = td.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-              + ' ' + td.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-            var spans = metaEl.querySelectorAll('span');
-            // Find the time span (second text span after the dot separator)
-            for (var si = 0; si < spans.length; si++) {
-              if (spans[si].hasAttribute('title')) {
-                spans[si].textContent = newTime;
-                spans[si].title = td.toISOString();
-                break;
-              }
-            }
-          }
-        }
-      }
-
-      // Insert engagement bar before footer
-      var engHtml = renderEngagementBar(thread, meta.url);
-      if (engHtml) {
-        var footer = el.querySelector('.social-card-footer');
-        if (footer) {
-          footer.insertAdjacentHTML('beforebegin', engHtml);
-        }
-      }
-
-      // Insert quoted post after body
-      if (thread.quotedPost) {
-        var bodyEl = el.querySelector('.social-card-body');
-        if (bodyEl) {
-          bodyEl.insertAdjacentHTML('afterend', renderQuotedPost(thread.quotedPost));
-        }
-      }
-    });
-  }
+  // Create and render the web component
+  el.innerHTML = '<pr-social-card></pr-social-card>';
+  var card = el.querySelector('pr-social-card');
+  card.render(meta, body, filename, platform);
 }
