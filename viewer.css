@@ -2277,6 +2277,22 @@
     width: 16px;
     height: 16px;
   }
+  .social-engagement-link {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 12px;
+  }
+  .social-engagement-link:hover {
+    color: var(--link);
+  }
+  .social-engagement-link svg {
+    width: 12px;
+    height: 12px;
+  }
   .social-quote-post {
     margin-top: 12px;
     border: 1px solid var(--border);
