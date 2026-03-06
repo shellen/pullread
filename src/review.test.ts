@@ -189,6 +189,16 @@ describe('generateBriefing', () => {
     expect(prompt).not.toContain('Excluded Article');
   });
 
+  test('prompt forbids generic preamble text before the briefing content', async () => {
+    mockListFiles.mockReturnValue(['/tmp/test/a.md']);
+    mockReadFile.mockReturnValueOnce(makeFrontmatter('Test Title', 'test.com', today) as any);
+    mockSummarize.mockResolvedValue({ summary: 'Brief', model: 'test' });
+
+    await generateBriefing('/tmp/test', 1);
+    const prompt = mockSummarize.mock.calls[0][0];
+    expect(prompt).toMatch(/do not.*preamble|no.*introductory|dive straight|start immediately/i);
+  });
+
   test('includes trending categories in prompt when articles have categories', async () => {
     const fm = (title: string, domain: string, cats: string[]) =>
       `---\ntitle: "${title}"\nurl: "https://${domain}/article"\nbookmarked: ${today}\ndomain: ${domain}\ncategories: ${JSON.stringify(cats)}\n---\nBody`;

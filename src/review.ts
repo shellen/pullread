@@ -297,6 +297,8 @@ If there's a video, podcast, or other media item, call out the type — e.g., "t
 
 Tone: be somber and respectful when mentioning death, tragedy, or loss. Never sound excited about bad news.
 
+Do NOT start with a preamble or introductory sentence like "Here is a summary of the article queue" — dive straight into the content.
+
 Do NOT use generic summarizing language like "underscoring the human impact" or "highlighting broader themes." Be specific — say what the article is actually about.
 
 Articles:

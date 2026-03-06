@@ -330,8 +330,8 @@ function loadBriefing(forceRefresh) {
     } catch (e) { /* fall through to fetch */ }
   }
 
-  // Show skeleton
-  body.innerHTML = '<div class="briefing-skeleton"><div class="skeleton-line w80"></div><div class="skeleton-line w60"></div><div class="skeleton-line w90"></div><div class="skeleton-line w70"></div></div>';
+  // Show generating status with skeleton
+  body.innerHTML = '<p class="briefing-generating">Generating your briefing\u2026</p><div class="briefing-skeleton"><div class="skeleton-line w80"></div><div class="skeleton-line w60"></div><div class="skeleton-line w90"></div><div class="skeleton-line w70"></div></div>';
 
   var excludeParam = (window._deckFilenames || []).join(',');
   fetch('/api/briefing?days=1' + (excludeParam ? '&exclude=' + encodeURIComponent(excludeParam) : ''))
@@ -358,8 +358,10 @@ function renderBriefing(data) {
   var body = document.getElementById('rundown-briefing-body');
   if (!body) return;
 
+  // Strip generic preamble lines LLMs sometimes prepend
+  var briefingText = data.briefing.replace(/^(?:here\s+is|below\s+is|this\s+is)\s+(?:a\s+)?(?:summary|overview|briefing|rundown)[^\n]*\n+/i, '');
+
   // Fix bare article-N references the LLM sometimes emits without link syntax
-  var briefingText = data.briefing;
   if (data.articles && data.articles.length > 0) {
     briefingText = briefingText.replace(/(?<!\[.*?)(?<!\(#)(?<!\/#)\barticle-(\d+)\b(?![^[]*\])/gi, function(match, num) {
       var idx = parseInt(num, 10) - 1;
