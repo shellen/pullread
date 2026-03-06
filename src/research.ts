@@ -1,18 +1,12 @@
 // ABOUTME: Knowledge graph storage — initializes and manages the research PDS
-// ABOUTME: Wraps loxodonta-core's PDS for entity, mention, edge, and extraction records
+// ABOUTME: Stores entities, mentions, edges, and extraction records in SQLite
 
 import { join, basename } from 'path';
 import { homedir } from 'os';
 import { readFileSync } from 'fs';
 import { summarizeText } from './summarizer';
 import { listMarkdownFiles } from './writer';
-
-// Build module paths at runtime to prevent the bundler from statically resolving
-// transitive native dependencies (e.g. sqlite-vec in resolve/index.js)
-const _loxBase = ['loxodonta-core-monorepo', 'packages', 'loxodonta-core', 'src'].join('/');
-const _loxModule = (mod: string) => require(`${_loxBase}/${mod}`);
-
-const { createPDS } = _loxModule('storage/index.js');
+import { createPDS } from './research-db';
 
 type PDS = ReturnType<typeof createPDS>;
 
@@ -119,6 +113,11 @@ ${article.body.slice(0, 8000)}`;
 
   return parsed;
 }
+
+// Dynamic require for optional loxodonta-core modules (embeddings, resolver, graph)
+// that pull in native deps like sqlite-vec — only loaded when actually called
+const _loxBase = ['loxodonta-core-monorepo', 'packages', 'loxodonta-core', 'src'].join('/');
+const _loxModule = (mod: string) => require(`${_loxBase}/${mod}`);
 
 export function initResolver(
   pds: PDS,
