@@ -2261,6 +2261,59 @@
     width: 14px;
     height: 14px;
   }
+  .social-engagement {
+    display: flex;
+    gap: 16px;
+    padding: 12px 0 4px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .social-engagement span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .social-engagement-icon {
+    width: 16px;
+    height: 16px;
+  }
+  .social-quote-post {
+    margin-top: 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    background: var(--bg-secondary, var(--bg));
+  }
+  .social-quote-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+    font-size: 13px;
+  }
+  .social-quote-avatar {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+  .social-quote-author {
+    font-weight: 600;
+    color: var(--fg);
+  }
+  .social-quote-handle {
+    color: var(--muted);
+  }
+  .social-quote-body {
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--fg);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .social-quote-body a {
+    color: var(--link);
+  }
   .article-hero {
     margin: 16px 0 20px;
   }
