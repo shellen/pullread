@@ -858,7 +858,6 @@ function sidebarNavFilter(filter) {
     return;
   } else if (filter === 'research') {
     closeDrawer();
-    switchSidebarView('home');
     showResearch();
     return;
   } else if (filter === 'notebook') {
