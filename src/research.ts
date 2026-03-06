@@ -1,9 +1,11 @@
 // ABOUTME: Knowledge graph storage — initializes and manages the research PDS
 // ABOUTME: Wraps loxodonta-core's PDS for entity, mention, edge, and extraction records
 
-import { join } from 'path';
+import { join, basename } from 'path';
 import { homedir } from 'os';
+import { readFileSync } from 'fs';
 import { summarizeText } from './summarizer';
+import { listMarkdownFiles } from './writer';
 
 // Import storage directly to avoid pulling in server dependencies (express, cors)
 const { createPDS } = require('loxodonta-core-monorepo/packages/loxodonta-core/src/storage/index.js');
@@ -138,4 +140,49 @@ export function initResolver(
 export function createResearchGraph(pds: PDS) {
   const { createGraph } = require('loxodonta-core-monorepo/packages/loxodonta-core/src/graph/index.js');
   return createGraph(pds);
+}
+
+function parseFrontmatterTitle(text: string): { title: string; body: string } | null {
+  const match = text.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)/);
+  if (!match) return null;
+  const titleMatch = match[1].match(/^title:\s*"?(.+?)"?\s*$/m);
+  return { title: titleMatch ? titleMatch[1] : 'Untitled', body: match[2] };
+}
+
+export async function runBackgroundExtraction(
+  pds: PDS,
+  outputPath: string,
+): Promise<{ extracted: number; skipped: number; errors: number }> {
+  const allPaths = listMarkdownFiles(outputPath);
+  const extracted = pds.listRecords('app.pullread.extraction');
+  const extractedSet = new Set(extracted.map((r: any) => r.value.filename));
+
+  let extractedCount = 0;
+  let skipped = 0;
+  let errors = 0;
+
+  for (const filePath of allPaths) {
+    const filename = basename(filePath);
+    if (filename.startsWith('_')) { skipped++; continue; }
+    if (extractedSet.has(filename)) { skipped++; continue; }
+
+    try {
+      const text = readFileSync(filePath, 'utf-8');
+      const parsed = parseFrontmatterTitle(text);
+      if (!parsed) { skipped++; continue; }
+
+      await extractArticle(pds, {
+        filename,
+        title: parsed.title,
+        body: parsed.body,
+        source: 'feed',
+      });
+      extractedCount++;
+    } catch (err) {
+      errors++;
+      console.log(`  Research extraction failed for ${filename}: ${err instanceof Error ? err.message : err}`);
+    }
+  }
+
+  return { extracted: extractedCount, skipped, errors };
 }

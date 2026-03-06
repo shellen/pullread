@@ -1,13 +1,26 @@
 // ABOUTME: Tests for research knowledge graph — PDS lifecycle, extraction, entity queries
 // ABOUTME: Verifies createResearchPDS initializes storage and closes without error
 
-import { createResearchPDS, extractArticle } from './research';
+import { createResearchPDS, extractArticle, runBackgroundExtraction } from './research';
 import { summarizeText } from './summarizer';
+import { listMarkdownFiles } from './writer';
+import { readFileSync } from 'fs';
 
 jest.mock('./summarizer', () => ({
   summarizeText: jest.fn(),
 }));
 const mockSummarize = summarizeText as jest.MockedFunction<typeof summarizeText>;
+
+jest.mock('./writer', () => ({
+  listMarkdownFiles: jest.fn(),
+}));
+const mockListFiles = listMarkdownFiles as jest.MockedFunction<typeof listMarkdownFiles>;
+
+jest.mock('fs', () => {
+  const actual = jest.requireActual('fs');
+  return { ...actual, readFileSync: jest.fn() };
+});
+const mockReadFile = readFileSync as jest.MockedFunction<typeof readFileSync>;
 
 describe('createResearchPDS', () => {
   test('creates PDS with in-memory database', () => {
@@ -76,6 +89,45 @@ describe('entity resolution', () => {
     const { initResolver } = require('./research');
     const resolver = initResolver(pds, null);
     expect(resolver).toBeNull();
+    pds.close();
+  });
+});
+
+describe('runBackgroundExtraction', () => {
+  beforeEach(() => {
+    mockSummarize.mockReset();
+    mockListFiles.mockReset();
+    mockReadFile.mockReset();
+  });
+
+  test('extracts unprocessed articles and skips already-extracted ones', async () => {
+    const pds = createResearchPDS(':memory:');
+    pds.putRecord('app.pullread.extraction', null, {
+      filename: 'already-done.md',
+      extractedAt: new Date().toISOString(),
+    });
+
+    mockListFiles.mockReturnValue(['/tmp/articles/already-done.md', '/tmp/articles/new-article.md']);
+    mockReadFile.mockImplementation((path: any) => {
+      if (String(path).includes('new-article')) {
+        return '---\ntitle: "New Article"\nurl: "https://example.com"\n---\nArticle body text' as any;
+      }
+      return '---\ntitle: "Done"\nurl: "https://done.com"\n---\nDone' as any;
+    });
+
+    mockSummarize.mockResolvedValue({
+      summary: JSON.stringify({
+        entities: [{ name: 'Example Corp', type: 'company' }],
+        relationships: [],
+        themes: ['tech'],
+      }),
+      model: 'test',
+    });
+
+    const stats = await runBackgroundExtraction(pds, '/tmp/articles');
+    expect(stats.extracted).toBe(1);
+    expect(stats.skipped).toBe(1);
+    expect(mockSummarize).toHaveBeenCalledTimes(1);
     pds.close();
   });
 });

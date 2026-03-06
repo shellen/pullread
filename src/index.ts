@@ -463,6 +463,19 @@ async function sync(feedFilter?: string, retryFailed = false): Promise<void> {
       }
     }
 
+    // Background research extraction
+    try {
+      const { getResearchPDS, runBackgroundExtraction, closeResearchPDS } = await import('./research');
+      const researchPds = getResearchPDS();
+      const stats = await runBackgroundExtraction(researchPds, config.outputPath);
+      if (stats.extracted > 0) {
+        console.log(`  Research: extracted ${stats.extracted} articles (${stats.skipped} skipped, ${stats.errors} errors)`);
+      }
+      closeResearchPDS();
+    } catch (err) {
+      console.log(`  Research extraction skipped: ${err instanceof Error ? err.message : err}`);
+    }
+
   } finally {
     clearSyncProgress();
     storage.close();
