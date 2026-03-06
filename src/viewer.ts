@@ -2452,6 +2452,56 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
       return;
     }
 
+    // Research API
+    if (url.pathname === '/api/research/entities' && req.method === 'GET') {
+      const { getResearchPDS, queryEntities } = await import('./research');
+      const pds = getResearchPDS();
+      const results = queryEntities(pds, {
+        search: url.searchParams.get('search') || undefined,
+        type: url.searchParams.get('type') || undefined,
+        limit: url.searchParams.get('limit') ? parseInt(url.searchParams.get('limit')!, 10) : undefined,
+      });
+      sendJson(res, results);
+      return;
+    }
+
+    if (url.pathname.startsWith('/api/research/entity/') && req.method === 'GET') {
+      const parts = url.pathname.split('/');
+      const rkey = parts[4];
+      const { getResearchPDS, queryEntityProfile } = await import('./research');
+      const pds = getResearchPDS();
+      const profile = queryEntityProfile(pds, rkey);
+      if (!profile) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Entity not found' }));
+        return;
+      }
+      sendJson(res, profile);
+      return;
+    }
+
+    if (url.pathname.startsWith('/api/research/related/') && req.method === 'GET') {
+      const filename = decodeURIComponent(url.pathname.split('/').pop()!);
+      const { getResearchPDS, queryRelatedEntities } = await import('./research');
+      const pds = getResearchPDS();
+      const entities = queryRelatedEntities(pds, filename);
+      sendJson(res, entities);
+      return;
+    }
+
+    if (url.pathname === '/api/research/status' && req.method === 'GET') {
+      const { getResearchPDS } = await import('./research');
+      const pds = getResearchPDS();
+      const extractions = pds.listRecords('app.pullread.extraction');
+      sendJson(res, {
+        extractedCount: extractions.length,
+        lastExtraction: extractions.length > 0
+          ? extractions[extractions.length - 1].value.extractedAt
+          : null,
+      });
+      return;
+    }
+
     send404(res);
   });
 

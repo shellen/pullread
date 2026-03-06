@@ -1,7 +1,7 @@
 // ABOUTME: Tests for research knowledge graph — PDS lifecycle, extraction, entity queries
 // ABOUTME: Verifies createResearchPDS initializes storage and closes without error
 
-import { createResearchPDS, extractArticle, runBackgroundExtraction } from './research';
+import { createResearchPDS, extractArticle, runBackgroundExtraction, queryEntities, queryEntityProfile, queryRelatedEntities } from './research';
 import { summarizeText } from './summarizer';
 import { listMarkdownFiles } from './writer';
 import { readFileSync } from 'fs';
@@ -128,6 +128,74 @@ describe('runBackgroundExtraction', () => {
     expect(stats.extracted).toBe(1);
     expect(stats.skipped).toBe(1);
     expect(mockSummarize).toHaveBeenCalledTimes(1);
+    pds.close();
+  });
+});
+
+describe('graph queries', () => {
+  test('queryEntities returns entities sorted by mention count', () => {
+    const pds = createResearchPDS(':memory:');
+    pds.putRecord('app.pullread.entity', null, { name: 'Apple', type: 'company' });
+    pds.putRecord('app.pullread.entity', null, { name: 'Google', type: 'company' });
+    pds.putRecord('app.pullread.mention', null, { entityName: 'Apple', filename: 'a.md', title: 'A' });
+    pds.putRecord('app.pullread.mention', null, { entityName: 'Apple', filename: 'b.md', title: 'B' });
+    pds.putRecord('app.pullread.mention', null, { entityName: 'Google', filename: 'c.md', title: 'C' });
+
+    const results = queryEntities(pds, {});
+    expect(results[0].name).toBe('Apple');
+    expect(results[0].mentionCount).toBe(2);
+    expect(results[1].name).toBe('Google');
+    expect(results[1].mentionCount).toBe(1);
+    pds.close();
+  });
+
+  test('queryEntities filters by search term', () => {
+    const pds = createResearchPDS(':memory:');
+    pds.putRecord('app.pullread.entity', null, { name: 'Apple', type: 'company' });
+    pds.putRecord('app.pullread.entity', null, { name: 'Google', type: 'company' });
+
+    const results = queryEntities(pds, { search: 'app' });
+    expect(results.length).toBe(1);
+    expect(results[0].name).toBe('Apple');
+    pds.close();
+  });
+
+  test('queryEntities filters by type', () => {
+    const pds = createResearchPDS(':memory:');
+    pds.putRecord('app.pullread.entity', null, { name: 'Apple', type: 'company' });
+    pds.putRecord('app.pullread.entity', null, { name: 'Tim Cook', type: 'person' });
+
+    const results = queryEntities(pds, { type: 'person' });
+    expect(results.length).toBe(1);
+    expect(results[0].name).toBe('Tim Cook');
+    pds.close();
+  });
+
+  test('queryEntityProfile returns entity with mentions and edges', () => {
+    const pds = createResearchPDS(':memory:');
+    const record = pds.putRecord('app.pullread.entity', null, { name: 'Apple', type: 'company' });
+    const rkey = record.rkey;
+    pds.putRecord('app.pullread.mention', null, { entityName: 'Apple', filename: 'a.md', title: 'Article A' });
+    pds.putRecord('app.pullread.edge', null, { from: 'Apple', to: 'Tim Cook', type: 'employs', sourceFilename: 'a.md' });
+
+    const profile = queryEntityProfile(pds, rkey);
+    expect(profile).not.toBeNull();
+    expect(profile!.entity.name).toBe('Apple');
+    expect(profile!.mentions.length).toBe(1);
+    expect(profile!.edges.length).toBe(1);
+    pds.close();
+  });
+
+  test('queryRelatedEntities returns entities mentioned in a file', () => {
+    const pds = createResearchPDS(':memory:');
+    pds.putRecord('app.pullread.entity', null, { name: 'Apple', type: 'company' });
+    pds.putRecord('app.pullread.entity', null, { name: 'Google', type: 'company' });
+    pds.putRecord('app.pullread.mention', null, { entityName: 'Apple', filename: 'a.md', title: 'A' });
+    pds.putRecord('app.pullread.mention', null, { entityName: 'Google', filename: 'b.md', title: 'B' });
+
+    const related = queryRelatedEntities(pds, 'a.md');
+    expect(related.length).toBe(1);
+    expect(related[0].name).toBe('Apple');
     pds.close();
   });
 });
