@@ -25,5 +25,8 @@ data/*.db
 # Downloaded fonts for image generation
 scripts/fonts/
 
+# Pongogo logs
+.pongogo/logs/
+
 # OS files
 .DS_Store
