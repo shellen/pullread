@@ -8,3 +8,6 @@
 2026-03-05 15:11:57,051 [INFO] mcp_server.hooks.pretooluse_compliance_hook: Intent detected: mutation (tool=Bash, pattern=rm )
 2026-03-05 16:21:47,660 [INFO] mcp_server.hooks.pretooluse_compliance_hook: Intent detected: mutation (tool=Bash, pattern=rm )
 2026-03-05 16:50:11,067 [INFO] mcp_server.hooks.pretooluse_compliance_hook: Intent detected: mutation (tool=Bash, pattern=rm )
+2026-03-05 17:18:42,689 [INFO] mcp_server.hooks.pretooluse_compliance_hook: Intent detected: commit_closure (tool=Bash, pattern=Closes #)
+2026-03-05 17:18:54,360 [INFO] mcp_server.hooks.pretooluse_compliance_hook: Intent detected: closure (tool=Bash, pattern=gh issue close)
+2026-03-05 17:18:56,295 [INFO] mcp_server.hooks.pretooluse_compliance_hook: Intent detected: closure (tool=Bash, pattern=gh issue close)
