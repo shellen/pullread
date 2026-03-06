@@ -162,6 +162,17 @@ describe('generateBriefing', () => {
     expect(prompt).not.toContain('biggest');
   });
 
+  test('prompt forbids "here" as link text and bare article-N references', async () => {
+    mockListFiles.mockReturnValue(['/tmp/test/a.md']);
+    mockReadFile.mockReturnValueOnce(makeFrontmatter('Test Title', 'test.com', today) as any);
+    mockSummarize.mockResolvedValue({ summary: 'Brief', model: 'test' });
+
+    await generateBriefing('/tmp/test', 1);
+    const prompt = mockSummarize.mock.calls[0][0];
+    expect(prompt).toMatch(/never.*\bhere\b/i);
+    expect(prompt).toMatch(/never.*bare.*article-/i);
+  });
+
   test('excludes articles by filename when excludeFilenames provided', async () => {
     mockListFiles.mockReturnValue(['/tmp/test/keep.md', '/tmp/test/exclude-me.md']);
     mockReadFile

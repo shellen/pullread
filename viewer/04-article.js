@@ -358,16 +358,33 @@ function renderBriefing(data) {
   var body = document.getElementById('rundown-briefing-body');
   if (!body) return;
 
-  var html = sanitizeHtml(marked.parse(cleanMarkdown(data.briefing)));
+  // Fix bare article-N references the LLM sometimes emits without link syntax
+  var briefingText = data.briefing;
+  if (data.articles && data.articles.length > 0) {
+    briefingText = briefingText.replace(/(?<!\[.*?)(?<!\(#)(?<!\/#)\barticle-(\d+)\b(?![^[]*\])/gi, function(match, num) {
+      var idx = parseInt(num, 10) - 1;
+      if (idx >= 0 && idx < data.articles.length) {
+        return '[' + data.articles[idx].title + '](#article-' + num + ')';
+      }
+      return match;
+    });
+  }
+
+  var html = sanitizeHtml(marked.parse(cleanMarkdown(briefingText)));
   body.innerHTML = html;
 
-  // Post-process: convert article:N links to clickable article openers
+  // Post-process: convert article links to clickable article openers
   if (data.articles && data.articles.length > 0) {
     var links = body.querySelectorAll('a[href^="#article-"]');
     for (var li = 0; li < links.length; li++) {
       var href = links[li].getAttribute('href');
       var idx = parseInt(href.replace('#article-', ''), 10) - 1;
       if (idx >= 0 && idx < data.articles.length && data.articles[idx].filename) {
+        // Replace generic link text ("here", "this article", etc.) with the actual title
+        var text = links[li].textContent.trim().toLowerCase();
+        if (text === 'here' || text === 'this' || text === 'this article' || text === 'link') {
+          links[li].textContent = data.articles[idx].title;
+        }
         links[li].className = 'briefing-article-link';
         links[li].setAttribute('data-filename', data.articles[idx].filename);
         links[li].removeAttribute('href');

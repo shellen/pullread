@@ -288,6 +288,8 @@ Write about two paragraphs of flowing prose with no headings — no #, no ##. Ke
 
 LINKING RULE — THIS IS CRITICAL: Every article you mention MUST be a markdown link in this exact format: [exact title](#article-N) where N is the article's number from the list below. Copy the title exactly. Example: if article 3 is "Apple Does Fusion", write [Apple Does Fusion](#article-3) in your text. Do NOT use bold, quotes, or any other format for article titles — always use this link format. This creates clickable links in the UI.
 
+NEVER use "here" as link text — e.g., WRONG: "read about it [here](#article-3)". The article title IS the link. NEVER write bare article-N references without the markdown link syntax — e.g., WRONG: "see article-3".
+
 When articles share a theme, group them naturally. Name the author or publication when it adds credibility (e.g., "Om Malik digs into fusion energy in [Apple Does Fusion](#article-3)").
 
 If there's a video, podcast, or other media item, call out the type — e.g., "there's a Daily Show clip, [Episode Title Here](#article-5)".
