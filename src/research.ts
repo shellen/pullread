@@ -7,8 +7,12 @@ import { readFileSync } from 'fs';
 import { summarizeText } from './summarizer';
 import { listMarkdownFiles } from './writer';
 
-// Import storage directly to avoid pulling in server dependencies (express, cors)
-const { createPDS } = require('loxodonta-core-monorepo/packages/loxodonta-core/src/storage/index.js');
+// Build module paths at runtime to prevent the bundler from statically resolving
+// transitive native dependencies (e.g. sqlite-vec in resolve/index.js)
+const _loxBase = ['loxodonta-core-monorepo', 'packages', 'loxodonta-core', 'src'].join('/');
+const _loxModule = (mod: string) => require(`${_loxBase}/${mod}`);
+
+const { createPDS } = _loxModule('storage/index.js');
 
 type PDS = ReturnType<typeof createPDS>;
 
@@ -122,9 +126,9 @@ export function initResolver(
 ) {
   if (!geminiApiKey) return null;
 
-  const { createEmbedder } = require('loxodonta-core-monorepo/packages/loxodonta-core/src/embeddings/index.js');
-  const { geminiEmbeddings } = require('loxodonta-core-monorepo/packages/loxodonta-core/src/embeddings/gemini.js');
-  const { createResolver } = require('loxodonta-core-monorepo/packages/loxodonta-core/src/resolve/index.js');
+  const { createEmbedder } = _loxModule('embeddings/index.js');
+  const { geminiEmbeddings } = _loxModule('embeddings/gemini.js');
+  const { createResolver } = _loxModule('resolve/index.js');
 
   const embedder = createEmbedder({
     provider: geminiEmbeddings({
@@ -138,7 +142,7 @@ export function initResolver(
 }
 
 export function createResearchGraph(pds: PDS) {
-  const { createGraph } = require('loxodonta-core-monorepo/packages/loxodonta-core/src/graph/index.js');
+  const { createGraph } = _loxModule('graph/index.js');
   return createGraph(pds);
 }
 

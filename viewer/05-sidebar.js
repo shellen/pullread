@@ -856,6 +856,11 @@ function sidebarNavFilter(filter) {
     closeDrawer();
     switchSidebarView('home');
     return;
+  } else if (filter === 'research') {
+    closeDrawer();
+    switchSidebarView('home');
+    showResearch();
+    return;
   } else if (filter === 'notebook') {
     closeDrawer();
     switchSidebarView('notebooks');

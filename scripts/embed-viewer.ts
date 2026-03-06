@@ -88,6 +88,7 @@ const CHEVRON_ATTRS = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 const ICON_MAP: Array<{ id: string; file: string; variant?: 'solid' | 'chevron' }> = [
   { id: 'i-backward', file: 'backward.svg' },
   { id: 'i-bars', file: 'bars-3.svg' },
+  { id: 'i-beaker', file: 'beaker.svg' },
   { id: 'i-book', file: 'book-open.svg' },
   { id: 'i-bookmark', file: 'bookmark.svg' },
   { id: 'i-calendar', file: 'calendar.svg' },

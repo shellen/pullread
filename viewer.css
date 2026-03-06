@@ -6797,3 +6797,142 @@
     }
   }
 
+  /* ---- Research tab ---- */
+  .research-layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    min-height: 400px;
+  }
+  .research-panel {
+    background: var(--bg);
+    padding: 16px;
+  }
+  .research-entity-list {
+    overflow-y: auto;
+    max-height: 70vh;
+  }
+  .research-search-bar { margin-bottom: 10px; }
+  .research-search-bar input {
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--fg);
+    font-size: 13px;
+    box-sizing: border-box;
+  }
+  .research-search-bar input:focus {
+    outline: none;
+    border-color: var(--link);
+  }
+  .research-type-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 10px;
+  }
+  .research-type-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--muted);
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .research-type-btn.active {
+    background: var(--link);
+    color: #fff;
+    border-color: var(--link);
+  }
+  .research-type-btn:hover:not(.active) {
+    border-color: var(--fg);
+    color: var(--fg);
+  }
+  .research-type-count { opacity: 0.7; }
+  .research-entity-items { display: flex; flex-direction: column; }
+  .research-entity-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .research-entity-row:hover { background: color-mix(in srgb, var(--fg) 5%, var(--bg)); }
+  .research-entity-row.active { background: color-mix(in srgb, var(--link) 10%, var(--bg)); }
+  .research-entity-name { flex: 1; font-weight: 500; }
+  .research-entity-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 5px;
+    padding: 2px 7px;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: capitalize;
+    background: color-mix(in srgb, var(--fg) 8%, transparent);
+    color: var(--muted);
+  }
+  .research-type-person { background: color-mix(in srgb, #3b82f6 12%, var(--bg)); color: #3b82f6; }
+  .research-type-company { background: color-mix(in srgb, #8b5cf6 12%, var(--bg)); color: #8b5cf6; }
+  .research-type-technology { background: color-mix(in srgb, #10b981 12%, var(--bg)); color: #10b981; }
+  .research-type-place { background: color-mix(in srgb, #f59e0b 12%, var(--bg)); color: #f59e0b; }
+  .research-type-event { background: color-mix(in srgb, #ef4444 12%, var(--bg)); color: #ef4444; }
+  .research-type-concept { background: color-mix(in srgb, #6366f1 12%, var(--bg)); color: #6366f1; }
+  .research-mention-count {
+    font-size: 11px;
+    color: var(--muted);
+    min-width: 20px;
+    text-align: right;
+  }
+  .research-detail h2 {
+    margin: 0 0 8px;
+    font-size: 20px;
+    font-weight: 600;
+  }
+  .research-detail h3 {
+    margin: 20px 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+  }
+  .research-mention-list, .research-edge-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .research-mention-list li, .research-edge-list li {
+    padding: 6px 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+    font-size: 13px;
+  }
+  .research-mention-list a { color: var(--link); text-decoration: none; }
+  .research-mention-list a:hover { text-decoration: underline; }
+  .research-edge-name { font-weight: 500; }
+  .research-edge-type {
+    font-size: 11px;
+    color: var(--muted);
+    margin-left: 6px;
+  }
+
+  @media (max-width: 768px) {
+    .research-layout {
+      grid-template-columns: 1fr;
+    }
+    .research-entity-list {
+      max-height: 40vh;
+    }
+  }
+
