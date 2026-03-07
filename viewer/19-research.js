@@ -38,6 +38,10 @@ function showResearch() {
 
 function researchRenderBrowser() {
   var html = '<div class="article-header"><h1>Research</h1></div>';
+
+  // Tensions section
+  html += '<div id="research-tensions"></div>';
+
   html += '<div class="research-layout">';
 
   // Entity list panel
@@ -60,6 +64,7 @@ function researchRenderBrowser() {
   content.innerHTML = html;
   document.getElementById('content-scroll').scrollTop = 0;
   researchLoadEntities();
+  researchLoadTensions();
 }
 
 function researchShowEmptyState(status) {
@@ -230,7 +235,16 @@ function researchRenderDetail(profile) {
     html += '<h3>Mentioned in</h3><ul class="research-mention-list">';
     for (var i = 0; i < profile.mentions.length; i++) {
       var m = profile.mentions[i];
-      html += '<li><a href="#" onclick="loadFileByName(\'' + escapeJsStr(m.value.filename) + '\');return false">' + escapeHtml(m.value.title) + '</a></li>';
+      var sentiment = m.value.sentiment || 'neutral';
+      var dot = sentiment === 'positive' ? 'research-sentiment-positive'
+        : sentiment === 'negative' ? 'research-sentiment-negative'
+        : sentiment === 'mixed' ? 'research-sentiment-mixed'
+        : 'research-sentiment-neutral';
+      html += '<li>';
+      html += '<span class="research-sentiment-dot ' + dot + '"></span>';
+      html += '<a href="#" onclick="loadFileByName(\'' + escapeJsStr(m.value.filename) + '\');return false">' + escapeHtml(m.value.title) + '</a>';
+      if (m.value.stance) html += ' <span class="research-stance">' + escapeHtml(m.value.stance) + '</span>';
+      html += '</li>';
     }
     html += '</ul>';
   }
@@ -251,6 +265,61 @@ function researchRenderDetail(profile) {
   }
 
   container.innerHTML = html;
+}
+
+function researchLoadTensions() {
+  fetch('/api/research/tensions')
+    .then(function(r) { return r.json(); })
+    .then(function(tensions) {
+      researchRenderTensions(tensions);
+    })
+    .catch(function() {});
+}
+
+function researchRenderTensions(tensions) {
+  var container = document.getElementById('research-tensions');
+  if (!container || tensions.length === 0) {
+    if (container) container.innerHTML = '';
+    return;
+  }
+
+  var html = '<div class="research-tensions-section">';
+  html += '<h3>Tensions</h3>';
+  html += '<div class="research-tensions-cards">';
+
+  var limit = Math.min(tensions.length, 5);
+  for (var i = 0; i < limit; i++) {
+    var t = tensions[i];
+    html += '<div class="research-tension-card" onclick="researchSearchFor(\'' + escapeJsStr(t.entityName) + '\')">';
+    html += '<div class="research-tension-header">';
+    html += '<span class="research-tension-name">' + escapeHtml(t.entityName) + '</span>';
+    html += '<span class="research-entity-badge research-type-' + escapeHtml(t.entityType) + '">' + escapeHtml(t.entityType) + '</span>';
+    html += '</div>';
+
+    // Show opposing stances
+    var posStance = researchPickStance(t.positive);
+    var negStance = researchPickStance(t.negative);
+    if (posStance || negStance) {
+      html += '<div class="research-tension-stances">';
+      if (posStance) html += '<span class="research-tension-pos">' + escapeHtml(posStance) + '</span>';
+      if (posStance && negStance) html += '<span class="research-tension-vs">vs</span>';
+      if (negStance) html += '<span class="research-tension-neg">' + escapeHtml(negStance) + '</span>';
+      html += '</div>';
+    }
+
+    html += '<div class="research-tension-counts">' + t.mentionCount + ' mentions, ' + t.positive.length + ' positive, ' + t.negative.length + ' negative</div>';
+    html += '</div>';
+  }
+
+  html += '</div></div>';
+  container.innerHTML = html;
+}
+
+function researchPickStance(mentions) {
+  for (var i = 0; i < mentions.length; i++) {
+    if (mentions[i].stance) return mentions[i].stance;
+  }
+  return null;
 }
 
 function researchSearchFor(name) {

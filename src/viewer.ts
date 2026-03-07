@@ -2507,6 +2507,14 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
       return;
     }
 
+    if (url.pathname === '/api/research/tensions' && req.method === 'GET') {
+      const { getResearchPDS, queryTensions } = await import('./research');
+      const pds = getResearchPDS();
+      const tensions = queryTensions(pds);
+      sendJson(res, tensions);
+      return;
+    }
+
     if (url.pathname === '/api/research/extract' && req.method === 'POST') {
       const { getResearchPDS, runBackgroundExtraction } = await import('./research');
       const pds = getResearchPDS();

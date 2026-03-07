@@ -6957,12 +6957,116 @@
     opacity: 0.7;
   }
 
+  /* Sentiment indicators */
+  .research-sentiment-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+    flex-shrink: 0;
+    position: relative;
+    top: -1px;
+  }
+  .research-sentiment-positive { background: #4ade80; }
+  .research-sentiment-negative { background: #f87171; }
+  .research-sentiment-mixed { background: #fbbf24; }
+  .research-sentiment-neutral { background: var(--border); }
+
+  .research-stance {
+    font-size: 11px;
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  .research-mention-list li {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+
+  /* Tensions section */
+  .research-tensions-section {
+    margin-bottom: 20px;
+    padding: 0 4px;
+  }
+  .research-tensions-section h3 {
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    margin: 0 0 10px;
+  }
+  .research-tensions-cards {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .research-tension-card {
+    flex: 0 0 auto;
+    min-width: 220px;
+    max-width: 300px;
+    background: var(--card-bg, var(--bg));
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .research-tension-card:hover {
+    border-color: var(--accent, #b8860b);
+  }
+  .research-tension-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .research-tension-name {
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .research-tension-stances {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    margin-bottom: 6px;
+    line-height: 1.4;
+  }
+  .research-tension-pos {
+    color: #4ade80;
+    font-style: italic;
+  }
+  .research-tension-neg {
+    color: #f87171;
+    font-style: italic;
+  }
+  .research-tension-vs {
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .research-tension-counts {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
   @media (max-width: 768px) {
     .research-layout {
       grid-template-columns: 1fr;
     }
     .research-entity-list {
       max-height: 40vh;
+    }
+    .research-tensions-cards {
+      flex-direction: column;
+    }
+    .research-tension-card {
+      max-width: none;
     }
   }
 

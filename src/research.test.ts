@@ -1,7 +1,7 @@
 // ABOUTME: Tests for research knowledge graph — PDS lifecycle, extraction, entity queries
 // ABOUTME: Verifies createResearchPDS initializes storage and closes without error
 
-import { createResearchPDS, extractArticle, runBackgroundExtraction, queryEntities, queryEntityProfile, queryRelatedEntities } from './research';
+import { createResearchPDS, extractArticle, runBackgroundExtraction, queryEntities, queryEntityProfile, queryRelatedEntities, queryTensions } from './research';
 import { summarizeText } from './summarizer';
 import { listMarkdownFiles } from './writer';
 import { readFileSync } from 'fs';
@@ -270,6 +270,125 @@ describe('graph queries', () => {
     const related = queryRelatedEntities(pds, 'a.md');
     expect(related.length).toBe(1);
     expect(related[0].name).toBe('Apple');
+    pds.close();
+  });
+});
+
+describe('sentiment extraction', () => {
+  beforeEach(() => mockSummarize.mockReset());
+
+  test('stores sentiment and stance on mention records', async () => {
+    const pds = createResearchPDS(':memory:');
+    mockSummarize.mockResolvedValue({
+      summary: JSON.stringify({
+        entities: [{ name: 'Apple', type: 'company', sentiment: 'positive', stance: 'innovative design' }],
+        relationships: [],
+        themes: ['technology'],
+      }),
+      model: 'test',
+    });
+
+    await extractArticle(pds, {
+      filename: 'sentiment-test.md',
+      title: 'Apple Review',
+      body: 'Apple has an innovative design.',
+      publishedAt: '2026-03-01T00:00:00Z',
+    });
+
+    const mentions = pds.listRecords('app.pullread.mention');
+    expect(mentions.length).toBe(1);
+    expect(mentions[0].value.sentiment).toBe('positive');
+    expect(mentions[0].value.stance).toBe('innovative design');
+    expect(mentions[0].value.publishedAt).toBe('2026-03-01T00:00:00Z');
+    pds.close();
+  });
+
+  test('defaults sentiment to neutral when not provided', async () => {
+    const pds = createResearchPDS(':memory:');
+    mockSummarize.mockResolvedValue({
+      summary: JSON.stringify({
+        entities: [{ name: 'Google', type: 'company' }],
+        relationships: [],
+        themes: [],
+      }),
+      model: 'test',
+    });
+
+    await extractArticle(pds, {
+      filename: 'no-sentiment.md',
+      title: 'Google News',
+      body: 'Google did a thing.',
+    });
+
+    const mentions = pds.listRecords('app.pullread.mention');
+    expect(mentions[0].value.sentiment).toBe('neutral');
+    expect(mentions[0].value.stance).toBeNull();
+    pds.close();
+  });
+});
+
+describe('tension detection', () => {
+  test('queryTensions surfaces entities with divergent sentiment', () => {
+    const pds = createResearchPDS(':memory:');
+    pds.putRecord('app.pullread.entity', null, { name: 'Macbook Neo', type: 'technology' });
+
+    pds.putRecord('app.pullread.mention', null, {
+      entityName: 'Macbook Neo', filename: 'a.md', title: 'Great Review',
+      sentiment: 'positive', stance: 'innovative design', publishedAt: '2026-03-01',
+    });
+    pds.putRecord('app.pullread.mention', null, {
+      entityName: 'Macbook Neo', filename: 'b.md', title: 'Thermal Issues',
+      sentiment: 'negative', stance: 'thermal throttling', publishedAt: '2026-03-02',
+    });
+    pds.putRecord('app.pullread.mention', null, {
+      entityName: 'Macbook Neo', filename: 'c.md', title: 'Neutral Take',
+      sentiment: 'positive', stance: 'sleek hardware', publishedAt: '2026-03-03',
+    });
+
+    const tensions = queryTensions(pds);
+    expect(tensions.length).toBe(1);
+    expect(tensions[0].entityName).toBe('Macbook Neo');
+    expect(tensions[0].positive.length).toBe(2);
+    expect(tensions[0].negative.length).toBe(1);
+    expect(tensions[0].negative[0].stance).toBe('thermal throttling');
+    pds.close();
+  });
+
+  test('does not flag entities with uniform sentiment', () => {
+    const pds = createResearchPDS(':memory:');
+    pds.putRecord('app.pullread.entity', null, { name: 'Boring Corp', type: 'company' });
+    pds.putRecord('app.pullread.mention', null, {
+      entityName: 'Boring Corp', filename: 'a.md', title: 'Fine',
+      sentiment: 'neutral', stance: null, publishedAt: '2026-03-01',
+    });
+    pds.putRecord('app.pullread.mention', null, {
+      entityName: 'Boring Corp', filename: 'b.md', title: 'Also Fine',
+      sentiment: 'neutral', stance: null, publishedAt: '2026-03-02',
+    });
+    pds.putRecord('app.pullread.mention', null, {
+      entityName: 'Boring Corp', filename: 'c.md', title: 'Still Fine',
+      sentiment: 'neutral', stance: null, publishedAt: '2026-03-03',
+    });
+
+    const tensions = queryTensions(pds);
+    expect(tensions.length).toBe(0);
+    pds.close();
+  });
+
+  test('requires minimum 3 mentions to be a tension', () => {
+    const pds = createResearchPDS(':memory:');
+    pds.putRecord('app.pullread.entity', null, { name: 'Small Topic', type: 'concept' });
+    pds.putRecord('app.pullread.mention', null, {
+      entityName: 'Small Topic', filename: 'a.md', title: 'Pro',
+      sentiment: 'positive', stance: 'good', publishedAt: '2026-03-01',
+    });
+    pds.putRecord('app.pullread.mention', null, {
+      entityName: 'Small Topic', filename: 'b.md', title: 'Con',
+      sentiment: 'negative', stance: 'bad', publishedAt: '2026-03-02',
+    });
+
+    const tensions = queryTensions(pds);
+    expect(tensions.length).toBe(0);
     pds.close();
   });
 });

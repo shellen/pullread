@@ -39,6 +39,7 @@ interface ArticleInput {
   title: string;
   body: string;
   source?: string;
+  publishedAt?: string;
 }
 
 const VALID_ENTITY_TYPES = new Set(['person', 'company', 'technology', 'place', 'event', 'concept']);
@@ -64,8 +65,16 @@ function normalizeEntityType(type: string): string {
   return TYPE_ALIASES[lower] || 'concept';
 }
 
+const VALID_SENTIMENTS = new Set(['positive', 'negative', 'neutral', 'mixed']);
+
+function normalizeSentiment(sentiment?: string): string {
+  if (!sentiment) return 'neutral';
+  const lower = sentiment.toLowerCase().trim();
+  return VALID_SENTIMENTS.has(lower) ? lower : 'neutral';
+}
+
 interface ExtractionResult {
-  entities: Array<{ name: string; type: string; role?: string }>;
+  entities: Array<{ name: string; type: string; role?: string; sentiment?: string; stance?: string }>;
   relationships: Array<{ from: string; to: string; type: string }>;
   themes: string[];
 }
@@ -82,14 +91,18 @@ export async function extractArticle(
   const prompt = `Extract structured information from this document as JSON.
 
 STRICT RULES:
-- entities: array of { name, type } where type MUST be exactly one of: person, company, technology, place, event, concept
-  - "person" = individual humans
-  - "company" = companies, brands, organizations, bands, teams, podcasts, publications
-  - "technology" = software, hardware, protocols, scientific concepts, products
-  - "place" = countries, cities, buildings, venues, websites/platforms
-  - "event" = named events, conferences, wars, elections
-  - "concept" = abstract ideas, genres, movements, themes
-  - Do NOT invent new types. If unsure, use "concept".
+- entities: array of { name, type, sentiment, stance } where:
+  - type MUST be exactly one of: person, company, technology, place, event, concept
+    - "person" = individual humans
+    - "company" = companies, brands, organizations, bands, teams, podcasts, publications
+    - "technology" = software, hardware, protocols, scientific concepts, products
+    - "place" = countries, cities, buildings, venues, websites/platforms
+    - "event" = named events, conferences, wars, elections
+    - "concept" = abstract ideas, genres, movements, themes
+    - Do NOT invent new types. If unsure, use "concept".
+  - sentiment MUST be exactly one of: positive, negative, neutral, mixed
+    - How does this document portray this entity? Use "neutral" if no clear sentiment.
+  - stance: a short phrase (3-6 words) capturing the document's position on this entity, or null if neutral
 - relationships: array of { from, to, type } connecting entity names
 - themes: array of short topic strings
 
@@ -133,11 +146,15 @@ ${article.body.slice(0, 8000)}`;
       });
     }
 
+    const sentiment = normalizeSentiment(entity.sentiment);
     pds.putRecord('app.pullread.mention', null, {
       entityName: entity.name,
       filename: article.filename,
       title: article.title,
       source: article.source || 'feed',
+      sentiment,
+      stance: sentiment === 'neutral' ? null : (entity.stance || null),
+      publishedAt: article.publishedAt || null,
     });
   }
 
@@ -305,4 +322,66 @@ export function queryRelatedEntities(pds: PDS, filename: string) {
     name: e.value.name,
     type: e.value.type,
   }));
+}
+
+interface TensionMention {
+  filename: string;
+  title: string;
+  sentiment: string;
+  stance: string | null;
+  publishedAt: string | null;
+}
+
+interface Tension {
+  entityName: string;
+  entityType: string;
+  positive: TensionMention[];
+  negative: TensionMention[];
+  mentionCount: number;
+}
+
+export function queryTensions(pds: PDS, minMentions = 3): Tension[] {
+  const mentions = pds.listRecords('app.pullread.mention');
+
+  const byEntity = new Map<string, any[]>();
+  for (const m of mentions) {
+    const name = (m as any).value.entityName;
+    if (!byEntity.has(name)) byEntity.set(name, []);
+    byEntity.get(name)!.push((m as any).value);
+  }
+
+  const entities = pds.listRecords('app.pullread.entity');
+  const entityTypes = new Map<string, string>();
+  for (const e of entities) {
+    entityTypes.set((e as any).value.name, (e as any).value.type);
+  }
+
+  const tensions: Tension[] = [];
+  for (const [name, entityMentions] of byEntity) {
+    if (entityMentions.length < minMentions) continue;
+
+    const positive = entityMentions.filter((m: any) => m.sentiment === 'positive' || m.sentiment === 'mixed');
+    const negative = entityMentions.filter((m: any) => m.sentiment === 'negative' || m.sentiment === 'mixed');
+
+    if (positive.length === 0 || negative.length === 0) continue;
+
+    const toMention = (m: any): TensionMention => ({
+      filename: m.filename,
+      title: m.title,
+      sentiment: m.sentiment,
+      stance: m.stance || null,
+      publishedAt: m.publishedAt || null,
+    });
+
+    tensions.push({
+      entityName: name,
+      entityType: entityTypes.get(name) || 'concept',
+      positive: positive.map(toMention),
+      negative: negative.map(toMention),
+      mentionCount: entityMentions.length,
+    });
+  }
+
+  tensions.sort((a, b) => b.mentionCount - a.mentionCount);
+  return tensions;
 }
