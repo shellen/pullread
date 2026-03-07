@@ -83,6 +83,21 @@ function normalizeEntityType(type: string): string {
 
 const VALID_SENTIMENTS = new Set(['positive', 'negative', 'neutral', 'mixed']);
 
+export function normalizeEntityName(name: string): string {
+  return name.trim().toLowerCase().replace(/^(the|a|an)\s+/i, '');
+}
+
+function findExistingEntityName(pds: PDS, name: string): string | null {
+  const normalized = normalizeEntityName(name);
+  const entities = pds.listRecords('app.pullread.entity');
+  for (const e of entities) {
+    if (normalizeEntityName((e as any).value.name) === normalized) {
+      return (e as any).value.name;
+    }
+  }
+  return null;
+}
+
 function normalizeSentiment(sentiment?: string): string {
   if (!sentiment) return 'neutral';
   const lower = sentiment.toLowerCase().trim();
@@ -152,14 +167,18 @@ ${article.body.slice(0, 8000)}`;
     entity.type = normalizeEntityType(entity.type);
   }
 
+  // Build name mapping: LLM-extracted name -> canonical stored name
+  const nameMap = new Map<string, string>();
+
   for (const entity of parsed.entities) {
     if (!entity.name || !entity.type) continue;
-    const existing = pds.query('app.pullread.entity', {
-      where: { name: entity.name },
-    });
-    if (existing.length === 0) {
+    const existingName = findExistingEntityName(pds, entity.name);
+    const canonicalName = existingName || entity.name;
+    nameMap.set(entity.name, canonicalName);
+
+    if (!existingName) {
       pds.putRecord('app.pullread.entity', null, {
-        name: entity.name,
+        name: canonicalName,
         type: entity.type,
         role: entity.role || null,
         source: article.source || 'feed',
@@ -168,7 +187,7 @@ ${article.body.slice(0, 8000)}`;
 
     const sentiment = normalizeSentiment(entity.sentiment);
     pds.putRecord('app.pullread.mention', null, {
-      entityName: entity.name,
+      entityName: canonicalName,
       filename: article.filename,
       title: article.title,
       source: article.source || 'feed',
@@ -180,8 +199,8 @@ ${article.body.slice(0, 8000)}`;
 
   for (const rel of parsed.relationships) {
     pds.putRecord('app.pullread.edge', null, {
-      from: rel.from,
-      to: rel.to,
+      from: nameMap.get(rel.from) || rel.from,
+      to: nameMap.get(rel.to) || rel.to,
       type: rel.type,
       sourceFilename: article.filename,
     });
@@ -420,6 +439,51 @@ export function queryTensions(pds: PDS, minMentions = 3): Tension[] {
 
   tensions.sort((a, b) => b.mentionCount - a.mentionCount);
   return tensions;
+}
+
+// --- Entity brief ---
+
+interface EntityBrief {
+  summary: string;
+  wikipediaUrl: string;
+  mentionCount: number;
+}
+
+export function generateEntityBrief(pds: PDS, entityName: string): EntityBrief | null {
+  const entities = pds.listRecords('app.pullread.entity');
+  const entity = entities.find((e: any) => e.value.name === entityName);
+  if (!entity) return null;
+
+  const mentions = pds.listRecords('app.pullread.mention')
+    .filter((m: any) => m.value.entityName === entityName);
+
+  const edges = pds.listRecords('app.pullread.edge')
+    .filter((e: any) => e.value.from === entityName || e.value.to === entityName);
+
+  // Build a brief from what we know
+  const type = (entity as any).value.type;
+  const relatedNames = new Set<string>();
+  for (const edge of edges) {
+    const other = (edge as any).value.from === entityName
+      ? (edge as any).value.to
+      : (edge as any).value.from;
+    relatedNames.add(other);
+  }
+
+  let summary = `${entityName} is a ${type}`;
+  if (mentions.length > 0) {
+    summary += ` mentioned in ${mentions.length} article${mentions.length === 1 ? '' : 's'}`;
+  }
+  if (relatedNames.size > 0) {
+    const related = Array.from(relatedNames).slice(0, 3);
+    summary += `, connected to ${related.join(', ')}`;
+  }
+  summary += '.';
+
+  const wikiSlug = entityName.replace(/\s+/g, '_');
+  const wikipediaUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(wikiSlug).replace(/%2F/g, '/')}`;
+
+  return { summary, wikipediaUrl, mentionCount: mentions.length };
 }
 
 // --- Watchlists ---

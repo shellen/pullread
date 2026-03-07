@@ -248,6 +248,10 @@ function researchRenderDetail(profile) {
   html += '<span class="research-entity-badge research-type-' + escapeHtml(e.type) + '">' + escapeHtml(e.type) + '</span>';
   researchCheckIfWatched(e.name);
 
+  // Entity brief (loaded async)
+  html += '<div class="research-brief" id="research-brief"></div>';
+  researchLoadBrief(e.name);
+
   if (profile.mentions && profile.mentions.length > 0) {
     html += '<h3>Mentioned in</h3><ul class="research-mention-list">';
     for (var i = 0; i < profile.mentions.length; i++) {
@@ -267,15 +271,36 @@ function researchRenderDetail(profile) {
   }
 
   if (profile.edges && profile.edges.length > 0) {
-    html += '<h3>Related</h3><ul class="research-edge-list">';
+    // Deduplicate edges by normalized target name
+    var edgeDedup = {};
     for (var i = 0; i < profile.edges.length; i++) {
       var edge = profile.edges[i];
       var other = edge.value.from === e.name ? edge.value.to : edge.value.from;
-      var rel = edge.value.type;
-      var isOutgoing = edge.value.from === e.name;
+      var normKey = other.toLowerCase().replace(/^(the|a|an)\s+/i, '');
+      var normLabel = edge.value.type.toLowerCase().replace(/s$/, '');
+      if (!edgeDedup[normKey]) {
+        edgeDedup[normKey] = { name: other, labels: {} };
+      }
+      edgeDedup[normKey].labels[normLabel] = (edgeDedup[normKey].labels[normLabel] || 0) + 1;
+    }
+
+    html += '<h3>Related</h3><ul class="research-edge-list">';
+    var edgeKeys = Object.keys(edgeDedup);
+    for (var i = 0; i < edgeKeys.length; i++) {
+      var entry = edgeDedup[edgeKeys[i]];
+      // Pick the most common label
+      var bestLabel = '';
+      var bestCount = 0;
+      var lblKeys = Object.keys(entry.labels);
+      for (var j = 0; j < lblKeys.length; j++) {
+        if (entry.labels[lblKeys[j]] > bestCount) {
+          bestCount = entry.labels[lblKeys[j]];
+          bestLabel = lblKeys[j];
+        }
+      }
       html += '<li>';
-      html += '<a href="#" class="research-edge-name" onclick="researchSearchFor(\'' + escapeJsStr(other) + '\');return false">' + escapeHtml(other) + '</a>';
-      html += ' <span class="research-edge-type">' + escapeHtml(rel) + '</span>';
+      html += '<a href="#" class="research-edge-name" onclick="researchSearchFor(\'' + escapeJsStr(entry.name) + '\');return false">' + escapeHtml(entry.name) + '</a>';
+      html += ' <span class="research-edge-type">' + escapeHtml(bestLabel) + '</span>';
       html += '</li>';
     }
     html += '</ul>';
@@ -519,6 +544,21 @@ function researchPickStance(mentions) {
     if (mentions[i].stance) return mentions[i].stance;
   }
   return null;
+}
+
+function researchLoadBrief(entityName) {
+  fetch('/api/research/brief/' + encodeURIComponent(entityName))
+    .then(function(r) { return r.json(); })
+    .then(function(brief) {
+      var el = document.getElementById('research-brief');
+      if (!el || !brief.summary) return;
+      var html = '<p class="research-brief-text">' + escapeHtml(brief.summary) + '</p>';
+      html += '<a class="research-brief-wiki" href="' + escapeHtml(brief.wikipediaUrl) + '" target="_blank" rel="noopener">';
+      html += '<svg class="icon" style="width:14px;height:14px;vertical-align:-2px" aria-hidden="true"><use href="#i-globe-alt"/></svg> ';
+      html += 'Wikipedia</a>';
+      el.innerHTML = html;
+    })
+    .catch(function() {});
 }
 
 function researchSearchFor(name) {

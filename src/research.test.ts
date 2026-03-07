@@ -1,7 +1,7 @@
 // ABOUTME: Tests for research knowledge graph — PDS lifecycle, extraction, entity queries
 // ABOUTME: Verifies createResearchPDS initializes storage and closes without error
 
-import { createResearchPDS, extractArticle, runBackgroundExtraction, queryEntities, queryEntityProfile, queryRelatedEntities, queryTensions, addWatch, removeWatch, listWatches, checkWatchMatches, getUnseenMatches, markMatchesSeen, resetResearchData, extractFromUrl } from './research';
+import { createResearchPDS, extractArticle, runBackgroundExtraction, queryEntities, queryEntityProfile, queryRelatedEntities, queryTensions, addWatch, removeWatch, listWatches, checkWatchMatches, getUnseenMatches, markMatchesSeen, resetResearchData, extractFromUrl, normalizeEntityName, generateEntityBrief } from './research';
 import { summarizeText } from './summarizer';
 import { listMarkdownFiles } from './writer';
 import { readFileSync } from 'fs';
@@ -500,6 +500,146 @@ describe('watchlists', () => {
     markMatchesSeen(pds);
     const unseen = getUnseenMatches(pds);
     expect(unseen.length).toBe(0);
+    pds.close();
+  });
+});
+
+describe('entity name normalization', () => {
+  test('normalizeEntityName strips leading articles', () => {
+    expect(normalizeEntityName('The New York Times')).toBe('new york times');
+    expect(normalizeEntityName('A Brief History')).toBe('brief history');
+    expect(normalizeEntityName('An Example')).toBe('example');
+  });
+
+  test('normalizeEntityName trims and lowercases', () => {
+    expect(normalizeEntityName('  Apple  ')).toBe('apple');
+    expect(normalizeEntityName('GOOGLE')).toBe('google');
+  });
+
+  test('extraction merges entities with matching normalized names', async () => {
+    const pds = createResearchPDS(':memory:');
+    mockSummarize.mockResolvedValue({
+      summary: JSON.stringify({
+        entities: [{ name: 'New York Times Magazine', type: 'company' }],
+        relationships: [],
+        themes: ['media'],
+      }),
+      model: 'test',
+    });
+
+    await extractArticle(pds, {
+      filename: 'article-1.md',
+      title: 'First Article',
+      body: 'About New York Times Magazine.',
+    });
+
+    mockSummarize.mockResolvedValue({
+      summary: JSON.stringify({
+        entities: [{ name: 'The New York Times Magazine', type: 'company' }],
+        relationships: [],
+        themes: ['media'],
+      }),
+      model: 'test',
+    });
+
+    await extractArticle(pds, {
+      filename: 'article-2.md',
+      title: 'Second Article',
+      body: 'About The New York Times Magazine.',
+    });
+
+    const entities = pds.listRecords('app.pullread.entity');
+    expect(entities.length).toBe(1);
+    expect(entities[0].value.name).toBe('New York Times Magazine');
+
+    // Both mentions should point to the original name
+    const mentions = pds.listRecords('app.pullread.mention');
+    expect(mentions.length).toBe(2);
+    expect(mentions[0].value.entityName).toBe('New York Times Magazine');
+    expect(mentions[1].value.entityName).toBe('New York Times Magazine');
+    pds.close();
+  });
+
+  test('extraction normalizes relationship entity names to existing entities', async () => {
+    const pds = createResearchPDS(':memory:');
+    mockSummarize.mockResolvedValue({
+      summary: JSON.stringify({
+        entities: [
+          { name: 'Trump', type: 'person' },
+          { name: 'Iran', type: 'place' },
+        ],
+        relationships: [{ from: 'Trump', to: 'Iran', type: 'sanctions' }],
+        themes: ['politics'],
+      }),
+      model: 'test',
+    });
+
+    await extractArticle(pds, {
+      filename: 'article-1.md',
+      title: 'First',
+      body: 'Trump and Iran.',
+    });
+
+    mockSummarize.mockResolvedValue({
+      summary: JSON.stringify({
+        entities: [
+          { name: 'President Trump', type: 'person' },
+          { name: 'The Pentagon', type: 'company' },
+        ],
+        relationships: [{ from: 'President Trump', to: 'The Pentagon', type: 'directs' }],
+        themes: ['politics'],
+      }),
+      model: 'test',
+    });
+
+    await extractArticle(pds, {
+      filename: 'article-2.md',
+      title: 'Second',
+      body: 'President Trump and The Pentagon.',
+    });
+
+    // "President Trump" should NOT merge with "Trump" (different normalized forms)
+    const entities = pds.listRecords('app.pullread.entity');
+    const names = entities.map((e: any) => e.value.name).sort();
+    expect(names).toContain('Trump');
+    expect(names).toContain('The Pentagon');
+
+    // Edge from article-2 should use the entity name as-is since no match
+    const edges = pds.listRecords('app.pullread.edge');
+    expect(edges.length).toBe(2);
+    pds.close();
+  });
+});
+
+describe('entity brief', () => {
+  test('generateEntityBrief returns summary and Wikipedia URL', () => {
+    const pds = createResearchPDS(':memory:');
+    pds.putRecord('app.pullread.entity', null, { name: 'Nikole Hannah-Jones', type: 'person' });
+    pds.putRecord('app.pullread.mention', null, {
+      entityName: 'Nikole Hannah-Jones', filename: 'a.md', title: 'The 1619 Project',
+      sentiment: 'positive', stance: 'groundbreaking journalism', publishedAt: '2026-01-01',
+    });
+    pds.putRecord('app.pullread.mention', null, {
+      entityName: 'Nikole Hannah-Jones', filename: 'b.md', title: 'The Myth That Busing Failed',
+      sentiment: 'neutral', stance: null, publishedAt: '2026-02-01',
+    });
+    pds.putRecord('app.pullread.edge', null, {
+      from: 'Nikole Hannah-Jones', to: 'New York Times Magazine', type: 'works for', sourceFilename: 'a.md',
+    });
+
+    const brief = generateEntityBrief(pds, 'Nikole Hannah-Jones');
+    expect(brief).not.toBeNull();
+    expect(brief!.wikipediaUrl).toBe('https://en.wikipedia.org/wiki/Nikole_Hannah-Jones');
+    expect(brief!.summary).toContain('Nikole Hannah-Jones');
+    expect(brief!.summary).toContain('person');
+    expect(brief!.mentionCount).toBe(2);
+    pds.close();
+  });
+
+  test('generateEntityBrief returns null for unknown entity', () => {
+    const pds = createResearchPDS(':memory:');
+    const brief = generateEntityBrief(pds, 'Nobody');
+    expect(brief).toBeNull();
     pds.close();
   });
 });

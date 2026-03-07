@@ -2489,6 +2489,15 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
       return;
     }
 
+    if (url.pathname.startsWith('/api/research/brief/') && req.method === 'GET') {
+      const entityName = decodeURIComponent(url.pathname.split('/').slice(4).join('/'));
+      const { getResearchPDS, generateEntityBrief } = await import('./research');
+      const pds = getResearchPDS();
+      const brief = generateEntityBrief(pds, entityName);
+      sendJson(res, brief || { summary: null, wikipediaUrl: null, mentionCount: 0 });
+      return;
+    }
+
     if (url.pathname.startsWith('/api/research/related/') && req.method === 'GET') {
       const filename = decodeURIComponent(url.pathname.split('/').pop()!);
       const { getResearchPDS, queryRelatedEntities } = await import('./research');

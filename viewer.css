@@ -7191,6 +7191,23 @@
     }
   }
 
+  .research-brief {
+    margin: 10px 0;
+  }
+  .research-brief-text {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 0 0 6px 0;
+    line-height: 1.5;
+  }
+  .research-brief-wiki {
+    font-size: 12px;
+    color: var(--link);
+    text-decoration: none;
+  }
+  .research-brief-wiki:hover {
+    text-decoration: underline;
+  }
   .research-graph-btn {
     margin-top: 12px;
     font-size: 13px;
