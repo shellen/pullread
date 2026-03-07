@@ -1504,6 +1504,46 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
       }
     }
 
+    // Email roundup settings API
+    if (url.pathname === '/api/email-settings') {
+      if (req.method === 'GET') {
+        const appSettings = loadJsonFile(APP_SETTINGS_PATH);
+        sendJson(res, (appSettings.emailRoundup as Record<string, unknown>) || {
+          enabled: false,
+          smtpHost: '',
+          smtpPort: 587,
+          smtpUser: '',
+          smtpPass: '',
+          useTls: true,
+          fromAddress: '',
+          toAddress: '',
+          sendTime: '08:00',
+          lookbackDays: 1
+        });
+        return;
+      }
+      if (req.method === 'POST') {
+        try {
+          const body = JSON.parse(await readBody(req));
+          const appSettings = loadJsonFile(APP_SETTINGS_PATH);
+          const existing = (appSettings.emailRoundup as Record<string, unknown>) || {};
+          // Merge — only update fields that are present in the request
+          const updated: Record<string, unknown> = { ...existing };
+          const fields = ['enabled', 'smtpHost', 'smtpPort', 'smtpUser', 'smtpPass', 'useTls', 'fromAddress', 'toAddress', 'sendTime', 'lookbackDays'];
+          for (const f of fields) {
+            if (body[f] !== undefined) updated[f] = body[f];
+          }
+          appSettings.emailRoundup = updated;
+          saveJsonFile(APP_SETTINGS_PATH, appSettings);
+          sendJson(res, { ok: true });
+        } catch (err) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid request body' }));
+        }
+        return;
+      }
+    }
+
     // Model catalog for Settings UI
     if (url.pathname === '/api/models' && req.method === 'GET') {
       try {
