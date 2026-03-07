@@ -184,6 +184,7 @@ const vendorLibs: Array<{ name: string; path: string; required: boolean }> = [
   { name: 'highlight.js', path: '@highlightjs/cdn-assets/highlight.min.js',        required: true },
   { name: 'DOMPurify',   path: 'dompurify/dist/purify.min.js',                    required: true },
   { name: 'mermaid',     path: 'mermaid/dist/mermaid.min.js',                      required: false },
+  { name: 'cytoscape',   path: 'cytoscape/dist/cytoscape.min.js',                  required: false },
 ];
 
 const vendorJs: string[] = [];

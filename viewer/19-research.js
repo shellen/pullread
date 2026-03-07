@@ -281,68 +281,167 @@ function researchRenderDetail(profile) {
     html += '</ul>';
   }
 
-  // Graph visualization (requires edges)
-  if (profile.edges && profile.edges.length > 0) {
-    html += '<h3>Graph</h3>';
-    html += '<div class="research-graph" id="research-graph"></div>';
+  // Graph button (requires edges and cytoscape)
+  if (profile.edges && profile.edges.length > 0 && typeof cytoscape !== 'undefined') {
+    html += '<button class="btn-secondary research-graph-btn" onclick="researchOpenGraph(\'' + escapeJsStr(e.name) + '\')">View graph</button>';
   }
 
   container.innerHTML = html;
-
-  // Render Mermaid graph after DOM update
-  if (profile.edges && profile.edges.length > 0) {
-    researchRenderGraph(e.name, profile.edges);
-  }
 }
 
-function researchRenderGraph(centerName, edges) {
-  var graphEl = document.getElementById('research-graph');
-  if (!graphEl || typeof mermaid === 'undefined') return;
+var _researchGraphProfile = null;
 
-  var nodeSet = {};
-  nodeSet[centerName] = true;
-  var lines = ['graph LR'];
+function researchOpenGraph(centerName) {
+  // Find the edges from the currently displayed detail
+  var container = document.getElementById('research-detail');
+  if (!container || typeof cytoscape === 'undefined') return;
 
-  // Style the center node
-  var centerId = researchMermaidId(centerName);
-  lines.push('  ' + centerId + '["' + researchMermaidEscape(centerName) + '"]');
-  lines.push('  style ' + centerId + ' fill:#f59e0b,stroke:#d97706,color:#000');
+  // Fetch fresh profile to get edges
+  var rows = document.querySelectorAll('.research-entity-row.active');
+  var rkey = rows.length > 0 ? rows[0].dataset.rkey : null;
+  if (!rkey) return;
+
+  fetch('/api/research/entity/' + rkey)
+    .then(function(r) { return r.json(); })
+    .then(function(profile) {
+      if (!profile.edges || profile.edges.length === 0) return;
+      researchShowGraphModal(profile.entity.name, profile.edges);
+    });
+}
+
+function researchShowGraphModal(centerName, edges) {
+  // Remove any existing modal
+  var existing = document.getElementById('research-graph-modal');
+  if (existing) existing.remove();
+
+  var modal = document.createElement('div');
+  modal.id = 'research-graph-modal';
+  modal.className = 'research-graph-modal';
+  modal.innerHTML = '<div class="research-graph-modal-header">' +
+    '<h2>' + escapeHtml(centerName) + '</h2>' +
+    '<button class="research-graph-modal-close" onclick="researchCloseGraph()" title="Close">&times;</button>' +
+    '</div>' +
+    '<div class="research-graph-container" id="research-graph-cy"></div>';
+  document.body.appendChild(modal);
+
+  // Close on Escape
+  modal._escHandler = function(ev) {
+    if (ev.key === 'Escape') researchCloseGraph();
+  };
+  document.addEventListener('keydown', modal._escHandler);
+
+  // Build Cytoscape elements
+  var nodes = {};
+  var elements = [];
+  nodes[centerName] = true;
+  elements.push({ data: { id: centerName, label: centerName }, classes: 'center' });
 
   for (var i = 0; i < edges.length; i++) {
     var edge = edges[i];
-    var fromId = researchMermaidId(edge.value.from);
-    var toId = researchMermaidId(edge.value.to);
-    var label = researchMermaidEscape(edge.value.type);
-    nodeSet[edge.value.from] = true;
-    nodeSet[edge.value.to] = true;
-    lines.push('  ' + fromId + '["' + researchMermaidEscape(edge.value.from) + '"] -->|' + label + '| ' + toId + '["' + researchMermaidEscape(edge.value.to) + '"]');
+    var from = edge.value.from;
+    var to = edge.value.to;
+    if (!nodes[from]) {
+      nodes[from] = true;
+      elements.push({ data: { id: from, label: from } });
+    }
+    if (!nodes[to]) {
+      nodes[to] = true;
+      elements.push({ data: { id: to, label: to } });
+    }
+    elements.push({
+      data: {
+        id: 'e' + i,
+        source: from,
+        target: to,
+        label: edge.value.type,
+      }
+    });
   }
 
-  var graphDef = lines.join('\n');
-  graphEl.removeAttribute('data-processed');
-  graphEl.innerHTML = graphDef;
-  graphEl.classList.add('mermaid');
+  var isDark = document.documentElement.dataset.theme === 'dark';
 
-  mermaid.run({ nodes: [graphEl] }).then(function() {
-    // Make nodes clickable
-    graphEl.querySelectorAll('.node').forEach(function(node) {
-      node.style.cursor = 'pointer';
-      node.addEventListener('click', function() {
-        var label = node.querySelector('.nodeLabel');
-        if (label) researchSearchFor(label.textContent.trim());
-      });
-    });
-  }).catch(function(err) {
-    graphEl.innerHTML = '<p class="briefing-hint">Could not render graph</p>';
+  var cy = cytoscape({
+    container: document.getElementById('research-graph-cy'),
+    elements: elements,
+    style: [
+      {
+        selector: 'node',
+        style: {
+          'label': 'data(label)',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'background-color': isDark ? '#4a5568' : '#dbeafe',
+          'color': isDark ? '#e0e0e0' : '#1e3a5f',
+          'border-width': 1,
+          'border-color': isDark ? '#718096' : '#93c5fd',
+          'font-size': '12px',
+          'text-wrap': 'wrap',
+          'text-max-width': '100px',
+          'width': 'label',
+          'height': 'label',
+          'padding': '10px',
+          'shape': 'round-rectangle',
+        }
+      },
+      {
+        selector: 'node.center',
+        style: {
+          'background-color': '#f59e0b',
+          'border-color': '#d97706',
+          'color': '#000',
+          'font-weight': 'bold',
+          'font-size': '14px',
+        }
+      },
+      {
+        selector: 'edge',
+        style: {
+          'label': 'data(label)',
+          'width': 1.5,
+          'line-color': isDark ? '#555' : '#cbd5e1',
+          'target-arrow-color': isDark ? '#555' : '#cbd5e1',
+          'target-arrow-shape': 'triangle',
+          'curve-style': 'bezier',
+          'font-size': '10px',
+          'color': isDark ? '#999' : '#64748b',
+          'text-rotation': 'autorotate',
+          'text-margin-y': -8,
+        }
+      },
+    ],
+    layout: {
+      name: 'cose',
+      animate: false,
+      nodeRepulsion: function() { return 8000; },
+      idealEdgeLength: function() { return 120; },
+      padding: 40,
+    },
+    minZoom: 0.2,
+    maxZoom: 3,
+    wheelSensitivity: 0.3,
+  });
+
+  // Click node to search
+  cy.on('tap', 'node', function(evt) {
+    var name = evt.target.data('label');
+    researchCloseGraph();
+    researchSearchFor(name);
+  });
+
+  // Hover cursor
+  cy.on('mouseover', 'node', function() {
+    document.getElementById('research-graph-cy').style.cursor = 'pointer';
+  });
+  cy.on('mouseout', 'node', function() {
+    document.getElementById('research-graph-cy').style.cursor = 'default';
   });
 }
 
-function researchMermaidId(name) {
-  return 'n' + name.replace(/[^a-zA-Z0-9]/g, '_');
-}
-
-function researchMermaidEscape(str) {
-  return str.replace(/"/g, "'").replace(/[[\]]/g, '');
+function researchCloseGraph() {
+  var modal = document.getElementById('research-graph-modal');
+  if (!modal) return;
+  if (modal._escHandler) document.removeEventListener('keydown', modal._escHandler);
+  modal.remove();
 }
 
 function researchLoadTensions() {

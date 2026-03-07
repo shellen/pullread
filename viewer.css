@@ -7191,15 +7191,44 @@
     }
   }
 
-  .research-graph {
-    margin-top: 8px;
-    padding: 12px;
-    background: var(--code-bg);
-    border-radius: 6px;
-    overflow-x: auto;
+  .research-graph-btn {
+    margin-top: 12px;
+    font-size: 13px;
+    padding: 6px 14px;
   }
-  .research-graph svg {
-    max-width: 100%;
-    height: auto;
+  .research-graph-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+  }
+  .research-graph-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .research-graph-modal-header h2 {
+    margin: 0;
+    font-size: 18px;
+  }
+  .research-graph-modal-close {
+    background: none;
+    border: none;
+    font-size: 28px;
+    cursor: pointer;
+    color: var(--muted);
+    padding: 0 4px;
+    line-height: 1;
+  }
+  .research-graph-modal-close:hover {
+    color: var(--fg);
+  }
+  .research-graph-container {
+    flex: 1;
+    min-height: 0;
   }
 
