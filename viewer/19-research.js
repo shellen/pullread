@@ -252,8 +252,16 @@ function researchRenderDetail(profile) {
   html += '<div class="research-brief" id="research-brief"></div>';
   researchLoadBrief(e.name);
 
-  // Facts — structured statements from graph edges
+  // Facts — structured statements from graph edges with source links
   if (profile.edges && profile.edges.length > 0) {
+    // Build title lookup from mentions
+    var titleLookup = {};
+    if (profile.mentions) {
+      for (var i = 0; i < profile.mentions.length; i++) {
+        titleLookup[profile.mentions[i].value.filename] = profile.mentions[i].value.title;
+      }
+    }
+
     var factDedup = {};
     for (var i = 0; i < profile.edges.length; i++) {
       var fe = profile.edges[i];
@@ -262,7 +270,10 @@ function researchRenderDetail(profile) {
       var factRel = fe.value.type.toLowerCase().replace(/s$/, '');
       var factKey = factFrom.toLowerCase() + '\0' + factRel + '\0' + factTo.toLowerCase();
       if (!factDedup[factKey]) {
-        factDedup[factKey] = { from: factFrom, to: factTo, rel: fe.value.type };
+        factDedup[factKey] = { from: factFrom, to: factTo, rel: fe.value.type, sources: [] };
+      }
+      if (fe.value.sourceFilename && factDedup[factKey].sources.indexOf(fe.value.sourceFilename) < 0) {
+        factDedup[factKey].sources.push(fe.value.sourceFilename);
       }
     }
     var factKeys = Object.keys(factDedup);
@@ -274,6 +285,14 @@ function researchRenderDetail(profile) {
         html += '<a href="#" onclick="researchSearchFor(\'' + escapeJsStr(fact.from) + '\');return false">' + escapeHtml(fact.from) + '</a>';
         html += ' <span class="research-fact-rel">' + escapeHtml(fact.rel) + '</span> ';
         html += '<a href="#" onclick="researchSearchFor(\'' + escapeJsStr(fact.to) + '\');return false">' + escapeHtml(fact.to) + '</a>';
+        if (fact.sources.length > 0) {
+          html += '<span class="research-fact-sources">';
+          for (var j = 0; j < fact.sources.length; j++) {
+            var srcTitle = titleLookup[fact.sources[j]] || fact.sources[j].replace(/\.md$/, '');
+            html += '<a href="#" class="research-fact-source" onclick="loadFileByName(\'' + escapeJsStr(fact.sources[j]) + '\');return false" title="' + escapeHtml(srcTitle) + '">[' + (j + 1) + ']</a>';
+          }
+          html += '</span>';
+        }
         html += '</li>';
       }
       html += '</ul>';

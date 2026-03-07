@@ -7228,6 +7228,19 @@
     color: var(--muted);
     font-style: italic;
   }
+  .research-fact-sources {
+    margin-left: 6px;
+  }
+  .research-fact-source {
+    font-size: 11px;
+    color: var(--muted);
+    text-decoration: none;
+    margin-left: 2px;
+    vertical-align: super;
+  }
+  .research-fact-source:hover {
+    color: var(--link);
+  }
   .research-graph-btn {
     margin-top: 12px;
     font-size: 13px;
