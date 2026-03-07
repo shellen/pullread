@@ -132,7 +132,11 @@ ${article.body.slice(0, 8000)}`;
   } catch {
     const jsonMatch = result.summary.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (jsonMatch) {
-      parsed = JSON.parse(jsonMatch[1]);
+      try {
+        parsed = JSON.parse(jsonMatch[1]);
+      } catch {
+        return null;
+      }
     } else {
       return null;
     }
