@@ -423,6 +423,7 @@ var _settingsTabMap = {
   'settings-voice': 'reading',
   'settings-ai': 'reading',
   'settings-breaks': 'reading',
+  'settings-email': 'general',
   'settings-backup': 'advanced',
   'settings-site-logins': 'advanced',
   'settings-beta': 'advanced',
@@ -506,6 +507,73 @@ function settingsSaveBreakActivity(input) {
 function settingsSaveBeta(enabled) {
   if (enabled) localStorage.setItem('pr-beta-features', 'true');
   else localStorage.removeItem('pr-beta-features');
+}
+
+function settingsEmailToggle(enabled) {
+  var fields = document.getElementById('email-smtp-fields');
+  if (fields) fields.style.display = enabled ? '' : 'none';
+  settingsSaveEmailConfig();
+}
+
+function settingsAutoSaveEmail(input) {
+  settingsSaveEmailConfig().then(function() {
+    if (input && input.parentNode) {
+      var indicator = input.parentNode.querySelector('.save-indicator');
+      if (indicator) indicator.classList.add('visible');
+    }
+  });
+}
+
+function settingsSaveEmailConfig() {
+  var body = {
+    enabled: document.getElementById('sp-email-enabled') ? document.getElementById('sp-email-enabled').checked : false,
+    toAddress: (document.getElementById('sp-email-to') || {}).value || '',
+    fromAddress: (document.getElementById('sp-email-from') || {}).value || '',
+    sendTime: (document.getElementById('sp-email-time') || {}).value || '08:00',
+    lookbackDays: parseInt((document.getElementById('sp-email-lookback') || {}).value || '1', 10),
+    smtpHost: (document.getElementById('sp-email-smtp-host') || {}).value || '',
+    smtpPort: parseInt((document.getElementById('sp-email-smtp-port') || {}).value || '587', 10),
+    smtpUser: (document.getElementById('sp-email-smtp-user') || {}).value || '',
+    smtpPass: (document.getElementById('sp-email-smtp-pass') || {}).value || '',
+    useTls: document.getElementById('sp-email-tls') ? document.getElementById('sp-email-tls').checked : true
+  };
+  return fetch('/api/email-settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  }).then(function(r) { return r.json(); });
+}
+
+function settingsTestEmail() {
+  var status = document.getElementById('email-test-status');
+  if (status) status.textContent = 'Sending test email\u2026';
+  // Save first, then send test
+  settingsSaveEmailConfig().then(function() {
+    if (window.__TAURI__) {
+      return window.__TAURI__.core.invoke('cmd_send_test_email');
+    }
+    // Fallback for browser mode — not available without Tauri
+    return Promise.reject('Test email requires the PullRead desktop app');
+  }).then(function(msg) {
+    if (status) { status.textContent = msg || 'Test email sent!'; status.style.color = 'var(--green, #2a9d4a)'; }
+  }).catch(function(err) {
+    if (status) { status.textContent = 'Error: ' + (err || 'Failed to send'); status.style.color = 'var(--red, #c44)'; }
+  });
+}
+
+function settingsSendRoundup() {
+  var status = document.getElementById('email-test-status');
+  if (status) status.textContent = 'Sending roundup\u2026';
+  settingsSaveEmailConfig().then(function() {
+    if (window.__TAURI__) {
+      return window.__TAURI__.core.invoke('cmd_send_roundup');
+    }
+    return Promise.reject('Email roundup requires the PullRead desktop app');
+  }).then(function(msg) {
+    if (status) { status.textContent = msg || 'Roundup sent!'; status.style.color = 'var(--green, #2a9d4a)'; }
+  }).catch(function(err) {
+    if (status) { status.textContent = 'Error: ' + (err || 'Failed to send'); status.style.color = 'var(--red, #c44)'; }
+  });
 }
 
 function settingsAutoSaveSync(input) {
@@ -612,6 +680,13 @@ function showSettingsPage(scrollToSection) {
   html += '<span style="flex-shrink:0;font-size:14px">&#9881;</span>';
   html += '<span>To change notification preferences, go to <strong style="color:var(--fg)">System Settings &rarr; Notifications &rarr; PullRead</strong>. You can enable or disable alerts, banners, and sounds there.</span>';
   html += '</div>';
+  html += '</div>';
+
+  // -- Email Roundup card (loaded async) --
+  html += '<div class="card" id="settings-email">';
+  html += '<div class="card-title">Email Roundup</div>';
+  html += '<div class="card-desc">Get a daily email digest of new articles with links back to PullRead.</div>';
+  html += '<p style="color:var(--muted);font-size:13px">Loading email settings\u2026</p>';
   html += '</div>';
 
 
@@ -944,6 +1019,102 @@ function showSettingsPage(scrollToSection) {
       var sec = document.getElementById('settings-sync');
       if (sec) {
         sec.innerHTML = '<div class="card-title">Sync</div><p style="color:var(--muted);font-size:13px">Could not load sync configuration.</p>';
+      }
+    });
+  }
+
+  // Load Email Roundup settings async
+  if (serverMode) {
+    fetch('/api/email-settings').then(function(r) { return r.json(); }).then(function(data) {
+      var sec = document.getElementById('settings-email');
+      if (!sec) return;
+
+      var h = '<div class="card-title">Email Roundup</div>';
+      h += '<div class="card-desc">Get a daily email digest of new articles with links back to PullRead.</div>';
+
+      // Enable toggle
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Enable email roundup</label><div class="setting-desc">Send a daily digest email at a scheduled time</div></div>';
+      h += '<div class="setting-control"><input type="checkbox" id="sp-email-enabled"' + (data.enabled ? ' checked' : '') + ' onchange="settingsEmailToggle(this.checked)" style="width:18px;height:18px;accent-color:var(--link)"></div>';
+      h += '</div>';
+
+      // SMTP fields (collapsible, shown when enabled)
+      h += '<div id="email-smtp-fields" style="' + (data.enabled ? '' : 'display:none') + '">';
+
+      // To address
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Send to</label><div class="setting-desc">Email address to receive the roundup</div></div>';
+      h += '<div class="setting-control"><div class="input-wrap"><input type="email" id="sp-email-to" value="' + escapeHtml(data.toAddress || '') + '" placeholder="you@example.com" class="input-field" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveEmail(this)"><span class="save-indicator">\u2713</span></div></div>';
+      h += '</div>';
+
+      // From address
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>From address</label><div class="setting-desc">Sender address (must match SMTP credentials)</div></div>';
+      h += '<div class="setting-control"><div class="input-wrap"><input type="email" id="sp-email-from" value="' + escapeHtml(data.fromAddress || '') + '" placeholder="pullread@example.com" class="input-field" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveEmail(this)"><span class="save-indicator">\u2713</span></div></div>';
+      h += '</div>';
+
+      // Send time
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Send time</label><div class="setting-desc">Time of day to send the roundup</div></div>';
+      h += '<div class="setting-control"><input type="time" id="sp-email-time" value="' + escapeHtml(data.sendTime || '08:00') + '" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;font-family:inherit" onchange="settingsAutoSaveEmail(this)"></div>';
+      h += '</div>';
+
+      // Lookback days
+      var lookbackDays = data.lookbackDays || 1;
+      var lookbacks = [['1','1 day'],['2','2 days'],['3','3 days'],['7','1 week']];
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Include articles from</label><div class="setting-desc">How far back to include articles</div></div>';
+      h += '<div class="setting-control"><div class="pill-group">';
+      for (var li = 0; li < lookbacks.length; li++) {
+        h += '<button class="pill' + (String(lookbackDays) === lookbacks[li][0] ? ' active' : '') + '" data-val="' + lookbacks[li][0] + '" onclick="settingsBtnSelect(this,\'sp-email-lookback\',\'' + lookbacks[li][0] + '\');settingsAutoSaveEmail(this)">' + lookbacks[li][1] + '</button>';
+      }
+      h += '</div><input type="hidden" id="sp-email-lookback" value="' + lookbackDays + '"></div>';
+      h += '</div>';
+
+      // SMTP host
+      h += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">';
+      h += '<div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em">SMTP Server</div>';
+      h += '</div>';
+
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Host</label></div>';
+      h += '<div class="setting-control"><div class="input-wrap"><input type="text" id="sp-email-smtp-host" value="' + escapeHtml(data.smtpHost || '') + '" placeholder="smtp.gmail.com" class="input-field" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveEmail(this)"><span class="save-indicator">\u2713</span></div></div>';
+      h += '</div>';
+
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Port</label></div>';
+      h += '<div class="setting-control"><div class="input-wrap"><input type="number" id="sp-email-smtp-port" value="' + (data.smtpPort || 587) + '" placeholder="587" class="input-field" style="width:80px" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveEmail(this)"><span class="save-indicator">\u2713</span></div></div>';
+      h += '</div>';
+
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Username</label></div>';
+      h += '<div class="setting-control"><div class="input-wrap"><input type="text" id="sp-email-smtp-user" value="' + escapeHtml(data.smtpUser || '') + '" placeholder="your-email@gmail.com" class="input-field" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveEmail(this)"><span class="save-indicator">\u2713</span></div></div>';
+      h += '</div>';
+
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Password</label><div class="setting-desc">Use an app password for Gmail/Outlook</div></div>';
+      h += '<div class="setting-control"><div class="input-wrap"><input type="password" id="sp-email-smtp-pass" value="' + escapeHtml(data.smtpPass || '') + '" placeholder="App password" class="input-field" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveEmail(this)"><span class="save-indicator">\u2713</span></div></div>';
+      h += '</div>';
+
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Use TLS</label><div class="setting-desc">Recommended for most providers</div></div>';
+      h += '<div class="setting-control"><input type="checkbox" id="sp-email-tls"' + (data.useTls !== false ? ' checked' : '') + ' onchange="settingsAutoSaveEmail(this)" style="width:18px;height:18px;accent-color:var(--link)"></div>';
+      h += '</div>';
+
+      // Test & Send buttons
+      h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">';
+      h += '<button onclick="settingsTestEmail()" style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit">Send Test Email</button>';
+      h += '<button onclick="settingsSendRoundup()" style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit">Send Roundup Now</button>';
+      h += '</div>';
+      h += '<div id="email-test-status" style="font-size:12px;color:var(--muted);padding-top:8px"></div>';
+
+      h += '</div>'; // end smtp fields
+
+      sec.innerHTML = h;
+    }).catch(function() {
+      var sec = document.getElementById('settings-email');
+      if (sec) {
+        sec.innerHTML = '<div class="card-title">Email Roundup</div><p style="color:var(--muted);font-size:13px">Could not load email settings.</p>';
       }
     });
   }
