@@ -80,15 +80,18 @@ ${article.body.slice(0, 8000)}`;
   }
 
   for (const entity of parsed.entities) {
-    pds.putRecord('app.pullread.entity', null, {
-      name: entity.name,
-      type: entity.type,
-      role: entity.role || null,
-      source: article.source || 'feed',
+    const existing = pds.query('app.pullread.entity', {
+      where: { name: entity.name },
     });
-  }
+    if (existing.length === 0) {
+      pds.putRecord('app.pullread.entity', null, {
+        name: entity.name,
+        type: entity.type,
+        role: entity.role || null,
+        source: article.source || 'feed',
+      });
+    }
 
-  for (const entity of parsed.entities) {
     pds.putRecord('app.pullread.mention', null, {
       entityName: entity.name,
       filename: article.filename,

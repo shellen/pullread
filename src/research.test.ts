@@ -68,6 +68,47 @@ describe('extractArticle', () => {
     pds.close();
   });
 
+  test('deduplicates entities across multiple articles', async () => {
+    const pds = createResearchPDS(':memory:');
+    mockSummarize.mockResolvedValue({
+      summary: JSON.stringify({
+        entities: [{ name: 'Ukraine', type: 'place' }],
+        relationships: [],
+        themes: ['politics'],
+      }),
+      model: 'test',
+    });
+
+    await extractArticle(pds, {
+      filename: 'article-1.md',
+      title: 'First Article',
+      body: 'Article about Ukraine.',
+    });
+
+    mockSummarize.mockResolvedValue({
+      summary: JSON.stringify({
+        entities: [{ name: 'Ukraine', type: 'place' }],
+        relationships: [],
+        themes: ['politics'],
+      }),
+      model: 'test',
+    });
+
+    await extractArticle(pds, {
+      filename: 'article-2.md',
+      title: 'Second Article',
+      body: 'Another article about Ukraine.',
+    });
+
+    const entities = pds.listRecords('app.pullread.entity');
+    expect(entities.length).toBe(1);
+    expect(entities[0].value.name).toBe('Ukraine');
+
+    const mentions = pds.listRecords('app.pullread.mention');
+    expect(mentions.length).toBe(2);
+    pds.close();
+  });
+
   test('skips already-extracted articles', async () => {
     const pds = createResearchPDS(':memory:');
     pds.putRecord('app.pullread.extraction', null, { filename: 'test-article.md', extractedAt: new Date().toISOString() });
