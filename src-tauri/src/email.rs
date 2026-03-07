@@ -50,6 +50,7 @@ impl Default for EmailConfig {
 
 /// Article summary for the roundup email
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct ArticleMeta {
     filename: String,
     title: String,
@@ -220,6 +221,7 @@ pub async fn send_roundup(app: &AppHandle) -> Result<String, String> {
 
     let articles = fetch_recent_articles(port, config.lookback_days).await?;
     let html = build_roundup_html(&articles, config.lookback_days);
+    let count = articles.len();
 
     let from: Mailbox = config
         .from_address
@@ -243,54 +245,30 @@ pub async fn send_roundup(app: &AppHandle) -> Result<String, String> {
 
     let creds = Credentials::new(config.smtp_user.clone(), config.smtp_pass.clone());
 
-    let transport = if config.use_tls {
+    let mailer = if config.use_tls {
         AsyncSmtpTransport::<Tokio1Executor>::relay(&config.smtp_host)
-    } else {
-        AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&config.smtp_host)
+            .map_err(|e| format!("SMTP connection failed: {}", e))?
             .port(config.smtp_port)
-            .build();
-        // For non-TLS we need a different path
-        return send_with_starttls(email, &config).await;
+            .credentials(creds)
+            .build()
+    } else {
+        AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&config.smtp_host)
+            .map_err(|e| format!("SMTP STARTTLS connection failed: {}", e))?
+            .port(config.smtp_port)
+            .credentials(creds)
+            .build()
     };
-
-    let mailer = transport
-        .map_err(|e| format!("SMTP connection failed: {}", e))?
-        .port(config.smtp_port)
-        .credentials(creds)
-        .build();
 
     mailer
         .send(email)
         .await
         .map_err(|e| format!("Failed to send email: {}", e))?;
 
-    let count = articles.len();
     Ok(format!(
         "Roundup sent with {} article{}",
         count,
         if count == 1 { "" } else { "s" }
     ))
-}
-
-/// Send email using STARTTLS (port 587 typical)
-async fn send_with_starttls(
-    email: Message,
-    config: &EmailConfig,
-) -> Result<String, String> {
-    let creds = Credentials::new(config.smtp_user.clone(), config.smtp_pass.clone());
-
-    let mailer = AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&config.smtp_host)
-        .map_err(|e| format!("SMTP STARTTLS connection failed: {}", e))?
-        .port(config.smtp_port)
-        .credentials(creds)
-        .build();
-
-    mailer
-        .send(email)
-        .await
-        .map_err(|e| format!("Failed to send email: {}", e))?;
-
-    Ok("Roundup sent".to_string())
 }
 
 /// Send a test email to verify SMTP configuration
