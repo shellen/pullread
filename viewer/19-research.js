@@ -252,6 +252,34 @@ function researchRenderDetail(profile) {
   html += '<div class="research-brief" id="research-brief"></div>';
   researchLoadBrief(e.name);
 
+  // Facts — structured statements from graph edges
+  if (profile.edges && profile.edges.length > 0) {
+    var factDedup = {};
+    for (var i = 0; i < profile.edges.length; i++) {
+      var fe = profile.edges[i];
+      var factFrom = fe.value.from;
+      var factTo = fe.value.to;
+      var factRel = fe.value.type.toLowerCase().replace(/s$/, '');
+      var factKey = factFrom.toLowerCase() + '\0' + factRel + '\0' + factTo.toLowerCase();
+      if (!factDedup[factKey]) {
+        factDedup[factKey] = { from: factFrom, to: factTo, rel: fe.value.type };
+      }
+    }
+    var factKeys = Object.keys(factDedup);
+    if (factKeys.length > 0) {
+      html += '<h3>Facts</h3><ul class="research-facts-list">';
+      for (var i = 0; i < factKeys.length; i++) {
+        var fact = factDedup[factKeys[i]];
+        html += '<li>';
+        html += '<a href="#" onclick="researchSearchFor(\'' + escapeJsStr(fact.from) + '\');return false">' + escapeHtml(fact.from) + '</a>';
+        html += ' <span class="research-fact-rel">' + escapeHtml(fact.rel) + '</span> ';
+        html += '<a href="#" onclick="researchSearchFor(\'' + escapeJsStr(fact.to) + '\');return false">' + escapeHtml(fact.to) + '</a>';
+        html += '</li>';
+      }
+      html += '</ul>';
+    }
+  }
+
   if (profile.mentions && profile.mentions.length > 0) {
     html += '<h3>Mentioned in</h3><ul class="research-mention-list">';
     for (var i = 0; i < profile.mentions.length; i++) {

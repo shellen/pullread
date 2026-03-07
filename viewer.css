@@ -7208,6 +7208,26 @@
   .research-brief-wiki:hover {
     text-decoration: underline;
   }
+  .research-facts-list {
+    list-style: none;
+    padding: 0;
+  }
+  .research-facts-list li {
+    padding: 4px 0;
+    font-size: 13px;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+  }
+  .research-facts-list a {
+    color: var(--link);
+    text-decoration: none;
+  }
+  .research-facts-list a:hover {
+    text-decoration: underline;
+  }
+  .research-fact-rel {
+    color: var(--muted);
+    font-style: italic;
+  }
   .research-graph-btn {
     margin-top: 12px;
     font-size: 13px;
