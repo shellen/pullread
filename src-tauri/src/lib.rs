@@ -3,7 +3,6 @@
 
 mod auth;
 mod commands;
-mod email;
 mod notifications;
 mod platform;
 mod sidecar;
@@ -89,8 +88,6 @@ pub fn run() {
             commands::trigger_review,
             commands::get_log_content,
             commands::print_webview,
-            email::cmd_send_test_email,
-            email::cmd_send_roundup,
             auth::open_site_login,
             auth::list_site_logins,
             auth::remove_site_login,

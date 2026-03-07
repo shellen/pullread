@@ -1,7 +1,7 @@
 // ABOUTME: Scheduled sync, review, and email roundup timers
 // ABOUTME: Reads intervals from config and runs periodic operations
 
-use crate::{email, notifications, sidecar, tray};
+use crate::{notifications, sidecar, tray};
 use tauri::{AppHandle, Manager};
 
 /// Start sync, review, and email roundup timers based on user configuration
@@ -88,20 +88,39 @@ fn start_review_timer(app: &AppHandle) {
     });
 }
 
-/// Start the email roundup timer — sends at a specific time of day
+/// Start the email roundup timer — sends via the Node sidecar HTTP API at a specific time of day
 fn start_email_timer(app: &AppHandle) {
-    let config = email::load_email_config(app);
-    if !config.enabled || config.smtp_host.is_empty() || config.to_address.is_empty() {
+    let state = app.state::<sidecar::SidecarState>();
+    let path = state
+        .config_path()
+        .parent()
+        .unwrap_or(std::path::Path::new("/tmp"))
+        .join("settings.json");
+
+    let config: serde_json::Value = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|c| serde_json::from_str(&c).ok())
+        .unwrap_or_default();
+
+    let email_cfg = config.get("emailRoundup").cloned().unwrap_or_default();
+    let enabled = email_cfg.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false);
+    let smtp_host = email_cfg.get("smtpHost").and_then(|v| v.as_str()).unwrap_or("");
+    let to_address = email_cfg.get("toAddress").and_then(|v| v.as_str()).unwrap_or("");
+
+    if !enabled || smtp_host.is_empty() || to_address.is_empty() {
         return;
     }
 
-    let send_time = config.send_time.clone();
+    let send_time = email_cfg
+        .get("sendTime")
+        .and_then(|v| v.as_str())
+        .unwrap_or("08:00")
+        .to_string();
     log::info!("Starting email roundup timer: daily at {}", send_time);
 
     let handle = app.clone();
     tauri::async_runtime::spawn(async move {
         loop {
-            // Calculate duration until next send time
             let wait = duration_until_time(&send_time);
             log::info!(
                 "Email roundup: next send in {} minutes",
@@ -111,13 +130,26 @@ fn start_email_timer(app: &AppHandle) {
             tokio::time::sleep(wait).await;
 
             log::info!("Scheduled email roundup triggered");
-            match email::send_roundup(&handle).await {
-                Ok(summary) => {
-                    log::info!("Email roundup sent: {}", summary);
-                    notifications::notify(&handle, "Roundup Sent", &summary);
+            match sidecar::ensure_viewer_running(&handle).await {
+                Ok(port) => {
+                    let url = format!("http://127.0.0.1:{}/api/email/send-roundup", port);
+                    match reqwest::Client::new()
+                        .post(&url)
+                        .send()
+                        .await
+                    {
+                        Ok(resp) => {
+                            let body = resp.text().await.unwrap_or_default();
+                            log::info!("Email roundup sent: {}", body);
+                            notifications::notify(&handle, "Roundup Sent", "Daily roundup email sent");
+                        }
+                        Err(e) => {
+                            log::error!("Email roundup HTTP request failed: {}", e);
+                        }
+                    }
                 }
                 Err(e) => {
-                    log::error!("Email roundup failed: {}", e);
+                    log::error!("Email roundup failed — could not start viewer: {}", e);
                 }
             }
 

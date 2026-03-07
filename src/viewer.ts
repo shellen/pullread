@@ -1553,6 +1553,30 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
       }
     }
 
+    if (url.pathname === '/api/email/test' && req.method === 'POST') {
+      try {
+        const { sendTestEmail } = await import('./email');
+        const msg = await sendTestEmail();
+        sendJson(res, { ok: true, message: msg });
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/email/send-roundup' && req.method === 'POST') {
+      try {
+        const { sendRoundup } = await import('./email');
+        const msg = await sendRoundup(undefined, undefined, port);
+        sendJson(res, { ok: true, message: msg });
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+      }
+      return;
+    }
+
     // Model catalog for Settings UI
     if (url.pathname === '/api/models' && req.method === 'GET') {
       try {

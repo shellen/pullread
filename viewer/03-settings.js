@@ -525,17 +525,19 @@ function settingsAutoSaveEmail(input) {
 }
 
 function settingsSaveEmailConfig() {
+  var provider = (document.getElementById('sp-email-provider') || {}).value || 'gmail';
   var body = {
     enabled: document.getElementById('sp-email-enabled') ? document.getElementById('sp-email-enabled').checked : false,
+    smtpProvider: provider,
     toAddress: (document.getElementById('sp-email-to') || {}).value || '',
     fromAddress: (document.getElementById('sp-email-from') || {}).value || '',
     sendTime: (document.getElementById('sp-email-time') || {}).value || '08:00',
     lookbackDays: parseInt((document.getElementById('sp-email-lookback') || {}).value || '1', 10),
-    smtpHost: (document.getElementById('sp-email-smtp-host') || {}).value || '',
-    smtpPort: parseInt((document.getElementById('sp-email-smtp-port') || {}).value || '587', 10),
+    smtpHost: provider === 'custom' ? ((document.getElementById('sp-email-smtp-host') || {}).value || '') : '',
+    smtpPort: provider === 'custom' ? parseInt((document.getElementById('sp-email-smtp-port') || {}).value || '587', 10) : 587,
     smtpUser: (document.getElementById('sp-email-smtp-user') || {}).value || '',
     smtpPass: (document.getElementById('sp-email-smtp-pass') || {}).value || '',
-    useTls: document.getElementById('sp-email-tls') ? document.getElementById('sp-email-tls').checked : true
+    useTls: provider === 'custom' ? (document.getElementById('sp-email-tls') ? document.getElementById('sp-email-tls').checked : true) : true
   };
   return fetch('/api/email-settings', {
     method: 'POST',
@@ -544,18 +546,41 @@ function settingsSaveEmailConfig() {
   }).then(function(r) { return r.json(); });
 }
 
+function settingsProviderChange(provider) {
+  var customFields = document.getElementById('email-custom-smtp');
+  var providerHelp = document.getElementById('email-provider-help');
+  var fromRow = document.getElementById('email-from-row');
+  if (customFields) customFields.style.display = provider === 'custom' ? '' : 'none';
+  if (fromRow) fromRow.style.display = provider === 'custom' ? '' : 'none';
+  if (providerHelp) {
+    if (provider === 'gmail') {
+      providerHelp.innerHTML = '<div style="font-size:13px;color:var(--muted);line-height:1.5;padding:8px 12px;background:var(--bg-secondary, var(--bg));border-radius:6px;border:1px solid var(--border)">'
+        + '<strong style="color:var(--fg)">Gmail setup:</strong><br>'
+        + '1. Enable <a href="https://myaccount.google.com/signinoptions/two-step-verification" target="_blank" rel="noopener" style="color:var(--link)">2-Step Verification</a> on your Google account<br>'
+        + '2. Create an <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener" style="color:var(--link)">App Password</a> (select Mail)<br>'
+        + '3. Use your Gmail address and the 16-character app password below'
+        + '</div>';
+    } else if (provider === 'outlook') {
+      providerHelp.innerHTML = '<div style="font-size:13px;color:var(--muted);line-height:1.5;padding:8px 12px;background:var(--bg-secondary, var(--bg));border-radius:6px;border:1px solid var(--border)">'
+        + '<strong style="color:var(--fg)">Outlook setup:</strong><br>'
+        + 'Use your Outlook/Microsoft email address and password below. '
+        + 'If you have 2FA enabled, create an <a href="https://account.live.com/proofs/AppPassword" target="_blank" rel="noopener" style="color:var(--link)">app password</a>.'
+        + '</div>';
+    } else {
+      providerHelp.innerHTML = '';
+    }
+  }
+  settingsAutoSaveEmail(null);
+}
+
 function settingsTestEmail() {
   var status = document.getElementById('email-test-status');
   if (status) status.textContent = 'Sending test email\u2026';
-  // Save first, then send test
   settingsSaveEmailConfig().then(function() {
-    if (window.__TAURI__) {
-      return window.__TAURI__.core.invoke('cmd_send_test_email');
-    }
-    // Fallback for browser mode — not available without Tauri
-    return Promise.reject('Test email requires the PullRead desktop app');
-  }).then(function(msg) {
-    if (status) { status.textContent = msg || 'Test email sent!'; status.style.color = 'var(--green, #2a9d4a)'; }
+    return fetch('/api/email/test', { method: 'POST' }).then(function(r) { return r.json(); });
+  }).then(function(data) {
+    if (data.error) throw data.error;
+    if (status) { status.textContent = data.message || 'Test email sent!'; status.style.color = 'var(--green, #2a9d4a)'; }
   }).catch(function(err) {
     if (status) { status.textContent = 'Error: ' + (err || 'Failed to send'); status.style.color = 'var(--red, #c44)'; }
   });
@@ -565,12 +590,10 @@ function settingsSendRoundup() {
   var status = document.getElementById('email-test-status');
   if (status) status.textContent = 'Sending roundup\u2026';
   settingsSaveEmailConfig().then(function() {
-    if (window.__TAURI__) {
-      return window.__TAURI__.core.invoke('cmd_send_roundup');
-    }
-    return Promise.reject('Email roundup requires the PullRead desktop app');
-  }).then(function(msg) {
-    if (status) { status.textContent = msg || 'Roundup sent!'; status.style.color = 'var(--green, #2a9d4a)'; }
+    return fetch('/api/email/send-roundup', { method: 'POST' }).then(function(r) { return r.json(); });
+  }).then(function(data) {
+    if (data.error) throw data.error;
+    if (status) { status.textContent = data.message || 'Roundup sent!'; status.style.color = 'var(--green, #2a9d4a)'; }
   }).catch(function(err) {
     if (status) { status.textContent = 'Error: ' + (err || 'Failed to send'); status.style.color = 'var(--red, #c44)'; }
   });
@@ -1060,8 +1083,9 @@ function showSettingsPage(scrollToSection) {
       h += '<div class="setting-control"><div class="input-wrap"><input type="email" id="sp-email-to" value="' + escapeHtml(data.toAddress || '') + '" placeholder="you@example.com" class="input-field" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveEmail(this)"><span class="save-indicator">\u2713</span></div></div>';
       h += '</div>';
 
-      // From address
-      h += '<div class="setting-row">';
+      // From address (only shown for custom provider)
+      var providerVal = data.smtpProvider || 'gmail';
+      h += '<div class="setting-row" id="email-from-row" style="' + (providerVal === 'custom' ? '' : 'display:none') + '">';
       h += '<div class="setting-label"><label>From address</label><div class="setting-desc">Sender address (must match SMTP credentials)</div></div>';
       h += '<div class="setting-control"><div class="input-wrap"><input type="email" id="sp-email-from" value="' + escapeHtml(data.fromAddress || '') + '" placeholder="pullread@example.com" class="input-field" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveEmail(this)"><span class="save-indicator">\u2713</span></div></div>';
       h += '</div>';
@@ -1084,14 +1108,55 @@ function showSettingsPage(scrollToSection) {
       h += '</div><input type="hidden" id="sp-email-lookback" value="' + lookbackDays + '"></div>';
       h += '</div>';
 
-      // SMTP host
+      // Email provider
       h += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">';
-      h += '<div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em">SMTP Server</div>';
+      h += '<div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em">Email Provider</div>';
       h += '</div>';
 
       h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Provider</label><div class="setting-desc">Select your email service</div></div>';
+      h += '<div class="setting-control"><select id="sp-email-provider" onchange="settingsProviderChange(this.value)" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;font-family:inherit">';
+      h += '<option value="gmail"' + (providerVal === 'gmail' ? ' selected' : '') + '>Gmail</option>';
+      h += '<option value="outlook"' + (providerVal === 'outlook' ? ' selected' : '') + '>Outlook</option>';
+      h += '<option value="custom"' + (providerVal === 'custom' ? ' selected' : '') + '>Custom SMTP</option>';
+      h += '</select></div>';
+      h += '</div>';
+
+      // Provider setup help
+      h += '<div id="email-provider-help" style="margin-bottom:8px">';
+      if (providerVal === 'gmail') {
+        h += '<div style="font-size:13px;color:var(--muted);line-height:1.5;padding:8px 12px;background:var(--bg-secondary, var(--bg));border-radius:6px;border:1px solid var(--border)">';
+        h += '<strong style="color:var(--fg)">Gmail setup:</strong><br>';
+        h += '1. Enable <a href="https://myaccount.google.com/signinoptions/two-step-verification" target="_blank" rel="noopener" style="color:var(--link)">2-Step Verification</a> on your Google account<br>';
+        h += '2. Create an <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener" style="color:var(--link)">App Password</a> (select Mail)<br>';
+        h += '3. Use your Gmail address and the 16-character app password below';
+        h += '</div>';
+      } else if (providerVal === 'outlook') {
+        h += '<div style="font-size:13px;color:var(--muted);line-height:1.5;padding:8px 12px;background:var(--bg-secondary, var(--bg));border-radius:6px;border:1px solid var(--border)">';
+        h += '<strong style="color:var(--fg)">Outlook setup:</strong><br>';
+        h += 'Use your Outlook/Microsoft email address and password below. ';
+        h += 'If you have 2FA enabled, create an <a href="https://account.live.com/proofs/AppPassword" target="_blank" rel="noopener" style="color:var(--link)">app password</a>.';
+        h += '</div>';
+      }
+      h += '</div>';
+
+      // Username + Password (shown for all providers)
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Email address</label></div>';
+      h += '<div class="setting-control"><div class="input-wrap"><input type="text" id="sp-email-smtp-user" value="' + escapeHtml(data.smtpUser || '') + '" placeholder="your-email@gmail.com" class="input-field" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveEmail(this)"><span class="save-indicator">\u2713</span></div></div>';
+      h += '</div>';
+
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>App password</label></div>';
+      h += '<div class="setting-control"><div class="input-wrap"><input type="password" id="sp-email-smtp-pass" value="' + escapeHtml(data.smtpPass || '') + '" placeholder="xxxx xxxx xxxx xxxx" class="input-field" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveEmail(this)"><span class="save-indicator">\u2713</span></div></div>';
+      h += '</div>';
+
+      // Custom SMTP fields (only shown for custom provider)
+      h += '<div id="email-custom-smtp" style="' + (providerVal === 'custom' ? '' : 'display:none') + '">';
+
+      h += '<div class="setting-row">';
       h += '<div class="setting-label"><label>Host</label></div>';
-      h += '<div class="setting-control"><div class="input-wrap"><input type="text" id="sp-email-smtp-host" value="' + escapeHtml(data.smtpHost || '') + '" placeholder="smtp.gmail.com" class="input-field" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveEmail(this)"><span class="save-indicator">\u2713</span></div></div>';
+      h += '<div class="setting-control"><div class="input-wrap"><input type="text" id="sp-email-smtp-host" value="' + escapeHtml(data.smtpHost || '') + '" placeholder="smtp.example.com" class="input-field" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveEmail(this)"><span class="save-indicator">\u2713</span></div></div>';
       h += '</div>';
 
       h += '<div class="setting-row">';
@@ -1100,19 +1165,11 @@ function showSettingsPage(scrollToSection) {
       h += '</div>';
 
       h += '<div class="setting-row">';
-      h += '<div class="setting-label"><label>Username</label></div>';
-      h += '<div class="setting-control"><div class="input-wrap"><input type="text" id="sp-email-smtp-user" value="' + escapeHtml(data.smtpUser || '') + '" placeholder="your-email@gmail.com" class="input-field" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveEmail(this)"><span class="save-indicator">\u2713</span></div></div>';
-      h += '</div>';
-
-      h += '<div class="setting-row">';
-      h += '<div class="setting-label"><label>Password</label><div class="setting-desc">Use an app password for Gmail/Outlook</div></div>';
-      h += '<div class="setting-control"><div class="input-wrap"><input type="password" id="sp-email-smtp-pass" value="' + escapeHtml(data.smtpPass || '') + '" placeholder="App password" class="input-field" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveEmail(this)"><span class="save-indicator">\u2713</span></div></div>';
-      h += '</div>';
-
-      h += '<div class="setting-row">';
       h += '<div class="setting-label"><label>Use TLS</label><div class="setting-desc">Recommended for most providers</div></div>';
       h += '<div class="setting-control"><input type="checkbox" id="sp-email-tls"' + (data.useTls !== false ? ' checked' : '') + ' onchange="settingsAutoSaveEmail(this)" style="width:18px;height:18px;accent-color:var(--link)"></div>';
       h += '</div>';
+
+      h += '</div>'; // end custom smtp
 
       // Test & Send buttons
       h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">';
