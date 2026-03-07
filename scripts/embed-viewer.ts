@@ -127,6 +127,8 @@ const ICON_MAP: Array<{ id: string; file: string; variant?: 'solid' | 'chevron' 
   { id: 'i-share', file: 'arrow-up-tray.svg' },
   { id: 'i-sliders', file: 'adjustments-horizontal.svg' },
   { id: 'i-squares', file: 'squares-2x2.svg' },
+  { id: 'i-star', file: 'star.svg' },
+  { id: 'i-star-solid', file: 'star.svg', variant: 'solid' },
   { id: 'i-stop', file: 'stop.svg' },
   { id: 'i-tags', file: 'tag.svg' },
   { id: 'i-video', file: 'video-camera.svg' },

@@ -781,6 +781,16 @@ function showSettingsPage(scrollToSection) {
   html += '</div>';
   html += '</div>';
 
+  // -- Research card --
+  html += '<div class="card" id="settings-research">';
+  html += '<div class="card-title">Research</div>';
+  html += '<div class="card-desc">The knowledge graph extracts entities, viewpoints, and relationships from your articles.</div>';
+  html += '<div id="research-settings-status" style="font-size:13px;color:var(--muted);margin-bottom:12px">Loading\u2026</div>';
+  html += '<div style="display:flex;gap:10px;flex-wrap:wrap">';
+  html += '<button onclick="settingsResetResearch()" style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit">Reset &amp; Re-extract</button>';
+  html += '</div>';
+  html += '</div>';
+
   // -- Backup & Restore card --
   html += '<div class="card" id="settings-backup">';
   html += '<div class="card-title">Backup &amp; Restore</div>';
@@ -955,6 +965,9 @@ function showSettingsPage(scrollToSection) {
 
   // Load Storage info
   loadStorageInfo();
+
+  // Load Research status
+  settingsLoadResearchStatus();
 
   // Load TTS settings async
   if (serverMode) {
@@ -1772,6 +1785,41 @@ function formatBytes(bytes) {
   if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
   if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
   return (bytes / 1073741824).toFixed(1) + ' GB';
+}
+
+function settingsLoadResearchStatus() {
+  fetch('/api/research/status')
+    .then(function(r) { return r.json(); })
+    .then(function(status) {
+      var el = document.getElementById('research-settings-status');
+      if (!el) return;
+      if (status.entityCount > 0) {
+        el.textContent = status.entityCount + ' entities from ' + status.extractedCount + ' of ' + status.totalArticles + ' articles';
+      } else if (status.extractedCount > 0) {
+        el.textContent = status.extractedCount + ' articles extracted, no entities yet';
+      } else {
+        el.textContent = status.totalArticles + ' articles available, none extracted yet';
+      }
+    })
+    .catch(function() {
+      var el = document.getElementById('research-settings-status');
+      if (el) el.textContent = 'Could not load status';
+    });
+}
+
+async function settingsResetResearch() {
+  if (!confirm('Reset the research knowledge graph? This deletes all extracted entities, mentions, and relationships. They will be re-extracted on next sync.')) return;
+  try {
+    var res = await fetch('/api/research/reset', { method: 'POST' });
+    if (res.ok) {
+      showToast('Research data cleared. Run a sync or click Extract in the Research tab to rebuild.');
+      settingsLoadResearchStatus();
+    } else {
+      showToast('Could not reset research data');
+    }
+  } catch {
+    showToast('Could not reset research data');
+  }
 }
 
 async function clearVideoCache() {

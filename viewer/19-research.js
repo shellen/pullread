@@ -39,6 +39,9 @@ function showResearch() {
 function researchRenderBrowser() {
   var html = '<div class="article-header"><h1>Research</h1></div>';
 
+  // New for you (watch matches)
+  html += '<div id="research-new-for-you"></div>';
+
   // Tensions section
   html += '<div id="research-tensions"></div>';
 
@@ -47,7 +50,8 @@ function researchRenderBrowser() {
   // Entity list panel
   html += '<div class="research-panel research-entity-list">';
   html += '<div class="research-search-bar">';
-  html += '<input type="text" id="research-search" placeholder="Search entities..." oninput="researchSearchEntities()" />';
+  html += '<input type="text" id="research-search" placeholder="Search entities..." oninput="researchSearchEntitiesWithClear()" />';
+  html += '<button class="research-search-clear" id="research-search-clear" onclick="researchClearSearch()" style="display:none" title="Clear search">&times;</button>';
   html += '</div>';
   html += '<div class="research-type-filters" id="research-type-filters"></div>';
   html += '<div id="research-entity-items" class="research-entity-items"></div>';
@@ -65,6 +69,7 @@ function researchRenderBrowser() {
   document.getElementById('content-scroll').scrollTop = 0;
   researchLoadEntities();
   researchLoadTensions();
+  researchLoadMatches();
 }
 
 function researchShowEmptyState(status) {
@@ -228,8 +233,14 @@ function researchRenderDetail(profile) {
   var container = document.getElementById('research-detail');
   if (!container || !profile.entity) return;
   var e = profile.entity;
-  var html = '<h2>' + escapeHtml(e.name) + '</h2>';
+  var html = '<div class="research-detail-header">';
+  html += '<h2>' + escapeHtml(e.name) + '</h2>';
+  html += '<button class="research-watch-btn" id="research-watch-btn" onclick="researchToggleWatch(\'' + escapeJsStr(e.name) + '\')" title="Watch this entity">';
+  html += '<svg class="icon" style="width:16px;height:16px" aria-hidden="true"><use href="#i-star"/></svg>';
+  html += '</button>';
+  html += '</div>';
   html += '<span class="research-entity-badge research-type-' + escapeHtml(e.type) + '">' + escapeHtml(e.type) + '</span>';
+  researchCheckIfWatched(e.name);
 
   if (profile.mentions && profile.mentions.length > 0) {
     html += '<h3>Mentioned in</h3><ul class="research-mention-list">';
@@ -327,6 +338,115 @@ function researchSearchFor(name) {
   if (input) input.value = name;
   _researchTypeFilter = null;
   researchLoadEntities(name);
+  researchUpdateClearBtn();
+}
+
+function researchClearSearch() {
+  var input = document.getElementById('research-search');
+  if (input) input.value = '';
+  _researchTypeFilter = null;
+  researchLoadEntities();
+  researchUpdateClearBtn();
+}
+
+function researchUpdateClearBtn() {
+  var input = document.getElementById('research-search');
+  var btn = document.getElementById('research-search-clear');
+  if (input && btn) {
+    btn.style.display = input.value.trim() ? 'block' : 'none';
+  }
+}
+
+function researchSearchEntitiesWithClear() {
+  researchSearchEntities();
+  researchUpdateClearBtn();
+}
+
+// --- Watchlist UI ---
+
+function researchToggleWatch(entityName) {
+  fetch('/api/research/watches')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var existing = data.watches.find(function(w) { return w.entityName === entityName; });
+      if (existing) {
+        return fetch('/api/research/watches/' + existing.rkey, { method: 'DELETE' })
+          .then(function() { researchSetWatchBtn(false); });
+      } else {
+        return fetch('/api/research/watches', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'entity', entityName: entityName }),
+        }).then(function() { researchSetWatchBtn(true); });
+      }
+    });
+}
+
+function researchCheckIfWatched(entityName) {
+  fetch('/api/research/watches')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var isWatched = data.watches.some(function(w) { return w.entityName === entityName; });
+      researchSetWatchBtn(isWatched);
+    });
+}
+
+function researchSetWatchBtn(isWatched) {
+  var btn = document.getElementById('research-watch-btn');
+  if (!btn) return;
+  btn.classList.toggle('active', isWatched);
+  btn.title = isWatched ? 'Unwatch this entity' : 'Watch this entity';
+}
+
+// --- Watch matches (New for you) ---
+
+function researchLoadMatches() {
+  fetch('/api/research/matches')
+    .then(function(r) { return r.json(); })
+    .then(function(matches) {
+      researchRenderMatches(matches);
+    })
+    .catch(function() {});
+}
+
+function researchRenderMatches(matches) {
+  var container = document.getElementById('research-new-for-you');
+  if (!container || matches.length === 0) {
+    if (container) container.innerHTML = '';
+    return;
+  }
+
+  var html = '<div class="research-matches-section">';
+  html += '<div class="research-matches-header">';
+  html += '<h3>New for you</h3>';
+  html += '<button class="research-matches-dismiss" onclick="researchDismissMatches()">Mark all seen</button>';
+  html += '</div>';
+  html += '<div class="research-matches-list">';
+
+  for (var i = 0; i < matches.length; i++) {
+    var m = matches[i];
+    var label = m.entityName ? escapeHtml(m.entityName) : escapeHtml(m.query || '');
+    var title = m.title ? escapeHtml(m.title) : escapeHtml(m.filename);
+    html += '<div class="research-match-row">';
+    html += '<span class="research-match-label">' + label + '</span>';
+    if (m.title) {
+      html += '<a href="#" onclick="loadFileByName(\'' + escapeJsStr(m.filename) + '\');return false">' + title + '</a>';
+    } else {
+      html += '<span class="research-match-file">' + title + '</span>';
+    }
+    html += '</div>';
+  }
+
+  html += '</div></div>';
+  container.innerHTML = html;
+}
+
+function researchDismissMatches() {
+  fetch('/api/research/matches/seen', { method: 'POST' })
+    .then(function() {
+      var container = document.getElementById('research-new-for-you');
+      if (container) container.innerHTML = '';
+    });
 }
 
 function loadFileByName(filename) {

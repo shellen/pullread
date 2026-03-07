@@ -60,6 +60,7 @@ export function createPDS({ db: dbPath = ':memory:', did = 'did:web:localhost' }
     get: db.prepare('SELECT collection, rkey, record, indexedAt FROM records WHERE collection = ? AND rkey = ?'),
     list: db.prepare('SELECT collection, rkey, record, indexedAt FROM records WHERE collection = ? ORDER BY rkey ASC'),
     del: db.prepare('DELETE FROM records WHERE collection = ? AND rkey = ?'),
+    delCollection: db.prepare('DELETE FROM records WHERE collection = ?'),
   };
 
   return {
@@ -84,6 +85,10 @@ export function createPDS({ db: dbPath = ':memory:', did = 'did:web:localhost' }
       stmts.del.run(collection, rkey);
     },
 
+    deleteCollection(collection: string) {
+      stmts.delCollection.run(collection);
+    },
+
     query(collection: string, opts: { where?: Record<string, any>; limit?: number } = {}) {
       const { where = {}, limit } = opts;
       const conditions = ['collection = ?'];
@@ -91,7 +96,10 @@ export function createPDS({ db: dbPath = ':memory:', did = 'did:web:localhost' }
 
       for (const [field, val] of Object.entries(where)) {
         conditions.push("json_extract(record, '$.' || ?) = ?");
-        params.push(field, typeof val === 'number' ? val : String(val));
+        const sqlVal = typeof val === 'number' ? val
+          : typeof val === 'boolean' ? (val ? 1 : 0)
+          : String(val);
+        params.push(field, sqlVal);
       }
 
       let sql = `SELECT collection, rkey, record, indexedAt FROM records WHERE ${conditions.join(' AND ')} ORDER BY rkey ASC`;

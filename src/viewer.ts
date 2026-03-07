@@ -2519,12 +2519,67 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
       const { getResearchPDS, runBackgroundExtraction } = await import('./research');
       const pds = getResearchPDS();
       // Run extraction (non-blocking response — send progress via status polling)
-      runBackgroundExtraction(pds, outputPath).then(function(stats) {
+      runBackgroundExtraction(pds, outputPath).then(async function(stats) {
         console.log(`  Research extraction complete: ${stats.extracted} extracted, ${stats.skipped} skipped, ${stats.errors} errors`);
+        const { checkWatchMatches } = await import('./research');
+        const newMatches = checkWatchMatches(pds);
+        if (newMatches > 0) console.log(`  Watchlist: ${newMatches} new matches`);
       }).catch(function(err) {
         console.log(`  Research extraction failed: ${err instanceof Error ? err.message : err}`);
       });
       sendJson(res, { started: true });
+      return;
+    }
+
+    if (url.pathname === '/api/research/watches' && req.method === 'GET') {
+      const { getResearchPDS, listWatches, getUnseenMatches } = await import('./research');
+      const pds = getResearchPDS();
+      const watches = listWatches(pds);
+      const unseen = getUnseenMatches(pds);
+      sendJson(res, { watches: watches.map((w: any) => ({ rkey: w.rkey, ...w.value })), unseenCount: unseen.length });
+      return;
+    }
+
+    if (url.pathname === '/api/research/watches' && req.method === 'POST') {
+      const body = await readBody(req);
+      const data = JSON.parse(body);
+      const { getResearchPDS, addWatch } = await import('./research');
+      const pds = getResearchPDS();
+      const watch = addWatch(pds, data);
+      sendJson(res, { rkey: watch.rkey });
+      return;
+    }
+
+    if (url.pathname.startsWith('/api/research/watches/') && req.method === 'DELETE') {
+      const rkey = url.pathname.split('/').pop()!;
+      const { getResearchPDS, removeWatch } = await import('./research');
+      const pds = getResearchPDS();
+      removeWatch(pds, rkey);
+      sendJson(res, { ok: true });
+      return;
+    }
+
+    if (url.pathname === '/api/research/matches' && req.method === 'GET') {
+      const { getResearchPDS, getUnseenMatches } = await import('./research');
+      const pds = getResearchPDS();
+      const matches = getUnseenMatches(pds);
+      sendJson(res, matches.map((m: any) => ({ rkey: m.rkey, ...m.value })));
+      return;
+    }
+
+    if (url.pathname === '/api/research/matches/seen' && req.method === 'POST') {
+      const { getResearchPDS, markMatchesSeen } = await import('./research');
+      const pds = getResearchPDS();
+      markMatchesSeen(pds);
+      sendJson(res, { ok: true });
+      return;
+    }
+
+    if (url.pathname === '/api/research/reset' && req.method === 'POST') {
+      const { getResearchPDS, resetResearchData } = await import('./research');
+      const pds = getResearchPDS();
+      resetResearchData(pds);
+      sendJson(res, { ok: true });
       return;
     }
 

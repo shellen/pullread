@@ -6957,6 +6957,110 @@
     opacity: 0.7;
   }
 
+  /* Search clear button */
+  .research-search-bar {
+    position: relative;
+  }
+  .research-search-clear {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 2px 6px;
+    line-height: 1;
+    border-radius: 50%;
+  }
+  .research-search-clear:hover {
+    color: var(--fg);
+    background: var(--border);
+  }
+
+  /* Watch button */
+  .research-detail-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .research-detail-header h2 {
+    margin: 0;
+    flex: 1;
+  }
+  .research-watch-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 8px;
+    cursor: pointer;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .research-watch-btn:hover {
+    color: var(--fg);
+    border-color: var(--fg);
+  }
+  .research-watch-btn.active {
+    color: #fbbf24;
+    border-color: #fbbf24;
+  }
+
+  /* New for you (watch matches) */
+  .research-matches-section {
+    margin-bottom: 20px;
+    padding: 0 4px;
+  }
+  .research-matches-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .research-matches-header h3 {
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    margin: 0;
+  }
+  .research-matches-dismiss {
+    background: none;
+    border: none;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  .research-matches-dismiss:hover { color: var(--fg); }
+  .research-matches-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .research-match-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: var(--card-bg, var(--bg));
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+  }
+  .research-match-label {
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .research-match-file {
+    color: var(--muted);
+  }
+
   /* Sentiment indicators */
   .research-sentiment-dot {
     display: inline-block;

@@ -34,6 +34,21 @@ export function closeResearchPDS(): void {
   }
 }
 
+const RESEARCH_COLLECTIONS = [
+  'app.pullread.entity',
+  'app.pullread.mention',
+  'app.pullread.extraction',
+  'app.pullread.edge',
+  'app.pullread.watch',
+  'app.pullread.watchMatch',
+];
+
+export function resetResearchData(pds: PDS): void {
+  for (const collection of RESEARCH_COLLECTIONS) {
+    pds.deleteCollection(collection);
+  }
+}
+
 interface ArticleInput {
   filename: string;
   title: string;
@@ -384,4 +399,105 @@ export function queryTensions(pds: PDS, minMentions = 3): Tension[] {
 
   tensions.sort((a, b) => b.mentionCount - a.mentionCount);
   return tensions;
+}
+
+// --- Watchlists ---
+
+interface WatchInput {
+  type: 'entity' | 'query';
+  entityName?: string;
+  query?: string;
+}
+
+export function addWatch(pds: PDS, input: WatchInput) {
+  return pds.putRecord('app.pullread.watch', null, {
+    type: input.type,
+    entityName: input.entityName || null,
+    query: input.query || null,
+    createdAt: new Date().toISOString(),
+    lastMatchAt: null,
+  });
+}
+
+export function removeWatch(pds: PDS, rkey: string) {
+  pds.deleteRecord('app.pullread.watch', rkey);
+}
+
+export function listWatches(pds: PDS) {
+  return pds.listRecords('app.pullread.watch');
+}
+
+export function checkWatchMatches(pds: PDS): number {
+  const watches = pds.listRecords('app.pullread.watch');
+  const existingMatches = pds.listRecords('app.pullread.watchMatch');
+  const matchedKeys = new Set(existingMatches.map((m: any) =>
+    m.value.watchRkey + ':' + m.value.filename
+  ));
+
+  let newMatches = 0;
+
+  for (const watch of watches) {
+    const w = watch.value as any;
+
+    if (w.type === 'entity' && w.entityName) {
+      const mentions = pds.query('app.pullread.mention', {
+        where: { entityName: w.entityName },
+      });
+      for (const mention of mentions) {
+        const key = watch.rkey + ':' + (mention as any).value.filename;
+        if (matchedKeys.has(key)) continue;
+        matchedKeys.add(key);
+        pds.putRecord('app.pullread.watchMatch', null, {
+          watchRkey: watch.rkey,
+          watchType: 'entity',
+          entityName: w.entityName,
+          filename: (mention as any).value.filename,
+          title: (mention as any).value.title,
+          matchedAt: new Date().toISOString(),
+          seen: false,
+        });
+        newMatches++;
+      }
+    }
+
+    if (w.type === 'query' && w.query) {
+      const queryLower = w.query.toLowerCase();
+      const extractions = pds.listRecords('app.pullread.extraction');
+      for (const ext of extractions) {
+        const themes: string[] = (ext as any).value.themes || [];
+        const matches = themes.some((t: string) => t.toLowerCase().includes(queryLower));
+        if (!matches) continue;
+
+        const key = watch.rkey + ':' + (ext as any).value.filename;
+        if (matchedKeys.has(key)) continue;
+        matchedKeys.add(key);
+        pds.putRecord('app.pullread.watchMatch', null, {
+          watchRkey: watch.rkey,
+          watchType: 'query',
+          query: w.query,
+          filename: (ext as any).value.filename,
+          title: null,
+          matchedAt: new Date().toISOString(),
+          seen: false,
+        });
+        newMatches++;
+      }
+    }
+  }
+
+  return newMatches;
+}
+
+export function getUnseenMatches(pds: PDS) {
+  return pds.query('app.pullread.watchMatch', { where: { seen: false } });
+}
+
+export function markMatchesSeen(pds: PDS) {
+  const unseen = getUnseenMatches(pds);
+  for (const match of unseen) {
+    pds.putRecord('app.pullread.watchMatch', match.rkey, {
+      ...(match as any).value,
+      seen: true,
+    });
+  }
 }

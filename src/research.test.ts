@@ -1,7 +1,7 @@
 // ABOUTME: Tests for research knowledge graph — PDS lifecycle, extraction, entity queries
 // ABOUTME: Verifies createResearchPDS initializes storage and closes without error
 
-import { createResearchPDS, extractArticle, runBackgroundExtraction, queryEntities, queryEntityProfile, queryRelatedEntities, queryTensions } from './research';
+import { createResearchPDS, extractArticle, runBackgroundExtraction, queryEntities, queryEntityProfile, queryRelatedEntities, queryTensions, addWatch, removeWatch, listWatches, checkWatchMatches, getUnseenMatches, markMatchesSeen, resetResearchData } from './research';
 import { summarizeText } from './summarizer';
 import { listMarkdownFiles } from './writer';
 import { readFileSync } from 'fs';
@@ -389,6 +389,129 @@ describe('tension detection', () => {
 
     const tensions = queryTensions(pds);
     expect(tensions.length).toBe(0);
+    pds.close();
+  });
+});
+
+describe('watchlists', () => {
+  beforeEach(() => mockSummarize.mockReset());
+
+  test('add and list entity watches', () => {
+    const pds = createResearchPDS(':memory:');
+    const watch = addWatch(pds, { type: 'entity', entityName: 'Apple' });
+    expect(watch.rkey).toBeDefined();
+
+    const watches = listWatches(pds);
+    expect(watches.length).toBe(1);
+    expect(watches[0].value.entityName).toBe('Apple');
+    expect(watches[0].value.type).toBe('entity');
+    pds.close();
+  });
+
+  test('add and list query watches', () => {
+    const pds = createResearchPDS(':memory:');
+    addWatch(pds, { type: 'query', query: 'AI regulation' });
+
+    const watches = listWatches(pds);
+    expect(watches.length).toBe(1);
+    expect(watches[0].value.query).toBe('AI regulation');
+    pds.close();
+  });
+
+  test('remove a watch', () => {
+    const pds = createResearchPDS(':memory:');
+    const watch = addWatch(pds, { type: 'entity', entityName: 'Apple' });
+    removeWatch(pds, watch.rkey);
+
+    const watches = listWatches(pds);
+    expect(watches.length).toBe(0);
+    pds.close();
+  });
+
+  test('checkWatchMatches finds new mentions for entity watches', () => {
+    const pds = createResearchPDS(':memory:');
+    addWatch(pds, { type: 'entity', entityName: 'Apple' });
+
+    // Simulate extraction having stored mentions
+    pds.putRecord('app.pullread.mention', null, {
+      entityName: 'Apple', filename: 'new-article.md', title: 'Apple News',
+      sentiment: 'positive', stance: 'strong earnings', publishedAt: '2026-03-06',
+    });
+
+    const matches = checkWatchMatches(pds);
+    expect(matches).toBe(1);
+
+    const unseen = getUnseenMatches(pds);
+    expect(unseen.length).toBe(1);
+    expect(unseen[0].value.filename).toBe('new-article.md');
+    pds.close();
+  });
+
+  test('checkWatchMatches finds articles matching query watches', () => {
+    const pds = createResearchPDS(':memory:');
+    addWatch(pds, { type: 'query', query: 'AI regulation' });
+
+    // Simulate extraction with themes
+    pds.putRecord('app.pullread.extraction', null, {
+      filename: 'ai-article.md', extractedAt: '2026-03-06T00:00:00Z',
+      entityCount: 2, themes: ['AI regulation', 'policy'], source: 'feed',
+    });
+
+    const matches = checkWatchMatches(pds);
+    expect(matches).toBe(1);
+
+    const unseen = getUnseenMatches(pds);
+    expect(unseen.length).toBe(1);
+    expect(unseen[0].value.filename).toBe('ai-article.md');
+    pds.close();
+  });
+
+  test('does not create duplicate matches', () => {
+    const pds = createResearchPDS(':memory:');
+    addWatch(pds, { type: 'entity', entityName: 'Apple' });
+    pds.putRecord('app.pullread.mention', null, {
+      entityName: 'Apple', filename: 'a.md', title: 'A',
+      sentiment: 'neutral', stance: null, publishedAt: '2026-03-06',
+    });
+
+    checkWatchMatches(pds);
+    checkWatchMatches(pds); // run again
+
+    const unseen = getUnseenMatches(pds);
+    expect(unseen.length).toBe(1);
+    pds.close();
+  });
+
+  test('markMatchesSeen clears unseen matches', () => {
+    const pds = createResearchPDS(':memory:');
+    addWatch(pds, { type: 'entity', entityName: 'Apple' });
+    pds.putRecord('app.pullread.mention', null, {
+      entityName: 'Apple', filename: 'a.md', title: 'A',
+      sentiment: 'neutral', stance: null, publishedAt: '2026-03-06',
+    });
+    checkWatchMatches(pds);
+
+    markMatchesSeen(pds);
+    const unseen = getUnseenMatches(pds);
+    expect(unseen.length).toBe(0);
+    pds.close();
+  });
+});
+
+describe('resetResearchData', () => {
+  test('clears all records from the PDS', () => {
+    const pds = createResearchPDS(':memory:');
+    pds.putRecord('app.pullread.entity', null, { name: 'Apple', type: 'company' });
+    pds.putRecord('app.pullread.mention', null, { entityName: 'Apple', filename: 'a.md', title: 'A' });
+    pds.putRecord('app.pullread.extraction', null, { filename: 'a.md', extractedAt: '2026-03-06' });
+    pds.putRecord('app.pullread.edge', null, { from: 'Apple', to: 'Tim Cook', type: 'employs' });
+
+    resetResearchData(pds);
+
+    expect(pds.listRecords('app.pullread.entity').length).toBe(0);
+    expect(pds.listRecords('app.pullread.mention').length).toBe(0);
+    expect(pds.listRecords('app.pullread.extraction').length).toBe(0);
+    expect(pds.listRecords('app.pullread.edge').length).toBe(0);
     pds.close();
   });
 });
