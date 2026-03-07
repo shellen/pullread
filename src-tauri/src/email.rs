@@ -92,10 +92,12 @@ async fn fetch_recent_articles(
     let resp = reqwest::get(&url)
         .await
         .map_err(|e| format!("Failed to fetch articles: {}", e))?;
-    let articles: Vec<ArticleMeta> = resp
-        .json()
+    let body = resp
+        .text()
         .await
-        .map_err(|e| format!("Failed to parse articles: {}", e))?;
+        .map_err(|e| format!("Failed to read articles response: {}", e))?;
+    let articles: Vec<ArticleMeta> =
+        serde_json::from_str(&body).map_err(|e| format!("Failed to parse articles: {}", e))?;
 
     let cutoff = chrono::Utc::now() - chrono::Duration::days(lookback_days as i64);
     let cutoff_str = cutoff.to_rfc3339();
