@@ -79,7 +79,12 @@ ${article.body.slice(0, 8000)}`;
     }
   }
 
+  if (!parsed.entities || !Array.isArray(parsed.entities)) return null;
+  if (!parsed.relationships) parsed.relationships = [];
+  if (!parsed.themes) parsed.themes = [];
+
   for (const entity of parsed.entities) {
+    if (!entity.name || !entity.type) continue;
     const existing = pds.query('app.pullread.entity', {
       where: { name: entity.name },
     });
