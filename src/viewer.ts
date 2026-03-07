@@ -2493,7 +2493,7 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
       const entityName = decodeURIComponent(url.pathname.split('/').slice(4).join('/'));
       const { getResearchPDS, generateEntityBrief } = await import('./research');
       const pds = getResearchPDS();
-      const brief = generateEntityBrief(pds, entityName);
+      const brief = await generateEntityBrief(pds, entityName);
       sendJson(res, brief || { summary: null, wikipediaUrl: null, mentionCount: 0 });
       return;
     }

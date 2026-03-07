@@ -449,7 +449,14 @@ interface EntityBrief {
   mentionCount: number;
 }
 
-export function generateEntityBrief(pds: PDS, entityName: string): EntityBrief | null {
+export function gatherEntityContext(pds: PDS, entityName: string): {
+  entity: any;
+  mentions: any[];
+  edges: any[];
+  sentimentBreakdown: Record<string, number>;
+  stances: string[];
+  relatedEntities: Array<{ name: string; relationship: string }>;
+} | null {
   const entities = pds.listRecords('app.pullread.entity');
   const entity = entities.find((e: any) => e.value.name === entityName);
   if (!entity) return null;
@@ -460,30 +467,58 @@ export function generateEntityBrief(pds: PDS, entityName: string): EntityBrief |
   const edges = pds.listRecords('app.pullread.edge')
     .filter((e: any) => e.value.from === entityName || e.value.to === entityName);
 
-  // Build a brief from what we know
-  const type = (entity as any).value.type;
-  const relatedNames = new Set<string>();
+  const sentimentBreakdown: Record<string, number> = {};
+  const stances: string[] = [];
+  for (const m of mentions) {
+    const s = (m as any).value.sentiment || 'neutral';
+    sentimentBreakdown[s] = (sentimentBreakdown[s] || 0) + 1;
+    if ((m as any).value.stance) stances.push((m as any).value.stance);
+  }
+
+  // Deduplicate related entities
+  const relMap = new Map<string, string>();
   for (const edge of edges) {
     const other = (edge as any).value.from === entityName
       ? (edge as any).value.to
       : (edge as any).value.from;
-    relatedNames.add(other);
+    if (!relMap.has(other)) relMap.set(other, (edge as any).value.type);
   }
+  const relatedEntities = Array.from(relMap.entries()).map(([name, relationship]) => ({ name, relationship }));
 
-  let summary = `${entityName} is a ${type}`;
-  if (mentions.length > 0) {
-    summary += ` mentioned in ${mentions.length} article${mentions.length === 1 ? '' : 's'}`;
-  }
-  if (relatedNames.size > 0) {
-    const related = Array.from(relatedNames).slice(0, 3);
-    summary += `, connected to ${related.join(', ')}`;
-  }
-  summary += '.';
+  return { entity: (entity as any).value, mentions, edges, sentimentBreakdown, stances, relatedEntities };
+}
+
+export async function generateEntityBrief(pds: PDS, entityName: string): Promise<EntityBrief | null> {
+  const ctx = gatherEntityContext(pds, entityName);
+  if (!ctx) return null;
 
   const wikiSlug = entityName.replace(/\s+/g, '_');
   const wikipediaUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(wikiSlug).replace(/%2F/g, '/')}`;
 
-  return { summary, wikipediaUrl, mentionCount: mentions.length };
+  const articleTitles = ctx.mentions.map((m: any) => m.value.title).slice(0, 10);
+  const relatedSummary = ctx.relatedEntities.slice(0, 8)
+    .map(r => `${r.name} (${r.relationship})`).join(', ');
+
+  const prompt = `Write a 2-3 sentence research insight about "${entityName}" based ONLY on the data below. Synthesize the sentiment, relationships, and stances into a narrative. Be specific and analytical, not generic. Do NOT start with "${entityName} is a...". Just write the insight paragraph, nothing else.
+
+Type: ${ctx.entity.type}
+Mentioned in ${ctx.mentions.length} articles: ${articleTitles.join(', ')}
+Sentiment: ${Object.entries(ctx.sentimentBreakdown).map(([k, v]) => `${v} ${k}`).join(', ')}
+Stances: ${ctx.stances.slice(0, 6).join('; ') || 'none recorded'}
+Related: ${relatedSummary || 'none'}`;
+
+  try {
+    const result = await summarizeText(prompt);
+    return { summary: result.summary.trim(), wikipediaUrl, mentionCount: ctx.mentions.length };
+  } catch {
+    // Fallback to simple template if LLM fails
+    let summary = `${entityName} appears in ${ctx.mentions.length} article${ctx.mentions.length === 1 ? '' : 's'}`;
+    if (ctx.relatedEntities.length > 0) {
+      summary += `, connected to ${ctx.relatedEntities.slice(0, 3).map(r => r.name).join(', ')}`;
+    }
+    summary += '.';
+    return { summary, wikipediaUrl, mentionCount: ctx.mentions.length };
+  }
 }
 
 // --- Watchlists ---

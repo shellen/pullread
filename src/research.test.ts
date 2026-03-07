@@ -1,7 +1,7 @@
 // ABOUTME: Tests for research knowledge graph — PDS lifecycle, extraction, entity queries
 // ABOUTME: Verifies createResearchPDS initializes storage and closes without error
 
-import { createResearchPDS, extractArticle, runBackgroundExtraction, queryEntities, queryEntityProfile, queryRelatedEntities, queryTensions, addWatch, removeWatch, listWatches, checkWatchMatches, getUnseenMatches, markMatchesSeen, resetResearchData, extractFromUrl, normalizeEntityName, generateEntityBrief } from './research';
+import { createResearchPDS, extractArticle, runBackgroundExtraction, queryEntities, queryEntityProfile, queryRelatedEntities, queryTensions, addWatch, removeWatch, listWatches, checkWatchMatches, getUnseenMatches, markMatchesSeen, resetResearchData, extractFromUrl, normalizeEntityName, generateEntityBrief, gatherEntityContext } from './research';
 import { summarizeText } from './summarizer';
 import { listMarkdownFiles } from './writer';
 import { readFileSync } from 'fs';
@@ -612,34 +612,86 @@ describe('entity name normalization', () => {
 });
 
 describe('entity brief', () => {
-  test('generateEntityBrief returns summary and Wikipedia URL', () => {
+  beforeEach(() => mockSummarize.mockReset());
+
+  test('gatherEntityContext builds structured data for brief generation', () => {
     const pds = createResearchPDS(':memory:');
-    pds.putRecord('app.pullread.entity', null, { name: 'Nikole Hannah-Jones', type: 'person' });
+    pds.putRecord('app.pullread.entity', null, { name: 'Iran', type: 'place' });
     pds.putRecord('app.pullread.mention', null, {
-      entityName: 'Nikole Hannah-Jones', filename: 'a.md', title: 'The 1619 Project',
-      sentiment: 'positive', stance: 'groundbreaking journalism', publishedAt: '2026-01-01',
+      entityName: 'Iran', filename: 'a.md', title: 'Iran Negotiations',
+      sentiment: 'mixed', stance: 'diplomatic partner', publishedAt: '2026-01-01',
     });
     pds.putRecord('app.pullread.mention', null, {
-      entityName: 'Nikole Hannah-Jones', filename: 'b.md', title: 'The Myth That Busing Failed',
-      sentiment: 'neutral', stance: null, publishedAt: '2026-02-01',
+      entityName: 'Iran', filename: 'b.md', title: 'Military Tensions',
+      sentiment: 'negative', stance: 'nuclear threat', publishedAt: '2026-02-01',
     });
     pds.putRecord('app.pullread.edge', null, {
-      from: 'Nikole Hannah-Jones', to: 'New York Times Magazine', type: 'works for', sourceFilename: 'a.md',
+      from: 'Trump', to: 'Iran', type: 'sanctions', sourceFilename: 'a.md',
+    });
+    pds.putRecord('app.pullread.edge', null, {
+      from: 'Iran', to: 'Russia', type: 'intelligence', sourceFilename: 'b.md',
     });
 
-    const brief = generateEntityBrief(pds, 'Nikole Hannah-Jones');
-    expect(brief).not.toBeNull();
-    expect(brief!.wikipediaUrl).toBe('https://en.wikipedia.org/wiki/Nikole_Hannah-Jones');
-    expect(brief!.summary).toContain('Nikole Hannah-Jones');
-    expect(brief!.summary).toContain('person');
-    expect(brief!.mentionCount).toBe(2);
+    const ctx = gatherEntityContext(pds, 'Iran');
+    expect(ctx).not.toBeNull();
+    expect(ctx!.mentions.length).toBe(2);
+    expect(ctx!.sentimentBreakdown).toEqual({ mixed: 1, negative: 1 });
+    expect(ctx!.stances).toEqual(['diplomatic partner', 'nuclear threat']);
+    expect(ctx!.relatedEntities).toEqual([
+      { name: 'Trump', relationship: 'sanctions' },
+      { name: 'Russia', relationship: 'intelligence' },
+    ]);
     pds.close();
   });
 
-  test('generateEntityBrief returns null for unknown entity', () => {
+  test('generateEntityBrief calls LLM with structured context', async () => {
     const pds = createResearchPDS(':memory:');
-    const brief = generateEntityBrief(pds, 'Nobody');
+    pds.putRecord('app.pullread.entity', null, { name: 'Iran', type: 'place' });
+    pds.putRecord('app.pullread.mention', null, {
+      entityName: 'Iran', filename: 'a.md', title: 'Iran Negotiations',
+      sentiment: 'negative', stance: 'nuclear threat', publishedAt: '2026-01-01',
+    });
+
+    mockSummarize.mockResolvedValue({
+      summary: 'Coverage of Iran in your feeds focuses on military tensions and nuclear concerns.',
+      model: 'test',
+    });
+
+    const brief = await generateEntityBrief(pds, 'Iran');
+    expect(brief).not.toBeNull();
+    expect(brief!.wikipediaUrl).toBe('https://en.wikipedia.org/wiki/Iran');
+    expect(brief!.summary).toContain('Iran');
+    expect(brief!.mentionCount).toBe(1);
+    expect(mockSummarize).toHaveBeenCalledTimes(1);
+
+    // Verify the prompt contains structured data
+    const promptArg = mockSummarize.mock.calls[0][0];
+    expect(promptArg).toContain('Iran');
+    expect(promptArg).toContain('nuclear threat');
+    pds.close();
+  });
+
+  test('generateEntityBrief returns null for unknown entity', async () => {
+    const pds = createResearchPDS(':memory:');
+    const brief = await generateEntityBrief(pds, 'Nobody');
     expect(brief).toBeNull();
+    pds.close();
+  });
+
+  test('generateEntityBrief falls back to template when LLM fails', async () => {
+    const pds = createResearchPDS(':memory:');
+    pds.putRecord('app.pullread.entity', null, { name: 'Iran', type: 'place' });
+    pds.putRecord('app.pullread.mention', null, {
+      entityName: 'Iran', filename: 'a.md', title: 'Article',
+      sentiment: 'neutral', stance: null, publishedAt: '2026-01-01',
+    });
+
+    mockSummarize.mockRejectedValue(new Error('LLM unavailable'));
+
+    const brief = await generateEntityBrief(pds, 'Iran');
+    expect(brief).not.toBeNull();
+    expect(brief!.summary).toContain('Iran');
+    expect(brief!.summary).toContain('1 article');
     pds.close();
   });
 });
