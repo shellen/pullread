@@ -516,6 +516,18 @@ describe('entity name normalization', () => {
     expect(normalizeEntityName('GOOGLE')).toBe('google');
   });
 
+  test('normalizeEntityName strips title prefixes', () => {
+    expect(normalizeEntityName('President Trump')).toBe('trump');
+    expect(normalizeEntityName('Dr. Fauci')).toBe('fauci');
+    expect(normalizeEntityName('Sen. Warren')).toBe('warren');
+  });
+
+  test('normalizeEntityName normalizes abbreviations', () => {
+    expect(normalizeEntityName('U.S.')).toBe('us');
+    expect(normalizeEntityName('U.S. officials')).toBe('us officials');
+    expect(normalizeEntityName('U.K.')).toBe('uk');
+  });
+
   test('extraction merges entities with matching normalized names', async () => {
     const pds = createResearchPDS(':memory:');
     mockSummarize.mockResolvedValue({
@@ -560,7 +572,7 @@ describe('entity name normalization', () => {
     pds.close();
   });
 
-  test('extraction normalizes relationship entity names to existing entities', async () => {
+  test('extraction merges title variants and abbreviations', async () => {
     const pds = createResearchPDS(':memory:');
     mockSummarize.mockResolvedValue({
       summary: JSON.stringify({
@@ -598,15 +610,22 @@ describe('entity name normalization', () => {
       body: 'President Trump and The Pentagon.',
     });
 
-    // "President Trump" should NOT merge with "Trump" (different normalized forms)
+    // "President Trump" merges with "Trump", "The Pentagon" stored as new
     const entities = pds.listRecords('app.pullread.entity');
     const names = entities.map((e: any) => e.value.name).sort();
     expect(names).toContain('Trump');
     expect(names).toContain('The Pentagon');
+    expect(names).not.toContain('President Trump');
 
-    // Edge from article-2 should use the entity name as-is since no match
+    // Mentions for "President Trump" should use canonical name "Trump"
+    const mentions = pds.listRecords('app.pullread.mention');
+    const trumpMentions = mentions.filter((m: any) => m.value.entityName === 'Trump');
+    expect(trumpMentions.length).toBe(2);
+
+    // Edge from article-2 should remap "President Trump" to "Trump"
     const edges = pds.listRecords('app.pullread.edge');
-    expect(edges.length).toBe(2);
+    const directsEdge = edges.find((e: any) => e.value.type === 'directs');
+    expect(directsEdge!.value.from).toBe('Trump');
     pds.close();
   });
 });

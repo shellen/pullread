@@ -402,18 +402,56 @@ function researchShowGraphModal(centerName, edges) {
   };
   document.addEventListener('keydown', modal._escHandler);
 
-  // Build Cytoscape elements
+  // Normalize node names to merge variants (Trump/President Trump/Donald Trump)
+  var nodeCanonical = {}; // normalized form -> first display name seen
+  function graphNormName(n) {
+    return n.trim().toLowerCase()
+      .replace(/\./g, '')
+      .replace(/^(the|a|an)\s+/i, '')
+      .replace(/^(president|dr|mr|mrs|ms|sir|lord|senator|rep|gov|gen|col|sgt)\s+/i, '')
+      .replace(/\s+/g, ' ').trim();
+  }
+  function graphCanonical(name) {
+    var norm = graphNormName(name);
+    if (!nodeCanonical[norm]) nodeCanonical[norm] = name;
+    return nodeCanonical[norm];
+  }
+
+  // Pre-scan edges to pick the shortest display name per normalized group
+  // (prefer "Trump" over "Donald Trump" over "President Trump")
+  var nameGroups = {};
+  nameGroups[graphNormName(centerName)] = [centerName];
+  for (var i = 0; i < edges.length; i++) {
+    var edge = edges[i];
+    var names = [edge.value.from, edge.value.to];
+    for (var j = 0; j < names.length; j++) {
+      var norm = graphNormName(names[j]);
+      if (!nameGroups[norm]) nameGroups[norm] = [];
+      if (nameGroups[norm].indexOf(names[j]) < 0) nameGroups[norm].push(names[j]);
+    }
+  }
+  // Pick the shortest name as canonical display name
+  var normKeys = Object.keys(nameGroups);
+  for (var i = 0; i < normKeys.length; i++) {
+    var group = nameGroups[normKeys[i]];
+    group.sort(function(a, b) { return a.length - b.length; });
+    nodeCanonical[normKeys[i]] = group[0];
+  }
+
+  var canonCenter = graphCanonical(centerName);
   var nodes = {};
   var elements = [];
-  nodes[centerName] = true;
-  elements.push({ data: { id: centerName, label: centerName }, classes: 'center' });
+  nodes[canonCenter] = true;
+  elements.push({ data: { id: canonCenter, label: canonCenter }, classes: 'center' });
 
-  // Deduplicate edges between same node pairs
+  // Deduplicate edges between same canonical node pairs
   var edgeMap = {};
   for (var i = 0; i < edges.length; i++) {
     var edge = edges[i];
-    var from = edge.value.from;
-    var to = edge.value.to;
+    var from = graphCanonical(edge.value.from);
+    var to = graphCanonical(edge.value.to);
+    // Skip self-loops created by merging
+    if (from === to) continue;
     if (!nodes[from]) {
       nodes[from] = true;
       elements.push({ data: { id: from, label: from } });
@@ -422,7 +460,6 @@ function researchShowGraphModal(centerName, edges) {
       nodes[to] = true;
       elements.push({ data: { id: to, label: to } });
     }
-    // Normalize: unordered pair key + lowercase label stripped of trailing 's'
     var pairKey = [from, to].sort().join('\0');
     var normLabel = edge.value.type.toLowerCase().replace(/s$/, '');
     if (!edgeMap[pairKey]) edgeMap[pairKey] = { from: from, to: to, labels: {} };
@@ -432,7 +469,6 @@ function researchShowGraphModal(centerName, edges) {
   var edgeKeys = Object.keys(edgeMap);
   for (var i = 0; i < edgeKeys.length; i++) {
     var entry = edgeMap[edgeKeys[i]];
-    // Pick the most frequent normalized label
     var bestLabel = '';
     var bestCount = 0;
     var labelKeys = Object.keys(entry.labels);

@@ -83,8 +83,18 @@ function normalizeEntityType(type: string): string {
 
 const VALID_SENTIMENTS = new Set(['positive', 'negative', 'neutral', 'mixed']);
 
+// Applied after dots are stripped, so "Dr." becomes "dr", "Sen." becomes "sen"
+const TITLE_PREFIXES = /^(president|dr|mr|mrs|ms|sir|lord|senator|sen|rep|gov|gen|col|sgt)\s+/i;
+
 export function normalizeEntityName(name: string): string {
-  return name.trim().toLowerCase().replace(/^(the|a|an)\s+/i, '');
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/\./g, '')        // U.S. → US, Dr. → Dr
+    .replace(/^(the|a|an)\s+/i, '')
+    .replace(TITLE_PREFIXES, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function findExistingEntityName(pds: PDS, name: string): string | null {
