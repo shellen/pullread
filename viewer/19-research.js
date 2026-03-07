@@ -336,6 +336,8 @@ function researchShowGraphModal(centerName, edges) {
   nodes[centerName] = true;
   elements.push({ data: { id: centerName, label: centerName }, classes: 'center' });
 
+  // Deduplicate edges between same node pairs
+  var edgeMap = {};
   for (var i = 0; i < edges.length; i++) {
     var edge = edges[i];
     var from = edge.value.from;
@@ -348,12 +350,32 @@ function researchShowGraphModal(centerName, edges) {
       nodes[to] = true;
       elements.push({ data: { id: to, label: to } });
     }
+    // Normalize: unordered pair key + lowercase label stripped of trailing 's'
+    var pairKey = [from, to].sort().join('\0');
+    var normLabel = edge.value.type.toLowerCase().replace(/s$/, '');
+    if (!edgeMap[pairKey]) edgeMap[pairKey] = { from: from, to: to, labels: {} };
+    edgeMap[pairKey].labels[normLabel] = (edgeMap[pairKey].labels[normLabel] || 0) + 1;
+  }
+
+  var edgeKeys = Object.keys(edgeMap);
+  for (var i = 0; i < edgeKeys.length; i++) {
+    var entry = edgeMap[edgeKeys[i]];
+    // Pick the most frequent normalized label
+    var bestLabel = '';
+    var bestCount = 0;
+    var labelKeys = Object.keys(entry.labels);
+    for (var j = 0; j < labelKeys.length; j++) {
+      if (entry.labels[labelKeys[j]] > bestCount) {
+        bestCount = entry.labels[labelKeys[j]];
+        bestLabel = labelKeys[j];
+      }
+    }
     elements.push({
       data: {
         id: 'e' + i,
-        source: from,
-        target: to,
-        label: edge.value.type,
+        source: entry.from,
+        target: entry.to,
+        label: bestLabel,
       }
     });
   }
