@@ -1,9 +1,9 @@
 // ABOUTME: Knowledge graph storage — initializes and manages the research PDS
 // ABOUTME: Stores entities, mentions, edges, and extraction records in SQLite
 
-import { join, basename } from 'path';
+import { join, basename, dirname } from 'path';
 import { homedir } from 'os';
-import { readFileSync } from 'fs';
+import { readFileSync, mkdirSync } from 'fs';
 import { summarizeText } from './summarizer';
 import { listMarkdownFiles } from './writer';
 import { createPDS } from './research-db';
@@ -14,6 +14,9 @@ let _pds: PDS | null = null;
 
 export function createResearchPDS(dbPath?: string): PDS {
   const path = dbPath || join(homedir(), '.pullread', 'research.db');
+  if (path !== ':memory:') {
+    mkdirSync(dirname(path), { recursive: true });
+  }
   return createPDS({ db: path, did: 'did:web:pullread.local' });
 }
 

@@ -1,5 +1,7 @@
 // ABOUTME: SQLite-backed record storage for the research knowledge graph.
-// ABOUTME: Uses bun:sqlite in compiled binaries, better-sqlite3 in Node/Jest.
+// ABOUTME: Uses bun:sqlite (mapped to better-sqlite3 in Jest via moduleNameMapper).
+
+import { Database } from 'bun:sqlite';
 
 const BASE32_CHARS = '234567abcdefghijklmnopqrstuvwxyz';
 let lastTimestamp = 0;
@@ -23,57 +25,6 @@ function generateTid(): string {
   return encoded;
 }
 
-// Adapter to normalize bun:sqlite and better-sqlite3 APIs
-interface DbAdapter {
-  exec(sql: string): void;
-  prepare(sql: string): StmtAdapter;
-  close(): void;
-}
-
-interface StmtAdapter {
-  run(...params: any[]): void;
-  get(...params: any[]): any;
-  all(...params: any[]): any[];
-}
-
-function openDatabase(dbPath: string): DbAdapter {
-  // Try bun:sqlite first (available in Bun runtime and compiled binaries)
-  try {
-    const { Database } = require('bun:sqlite');
-    const db = new Database(dbPath);
-    db.exec('PRAGMA journal_mode = WAL');
-    return {
-      exec: (sql: string) => db.exec(sql),
-      prepare: (sql: string) => {
-        const stmt = db.prepare(sql);
-        return {
-          run: (...params: any[]) => stmt.run(...params),
-          get: (...params: any[]) => stmt.get(...params),
-          all: (...params: any[]) => stmt.all(...params),
-        };
-      },
-      close: () => db.close(),
-    };
-  } catch {
-    // Fall back to better-sqlite3 (Node.js / Jest)
-    const Database = require('better-sqlite3');
-    const db = new Database(dbPath);
-    db.pragma('journal_mode = WAL');
-    return {
-      exec: (sql: string) => db.exec(sql),
-      prepare: (sql: string) => {
-        const stmt = db.prepare(sql);
-        return {
-          run: (...params: any[]) => stmt.run(...params),
-          get: (...params: any[]) => stmt.get(...params),
-          all: (...params: any[]) => stmt.all(...params),
-        };
-      },
-      close: () => db.close(),
-    };
-  }
-}
-
 interface PdsRecord {
   collection: string;
   rkey: string;
@@ -92,7 +43,8 @@ function parseRow(row: any): PdsRecord | null {
 }
 
 export function createPDS({ db: dbPath = ':memory:', did = 'did:web:localhost' } = {}) {
-  const db = openDatabase(dbPath);
+  const db = new Database(dbPath);
+  db.exec('PRAGMA journal_mode = WAL');
   db.exec(`
     CREATE TABLE IF NOT EXISTS records (
       collection TEXT NOT NULL,
