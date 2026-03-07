@@ -157,10 +157,11 @@ fn build_roundup_html(articles: &[ArticleMeta], lookback_days: u32) -> String {
                 )
             };
 
-            // Link to pullread://open?file=filename for deep linking
+            // Use pullread.com/link redirect page — email clients block custom URL schemes
             let pr_link = format!(
-                "pullread://open?file={}",
-                urlencoding::encode(&article.filename)
+                "https://pullread.com/link?url={}&title={}",
+                urlencoding::encode(&article.url),
+                urlencoding::encode(&article.title)
             );
 
             html.push_str(&format!(
@@ -186,7 +187,7 @@ fn build_roundup_html(articles: &[ArticleMeta], lookback_days: u32) -> String {
         r#"</div>
 <p style="text-align:center;font-size:11px;color:#aaa;margin-top:16px">
 Sent by <a href="https://pullread.com" style="color:#aaa">Pull Read</a> &middot;
-<a href="pullread://open?file=tab%3Dsettings%26section%3Dsettings-email" style="color:#aaa">Manage email settings</a>
+Open Pull Read and go to Settings to manage your email roundup
 </p>
 </div>
 </body>
