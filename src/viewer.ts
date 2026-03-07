@@ -1403,7 +1403,8 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
           },
           viewerMode: (appSettings.viewerMode as string) || 'app',
           timeFormat: (appSettings.timeFormat as string) || '12h',
-          autoTag: appSettings.autoTag === true
+          autoTag: appSettings.autoTag === true,
+          researchAutoExtract: appSettings.researchAutoExtract !== false
         });
         return;
       }
@@ -1433,6 +1434,14 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
           if (body.autoTag !== undefined) {
             const appSettings = loadJsonFile(APP_SETTINGS_PATH);
             appSettings.autoTag = body.autoTag === true;
+            saveJsonFile(APP_SETTINGS_PATH, appSettings);
+            sendJson(res, { ok: true });
+            return;
+          }
+
+          if (body.researchAutoExtract !== undefined) {
+            const appSettings = loadJsonFile(APP_SETTINGS_PATH);
+            appSettings.researchAutoExtract = body.researchAutoExtract === true;
             saveJsonFile(APP_SETTINGS_PATH, appSettings);
             sendJson(res, { ok: true });
             return;
@@ -2572,6 +2581,25 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
       const pds = getResearchPDS();
       markMatchesSeen(pds);
       sendJson(res, { ok: true });
+      return;
+    }
+
+    if (url.pathname === '/api/research/extract-url' && req.method === 'POST') {
+      try {
+        const body = JSON.parse(await readBody(req));
+        if (!body.url) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'url is required' }));
+          return;
+        }
+        const { getResearchPDS, extractFromUrl } = await import('./research');
+        const pds = getResearchPDS();
+        const result = await extractFromUrl(pds, body.url);
+        sendJson(res, result || { entities: [], relationships: [], themes: [] });
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err instanceof Error ? err.message : 'Extraction failed' }));
+      }
       return;
     }
 

@@ -786,6 +786,9 @@ function showSettingsPage(scrollToSection) {
   html += '<div class="card-title">Research</div>';
   html += '<div class="card-desc">The knowledge graph extracts entities, viewpoints, and relationships from your articles.</div>';
   html += '<div id="research-settings-status" style="font-size:13px;color:var(--muted);margin-bottom:12px">Loading\u2026</div>';
+  html += '<div class="setting-row" style="margin-bottom:12px"><div class="setting-label"><label>Auto-extract after sync</label>';
+  html += '<div class="setting-desc">Automatically extract entities from new articles after each sync</div></div>';
+  html += '<div class="setting-control"><label class="toggle"><input type="checkbox" id="research-auto-extract" onchange="settingsSaveResearchAutoExtract()" checked /><span class="toggle-slider"></span></label></div></div>';
   html += '<div style="display:flex;gap:10px;flex-wrap:wrap">';
   html += '<button onclick="settingsResetResearch()" style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit">Reset &amp; Re-extract</button>';
   html += '</div>';
@@ -1787,6 +1790,16 @@ function formatBytes(bytes) {
   return (bytes / 1073741824).toFixed(1) + ' GB';
 }
 
+function settingsSaveResearchAutoExtract() {
+  var cb = document.getElementById('research-auto-extract');
+  var enabled = cb ? cb.checked : true;
+  fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ researchAutoExtract: enabled }),
+  });
+}
+
 function settingsLoadResearchStatus() {
   fetch('/api/research/status')
     .then(function(r) { return r.json(); })
@@ -1805,6 +1818,15 @@ function settingsLoadResearchStatus() {
       var el = document.getElementById('research-settings-status');
       if (el) el.textContent = 'Could not load status';
     });
+
+  // Load auto-extract toggle state
+  fetch('/api/settings')
+    .then(function(r) { return r.json(); })
+    .then(function(settings) {
+      var cb = document.getElementById('research-auto-extract');
+      if (cb) cb.checked = settings.researchAutoExtract !== false;
+    })
+    .catch(function() {});
 }
 
 async function settingsResetResearch() {

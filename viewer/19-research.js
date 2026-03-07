@@ -39,6 +39,12 @@ function showResearch() {
 function researchRenderBrowser() {
   var html = '<div class="article-header"><h1>Research</h1></div>';
 
+  // URL import bar
+  html += '<div class="research-url-bar">';
+  html += '<input type="text" id="research-url-input" placeholder="Paste a URL to extract entities..." />';
+  html += '<button class="btn-primary" id="research-url-btn" onclick="researchExtractUrl()" style="font-size:13px;padding:6px 14px">Extract</button>';
+  html += '</div>';
+
   // New for you (watch matches)
   html += '<div id="research-new-for-you"></div>';
 
@@ -275,7 +281,68 @@ function researchRenderDetail(profile) {
     html += '</ul>';
   }
 
+  // Graph visualization (requires edges)
+  if (profile.edges && profile.edges.length > 0) {
+    html += '<h3>Graph</h3>';
+    html += '<div class="research-graph" id="research-graph"></div>';
+  }
+
   container.innerHTML = html;
+
+  // Render Mermaid graph after DOM update
+  if (profile.edges && profile.edges.length > 0) {
+    researchRenderGraph(e.name, profile.edges);
+  }
+}
+
+function researchRenderGraph(centerName, edges) {
+  var graphEl = document.getElementById('research-graph');
+  if (!graphEl || typeof mermaid === 'undefined') return;
+
+  var nodeSet = {};
+  nodeSet[centerName] = true;
+  var lines = ['graph LR'];
+
+  // Style the center node
+  var centerId = researchMermaidId(centerName);
+  lines.push('  ' + centerId + '["' + researchMermaidEscape(centerName) + '"]');
+  lines.push('  style ' + centerId + ' fill:#f59e0b,stroke:#d97706,color:#000');
+
+  for (var i = 0; i < edges.length; i++) {
+    var edge = edges[i];
+    var fromId = researchMermaidId(edge.value.from);
+    var toId = researchMermaidId(edge.value.to);
+    var label = researchMermaidEscape(edge.value.type);
+    nodeSet[edge.value.from] = true;
+    nodeSet[edge.value.to] = true;
+    lines.push('  ' + fromId + '["' + researchMermaidEscape(edge.value.from) + '"] -->|' + label + '| ' + toId + '["' + researchMermaidEscape(edge.value.to) + '"]');
+  }
+
+  var graphDef = lines.join('\n');
+  graphEl.removeAttribute('data-processed');
+  graphEl.innerHTML = graphDef;
+  graphEl.classList.add('mermaid');
+
+  mermaid.run({ nodes: [graphEl] }).then(function() {
+    // Make nodes clickable
+    graphEl.querySelectorAll('.node').forEach(function(node) {
+      node.style.cursor = 'pointer';
+      node.addEventListener('click', function() {
+        var label = node.querySelector('.nodeLabel');
+        if (label) researchSearchFor(label.textContent.trim());
+      });
+    });
+  }).catch(function(err) {
+    graphEl.innerHTML = '<p class="briefing-hint">Could not render graph</p>';
+  });
+}
+
+function researchMermaidId(name) {
+  return 'n' + name.replace(/[^a-zA-Z0-9]/g, '_');
+}
+
+function researchMermaidEscape(str) {
+  return str.replace(/"/g, "'").replace(/[[\]]/g, '');
 }
 
 function researchLoadTensions() {
@@ -339,6 +406,34 @@ function researchSearchFor(name) {
   _researchTypeFilter = null;
   researchLoadEntities(name);
   researchUpdateClearBtn();
+}
+
+function researchExtractUrl() {
+  var input = document.getElementById('research-url-input');
+  var btn = document.getElementById('research-url-btn');
+  var url = input ? input.value.trim() : '';
+  if (!url) return;
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Extracting\u2026'; }
+
+  fetch('/api/research/extract-url', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url: url }),
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(result) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Extract'; }
+      if (input) input.value = '';
+      var count = result.entities ? result.entities.length : 0;
+      showToast('Extracted ' + count + ' entities from URL');
+      researchLoadEntities();
+      researchLoadTensions();
+    })
+    .catch(function(err) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Extract'; }
+      showToast('Extraction failed: ' + (err.message || 'unknown error'));
+    });
 }
 
 function researchClearSearch() {

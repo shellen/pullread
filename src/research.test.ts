@@ -1,7 +1,7 @@
 // ABOUTME: Tests for research knowledge graph — PDS lifecycle, extraction, entity queries
 // ABOUTME: Verifies createResearchPDS initializes storage and closes without error
 
-import { createResearchPDS, extractArticle, runBackgroundExtraction, queryEntities, queryEntityProfile, queryRelatedEntities, queryTensions, addWatch, removeWatch, listWatches, checkWatchMatches, getUnseenMatches, markMatchesSeen, resetResearchData } from './research';
+import { createResearchPDS, extractArticle, runBackgroundExtraction, queryEntities, queryEntityProfile, queryRelatedEntities, queryTensions, addWatch, removeWatch, listWatches, checkWatchMatches, getUnseenMatches, markMatchesSeen, resetResearchData, extractFromUrl } from './research';
 import { summarizeText } from './summarizer';
 import { listMarkdownFiles } from './writer';
 import { readFileSync } from 'fs';
@@ -21,6 +21,12 @@ jest.mock('fs', () => {
   return { ...actual, readFileSync: jest.fn() };
 });
 const mockReadFile = readFileSync as jest.MockedFunction<typeof readFileSync>;
+
+jest.mock('./extractor', () => ({
+  fetchAndExtract: jest.fn(),
+}));
+import { fetchAndExtract } from './extractor';
+const mockFetchAndExtract = fetchAndExtract as jest.MockedFunction<typeof fetchAndExtract>;
 
 describe('createResearchPDS', () => {
   test('creates PDS with in-memory database', () => {
@@ -512,6 +518,50 @@ describe('resetResearchData', () => {
     expect(pds.listRecords('app.pullread.mention').length).toBe(0);
     expect(pds.listRecords('app.pullread.extraction').length).toBe(0);
     expect(pds.listRecords('app.pullread.edge').length).toBe(0);
+    pds.close();
+  });
+});
+
+describe('extractFromUrl', () => {
+  beforeEach(() => {
+    mockSummarize.mockReset();
+    mockFetchAndExtract.mockReset();
+  });
+
+  test('fetches URL content and runs extraction', async () => {
+    const pds = createResearchPDS(':memory:');
+    mockFetchAndExtract.mockResolvedValue({
+      title: 'Test Page',
+      markdown: 'Page content about Apple.',
+      url: 'https://example.com/page',
+      domain: 'example.com',
+      excerpt: '',
+    } as any);
+    mockSummarize.mockResolvedValue({
+      summary: JSON.stringify({
+        entities: [{ name: 'Apple', type: 'company', sentiment: 'neutral' }],
+        relationships: [],
+        themes: ['tech'],
+      }),
+      model: 'test',
+    });
+
+    const result = await extractFromUrl(pds, 'https://example.com/page');
+    expect(result).not.toBeNull();
+    expect(result!.entities.length).toBe(1);
+
+    const extractions = pds.listRecords('app.pullread.extraction');
+    expect(extractions[0].value.source).toBe('url-import');
+    pds.close();
+  });
+
+  test('returns null when fetch fails', async () => {
+    const pds = createResearchPDS(':memory:');
+    mockFetchAndExtract.mockResolvedValue(null);
+
+    const result = await extractFromUrl(pds, 'https://example.com/bad');
+    expect(result).toBeNull();
+    expect(mockSummarize).not.toHaveBeenCalled();
     pds.close();
   });
 });

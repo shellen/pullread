@@ -6,6 +6,7 @@ import { homedir } from 'os';
 import { readFileSync, mkdirSync } from 'fs';
 import { summarizeText } from './summarizer';
 import { listMarkdownFiles } from './writer';
+import { fetchAndExtract } from './extractor';
 import { createPDS } from './research-db';
 
 type PDS = ReturnType<typeof createPDS>;
@@ -195,6 +196,22 @@ ${article.body.slice(0, 8000)}`;
   });
 
   return parsed;
+}
+
+export async function extractFromUrl(
+  pds: PDS,
+  url: string,
+): Promise<ExtractionResult | null> {
+  const content = await fetchAndExtract(url);
+  if (!content || !content.markdown) return null;
+
+  const filename = `url-import-${Date.now()}.md`;
+  return extractArticle(pds, {
+    filename,
+    title: content.title || url,
+    body: content.markdown,
+    source: 'url-import',
+  });
 }
 
 // Dynamic require for optional loxodonta-core modules (embeddings, resolver, graph)

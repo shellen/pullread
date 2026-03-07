@@ -6957,6 +6957,23 @@
     opacity: 0.7;
   }
 
+  /* URL import bar */
+  .research-url-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .research-url-bar input {
+    flex: 1;
+    font-size: 13px;
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: inherit;
+  }
+
   /* Search clear button */
   .research-search-bar {
     position: relative;
@@ -7172,5 +7189,17 @@
     .research-tension-card {
       max-width: none;
     }
+  }
+
+  .research-graph {
+    margin-top: 8px;
+    padding: 12px;
+    background: var(--code-bg);
+    border-radius: 6px;
+    overflow-x: auto;
+  }
+  .research-graph svg {
+    max-width: 100%;
+    height: auto;
   }
 
