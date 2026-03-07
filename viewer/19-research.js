@@ -240,12 +240,24 @@ function researchRenderDetail(profile) {
     for (var i = 0; i < profile.edges.length; i++) {
       var edge = profile.edges[i];
       var other = edge.value.from === e.name ? edge.value.to : edge.value.from;
-      html += '<li><span class="research-edge-name">' + escapeHtml(other) + '</span> <span class="research-edge-type">' + escapeHtml(edge.value.type) + '</span></li>';
+      var rel = edge.value.type;
+      var isOutgoing = edge.value.from === e.name;
+      html += '<li>';
+      html += '<a href="#" class="research-edge-name" onclick="researchSearchFor(\'' + escapeJsStr(other) + '\');return false">' + escapeHtml(other) + '</a>';
+      html += ' <span class="research-edge-type">' + escapeHtml(rel) + '</span>';
+      html += '</li>';
     }
     html += '</ul>';
   }
 
   container.innerHTML = html;
+}
+
+function researchSearchFor(name) {
+  var input = document.getElementById('research-search');
+  if (input) input.value = name;
+  _researchTypeFilter = null;
+  researchLoadEntities(name);
 }
 
 function loadFileByName(filename) {

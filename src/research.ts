@@ -41,6 +41,29 @@ interface ArticleInput {
   source?: string;
 }
 
+const VALID_ENTITY_TYPES = new Set(['person', 'company', 'technology', 'place', 'event', 'concept']);
+
+const TYPE_ALIASES: Record<string, string> = {
+  organization: 'company', org: 'company', brand: 'company', band: 'company',
+  group: 'company', 'music group': 'company', team: 'company', podcast: 'company',
+  publication: 'company', institution: 'company', network: 'company',
+  product: 'technology', software: 'technology', tool: 'technology', platform: 'technology',
+  website: 'place', building: 'place', venue: 'place', country: 'place', city: 'place',
+  animal: 'concept', species: 'concept', genre: 'concept', material: 'concept',
+  'chemical compound': 'concept', character: 'concept', title: 'concept',
+  'television show': 'concept', program: 'concept', award: 'concept',
+  role: 'concept', people: 'person', year: 'event',
+  show: 'concept', series: 'concept', listener: 'person',
+  listeners: 'concept', host: 'person',
+};
+
+function normalizeEntityType(type: string): string {
+  if (!type) return 'concept';
+  const lower = type.toLowerCase().trim();
+  if (VALID_ENTITY_TYPES.has(lower)) return lower;
+  return TYPE_ALIASES[lower] || 'concept';
+}
+
 interface ExtractionResult {
   entities: Array<{ name: string; type: string; role?: string }>;
   relationships: Array<{ from: string; to: string; type: string }>;
@@ -56,11 +79,19 @@ export async function extractArticle(
   });
   if (existing.length > 0) return null;
 
-  const prompt = `You are an analyst. Extract structured information from this document.
-Return ONLY valid JSON with these fields:
-- entities: array of { name, type, role? } where type is one of: person, company, technology, place, event, concept
-- relationships: array of { from, to, type } describing connections between entities
-- themes: array of strings
+  const prompt = `Extract structured information from this document as JSON.
+
+STRICT RULES:
+- entities: array of { name, type } where type MUST be exactly one of: person, company, technology, place, event, concept
+  - "person" = individual humans
+  - "company" = companies, brands, organizations, bands, teams, podcasts, publications
+  - "technology" = software, hardware, protocols, scientific concepts, products
+  - "place" = countries, cities, buildings, venues, websites/platforms
+  - "event" = named events, conferences, wars, elections
+  - "concept" = abstract ideas, genres, movements, themes
+  - Do NOT invent new types. If unsure, use "concept".
+- relationships: array of { from, to, type } connecting entity names
+- themes: array of short topic strings
 
 Document title: ${article.title}
 
@@ -82,6 +113,11 @@ ${article.body.slice(0, 8000)}`;
   if (!parsed.entities || !Array.isArray(parsed.entities)) return null;
   if (!parsed.relationships) parsed.relationships = [];
   if (!parsed.themes) parsed.themes = [];
+
+  // Normalize entity types to the canonical set
+  for (const entity of parsed.entities) {
+    entity.type = normalizeEntityType(entity.type);
+  }
 
   for (const entity of parsed.entities) {
     if (!entity.name || !entity.type) continue;

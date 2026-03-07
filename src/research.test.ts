@@ -109,6 +109,39 @@ describe('extractArticle', () => {
     pds.close();
   });
 
+  test('normalizes stray entity types to canonical set', async () => {
+    const pds = createResearchPDS(':memory:');
+    mockSummarize.mockResolvedValue({
+      summary: JSON.stringify({
+        entities: [
+          { name: 'The Beatles', type: 'band' },
+          { name: 'Aspirin', type: 'chemical compound' },
+          { name: 'Reddit', type: 'website' },
+          { name: 'Grammy', type: 'award' },
+        ],
+        relationships: [],
+        themes: [],
+      }),
+      model: 'test',
+    });
+
+    await extractArticle(pds, {
+      filename: 'types-test.md',
+      title: 'Type Test',
+      body: 'Testing type normalization.',
+    });
+
+    const entities = pds.listRecords('app.pullread.entity');
+    const types = entities.map((e: any) => ({ name: e.value.name, type: e.value.type }));
+    expect(types).toEqual([
+      { name: 'The Beatles', type: 'company' },
+      { name: 'Aspirin', type: 'concept' },
+      { name: 'Reddit', type: 'place' },
+      { name: 'Grammy', type: 'concept' },
+    ]);
+    pds.close();
+  });
+
   test('skips already-extracted articles', async () => {
     const pds = createResearchPDS(':memory:');
     pds.putRecord('app.pullread.extraction', null, { filename: 'test-article.md', extractedAt: new Date().toISOString() });
