@@ -88,26 +88,30 @@ fn start_review_timer(app: &AppHandle) {
     });
 }
 
-/// Start the email roundup timer — sends via the Node sidecar HTTP API at a specific time of day
+/// Start the email roundup timer — sends via the Node sidecar HTTP API at a specific time of day.
+/// If the app was not running at the scheduled time, sends on next activation.
 fn start_email_timer(app: &AppHandle) {
     let state = app.state::<sidecar::SidecarState>();
-    let path = state
+    let settings_path = state
         .config_path()
         .parent()
         .unwrap_or(std::path::Path::new("/tmp"))
         .join("settings.json");
 
-    let config: serde_json::Value = std::fs::read_to_string(&path)
+    let config: serde_json::Value = std::fs::read_to_string(&settings_path)
         .ok()
         .and_then(|c| serde_json::from_str(&c).ok())
         .unwrap_or_default();
 
     let email_cfg = config.get("emailRoundup").cloned().unwrap_or_default();
     let enabled = email_cfg.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false);
-    let smtp_host = email_cfg.get("smtpHost").and_then(|v| v.as_str()).unwrap_or("");
     let to_address = email_cfg.get("toAddress").and_then(|v| v.as_str()).unwrap_or("");
+    let provider = email_cfg.get("smtpProvider").and_then(|v| v.as_str()).unwrap_or("custom");
+    let smtp_host = email_cfg.get("smtpHost").and_then(|v| v.as_str()).unwrap_or("");
 
-    if !enabled || smtp_host.is_empty() || to_address.is_empty() {
+    // Provider presets (gmail, outlook) don't need a custom host
+    let has_host = provider != "custom" || !smtp_host.is_empty();
+    if !enabled || !has_host || to_address.is_empty() {
         return;
     }
 
@@ -116,10 +120,23 @@ fn start_email_timer(app: &AppHandle) {
         .and_then(|v| v.as_str())
         .unwrap_or("08:00")
         .to_string();
+    let last_sent = email_cfg
+        .get("lastSentDate")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
     log::info!("Starting email roundup timer: daily at {}", send_time);
 
     let handle = app.clone();
     tauri::async_runtime::spawn(async move {
+        // Check if we missed today's send (computer was off at scheduled time)
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let send_time_passed = is_time_past(&send_time);
+        if send_time_passed && last_sent != today {
+            log::info!("Email roundup: missed scheduled time, sending now (failover)");
+            send_email_roundup(&handle, &settings_path).await;
+        }
+
         loop {
             let wait = duration_until_time(&send_time);
             log::info!(
@@ -130,33 +147,72 @@ fn start_email_timer(app: &AppHandle) {
             tokio::time::sleep(wait).await;
 
             log::info!("Scheduled email roundup triggered");
-            match sidecar::ensure_viewer_running(&handle).await {
-                Ok(port) => {
-                    let url = format!("http://127.0.0.1:{}/api/email/send-roundup", port);
-                    match reqwest::Client::new()
-                        .post(&url)
-                        .send()
-                        .await
-                    {
-                        Ok(resp) => {
-                            let body = resp.text().await.unwrap_or_default();
-                            log::info!("Email roundup sent: {}", body);
-                            notifications::notify(&handle, "Roundup Sent", "Daily roundup email sent");
-                        }
-                        Err(e) => {
-                            log::error!("Email roundup HTTP request failed: {}", e);
-                        }
-                    }
-                }
-                Err(e) => {
-                    log::error!("Email roundup failed — could not start viewer: {}", e);
-                }
-            }
+            send_email_roundup(&handle, &settings_path).await;
 
             // Sleep a bit to avoid firing twice in the same minute
             tokio::time::sleep(std::time::Duration::from_secs(61)).await;
         }
     });
+}
+
+/// Send the email roundup via the viewer HTTP API and record the send date
+async fn send_email_roundup(handle: &AppHandle, settings_path: &std::path::Path) {
+    match sidecar::ensure_viewer_running(handle).await {
+        Ok(port) => {
+            let url = format!("http://127.0.0.1:{}/api/email/send-roundup", port);
+            match reqwest::Client::new().post(&url).send().await {
+                Ok(resp) => {
+                    let body = resp.text().await.unwrap_or_default();
+                    log::info!("Email roundup sent: {}", body);
+                    notifications::notify(handle, "Roundup Sent", "Daily roundup email sent");
+                    record_last_sent(settings_path);
+                }
+                Err(e) => {
+                    log::error!("Email roundup HTTP request failed: {}", e);
+                }
+            }
+        }
+        Err(e) => {
+            log::error!("Email roundup failed — could not start viewer: {}", e);
+        }
+    }
+}
+
+/// Write today's date to emailRoundup.lastSentDate in settings.json
+fn record_last_sent(settings_path: &std::path::Path) {
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let mut config: serde_json::Value = std::fs::read_to_string(settings_path)
+        .ok()
+        .and_then(|c| serde_json::from_str(&c).ok())
+        .unwrap_or_else(|| serde_json::json!({}));
+
+    if let Some(obj) = config.as_object_mut() {
+        let email = obj
+            .entry("emailRoundup")
+            .or_insert_with(|| serde_json::json!({}));
+        if let Some(email_obj) = email.as_object_mut() {
+            email_obj.insert("lastSentDate".to_string(), serde_json::json!(today));
+        }
+    }
+
+    if let Ok(json) = serde_json::to_string_pretty(&config) {
+        let _ = std::fs::write(settings_path, json);
+    }
+}
+
+/// Check if the given HH:MM time has already passed today
+fn is_time_past(time_str: &str) -> bool {
+    let parts: Vec<&str> = time_str.split(':').collect();
+    let target_hour: u32 = parts.first().and_then(|h| h.parse().ok()).unwrap_or(8);
+    let target_min: u32 = parts.get(1).and_then(|m| m.parse().ok()).unwrap_or(0);
+
+    let now = chrono::Local::now();
+    let target = now
+        .date_naive()
+        .and_hms_opt(target_hour, target_min, 0)
+        .unwrap_or_else(|| now.naive_local());
+
+    now.naive_local() > target
 }
 
 /// Calculate how long to wait until a given HH:MM time today (or tomorrow if past)
