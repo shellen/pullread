@@ -13,40 +13,40 @@ const HTML = `<!DOCTYPE html>
 <style>
   * { margin: 0; padding: 0; }
   body {
-    background: transparent;
+    background: #f7f5f3;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 440px;
-    height: 80px;
+    width: 600px;
+    height: 110px;
   }
   .header {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
   }
   .brand {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 14px;
   }
   .brand svg {
-    width: 28px;
-    height: 28px;
+    width: 38px;
+    height: 38px;
     color: #b45535;
   }
   .brand-text {
     font-family: 'Instrument Serif', Georgia, serif;
-    font-size: 32px;
+    font-size: 42px;
     color: #1a1a1a;
     letter-spacing: -0.01em;
   }
   .subtitle {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 12px;
+    font-size: 13px;
     color: #999;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.05em;
   }
 </style>
 </head>
@@ -62,7 +62,7 @@ const HTML = `<!DOCTYPE html>
     </svg>
     <span class="brand-text">Pull Read</span>
   </div>
-  <div class="subtitle">YOUR DAILY ROUNDUP</div>
+  <div class="subtitle">THE RUNDOWN</div>
 </div>
 </body>
 </html>`;
@@ -70,7 +70,7 @@ const HTML = `<!DOCTYPE html>
 async function render() {
   const browser = await chromium.launch();
   const page = await browser.newPage({
-    viewport: { width: 440, height: 80 },
+    viewport: { width: 600, height: 110 },
     deviceScaleFactor: 2,
   });
 
@@ -80,7 +80,7 @@ async function render() {
 
   const screenshot = await page.screenshot({
     type: 'png',
-    omitBackground: true,
+    omitBackground: false,
   });
 
   const outPath = join(__dirname, '..', 'email-header.png');

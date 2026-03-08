@@ -14,7 +14,9 @@ const baseConfig: EmailConfig = {
   useTls: true,
   fromAddress: 'from@test.com',
   toAddress: 'to@test.com',
+  frequency: 'daily',
   sendTime: '08:00',
+  sendTime2: '17:00',
   lookbackDays: 1,
 };
 
@@ -111,7 +113,7 @@ describe('buildRoundupHtml', () => {
 
   test('uses lookback period text for multi-day', () => {
     const html = buildRoundupHtml([], 7);
-    expect(html).toContain('the last 7 days');
+    expect(html).toContain('this week');
   });
 
   test('shows author when present', () => {

@@ -531,7 +531,9 @@ function settingsSaveEmailConfig() {
     smtpProvider: provider,
     toAddress: (document.getElementById('sp-email-to') || {}).value || '',
     fromAddress: (document.getElementById('sp-email-from') || {}).value || '',
+    frequency: (document.getElementById('sp-email-frequency') || {}).value || 'daily',
     sendTime: (document.getElementById('sp-email-time') || {}).value || '08:00',
+    sendTime2: (document.getElementById('sp-email-time2') || {}).value || '17:00',
     lookbackDays: parseInt((document.getElementById('sp-email-lookback') || {}).value || '1', 10),
     smtpHost: provider === 'custom' ? ((document.getElementById('sp-email-smtp-host') || {}).value || '') : '',
     smtpPort: provider === 'custom' ? parseInt((document.getElementById('sp-email-smtp-port') || {}).value || '587', 10) : 587,
@@ -586,14 +588,21 @@ function settingsTestEmail() {
   });
 }
 
+function settingsFrequencyChange(freq) {
+  var sep = document.getElementById('email-time2-sep');
+  var time2 = document.getElementById('sp-email-time2');
+  if (sep) sep.style.display = freq === 'twice' ? '' : 'none';
+  if (time2) time2.style.display = freq === 'twice' ? '' : 'none';
+}
+
 function settingsSendRoundup() {
   var status = document.getElementById('email-test-status');
-  if (status) status.textContent = 'Sending roundup\u2026';
+  if (status) status.textContent = 'Sending rundown\u2026';
   settingsSaveEmailConfig().then(function() {
     return fetch('/api/email/send-roundup', { method: 'POST' }).then(function(r) { return r.json(); });
   }).then(function(data) {
     if (data.error) throw data.error;
-    if (status) { status.textContent = data.message || 'Roundup sent!'; status.style.color = 'var(--green, #2a9d4a)'; }
+    if (status) { status.textContent = data.message || 'Rundown sent!'; status.style.color = 'var(--green, #2a9d4a)'; }
   }).catch(function(err) {
     if (status) { status.textContent = 'Error: ' + (err || 'Failed to send'); status.style.color = 'var(--red, #c44)'; }
   });
@@ -705,10 +714,10 @@ function showSettingsPage(scrollToSection) {
   html += '</div>';
   html += '</div>';
 
-  // -- Email Roundup card (loaded async) --
+  // -- Email Rundown card (loaded async) --
   html += '<div class="card" id="settings-email">';
-  html += '<div class="card-title">Email Roundup</div>';
-  html += '<div class="card-desc">Get a daily email digest of new articles with links back to PullRead.</div>';
+  html += '<div class="card-title">The Rundown</div>';
+  html += '<div class="card-desc">Get a daily email digest of new articles with links back to Pull Read.</div>';
   html += '<p style="color:var(--muted);font-size:13px">Loading email settings\u2026</p>';
   html += '</div>';
 
@@ -1065,12 +1074,12 @@ function showSettingsPage(scrollToSection) {
       var sec = document.getElementById('settings-email');
       if (!sec) return;
 
-      var h = '<div class="card-title">Email Roundup</div>';
-      h += '<div class="card-desc">Get a daily email digest of new articles with links back to PullRead.</div>';
+      var h = '<div class="card-title">The Rundown</div>';
+      h += '<div class="card-desc">Get a daily email digest of new articles with links back to Pull Read.</div>';
 
       // Enable toggle
       h += '<div class="setting-row">';
-      h += '<div class="setting-label"><label>Enable email roundup</label><div class="setting-desc">Send a daily digest email at a scheduled time</div></div>';
+      h += '<div class="setting-label"><label>Enable The Rundown</label><div class="setting-desc">Send a daily digest email at a scheduled time</div></div>';
       h += '<div class="setting-control"><input type="checkbox" id="sp-email-enabled"' + (data.enabled ? ' checked' : '') + ' onchange="settingsEmailToggle(this.checked)" style="width:18px;height:18px;accent-color:var(--link)"></div>';
       h += '</div>';
 
@@ -1079,7 +1088,7 @@ function showSettingsPage(scrollToSection) {
 
       // To address
       h += '<div class="setting-row">';
-      h += '<div class="setting-label"><label>Send to</label><div class="setting-desc">Email address to receive the roundup</div></div>';
+      h += '<div class="setting-label"><label>Send to</label><div class="setting-desc">Email address to receive The Rundown</div></div>';
       h += '<div class="setting-control"><div class="input-wrap"><input type="email" id="sp-email-to" value="' + escapeHtml(data.toAddress || '') + '" placeholder="you@example.com" class="input-field" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveEmail(this)"><span class="save-indicator">\u2713</span></div></div>';
       h += '</div>';
 
@@ -1090,10 +1099,28 @@ function showSettingsPage(scrollToSection) {
       h += '<div class="setting-control"><div class="input-wrap"><input type="email" id="sp-email-from" value="' + escapeHtml(data.fromAddress || '') + '" placeholder="pullread@example.com" class="input-field" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveEmail(this)"><span class="save-indicator">\u2713</span></div></div>';
       h += '</div>';
 
-      // Send time
+      // Frequency
+      var frequency = data.frequency || 'daily';
       h += '<div class="setting-row">';
-      h += '<div class="setting-label"><label>Send time</label><div class="setting-desc">Time of day to send the roundup</div></div>';
-      h += '<div class="setting-control"><input type="time" id="sp-email-time" value="' + escapeHtml(data.sendTime || '08:00') + '" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;font-family:inherit" onchange="settingsAutoSaveEmail(this)"></div>';
+      h += '<div class="setting-label"><label>Frequency</label><div class="setting-desc">How often to send The Rundown</div></div>';
+      h += '<div class="setting-control"><div class="pill-group">';
+      var freqs = [['daily','Daily'],['twice','Twice daily'],['weekly','Weekly']];
+      for (var fi = 0; fi < freqs.length; fi++) {
+        h += '<button class="pill' + (frequency === freqs[fi][0] ? ' active' : '') + '" data-val="' + freqs[fi][0] + '" onclick="settingsBtnSelect(this,\'sp-email-frequency\',\'' + freqs[fi][0] + '\');settingsFrequencyChange(\'' + freqs[fi][0] + '\');settingsAutoSaveEmail(this)">' + freqs[fi][1] + '</button>';
+      }
+      h += '</div><input type="hidden" id="sp-email-frequency" value="' + frequency + '"></div>';
+      h += '</div>';
+
+      // Send time(s)
+      var sendTime = data.sendTime || '08:00';
+      var sendTime2 = data.sendTime2 || '17:00';
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Send time</label><div class="setting-desc" id="email-time-desc">Time of day to send The Rundown</div></div>';
+      h += '<div class="setting-control"><div style="display:flex;gap:8px;align-items:center">';
+      h += '<input type="time" id="sp-email-time" value="' + escapeHtml(sendTime) + '" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;font-family:inherit" onchange="settingsAutoSaveEmail(this)">';
+      h += '<span id="email-time2-sep" style="color:var(--muted);font-size:12px;' + (frequency === 'twice' ? '' : 'display:none') + '">&amp;</span>';
+      h += '<input type="time" id="sp-email-time2" value="' + escapeHtml(sendTime2) + '" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;font-family:inherit;' + (frequency === 'twice' ? '' : 'display:none') + '" onchange="settingsAutoSaveEmail(this)">';
+      h += '</div></div>';
       h += '</div>';
 
       // Lookback days
@@ -1174,7 +1201,7 @@ function showSettingsPage(scrollToSection) {
       // Test & Send buttons
       h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">';
       h += '<button onclick="settingsTestEmail()" style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit">Send Test Email</button>';
-      h += '<button onclick="settingsSendRoundup()" style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit">Send Roundup Now</button>';
+      h += '<button onclick="settingsSendRoundup()" style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit">Send Rundown Now</button>';
       h += '</div>';
       h += '<div id="email-test-status" style="font-size:12px;color:var(--muted);padding-top:8px"></div>';
 
@@ -1184,7 +1211,7 @@ function showSettingsPage(scrollToSection) {
     }).catch(function() {
       var sec = document.getElementById('settings-email');
       if (sec) {
-        sec.innerHTML = '<div class="card-title">Email Roundup</div><p style="color:var(--muted);font-size:13px">Could not load email settings.</p>';
+        sec.innerHTML = '<div class="card-title">The Rundown</div><p style="color:var(--muted);font-size:13px">Could not load email settings.</p>';
       }
     });
   }

@@ -18,7 +18,9 @@ export interface EmailConfig {
   useTls: boolean;
   fromAddress: string;
   toAddress: string;
+  frequency: 'daily' | 'twice' | 'weekly';
   sendTime: string;
+  sendTime2: string;
   lookbackDays: number;
 }
 
@@ -32,7 +34,9 @@ const DEFAULT_CONFIG: EmailConfig = {
   useTls: true,
   fromAddress: '',
   toAddress: '',
+  frequency: 'daily',
   sendTime: '08:00',
+  sendTime2: '17:00',
   lookbackDays: 1,
 };
 
@@ -91,7 +95,7 @@ export async function sendTestEmail(config?: EmailConfig): Promise<string> {
     subject: 'Pull Read — Test Email',
     html: `<html><body style="font-family:sans-serif;padding:20px">
 <h2>Pull Read Email Test</h2>
-<p>Your email roundup is configured correctly! You'll receive daily roundups at your scheduled time.</p>
+<p>Your email is configured correctly! You'll receive The Pull Read Rundown at your scheduled time.</p>
 </body></html>`,
   });
 
@@ -154,8 +158,8 @@ function heroArticleHtml(article: ArticleMeta): string {
   if (hasImage) {
     // Image + text side by side using table layout (email-safe)
     return `<table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:16px"><tr>
-<td width="130" valign="top" style="padding-right:16px">
-<a href="${escapeHtml(article.url)}" style="text-decoration:none"><img src="${escapeHtml(article.image!)}" width="130" height="90" alt="" style="border-radius:8px;object-fit:cover;display:block;width:130px;height:90px;background:#f0ebe7" /></a>
+<td width="130" valign="top" style="padding-right:16px;background:#f0ebe7;width:130px;height:90px">
+<a href="${escapeHtml(article.url)}" style="text-decoration:none"><img src="${escapeHtml(article.image!)}" width="130" height="90" alt="" style="object-fit:cover;display:block;width:130px;height:90px;border:0" /></a>
 </td>
 <td valign="top">
 <a href="${escapeHtml(article.url)}" style="font-size:16px;color:#1a1a1a;text-decoration:none;font-weight:600;line-height:1.3">${escapeHtml(article.title)}</a>
@@ -205,29 +209,34 @@ export function buildRoundupHtml(articles: ArticleMeta[], lookbackDays: number, 
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
   });
-  const period = lookbackDays === 1 ? 'today' : `the last ${lookbackDays} days`;
+  const period = lookbackDays === 1 ? 'today'
+    : lookbackDays <= 3 ? `the last ${lookbackDays} days`
+    : lookbackDays === 7 ? 'this week'
+    : `the last ${lookbackDays} days`;
   const count = articles.length;
 
   let html = `<!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
-<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f7f5f3">
-<div style="max-width:600px;margin:0 auto;padding:20px">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only">
+<style>:root{color-scheme:light only}body,table,td,div,p,a,span{color-scheme:light only}</style>
+</head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background-color:#f7f5f3;color:#1a1a1a">
+<div style="max-width:600px;margin:0 auto;padding:20px;background-color:#f7f5f3">
 
 <div style="text-align:center;padding:24px 0 16px">
-<a href="https://pullread.com" style="text-decoration:none"><img src="cid:header" width="220" height="40" alt="Pull Read" style="display:inline-block" /></a>
+<a href="https://pullread.com" style="text-decoration:none"><img src="cid:header" width="300" height="55" alt="Pull Read — The Rundown" style="display:inline-block" /></a>
 </div>
 
-<div style="background:#ffffff;border-radius:12px;padding:32px;border:1px solid #e8e3de">
+<div style="background:#ffffff;padding:32px;border:1px solid #e8e3de">
 
 <div style="text-align:center;margin-bottom:24px">
-<div style="font-size:20px;font-weight:600;color:#1a1a1a;font-family:Georgia,'Times New Roman',serif;margin-bottom:4px">Your Roundup</div>
+<div style="font-size:20px;font-weight:600;color:#1a1a1a;font-family:Georgia,'Times New Roman',serif;margin-bottom:4px">The Rundown</div>
 <div style="font-size:13px;color:#999">${escapeHtml(today)} &middot; ${count} article${count === 1 ? '' : 's'} from ${period}</div>
 </div>
 `;
 
   if (summary) {
-    html += `<div style="font-size:15px;color:#444;line-height:1.6;padding:16px 20px;background:#faf8f6;border-radius:8px;border-left:3px solid #b45535;margin-bottom:24px;font-style:italic">${escapeHtml(summary)}</div>`;
+    html += `<div style="font-size:15px;color:#444;line-height:1.6;padding:16px 20px;background:#faf8f6;border-left:3px solid #b45535;margin-bottom:24px;font-style:italic">${escapeHtml(summary)}</div>`;
   }
 
   if (articles.length === 0) {
@@ -257,6 +266,22 @@ export function buildRoundupHtml(articles: ArticleMeta[], lookbackDays: number, 
 
 export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+async function validateArticleImages(articles: ArticleMeta[]): Promise<void> {
+  const checks = articles.map(async (a) => {
+    if (!a.image || !a.image.startsWith('http')) return;
+    try {
+      const resp = await fetch(a.image, { method: 'HEAD', signal: AbortSignal.timeout(3000) });
+      const contentType = resp.headers.get('content-type') || '';
+      if (!resp.ok || !contentType.startsWith('image/')) {
+        a.image = '';
+      }
+    } catch {
+      a.image = '';
+    }
+  });
+  await Promise.all(checks);
 }
 
 const MAX_ROUNDUP_ARTICLES = 12;
@@ -316,7 +341,15 @@ export function curateArticles(
   return picked;
 }
 
-const ROUNDUP_SUMMARY_PROMPT = `You are writing the editorial intro for a daily reading roundup email. Based on the article titles and excerpts below, write 2-3 sentences that highlight the most interesting themes and stories. Be conversational and engaging — like a smart friend telling you what's worth reading today. Do not list articles individually. Do not use phrases like "today's roundup features" or "here are the highlights". Just dive into what's interesting.
+const ROUNDUP_SUMMARY_PROMPT = `You're writing the opening note for a daily reading rundown. Think of yourself as the reader's sharpest, most well-read friend — someone who genuinely finds this stuff fascinating and wants to share why. Your voice is warm but not saccharine, opinionated but not preachy, witty but never try-hard.
+
+Rules:
+- Write 2-3 sentences. No more.
+- Dive straight in. No "Welcome to" or "In today's rundown" throat-clearing.
+- Don't list articles or name-drop every piece. Synthesize the themes.
+- Be direct. "This matters because..." is better than "It's interesting to note that..."
+- A good line has texture. "The AI safety debate is heating up" is flat. Give it life.
+- Never use: "dive in", "buckle up", "without further ado", "let's get started", "here's what caught my eye".
 
 Articles:
 `;
@@ -390,12 +423,15 @@ export async function sendRoundup(
 
   const curated = curateArticles(articles, mentionCounts, watchedEntities);
 
+  // Validate article images — strip broken URLs to avoid broken image icons
+  await validateArticleImages(curated);
+
   // Generate AI editorial summary (non-blocking — email sends even if this fails)
   const summary = await generateRoundupSummary(curated);
 
   const html = buildRoundupHtml(curated, cfg.lookbackDays, summary);
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-  const subject = `Pull Read Roundup — ${today}`;
+  const subject = `The Pull Read Rundown — ${today}`;
 
   const transport = createSmtpTransport(cfg);
   const mailOptions: Record<string, unknown> = {
@@ -415,5 +451,5 @@ export async function sendRoundup(
 
   await transport.sendMail(mailOptions);
 
-  return `Roundup sent with ${curated.length} article${curated.length === 1 ? '' : 's'}`;
+  return `Rundown sent with ${curated.length} article${curated.length === 1 ? '' : 's'}`;
 }

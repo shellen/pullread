@@ -2,6 +2,7 @@
 // ABOUTME: Reads intervals from config and runs periodic operations
 
 use crate::{notifications, sidecar, tray};
+use chrono::Datelike;
 use tauri::{AppHandle, Manager};
 
 /// Start sync, review, and email roundup timers based on user configuration
@@ -115,38 +116,71 @@ fn start_email_timer(app: &AppHandle) {
         return;
     }
 
+    let frequency = email_cfg
+        .get("frequency")
+        .and_then(|v| v.as_str())
+        .unwrap_or("daily")
+        .to_string();
     let send_time = email_cfg
         .get("sendTime")
         .and_then(|v| v.as_str())
         .unwrap_or("08:00")
+        .to_string();
+    let send_time2 = email_cfg
+        .get("sendTime2")
+        .and_then(|v| v.as_str())
+        .unwrap_or("17:00")
         .to_string();
     let last_sent = email_cfg
         .get("lastSentDate")
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
-    log::info!("Starting email roundup timer: daily at {}", send_time);
+
+    // Build list of send times based on frequency
+    let mut send_times = vec![send_time.clone()];
+    if frequency == "twice" {
+        send_times.push(send_time2.clone());
+    }
+    // Weekly uses the same single send time (timer checks day-of-week)
+    log::info!("Starting email timer: {} at {:?}", frequency, send_times);
 
     let handle = app.clone();
     tauri::async_runtime::spawn(async move {
-        // Check if we missed today's send (computer was off at scheduled time)
+        // Check if we missed a send (computer was off at scheduled time)
         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-        let send_time_passed = is_time_past(&send_time);
-        if send_time_passed && last_sent != today {
-            log::info!("Email roundup: missed scheduled time, sending now (failover)");
-            send_email_roundup(&handle, &settings_path).await;
+        if last_sent != today && frequency != "weekly" {
+            // Check if any scheduled time has passed
+            let missed = send_times.iter().any(|t| is_time_past(t));
+            if missed {
+                log::info!("Email: missed scheduled time, sending now (failover)");
+                send_email_roundup(&handle, &settings_path).await;
+            }
         }
 
         loop {
-            let wait = duration_until_time(&send_time);
+            // Find the next upcoming send time
+            let wait = send_times.iter()
+                .map(|t| duration_until_time(t))
+                .min()
+                .unwrap_or(std::time::Duration::from_secs(3600));
             log::info!(
-                "Email roundup: next send in {} minutes",
+                "Email: next send in {} minutes",
                 wait.as_secs() / 60
             );
 
             tokio::time::sleep(wait).await;
 
-            log::info!("Scheduled email roundup triggered");
+            // Weekly: only send on the configured day (default Monday)
+            if frequency == "weekly" {
+                let dow = chrono::Local::now().weekday();
+                if dow != chrono::Weekday::Mon {
+                    tokio::time::sleep(std::time::Duration::from_secs(61)).await;
+                    continue;
+                }
+            }
+
+            log::info!("Scheduled email triggered");
             send_email_roundup(&handle, &settings_path).await;
 
             // Sleep a bit to avoid firing twice in the same minute
@@ -164,7 +198,7 @@ async fn send_email_roundup(handle: &AppHandle, settings_path: &std::path::Path)
                 Ok(resp) => {
                     let body = resp.text().await.unwrap_or_default();
                     log::info!("Email roundup sent: {}", body);
-                    notifications::notify(handle, "Roundup Sent", "Daily roundup email sent");
+                    notifications::notify(handle, "Rundown Sent", "The Pull Read Rundown has been sent");
                     record_last_sent(settings_path);
                 }
                 Err(e) => {
