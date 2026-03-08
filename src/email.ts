@@ -1,5 +1,5 @@
 // ABOUTME: Email roundup module for sending daily digest emails
-// ABOUTME: Uses nodemailer SMTP to deliver HTML roundups of recent articles
+// ABOUTME: Uses nodemailer SMTP with AI curation and editorial summaries
 
 import { createTransport } from 'nodemailer';
 import { join } from 'path';
@@ -199,7 +199,7 @@ function categorySection(name: string, articles: ArticleMeta[]): string {
   return html;
 }
 
-export function buildRoundupHtml(articles: ArticleMeta[], lookbackDays: number): string {
+export function buildRoundupHtml(articles: ArticleMeta[], lookbackDays: number, summary?: string | null): string {
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
   });
@@ -223,6 +223,10 @@ export function buildRoundupHtml(articles: ArticleMeta[], lookbackDays: number):
 <div style="font-size:13px;color:#999">${escapeHtml(today)} &middot; ${count} article${count === 1 ? '' : 's'} from ${period}</div>
 </div>
 `;
+
+  if (summary) {
+    html += `<div style="font-size:15px;color:#444;line-height:1.6;padding:16px 20px;background:#faf8f6;border-radius:8px;border-left:3px solid #b45535;margin-bottom:24px;font-style:italic">${escapeHtml(summary)}</div>`;
+  }
 
   if (articles.length === 0) {
     html += `<div style="text-align:center;padding:32px 0">
@@ -253,6 +257,90 @@ export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+const MAX_ROUNDUP_ARTICLES = 12;
+
+export function curateArticles(
+  articles: ArticleMeta[],
+  mentionCounts?: Map<string, number>,
+  watchedEntities?: Set<string>,
+  limit = MAX_ROUNDUP_ARTICLES,
+): ArticleMeta[] {
+  if (articles.length <= limit) return articles;
+
+  // Score each article based on signals
+  const scored = articles.map(a => {
+    let score = 0;
+    // Boost articles with excerpts (richer content)
+    if (a.excerpt) score += 1;
+    // Boost articles with images (visual interest)
+    if (a.image?.startsWith('http')) score += 1;
+    // Boost articles that mention watched/trending entities
+    if (mentionCounts && watchedEntities) {
+      const titleLower = a.title.toLowerCase();
+      for (const entity of watchedEntities) {
+        if (titleLower.includes(entity.toLowerCase())) score += 3;
+      }
+    }
+    // Boost articles with research graph mentions
+    if (mentionCounts) {
+      const titleWords = a.title.toLowerCase().split(/\s+/);
+      for (const [entity, count] of mentionCounts) {
+        if (titleWords.some(w => entity.toLowerCase().includes(w) && w.length > 3)) {
+          score += Math.min(count, 5);
+        }
+      }
+    }
+    return { article: a, score };
+  });
+
+  // Sort by score descending, then ensure category diversity
+  scored.sort((a, b) => b.score - a.score);
+
+  const picked: ArticleMeta[] = [];
+  const catCounts = new Map<string, number>();
+  const maxPerCategory = Math.ceil(limit / 3);
+
+  for (const { article } of scored) {
+    if (picked.length >= limit) break;
+    const cat = article.categories?.[0] || 'More';
+    const catCount = catCounts.get(cat) || 0;
+    // Only enforce diversity cap when there are multiple categories
+    const uniqueCats = new Set(scored.map(s => s.article.categories?.[0] || 'More'));
+    if (uniqueCats.size > 1 && catCount >= maxPerCategory && picked.length > limit / 2) continue;
+    picked.push(article);
+    catCounts.set(cat, catCount + 1);
+  }
+
+  return picked;
+}
+
+const ROUNDUP_SUMMARY_PROMPT = `You are writing the editorial intro for a daily reading roundup email. Based on the article titles and excerpts below, write 2-3 sentences that highlight the most interesting themes and stories. Be conversational and engaging — like a smart friend telling you what's worth reading today. Do not list articles individually. Do not use phrases like "today's roundup features" or "here are the highlights". Just dive into what's interesting.
+
+Articles:
+`;
+
+export async function generateRoundupSummary(articles: ArticleMeta[]): Promise<string | null> {
+  try {
+    const { summarizeText, loadLLMConfig } = await import('./summarizer');
+    const config = loadLLMConfig();
+    if (!config) return null;
+
+    const articleList = articles
+      .slice(0, 15)
+      .map(a => {
+        const excerpt = a.excerpt ? ` — ${a.excerpt.slice(0, 100)}` : '';
+        return `- ${a.title} (${a.domain || a.feed || ''})${excerpt}`;
+      })
+      .join('\n');
+
+    const prompt = ROUNDUP_SUMMARY_PROMPT + articleList;
+    const result = await summarizeText(prompt, config);
+    return result.summary;
+  } catch {
+    return null;
+  }
+}
+
 export async function sendRoundup(
   config?: EmailConfig,
   fetchArticles?: () => Promise<ArticleMeta[]>,
@@ -268,7 +356,6 @@ export async function sendRoundup(
   if (fetchArticles) {
     articles = await fetchArticles();
   } else {
-    // Fetch from local API
     try {
       const resp = await fetch(`http://127.0.0.1:${port}/api/files`);
       const allArticles = (await resp.json()) as ArticleMeta[];
@@ -281,7 +368,30 @@ export async function sendRoundup(
     }
   }
 
-  const html = buildRoundupHtml(articles, cfg.lookbackDays);
+  // Curate using research graph if available
+  let mentionCounts: Map<string, number> | undefined;
+  let watchedEntities: Set<string> | undefined;
+  try {
+    const { getResearchPDS, listWatches } = await import('./research');
+    const pds = getResearchPDS();
+    const mentions = pds.listRecords('app.pullread.mention');
+    mentionCounts = new Map();
+    for (const m of mentions) {
+      const name = m.value.entityName as string;
+      mentionCounts.set(name, (mentionCounts.get(name) || 0) + 1);
+    }
+    const watches = listWatches(pds);
+    watchedEntities = new Set(watches.map(w => w.value.query as string));
+  } catch {
+    // Research module not available — curate without it
+  }
+
+  const curated = curateArticles(articles, mentionCounts, watchedEntities);
+
+  // Generate AI editorial summary (non-blocking — email sends even if this fails)
+  const summary = await generateRoundupSummary(curated);
+
+  const html = buildRoundupHtml(curated, cfg.lookbackDays, summary);
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   const subject = `Pull Read Roundup — ${today}`;
 
@@ -293,5 +403,5 @@ export async function sendRoundup(
     html,
   });
 
-  return `Roundup sent with ${articles.length} article${articles.length === 1 ? '' : 's'}`;
+  return `Roundup sent with ${curated.length} article${curated.length === 1 ? '' : 's'}`;
 }

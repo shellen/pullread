@@ -1,7 +1,7 @@
 // ABOUTME: Tests for the email roundup module
-// ABOUTME: Covers HTML generation, escaping, provider resolution, category grouping, and send logic
+// ABOUTME: Covers HTML generation, escaping, provider resolution, curation, summary, and send logic
 
-import { escapeHtml, buildRoundupHtml, sendTestEmail, sendRoundup, resolveSmtpConfig, SMTP_PROVIDERS } from './email';
+import { escapeHtml, buildRoundupHtml, sendTestEmail, sendRoundup, resolveSmtpConfig, SMTP_PROVIDERS, curateArticles } from './email';
 import type { EmailConfig, ArticleMeta } from './email';
 
 const baseConfig: EmailConfig = {
@@ -201,6 +201,63 @@ describe('buildRoundupHtml', () => {
     const html = buildRoundupHtml([], 1);
     expect(html).toContain('email-header.png');
     expect(html).toContain('Pull Read');
+  });
+
+  test('renders AI summary when provided', () => {
+    const html = buildRoundupHtml([article()], 1, 'AI is reshaping how we read and write.');
+    expect(html).toContain('AI is reshaping how we read and write.');
+    expect(html).toContain('border-left:3px solid #b45535');
+  });
+
+  test('renders without summary when null', () => {
+    const html = buildRoundupHtml([article()], 1, null);
+    expect(html).not.toContain('border-left:3px solid #b45535');
+  });
+});
+
+describe('curateArticles', () => {
+  test('returns all articles when under limit', () => {
+    const articles = [article({ title: 'A' }), article({ title: 'B' })];
+    const result = curateArticles(articles, undefined, undefined, 5);
+    expect(result).toHaveLength(2);
+  });
+
+  test('limits articles to max count', () => {
+    const articles = Array.from({ length: 20 }, (_, i) => article({ title: `Art ${i}` }));
+    const result = curateArticles(articles, undefined, undefined, 5);
+    expect(result).toHaveLength(5);
+  });
+
+  test('boosts articles with excerpts and images', () => {
+    const articles = [
+      article({ title: 'Plain', filename: 'plain.md' }),
+      article({ title: 'Rich', filename: 'rich.md', excerpt: 'Great stuff', image: 'https://img.com/a.jpg' }),
+      article({ title: 'Also Plain', filename: 'plain2.md' }),
+    ];
+    const result = curateArticles(articles, undefined, undefined, 2);
+    expect(result[0].title).toBe('Rich');
+  });
+
+  test('boosts articles matching watched entities', () => {
+    const articles = [
+      article({ title: 'Random News' }),
+      article({ title: 'Apple Launches New Product' }),
+      article({ title: 'Weather Report' }),
+    ];
+    const watched = new Set(['Apple']);
+    const result = curateArticles(articles, new Map(), watched, 2);
+    expect(result.some(a => a.title.includes('Apple'))).toBe(true);
+  });
+
+  test('ensures category diversity', () => {
+    const articles = Array.from({ length: 12 }, (_, i) =>
+      article({ title: `Tech ${i}`, categories: ['Technology'], excerpt: 'x' })
+    ).concat([
+      article({ title: 'Business One', categories: ['Business'], excerpt: 'x' }),
+    ]);
+    const result = curateArticles(articles, undefined, undefined, 6);
+    const cats = new Set(result.map(a => a.categories?.[0]));
+    expect(cats.size).toBeGreaterThan(1);
   });
 });
 
