@@ -230,14 +230,8 @@
   }
 
   // Build the deep link
-  var deepLink = 'pullread://save?url=' + encodeURIComponent(url);
+  var deepLink = 'pullread://open?url=' + encodeURIComponent(url);
   if (title) deepLink += '&title=' + encodeURIComponent(title);
-
-  // Attempt the deep link via hidden iframe (avoids navigation if app isn't installed)
-  var iframe = document.createElement('iframe');
-  iframe.style.display = 'none';
-  iframe.src = deepLink;
-  document.body.appendChild(iframe);
 
   // Set up the fallback state
   var infoEl = document.getElementById('article-info');
@@ -248,14 +242,29 @@
     infoEl.innerHTML = '<p class="article-url"><a href="' + escapeHtml(url) + '">' + escapeHtml(truncateUrl(url)) + '</a></p>';
   }
 
-  document.getElementById('try-open').href = deepLink;
+  var tryOpenBtn = document.getElementById('try-open');
+  tryOpenBtn.href = deepLink;
+  tryOpenBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    window.location.href = deepLink;
+  });
   document.getElementById('source-link').href = url;
 
-  // After 2.5 seconds, show fallback (app either opened or isn't installed)
-  setTimeout(function() {
+  // On mobile, skip the deep link attempt and show fallback immediately
+  var isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (isMobile) {
     document.getElementById('loading-state').classList.add('hidden');
     document.getElementById('fallback-state').classList.remove('hidden');
-  }, 2500);
+  } else {
+    // Attempt deep link via direct navigation — works in modern Safari/Chrome
+    window.location.href = deepLink;
+
+    // After 1.5 seconds, show fallback (app either opened or isn't installed)
+    setTimeout(function() {
+      document.getElementById('loading-state').classList.add('hidden');
+      document.getElementById('fallback-state').classList.remove('hidden');
+    }, 1500);
+  }
 
   function escapeHtml(str) {
     var div = document.createElement('div');
