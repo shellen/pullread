@@ -337,6 +337,10 @@ function handleHashNavigation() {
     var idx = displayFiles.findIndex(function(f) { return f.filename === params.file; });
     if (idx >= 0) loadFile(idx);
     history.replaceState(null, '', location.pathname);
+  } else if ('url' in params) {
+    var idx = displayFiles.findIndex(function(f) { return f.url === params.url; });
+    if (idx >= 0) loadFile(idx);
+    history.replaceState(null, '', location.pathname);
   } else if ('notebook' in params) {
     var nb = _notebooks.find(function(n) { return n.id === params.notebook; });
     if (nb) openNotebook(nb.id);

@@ -151,11 +151,17 @@ pub async fn handle_deep_link(app: &AppHandle, url: &str) {
 
     match host {
         "open" => {
-            // pullread://open or pullread://open?file=filename.md
+            // pullread://open, pullread://open?file=filename.md, or pullread://open?url=<article_url>
             let hash = parsed
                 .query_pairs()
                 .find(|(k, _)| k == "file")
-                .map(|(_, v)| format!("file={}", urlencoding::encode(&v)));
+                .map(|(_, v)| format!("file={}", urlencoding::encode(&v)))
+                .or_else(|| {
+                    parsed
+                        .query_pairs()
+                        .find(|(k, _)| k == "url")
+                        .map(|(_, v)| format!("url={}", urlencoding::encode(&v)))
+                });
             let _ = open_viewer_at(app, hash.as_deref()).await;
         }
         "save" => {
