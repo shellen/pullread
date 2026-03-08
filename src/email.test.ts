@@ -197,9 +197,9 @@ describe('buildRoundupHtml', () => {
     expect(html).toContain('#b45535'); // terracotta accent
   });
 
-  test('includes rendered header image', () => {
+  test('includes rendered header image via CID', () => {
     const html = buildRoundupHtml([], 1);
-    expect(html).toContain('email-header.png');
+    expect(html).toContain('cid:header');
     expect(html).toContain('Pull Read');
   });
 

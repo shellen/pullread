@@ -6,6 +6,8 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { readFileSync, existsSync } from 'fs';
 
+const HEADER_IMAGE_PATH = join(__dirname, '..', 'email-header.png');
+
 export interface EmailConfig {
   enabled: boolean;
   smtpProvider: 'gmail' | 'outlook' | 'custom';
@@ -213,7 +215,7 @@ export function buildRoundupHtml(articles: ArticleMeta[], lookbackDays: number, 
 <div style="max-width:600px;margin:0 auto;padding:20px">
 
 <div style="text-align:center;padding:24px 0 16px">
-<a href="https://pullread.com" style="text-decoration:none"><img src="https://pullread.com/email-header.png" width="220" height="44" alt="Pull Read" style="display:inline-block" /></a>
+<a href="https://pullread.com" style="text-decoration:none"><img src="cid:header" width="220" height="40" alt="Pull Read" style="display:inline-block" /></a>
 </div>
 
 <div style="background:#ffffff;border-radius:12px;padding:32px;border:1px solid #e8e3de">
@@ -396,12 +398,22 @@ export async function sendRoundup(
   const subject = `Pull Read Roundup — ${today}`;
 
   const transport = createSmtpTransport(cfg);
-  await transport.sendMail({
+  const mailOptions: Record<string, unknown> = {
     from: cfg.fromAddress || cfg.smtpUser,
     to: cfg.toAddress,
     subject,
     html,
-  });
+  };
+
+  if (existsSync(HEADER_IMAGE_PATH)) {
+    mailOptions.attachments = [{
+      filename: 'email-header.png',
+      path: HEADER_IMAGE_PATH,
+      cid: 'header',
+    }];
+  }
+
+  await transport.sendMail(mailOptions);
 
   return `Roundup sent with ${curated.length} article${curated.length === 1 ? '' : 's'}`;
 }
