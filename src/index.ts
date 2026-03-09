@@ -2,7 +2,7 @@
 // ABOUTME: Syncs RSS and Atom feeds to markdown files
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
-import { join, basename } from 'path';
+import { join, basename, dirname } from 'path';
 import { homedir } from 'os';
 import { fetchFeed, FeedEntry } from './feed';
 import { fetchAndExtract, FetchOptions, shouldSkipUrl, isBinaryUrl, classifyFetchError, htmlToMarkdown } from './extractor';
@@ -123,6 +123,32 @@ function loadConfig(): Config {
     console.error('Error: Could not parse feeds.json:', err instanceof Error ? err.message : err);
     process.exit(1);
   }
+}
+
+/** Load config, or create a default one for first-run (viewer onboarding) */
+function loadOrBootstrapConfig(): Config {
+  if (existsSync(CONFIG_PATH)) {
+    return loadConfig();
+  }
+
+  const configDir = dirname(CONFIG_PATH);
+  const defaultOutputPath = join(homedir(), 'Documents', 'PullRead');
+
+  mkdirSync(configDir, { recursive: true });
+  mkdirSync(defaultOutputPath, { recursive: true });
+
+  const defaultConfig = {
+    outputPath: '~/Documents/PullRead',
+    feeds: {},
+  };
+  writeFileSync(CONFIG_PATH, JSON.stringify(defaultConfig, null, 2));
+  console.log(`First run: created ${CONFIG_PATH}`);
+
+  return {
+    outputPath: defaultOutputPath,
+    feeds: {},
+    useBrowserCookies: false,
+  };
 }
 
 async function syncFeed(
@@ -502,7 +528,7 @@ if (command === 'sync') {
     process.exit(1);
   });
 } else if (command === 'view') {
-  const config = loadConfig();
+  const config = loadOrBootstrapConfig();
   const portIndex = args.indexOf('--port');
   const port = portIndex !== -1 && args[portIndex + 1]
     ? parseInt(args[portIndex + 1], 10)
