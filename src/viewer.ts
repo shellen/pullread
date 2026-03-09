@@ -1340,10 +1340,9 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
           if (body.maxAgeDays !== undefined) existing.maxAgeDays = body.maxAgeDays;
           saveJsonFile(FEEDS_PATH, existing);
 
-          // Create output directory if it doesn't exist
+          // Register and create output directory when outputPath is set
           if (existing.outputPath) {
             const expandedPath = (existing.outputPath as string).replace(/^~/, homedir());
-            assertWritablePath(expandedPath);
             setOutputPath(expandedPath);
             if (!existsSync(expandedPath)) {
               mkdirSync(expandedPath, { recursive: true });
@@ -1352,8 +1351,10 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
 
           sendJson(res, { ok: true });
         } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Invalid request body';
+          log(`[api/config] POST error: ${msg}`);
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Invalid request body' }));
+          res.end(JSON.stringify({ error: msg }));
         }
         return;
       }

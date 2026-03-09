@@ -125,30 +125,49 @@ function loadConfig(): Config {
   }
 }
 
-/** Load config, or create a default one for first-run (viewer onboarding) */
+/** Load config for the viewer, tolerating empty feeds for onboarding */
 function loadOrBootstrapConfig(): Config {
-  if (existsSync(CONFIG_PATH)) {
-    return loadConfig();
-  }
-
   const configDir = dirname(CONFIG_PATH);
   const defaultOutputPath = join(homedir(), 'Documents', 'PullRead');
 
-  mkdirSync(configDir, { recursive: true });
-  mkdirSync(defaultOutputPath, { recursive: true });
+  if (!existsSync(CONFIG_PATH)) {
+    mkdirSync(configDir, { recursive: true });
+    mkdirSync(defaultOutputPath, { recursive: true });
 
-  const defaultConfig = {
-    outputPath: '~/Documents/PullRead',
-    feeds: {},
-  };
-  writeFileSync(CONFIG_PATH, JSON.stringify(defaultConfig, null, 2));
-  console.log(`First run: created ${CONFIG_PATH}`);
+    const defaultConfig = {
+      outputPath: '~/Documents/PullRead',
+      feeds: {},
+    };
+    writeFileSync(CONFIG_PATH, JSON.stringify(defaultConfig, null, 2));
+    console.log(`First run: created ${CONFIG_PATH}`);
 
-  return {
-    outputPath: defaultOutputPath,
-    feeds: {},
-    useBrowserCookies: false,
-  };
+    return {
+      outputPath: defaultOutputPath,
+      feeds: {},
+      useBrowserCookies: false,
+    };
+  }
+
+  try {
+    const content = readFileSync(CONFIG_PATH, 'utf-8');
+    const config = JSON.parse(content);
+    const outputPath = config.outputPath
+      ? config.outputPath.replace(/^~/, process.env.HOME || '')
+      : defaultOutputPath;
+
+    return {
+      outputPath,
+      feeds: config.feeds || {},
+      useBrowserCookies: config.useBrowserCookies || false,
+      maxAgeDays: config.maxAgeDays,
+    };
+  } catch {
+    return {
+      outputPath: defaultOutputPath,
+      feeds: {},
+      useBrowserCookies: false,
+    };
+  }
 }
 
 async function syncFeed(
