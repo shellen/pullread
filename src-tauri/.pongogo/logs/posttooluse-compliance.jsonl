@@ -1,0 +1,1 @@
+{"ts": "2026-03-08T00:44:00.292455+00:00", "level": "ERROR", "hook": "posttooluse-compliance", "session_id": "c53e2ca3-204a-4266-bc27-e77653e8219a", "branch": "feature/research-tab", "msg": "Database error querying pending requirements: no such column: enforcement_phase"}
