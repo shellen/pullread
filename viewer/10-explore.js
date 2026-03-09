@@ -364,9 +364,7 @@ function buildDiscoverTab(data) {
   if (serverMode && llmConfigured) {
     html += '<button class="discover-chip" onclick="dashGenerateReview(1)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Daily Review</button>';
     html += '<button class="discover-chip" onclick="dashGenerateReview(7)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Weekly Review</button>';
-    if (localStorage.getItem('pr-beta-features') === 'true') {
-      html += '<button class="discover-chip" onclick="renderAskPage()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Ask</button>';
-    }
+    html += '<button class="discover-chip" onclick="renderAskPage()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-wand"/></svg> Ask</button>';
   }
   html += '<button class="discover-chip" onclick="showGuideModal()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-book"/></svg> Guide</button>';
   html += '<button class="discover-chip" onclick="showGuideModal();setTimeout(function(){var f=document.getElementById(\'guide-faq\');if(f)f.scrollIntoView({behavior:\'smooth\'})},100)"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-comment"/></svg> FAQ</button>';

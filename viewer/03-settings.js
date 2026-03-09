@@ -507,6 +507,8 @@ function settingsSaveBreakActivity(input) {
 function settingsSaveBeta(enabled) {
   if (enabled) localStorage.setItem('pr-beta-features', 'true');
   else localStorage.removeItem('pr-beta-features');
+  var researchNav = document.getElementById('nav-research');
+  if (researchNav) researchNav.style.display = enabled ? '' : 'none';
 }
 
 function settingsEmailToggle(enabled) {
@@ -888,7 +890,8 @@ function showSettingsPage(scrollToSection) {
   html += '</div>';
   html += '</div>';
 
-  // -- Research card --
+  // -- Research card (beta only) --
+  if (localStorage.getItem('pr-beta-features') === 'true') {
   html += '<div class="card" id="settings-research">';
   html += '<div class="card-title">Research</div>';
   html += '<div class="card-desc">The knowledge graph extracts entities, viewpoints, and relationships from your articles.</div>';
@@ -900,6 +903,7 @@ function showSettingsPage(scrollToSection) {
   html += '<button onclick="settingsResetResearch()" style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit">Reset &amp; Re-extract</button>';
   html += '</div>';
   html += '</div>';
+  } // end beta Research card
 
   // -- Backup & Restore card --
   html += '<div class="card" id="settings-backup">';

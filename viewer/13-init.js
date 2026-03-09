@@ -254,6 +254,12 @@ async function init() {
     document.getElementById('focus-btn').classList.add('active');
   }
 
+  // Show Research nav when beta features enabled
+  if (localStorage.getItem('pr-beta-features') === 'true') {
+    var researchNav = document.getElementById('nav-research');
+    if (researchNav) researchNav.style.display = '';
+  }
+
   // Restore hide-read
   hideRead = localStorage.getItem('pr-hide-read') === '1';
   document.getElementById('hide-read-toggle').classList.toggle('active', hideRead);
@@ -330,7 +336,7 @@ function handleHashNavigation() {
   if ('tab' in params && params.tab === 'settings') {
     showSettingsPage();
     history.replaceState(null, '', location.pathname);
-  } else if ('tab' in params && params.tab === 'ask' && localStorage.getItem('pr-beta-features') === 'true') {
+  } else if ('tab' in params && params.tab === 'ask') {
     renderAskPage();
     history.replaceState(null, '', location.pathname);
   } else if ('file' in params) {

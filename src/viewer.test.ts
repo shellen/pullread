@@ -1171,15 +1171,21 @@ describe('Beta features gate', () => {
     expect(settings).toContain('pr-beta-features');
   });
 
-  test('Discover area gates Ask chip behind beta flag', () => {
+  test('Discover area shows Ask chip without beta gate', () => {
     const explore = readFileSync(join(rootDir, 'viewer', '10-explore.js'), 'utf-8');
-    expect(explore).toContain('pr-beta-features');
     expect(explore).toContain('renderAskPage');
+    expect(explore).not.toMatch(/pr-beta-features.*renderAskPage/s);
   });
 
-  test('#tab=ask deep link is gated behind beta flag', () => {
+  test('Research nav is gated behind beta flag', () => {
     const init = readFileSync(join(rootDir, 'viewer', '13-init.js'), 'utf-8');
     expect(init).toContain('pr-beta-features');
+    expect(init).toContain('nav-research');
+  });
+
+  test('Research settings card is gated behind beta flag', () => {
+    const settings = readFileSync(join(rootDir, 'viewer', '03-settings.js'), 'utf-8');
+    expect(settings).toMatch(/pr-beta-features.*settings-research/s);
   });
 });
 
