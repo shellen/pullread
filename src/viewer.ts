@@ -659,7 +659,11 @@ function installBundledBooks(outputPath: string): void {
   for (const filename of entries) {
     const dest = join(outputPath, filename);
     if (!existsSync(dest)) {
-      copyFileSync(join(booksDir, filename), dest);
+      try {
+        copyFileSync(join(booksDir, filename), dest);
+      } catch {
+        continue;
+      }
     }
 
     // Ensure "classicbooks" tag exists in annotation sidecar
