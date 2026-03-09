@@ -616,6 +616,7 @@ function settingsAutoSaveSync(input) {
       var indicator = input.parentNode.querySelector('.save-indicator');
       if (indicator) indicator.classList.add('visible');
     }
+    if (input && input.id === 'sp-output-path') refreshArticleList(true);
   });
 }
 
@@ -1792,6 +1793,7 @@ function pickOutputFolder(inputId) {
     .then(function(data) {
       if (data.path) {
         document.getElementById(inputId).value = data.path;
+        settingsPageSaveConfig(true).then(function() { refreshArticleList(true); });
       }
     })
     .catch(function() { /* osascript not available — user can type manually */ });
