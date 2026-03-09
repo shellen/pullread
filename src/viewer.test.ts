@@ -57,6 +57,71 @@ Body`;
     const meta = parseFrontmatter(content);
     expect(meta.categories).toBe('["Technology", "Programming"]');
   });
+
+  test('aliases Defuddle "source" to "url" when url is absent', () => {
+    const content = `---
+title: "Defuddle Article"
+source: https://example.com/defuddle
+domain: example.com
+---
+Body`;
+    const meta = parseFrontmatter(content);
+    expect(meta.url).toBe('https://example.com/defuddle');
+    expect(meta.source).toBe('https://example.com/defuddle');
+  });
+
+  test('aliases Defuddle "published" to "bookmarked" when bookmarked is absent', () => {
+    const content = `---
+title: "Defuddle Article"
+published: 2025-03-09T12:00:00Z
+---
+Body`;
+    const meta = parseFrontmatter(content);
+    expect(meta.bookmarked).toBe('2025-03-09T12:00:00Z');
+    expect(meta.published).toBe('2025-03-09T12:00:00Z');
+  });
+
+  test('aliases Defuddle "description" to "excerpt" when excerpt is absent', () => {
+    const content = `---
+title: "Defuddle Article"
+description: A great article about something
+---
+Body`;
+    const meta = parseFrontmatter(content);
+    expect(meta.excerpt).toBe('A great article about something');
+    expect(meta.description).toBe('A great article about something');
+  });
+
+  test('aliases Defuddle "image" to "thumbnail" when thumbnail is absent', () => {
+    const content = `---
+title: "Defuddle Article"
+image: https://example.com/hero.jpg
+---
+Body`;
+    const meta = parseFrontmatter(content);
+    expect(meta.thumbnail).toBe('https://example.com/hero.jpg');
+    expect(meta.image).toBe('https://example.com/hero.jpg');
+  });
+
+  test('does not overwrite existing PullRead fields with Defuddle aliases', () => {
+    const content = `---
+title: "Mixed Article"
+url: https://pullread.com/article
+source: https://defuddle.com/article
+bookmarked: 2025-01-01T00:00:00Z
+published: 2025-03-09T00:00:00Z
+excerpt: "PullRead excerpt"
+description: Defuddle description
+thumbnail: https://pullread.com/thumb.jpg
+image: https://defuddle.com/hero.jpg
+---
+Body`;
+    const meta = parseFrontmatter(content);
+    expect(meta.url).toBe('https://pullread.com/article');
+    expect(meta.bookmarked).toBe('2025-01-01T00:00:00Z');
+    expect(meta.excerpt).toBe('PullRead excerpt');
+    expect(meta.thumbnail).toBe('https://pullread.com/thumb.jpg');
+  });
 });
 
 describe('reprocessFile', () => {
@@ -231,7 +296,7 @@ thumbnail: https://example.com/hero.jpg
     expect(result.ok).toBe(true);
 
     const updated = readFileSync(filePath, 'utf-8');
-    expect(updated).toContain('thumbnail: https://example.com/hero.jpg');
+    expect(updated).toContain('image: https://example.com/hero.jpg');
     expect(updated).toContain('categories: ["Technology", "Programming"]');
   });
 

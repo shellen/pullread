@@ -46,6 +46,7 @@ export interface ArticleData {
   author?: string;
   excerpt?: string;
   thumbnail?: string;
+  favicon?: string;
   lang?: string;
   categories?: string[];
   source?: string;
@@ -81,6 +82,7 @@ export function generateMarkdown(data: ArticleData): string {
 title: "${escapeQuotes(data.title)}"
 url: ${data.url}
 bookmarked: ${data.bookmarkedAt}
+published: ${data.bookmarkedAt}
 domain: ${data.domain}`;
 
   if (data.feed) {
@@ -104,7 +106,11 @@ domain: ${data.domain}`;
   }
 
   if (data.thumbnail) {
-    frontmatter += `\nthumbnail: ${data.thumbnail}`;
+    frontmatter += `\nimage: ${data.thumbnail}`;
+  }
+
+  if (data.favicon) {
+    frontmatter += `\nfavicon: ${data.favicon}`;
   }
 
   if (data.annotation) {

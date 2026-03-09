@@ -246,6 +246,46 @@ describe('generateMarkdown', () => {
     expect(md).not.toContain('video_enclosure');
   });
 
+  test('writes image instead of thumbnail', () => {
+    const md = generateMarkdown({
+      title: 'Article With Hero',
+      url: 'https://example.com/hero',
+      bookmarkedAt: '2024-01-29T12:00:00Z',
+      domain: 'example.com',
+      content: 'Content',
+      thumbnail: 'https://example.com/hero.jpg'
+    });
+
+    expect(md).toContain('image: https://example.com/hero.jpg');
+    expect(md).not.toContain('thumbnail:');
+  });
+
+  test('writes published alongside bookmarked', () => {
+    const md = generateMarkdown({
+      title: 'Test',
+      url: 'https://example.com',
+      bookmarkedAt: '2024-01-29T12:00:00Z',
+      domain: 'example.com',
+      content: 'Content'
+    });
+
+    expect(md).toContain('bookmarked: 2024-01-29T12:00:00Z');
+    expect(md).toContain('published: 2024-01-29T12:00:00Z');
+  });
+
+  test('includes favicon when present', () => {
+    const md = generateMarkdown({
+      title: 'Test',
+      url: 'https://example.com',
+      bookmarkedAt: '2024-01-29T12:00:00Z',
+      domain: 'example.com',
+      content: 'Content',
+      favicon: 'https://example.com/favicon.ico'
+    });
+
+    expect(md).toContain('favicon: https://example.com/favicon.ico');
+  });
+
   test('omits enclosure_duration when not provided', () => {
     const md = generateMarkdown({
       title: 'Podcast Episode',

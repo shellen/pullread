@@ -31,6 +31,7 @@ interface FileMeta {
   summaryModel: string;
   excerpt: string;
   image: string;
+  favicon: string;
   enclosureUrl: string;
   enclosureType: string;
   enclosureDuration: string;
@@ -53,6 +54,11 @@ export function parseFrontmatter(content: string): Record<string, string> {
       meta[key] = val;
     }
   }
+  // Normalize Defuddle field names to PullRead equivalents
+  if (meta.source && !meta.url) meta.url = meta.source;
+  if (meta.published && !meta.bookmarked) meta.bookmarked = meta.published;
+  if (meta.description && !meta.excerpt) meta.excerpt = meta.description;
+  if (meta.image && !meta.thumbnail) meta.thumbnail = meta.image;
   return meta;
 }
 
@@ -503,6 +509,7 @@ function listFiles(outputPath: string): FileMeta[] {
         summaryModel: meta.summaryModel || '',
         excerpt: meta.excerpt || '',
         image,
+        favicon: meta.favicon || '',
         enclosureUrl: meta.enclosure_url || '',
         enclosureType: meta.enclosure_type || '',
         enclosureDuration: meta.enclosure_duration || '',
@@ -543,6 +550,7 @@ function listFiles(outputPath: string): FileMeta[] {
         summaryModel: '',
         excerpt: meta.description || '',
         image: coverImage,
+        favicon: '',
         enclosureUrl: '',
         enclosureType: '',
         enclosureDuration: '',
@@ -1352,7 +1360,7 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
           sendJson(res, { ok: true });
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Invalid request body';
-          log(`[api/config] POST error: ${msg}`);
+          console.log(`[api/config] POST error: ${msg}`);
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: msg }));
         }
