@@ -783,7 +783,8 @@ export async function reprocessFile(filePath: string, options?: { force?: boolea
   }
 }
 
-export function startViewer(outputPath: string, port = 7777, openBrowser = true): void {
+export function startViewer(initialOutputPath: string, port = 7777, openBrowser = true): ReturnType<typeof createServer> {
+  let outputPath = initialOutputPath;
   setOutputPath(outputPath);
 
   // Watch output directory for .md file changes
@@ -1348,12 +1349,13 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
           if (body.maxAgeDays !== undefined) existing.maxAgeDays = body.maxAgeDays;
           saveJsonFile(FEEDS_PATH, existing);
 
-          // Register and create output directory when outputPath is set
+          // Register and switch to the new output directory
           if (existing.outputPath) {
             const expandedPath = (existing.outputPath as string).replace(/^~/, homedir());
-            setOutputPath(expandedPath);
-            if (!existsSync(expandedPath)) {
-              mkdirSync(expandedPath, { recursive: true });
+            outputPath = expandedPath;
+            setOutputPath(outputPath);
+            if (!existsSync(outputPath)) {
+              mkdirSync(outputPath, { recursive: true });
             }
           }
 
@@ -2709,4 +2711,6 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
       execFile(cmd, [url]);
     }
   });
+
+  return server;
 }
