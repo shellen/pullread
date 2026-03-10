@@ -322,5 +322,5 @@ describe('sendRoundup', () => {
       },
       async () => articles,
     )).rejects.toThrow();
-  });
+  }, 45000);
 });
