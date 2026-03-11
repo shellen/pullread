@@ -176,8 +176,38 @@ pub async fn handle_deep_link(app: &AppHandle, url: &str) {
                 .map(|(_, v)| v.to_string());
 
             if let Some(article_url) = save_url {
-                save_to_inbox(app, &article_url, title.as_deref());
-                notifications::notify(app, "Article Saved", "Added to inbox for next sync.");
+                // Try immediate processing via the viewer's /api/save endpoint
+                let mut saved_immediately = false;
+                if let Ok(port) = sidecar::ensure_viewer_running(app).await {
+                    let api_url = format!("http://127.0.0.1:{}/api/save", port);
+                    let body = serde_json::json!({ "url": article_url }).to_string();
+                    let result = reqwest::Client::new()
+                        .post(&api_url)
+                        .header("Content-Type", "application/json")
+                        .body(body)
+                        .send()
+                        .await;
+                    match result {
+                        Ok(resp) => {
+                            if resp.status().is_success() {
+                                saved_immediately = true;
+                                log::info!("Article saved immediately via viewer API");
+                                notifications::notify(app, "Article Saved", "Ready to read now.");
+                                let _ = open_viewer_at(app, None).await;
+                            } else {
+                                log::warn!("Viewer /api/save returned {}", resp.status());
+                            }
+                        }
+                        Err(e) => {
+                            log::warn!("Viewer /api/save failed: {}", e);
+                        }
+                    }
+                }
+                // Fall back to inbox if immediate processing failed
+                if !saved_immediately {
+                    save_to_inbox(app, &article_url, title.as_deref());
+                    notifications::notify(app, "Article Saved", "Added to inbox for next sync.");
+                }
             }
         }
         "sync" => {

@@ -1553,7 +1553,7 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
           const existing = (appSettings.emailRoundup as Record<string, unknown>) || {};
           // Merge — only update fields that are present in the request
           const updated: Record<string, unknown> = { ...existing };
-          const fields = ['enabled', 'smtpHost', 'smtpPort', 'smtpUser', 'smtpPass', 'useTls', 'fromAddress', 'toAddress', 'sendTime', 'lookbackDays'];
+          const fields = ['enabled', 'smtpProvider', 'smtpHost', 'smtpPort', 'smtpUser', 'smtpPass', 'useTls', 'fromAddress', 'toAddress', 'frequency', 'sendTime', 'sendTime2', 'lookbackDays'];
           for (const f of fields) {
             if (body[f] !== undefined) updated[f] = body[f];
           }

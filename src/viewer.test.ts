@@ -1189,6 +1189,58 @@ describe('Beta features gate', () => {
   });
 });
 
+describe('Email settings persistence', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('email-settings POST handler persists smtpProvider, frequency, and sendTime2', () => {
+    const viewer = readFileSync(join(rootDir, 'src', 'viewer.ts'), 'utf-8');
+    // Find the fields array in the email-settings POST handler
+    const emailSection = viewer.slice(viewer.indexOf("'/api/email-settings'"));
+    const fieldsMatch = emailSection.match(/const fields = \[([^\]]+)\]/);
+    expect(fieldsMatch).toBeTruthy();
+    const fields = fieldsMatch![1];
+    expect(fields).toContain('smtpProvider');
+    expect(fields).toContain('frequency');
+    expect(fields).toContain('sendTime2');
+  });
+
+  test('settings UI sends all fields that timers.rs reads', () => {
+    const settings = readFileSync(join(rootDir, 'viewer', '03-settings.js'), 'utf-8');
+    // The save function must include these fields that Rust reads at startup
+    expect(settings).toContain('smtpProvider: provider');
+    expect(settings).toContain('frequency:');
+    expect(settings).toContain('sendTime2:');
+  });
+});
+
+describe('Bookmark save immediate processing', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('deep link save handler calls viewer /api/save for immediate processing', () => {
+    const commands = readFileSync(join(rootDir, 'src-tauri', 'src', 'commands.rs'), 'utf-8');
+    // The "save" deep link should POST to /api/save on the viewer
+    expect(commands).toContain('/api/save');
+    expect(commands).toContain('ensure_viewer_running');
+  });
+
+  test('deep link save falls back to inbox if viewer unavailable', () => {
+    const commands = readFileSync(join(rootDir, 'src-tauri', 'src', 'commands.rs'), 'utf-8');
+    // Must still have inbox fallback for offline/error cases
+    expect(commands).toContain('save_to_inbox');
+  });
+});
+
+describe('Magic sort inbox boost', () => {
+  const rootDir = join(__dirname, '..');
+
+  test('magicScore boosts recently bookmarked inbox items', () => {
+    const sidebar = readFileSync(join(rootDir, 'viewer', '05-sidebar.js'), 'utf-8');
+    // The magicScore function should check for inbox feed and apply a boost
+    const scoreSection = sidebar.slice(sidebar.indexOf('function magicScore'));
+    expect(scoreSection).toContain('inbox');
+  });
+});
+
 describe('Feed catalog', () => {
   const rootDir = join(__dirname, '..');
 
