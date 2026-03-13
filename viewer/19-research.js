@@ -60,7 +60,11 @@ function researchRenderBrowser() {
   // Graph panel with Cytoscape container
   html += '<div class="research-graph-panel">';
   html += '<div class="research-graph-cy" id="research-graph-cy"></div>';
-  html += '<div class="research-graph-legend"><span class="research-graph-legend-line"></span> relationship</div>';
+  html += '<div class="research-graph-legend">';
+  html += '<span><span class="research-graph-legend-line"></span> extracted</span>';
+  html += '<span><span class="research-graph-legend-line" style="height:2.5px;background:#8a6d20;border-radius:1px"></span> your links</span>';
+  html += '<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;border:1.5px solid #8a6d20;background:transparent;vertical-align:middle"></span> note</span>';
+  html += '</div>';
   html += '<div class="research-graph-overflow" id="research-graph-overflow" style="display:none"></div>';
   html += '<div class="research-popover" id="research-popover"></div>';
   html += '</div>';
@@ -153,7 +157,8 @@ function researchRenderGraph(graph) {
     if (!entityByName[from] || !entityByName[to]) continue;
     var pairKey = [from, to].sort().join('\0');
     var normLabel = edge.value.type.toLowerCase().replace(/s$/, '');
-    if (!edgeMap[pairKey]) edgeMap[pairKey] = { from: from, to: to, labels: {} };
+    if (!edgeMap[pairKey]) edgeMap[pairKey] = { from: from, to: to, labels: {}, hasNoteOrigin: false };
+    if (edge.value.origin === 'note') edgeMap[pairKey].hasNoteOrigin = true;
     edgeMap[pairKey].labels[normLabel] = (edgeMap[pairKey].labels[normLabel] || 0) + 1;
   }
   var edgeKeys = Object.keys(edgeMap);
@@ -173,7 +178,9 @@ function researchRenderGraph(graph) {
         id: 'e' + i,
         source: entry.from,
         target: entry.to,
-        label: bestLabel
+        label: bestLabel,
+        edgeWidth: entry.hasNoteOrigin ? 2.5 : 1,
+        edgeColor: entry.hasNoteOrigin ? '#8a6d20' : (isDark ? '#3a3a4a' : '#cbd5e1')
       }
     });
   }
@@ -221,9 +228,9 @@ function researchRenderGraph(graph) {
         selector: 'edge',
         style: {
           'label': 'data(label)',
-          'width': 1,
-          'line-color': isDark ? '#3a3a4a' : '#cbd5e1',
-          'target-arrow-color': isDark ? '#3a3a4a' : '#cbd5e1',
+          'width': 'data(edgeWidth)',
+          'line-color': 'data(edgeColor)',
+          'target-arrow-color': 'data(edgeColor)',
           'target-arrow-shape': 'triangle',
           'curve-style': 'bezier',
           'font-size': '8px',

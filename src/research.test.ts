@@ -332,6 +332,18 @@ describe('queryGraphData', () => {
     expect(graph.entities[0].name).toBe('Google');
     pds.close();
   });
+  test('includes origin field on edges in graph data', () => {
+    const pds = createResearchPDS(':memory:');
+    pds.putRecord('app.pullread.entity', null, { name: 'A', type: 'concept' });
+    pds.putRecord('app.pullread.entity', null, { name: 'B', type: 'concept' });
+    pds.putRecord('app.pullread.mention', null, { entityName: 'A', filename: 'a.md', title: 'A' });
+    pds.putRecord('app.pullread.mention', null, { entityName: 'B', filename: 'b.md', title: 'B' });
+    pds.putRecord('app.pullread.edge', null, { from: 'A', to: 'B', type: 'relates', origin: 'note', sourceFilename: 'note:n1' });
+
+    const graph = queryGraphData(pds);
+    expect(graph.edges[0].value.origin).toBe('note');
+    pds.close();
+  });
 });
 
 describe('sentiment extraction', () => {
