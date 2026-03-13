@@ -211,10 +211,10 @@ function _researchRenderGraphInner(graph) {
           'color': isDark ? '#e0e0e0' : '#1e3a5f',
           'border-width': 1,
           'border-color': 'data(borderColor)',
-          'font-size': 'data(fontSize)',
+          'font-size': 10,
           'text-wrap': 'wrap',
-          'text-max-width': '80px',
-          'padding': '8px',
+          'text-max-width': 80,
+          'padding': 8,
           'shape': 'round-rectangle'
         }
       },
@@ -226,19 +226,18 @@ function _researchRenderGraphInner(graph) {
           'border-width': 1.5,
           'color': isDark ? '#9a8a5a' : '#6a5a2a',
           'font-style': 'italic',
-          'font-size': '9px'
+          'font-size': 9
         }
       },
       {
         selector: 'edge',
         style: {
-          'label': 'data(label)',
-          'width': 'data(edgeWidth)',
-          'line-color': 'data(edgeColor)',
-          'target-arrow-color': 'data(edgeColor)',
+          'width': 1,
+          'line-color': isDark ? '#3a3a4a' : '#cbd5e1',
+          'target-arrow-color': isDark ? '#3a3a4a' : '#cbd5e1',
           'target-arrow-shape': 'triangle',
           'curve-style': 'bezier',
-          'font-size': '8px',
+          'font-size': 8,
           'color': isDark ? '#666' : '#94a3b8',
           'text-rotation': 'autorotate',
           'text-margin-y': -6
@@ -248,8 +247,10 @@ function _researchRenderGraphInner(graph) {
     layout: {
       name: 'cose',
       animate: false,
-      nodeRepulsion: function() { return 8000; },
-      idealEdgeLength: function() { return 120; },
+      randomize: true,
+      nodeRepulsion: function() { return 12000; },
+      idealEdgeLength: function() { return 100; },
+      numIter: 200,
       padding: 40
     },
     minZoom: 0.2,
