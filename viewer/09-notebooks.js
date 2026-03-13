@@ -386,6 +386,19 @@ function autoGrowTextarea(ta) {
   if (mirror) mirror.style.height = ta.offsetHeight + 'px';
 }
 
+var _noteExtractTimeout = null;
+
+function researchExtractNoteDebounced(noteId, content, sourceArticle) {
+  if (_noteExtractTimeout) clearTimeout(_noteExtractTimeout);
+  _noteExtractTimeout = setTimeout(function() {
+    fetch('/api/research/extract-note', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ noteId: noteId, content: content, sourceArticle: sourceArticle || '' })
+    }).catch(function() {});
+  }, 3000);
+}
+
 function notebookDebounceSave() {
   const hint = document.getElementById('notebook-save-hint');
   if (hint) hint.textContent = 'Saving...';
@@ -407,6 +420,13 @@ function notebookDebounceSave() {
     _activeNotebook.updatedAt = new Date().toISOString();
     saveNotebook(_activeNotebook).then(() => {
       if (hint) hint.textContent = 'Saved';
+      // Trigger research extraction for the active note
+      if (_activeNoteId && _activeNotebook && _activeNotebook.notes) {
+        var note = _activeNotebook.notes.find(function(n) { return n.id === _activeNoteId; });
+        if (note && note.content && note.content.trim().length > 10) {
+          researchExtractNoteDebounced(note.id, note.content, note.sourceArticle);
+        }
+      }
     });
   }, 800);
 }
