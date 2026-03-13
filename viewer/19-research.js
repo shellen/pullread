@@ -214,8 +214,6 @@ function _researchRenderGraphInner(graph) {
           'font-size': 'data(fontSize)',
           'text-wrap': 'wrap',
           'text-max-width': '80px',
-          'width': 'label',
-          'height': 'label',
           'padding': '8px',
           'shape': 'round-rectangle'
         }
