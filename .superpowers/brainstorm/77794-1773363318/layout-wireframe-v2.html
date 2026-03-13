@@ -1,0 +1,197 @@
+<style>
+  /* Muted type palette matching existing viewer.css color-mix approach */
+  :root {
+    --type-person: #3b82f6;
+    --type-company: #8b5cf6;
+    --type-tech: #10b981;
+    --type-place: #f59e0b;
+    --type-event: #ef4444;
+    --type-concept: #6366f1;
+    --user-edge: #b8860b;
+    --muted-edge: #444;
+  }
+  .type-chip {
+    padding: 2px 7px; border-radius: 3px; font-size: 10px; font-weight: 500;
+  }
+  .type-chip-person   { background: color-mix(in srgb, var(--type-person) 12%, #1a1a2e); color: color-mix(in srgb, var(--type-person) 70%, #999); }
+  .type-chip-company  { background: color-mix(in srgb, var(--type-company) 12%, #1a1a2e); color: color-mix(in srgb, var(--type-company) 70%, #999); }
+  .type-chip-tech     { background: color-mix(in srgb, var(--type-tech) 12%, #1a1a2e); color: color-mix(in srgb, var(--type-tech) 70%, #999); }
+  .type-chip-place    { background: color-mix(in srgb, var(--type-place) 12%, #1a1a2e); color: color-mix(in srgb, var(--type-place) 70%, #999); }
+  .type-chip-event    { background: color-mix(in srgb, var(--type-event) 12%, #1a1a2e); color: color-mix(in srgb, var(--type-event) 70%, #999); }
+  .type-chip-concept  { background: color-mix(in srgb, var(--type-concept) 12%, #1a1a2e); color: color-mix(in srgb, var(--type-concept) 70%, #999); }
+  .graph-node { opacity: 0.7; }
+  .graph-node-selected { opacity: 1; }
+  .graph-node text { fill: #ccc; }
+</style>
+
+<h2>Section 1: Research Tab Layout (revised)</h2>
+<p class="subtitle">Muted palette matching existing viewer.css — desaturated badges, softer graph nodes</p>
+
+<div class="split">
+  <div class="mockup" style="flex: 0 0 260px;">
+    <div class="mockup-header">Adaptive Sidebar</div>
+    <div class="mockup-body" style="font-size: 13px; padding: 12px;">
+      <!-- Search -->
+      <div style="margin-bottom: 12px;">
+        <input class="mock-input" placeholder="Search entities..." style="width: 100%; font-size: 12px;">
+      </div>
+
+      <!-- Layer toggle -->
+      <div style="display: flex; gap: 4px; margin-bottom: 12px; font-size: 11px;">
+        <span style="padding: 3px 8px; border-radius: 4px; background: color-mix(in srgb, #b8860b 25%, #1a1a2e); color: #d4a84b; font-weight: 600;">All</span>
+        <span style="padding: 3px 8px; border-radius: 4px; background: #252535; color: #888;">My links</span>
+        <span style="padding: 3px 8px; border-radius: 4px; background: #252535; color: #888;">Notes</span>
+      </div>
+
+      <!-- Type filter chips -->
+      <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 14px;">
+        <span class="type-chip type-chip-person">person</span>
+        <span class="type-chip type-chip-company">company</span>
+        <span class="type-chip type-chip-tech">tech</span>
+        <span class="type-chip type-chip-place">place</span>
+        <span class="type-chip type-chip-event">event</span>
+        <span class="type-chip type-chip-concept">concept</span>
+      </div>
+
+      <!-- Entity list -->
+      <div style="font-size: 12px;">
+        <div style="padding: 8px 6px; border-bottom: 1px solid #2a2a3a; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+          <div>
+            <span style="font-weight: 600; color: #ddd;">OpenAI</span>
+            <span class="type-chip type-chip-company" style="margin-left: 6px;">company</span>
+          </div>
+          <span style="font-size: 10px; color: #555;">23</span>
+        </div>
+        <div style="padding: 8px 6px; border-bottom: 1px solid #2a2a3a; display: flex; justify-content: space-between; align-items: center; background: #1e1e30; border-left: 3px solid #b8860b; cursor: pointer;">
+          <div>
+            <span style="font-weight: 600; color: #eee;">Sam Altman</span>
+            <span class="type-chip type-chip-person" style="margin-left: 6px;">person</span>
+          </div>
+          <span style="font-size: 10px; color: #555;">18</span>
+        </div>
+        <div style="padding: 8px 6px; border-bottom: 1px solid #2a2a3a; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+          <div>
+            <span style="font-weight: 600; color: #ddd;">GPT-4</span>
+            <span class="type-chip type-chip-tech" style="margin-left: 6px;">tech</span>
+          </div>
+          <span style="font-size: 10px; color: #555;">12</span>
+        </div>
+        <div style="padding: 8px 6px; border-bottom: 1px solid #2a2a3a; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+          <div>
+            <span style="font-weight: 600; color: #ddd;">EU AI Act</span>
+            <span class="type-chip type-chip-event" style="margin-left: 6px;">event</span>
+          </div>
+          <span style="font-size: 10px; color: #555;">7</span>
+        </div>
+        <div style="padding: 8px 6px; border-bottom: 1px solid #2a2a3a; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+          <div>
+            <span style="font-weight: 500; color: #bbb; font-style: italic;">AI Safety Research</span>
+            <span class="type-chip" style="background: color-mix(in srgb, #b8860b 10%, #1a1a2e); color: #9a7a3a; margin-left: 6px;">note</span>
+          </div>
+          <span style="font-size: 10px; color: #555;">3 links</span>
+        </div>
+        <div style="padding: 8px 6px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+          <div>
+            <span style="font-weight: 500; color: #aaa;">Anthropic</span>
+            <span class="type-chip type-chip-company" style="margin-left: 6px;">company</span>
+          </div>
+          <span style="font-size: 10px; color: #555;">5</span>
+        </div>
+      </div>
+
+      <!-- Tensions -->
+      <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #2a2a3a;">
+        <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #555; margin-bottom: 8px;">Tensions</div>
+        <div style="font-size: 12px; padding: 6px 8px; background: #1e1e30; border-radius: 4px;">
+          <span style="color: color-mix(in srgb, #10b981 70%, #666);">+3</span> / <span style="color: color-mix(in srgb, #ef4444 70%, #666);">-2</span> &nbsp; <strong style="color: #ccc;">OpenAI</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup" style="flex: 1;">
+    <div class="mockup-header">Live Graph</div>
+    <div class="mockup-body" style="min-height: 400px; position: relative; overflow: hidden; background: #12121e;">
+      <svg viewBox="0 0 500 350" style="width: 100%; height: 100%;">
+        <!-- Extracted edges (muted, thin) -->
+        <line x1="250" y1="160" x2="140" y2="80" stroke="#3a3a4a" stroke-width="1"/>
+        <line x1="250" y1="160" x2="370" y2="90" stroke="#3a3a4a" stroke-width="1"/>
+        <line x1="250" y1="160" x2="150" y2="260" stroke="#3a3a4a" stroke-width="1"/>
+        <line x1="250" y1="160" x2="380" y2="240" stroke="#3a3a4a" stroke-width="1"/>
+        <line x1="140" y1="80" x2="370" y2="90" stroke="#2d2d3d" stroke-width="1"/>
+        <line x1="370" y1="90" x2="380" y2="240" stroke="#2d2d3d" stroke-width="1"/>
+
+        <!-- User-created edges (warm, thicker, but not screaming) -->
+        <line x1="250" y1="160" x2="90" y2="170" stroke="#8a6d20" stroke-width="2.5" opacity="0.7"/>
+        <line x1="90" y1="170" x2="140" y2="80" stroke="#8a6d20" stroke-width="2" opacity="0.6"/>
+        <line x1="90" y1="170" x2="150" y2="260" stroke="#8a6d20" stroke-width="1.5" opacity="0.5"/>
+
+        <!-- Highlight-boosted edge (slightly thicker extracted) -->
+        <line x1="250" y1="160" x2="420" y2="170" stroke="#4a4a5a" stroke-width="2"/>
+
+        <!-- Entity nodes (desaturated) -->
+        <circle cx="250" cy="160" r="18" fill="color-mix(in srgb, #b8860b 60%, #1a1a2e)" class="graph-node-selected"/>
+        <text x="250" y="164" text-anchor="middle" fill="#eee" font-size="9" font-weight="bold">Sam Altman</text>
+
+        <circle cx="140" cy="80" r="14" fill="color-mix(in srgb, #8b5cf6 35%, #1a1a2e)" class="graph-node"/>
+        <text x="140" y="84" text-anchor="middle" fill="#aaa" font-size="8">OpenAI</text>
+
+        <circle cx="370" cy="90" r="12" fill="color-mix(in srgb, #10b981 35%, #1a1a2e)" class="graph-node"/>
+        <text x="370" y="94" text-anchor="middle" fill="#aaa" font-size="8">GPT-4</text>
+
+        <circle cx="150" cy="260" r="11" fill="color-mix(in srgb, #ef4444 30%, #1a1a2e)" class="graph-node"/>
+        <text x="150" y="264" text-anchor="middle" fill="#999" font-size="7">EU AI Act</text>
+
+        <circle cx="380" cy="240" r="10" fill="color-mix(in srgb, #6366f1 30%, #1a1a2e)" class="graph-node"/>
+        <text x="380" y="244" text-anchor="middle" fill="#999" font-size="7">AI Safety</text>
+
+        <circle cx="420" cy="170" r="12" fill="color-mix(in srgb, #8b5cf6 35%, #1a1a2e)" class="graph-node"/>
+        <text x="420" y="174" text-anchor="middle" fill="#aaa" font-size="8">Anthropic</text>
+
+        <!-- Note node (rounded rect, outlined not filled) -->
+        <rect x="62" y="152" width="56" height="36" rx="8" fill="#1a1a2e" stroke="#8a6d20" stroke-width="1.5"/>
+        <text x="90" y="167" text-anchor="middle" fill="#9a8a5a" font-size="7" font-style="italic">AI Safety</text>
+        <text x="90" y="178" text-anchor="middle" fill="#9a8a5a" font-size="7" font-style="italic">Research</text>
+      </svg>
+
+      <!-- Legend (subtle) -->
+      <div style="position: absolute; bottom: 10px; right: 14px; font-size: 10px; color: #555; display: flex; gap: 14px; align-items: center;">
+        <span style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 14px; height: 1px; background: #3a3a4a;"></span> extracted</span>
+        <span style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 14px; height: 2.5px; background: #8a6d20; border-radius: 1px;"></span> your links</span>
+        <span style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid #8a6d20; background: transparent;"></span> note</span>
+      </div>
+
+      <!-- Popover (muted) -->
+      <div style="position: absolute; top: 24px; right: 20px; width: 220px; background: #1a1a2e; border: 1px solid #2a2a3a; border-radius: 8px; padding: 14px; font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);">
+        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+          <div>
+            <div style="font-weight: 700; font-size: 14px; color: #ddd;">Sam Altman</div>
+            <span class="type-chip type-chip-person">person</span>
+          </div>
+          <span style="cursor: pointer; color: #555; font-size: 16px;">&times;</span>
+        </div>
+        <p style="font-size: 11px; color: #777; margin: 6px 0 10px;">CEO of OpenAI. Mentioned in 18 articles across AI policy, product launches, and corporate governance.</p>
+        <div style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #444; margin-bottom: 4px;">Mentioned in</div>
+        <div style="font-size: 11px;">
+          <div style="padding: 3px 0; color: #999;"><span style="color: color-mix(in srgb, #10b981 60%, #666);">&#9679;</span> OpenAI Announces GPT-5</div>
+          <div style="padding: 3px 0; color: #999;"><span style="color: color-mix(in srgb, #ef4444 60%, #666);">&#9679;</span> The Case Against AI Consolidation</div>
+          <div style="padding: 3px 0; color: #999;"><span style="color: #555;">&#9679;</span> Senate Hearing on AI Regulation</div>
+        </div>
+        <div style="margin-top: 8px; font-size: 10px; color: #8a6d20; cursor: pointer;">View all 18 mentions &rarr;</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 1.5rem;">
+  <h3>Changes from v1:</h3>
+  <ul style="font-size: 14px; line-height: 1.8; color: #bbb;">
+    <li><strong>Type badges</strong> — now use <code>color-mix(in srgb, color 12%, bg)</code> matching existing viewer.css</li>
+    <li><strong>Graph nodes</strong> — desaturated to 30-35% mix with background, selected node warmer</li>
+    <li><strong>Extracted edges</strong> — nearly invisible (#3a3a4a) so graph doesn't feel busy</li>
+    <li><strong>User edges</strong> — dark gold (#8a6d20) instead of bright amber — visible but not loud</li>
+    <li><strong>Note node</strong> — outlined rather than filled, blends into the graph background</li>
+    <li><strong>Sentiment dots</strong> — also desaturated via color-mix</li>
+    <li><strong>Overall</strong> — the graph background is slightly darker (#12121e) to let nodes float without needing bright colors</li>
+  </ul>
+</div>

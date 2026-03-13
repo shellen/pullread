@@ -1,0 +1,172 @@
+<h2>Section 1: Research Tab Layout</h2>
+<p class="subtitle">Two-panel layout replacing the current three-panel entity browser</p>
+
+<div class="split">
+  <div class="mockup" style="flex: 0 0 260px;">
+    <div class="mockup-header">Left: Adaptive Sidebar (260px)</div>
+    <div class="mockup-body" style="font-size: 13px; padding: 12px;">
+      <!-- Search -->
+      <div style="margin-bottom: 12px;">
+        <input class="mock-input" placeholder="Search entities..." style="width: 100%; font-size: 12px;">
+      </div>
+
+      <!-- Layer toggle -->
+      <div style="display: flex; gap: 4px; margin-bottom: 12px; font-size: 11px;">
+        <span style="padding: 3px 8px; border-radius: 4px; background: var(--accent, #f59e0b); color: #000; font-weight: 600;">All</span>
+        <span style="padding: 3px 8px; border-radius: 4px; background: var(--bg-tertiary, #333); opacity: 0.7;">My links</span>
+        <span style="padding: 3px 8px; border-radius: 4px; background: var(--bg-tertiary, #333); opacity: 0.7;">Notes</span>
+      </div>
+
+      <!-- Type filter chips -->
+      <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 14px; font-size: 10px;">
+        <span style="padding: 2px 7px; border-radius: 3px; background: #3b82f6; color: white;">person</span>
+        <span style="padding: 2px 7px; border-radius: 3px; background: #8b5cf6; color: white;">company</span>
+        <span style="padding: 2px 7px; border-radius: 3px; background: #10b981; color: white;">tech</span>
+        <span style="padding: 2px 7px; border-radius: 3px; background: #f59e0b; color: black;">place</span>
+        <span style="padding: 2px 7px; border-radius: 3px; background: #ef4444; color: white;">event</span>
+        <span style="padding: 2px 7px; border-radius: 3px; background: #6366f1; color: white;">concept</span>
+      </div>
+
+      <!-- Entity list -->
+      <div style="font-size: 12px;">
+        <div style="padding: 8px 6px; border-bottom: 1px solid var(--bg-tertiary, #333); display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+          <div>
+            <span style="font-weight: 600;">OpenAI</span>
+            <span style="font-size: 10px; padding: 1px 5px; border-radius: 3px; background: #8b5cf6; color: white; margin-left: 6px;">company</span>
+          </div>
+          <span style="font-size: 10px; opacity: 0.5;">23</span>
+        </div>
+        <div style="padding: 8px 6px; border-bottom: 1px solid var(--bg-tertiary, #333); display: flex; justify-content: space-between; align-items: center; background: var(--bg-tertiary, #222); border-left: 3px solid var(--accent, #f59e0b); cursor: pointer;">
+          <div>
+            <span style="font-weight: 600;">Sam Altman</span>
+            <span style="font-size: 10px; padding: 1px 5px; border-radius: 3px; background: #3b82f6; color: white; margin-left: 6px;">person</span>
+          </div>
+          <span style="font-size: 10px; opacity: 0.5;">18</span>
+        </div>
+        <div style="padding: 8px 6px; border-bottom: 1px solid var(--bg-tertiary, #333); display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+          <div>
+            <span style="font-weight: 600;">GPT-4</span>
+            <span style="font-size: 10px; padding: 1px 5px; border-radius: 3px; background: #10b981; color: white; margin-left: 6px;">tech</span>
+          </div>
+          <span style="font-size: 10px; opacity: 0.5;">12</span>
+        </div>
+        <div style="padding: 8px 6px; border-bottom: 1px solid var(--bg-tertiary, #333); display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+          <div>
+            <span style="font-weight: 600;">EU AI Act</span>
+            <span style="font-size: 10px; padding: 1px 5px; border-radius: 3px; background: #ef4444; color: white; margin-left: 6px;">event</span>
+          </div>
+          <span style="font-size: 10px; opacity: 0.5;">7</span>
+        </div>
+        <div style="padding: 8px 6px; border-bottom: 1px solid var(--bg-tertiary, #333); display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+          <div>
+            <span style="font-weight: 600; opacity: 0.8; font-style: italic;">&#x1f4d3; AI Safety Research</span>
+            <span style="font-size: 10px; padding: 1px 5px; border-radius: 3px; background: var(--bg-tertiary, #444); color: var(--text-secondary, #aaa); margin-left: 6px;">note</span>
+          </div>
+          <span style="font-size: 10px; opacity: 0.5;">3 links</span>
+        </div>
+        <div style="padding: 8px 6px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; opacity: 0.6;">
+          <div>
+            <span style="font-weight: 500;">Anthropic</span>
+            <span style="font-size: 10px; padding: 1px 5px; border-radius: 3px; background: #8b5cf6; color: white; margin-left: 6px;">company</span>
+          </div>
+          <span style="font-size: 10px; opacity: 0.5;">5</span>
+        </div>
+      </div>
+
+      <!-- Tensions section -->
+      <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--bg-tertiary, #333);">
+        <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.5; margin-bottom: 8px;">Tensions</div>
+        <div style="font-size: 12px; padding: 6px; background: var(--bg-tertiary, #222); border-radius: 4px;">
+          <span style="color: #10b981;">+3</span> / <span style="color: #ef4444;">-2</span> &nbsp; <strong>OpenAI</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup" style="flex: 1;">
+    <div class="mockup-header">Right: Live Graph (fills remaining space)</div>
+    <div class="mockup-body" style="min-height: 400px; position: relative; overflow: hidden;">
+      <!-- Simulated graph with SVG -->
+      <svg viewBox="0 0 500 350" style="width: 100%; height: 100%;">
+        <!-- Edges - LLM extracted (thin) -->
+        <line x1="250" y1="160" x2="140" y2="80" stroke="var(--text-secondary, #666)" stroke-width="1" opacity="0.3"/>
+        <line x1="250" y1="160" x2="370" y2="90" stroke="var(--text-secondary, #666)" stroke-width="1" opacity="0.3"/>
+        <line x1="250" y1="160" x2="150" y2="260" stroke="var(--text-secondary, #666)" stroke-width="1" opacity="0.3"/>
+        <line x1="250" y1="160" x2="380" y2="240" stroke="var(--text-secondary, #666)" stroke-width="1" opacity="0.3"/>
+        <line x1="140" y1="80" x2="370" y2="90" stroke="var(--text-secondary, #666)" stroke-width="1" opacity="0.2"/>
+        <line x1="370" y1="90" x2="380" y2="240" stroke="var(--text-secondary, #666)" stroke-width="1" opacity="0.2"/>
+
+        <!-- Edges - user created (thick, warm) -->
+        <line x1="250" y1="160" x2="90" y2="170" stroke="#f59e0b" stroke-width="3" opacity="0.6"/>
+        <line x1="90" y1="170" x2="140" y2="80" stroke="#f59e0b" stroke-width="2.5" opacity="0.5"/>
+        <line x1="90" y1="170" x2="150" y2="260" stroke="#f59e0b" stroke-width="2" opacity="0.4"/>
+
+        <!-- Highlight-boosted edge -->
+        <line x1="250" y1="160" x2="420" y2="170" stroke="var(--text-secondary, #666)" stroke-width="2.5" opacity="0.5"/>
+
+        <!-- Entity nodes -->
+        <circle cx="250" cy="160" r="18" fill="#f59e0b" opacity="0.9"/>
+        <text x="250" y="164" text-anchor="middle" fill="black" font-size="9" font-weight="bold">Sam Altman</text>
+
+        <circle cx="140" cy="80" r="14" fill="#8b5cf6" opacity="0.8"/>
+        <text x="140" y="84" text-anchor="middle" fill="white" font-size="8">OpenAI</text>
+
+        <circle cx="370" cy="90" r="12" fill="#10b981" opacity="0.8"/>
+        <text x="370" y="94" text-anchor="middle" fill="white" font-size="8">GPT-4</text>
+
+        <circle cx="150" cy="260" r="11" fill="#ef4444" opacity="0.8"/>
+        <text x="150" y="264" text-anchor="middle" fill="white" font-size="7">EU AI Act</text>
+
+        <circle cx="380" cy="240" r="10" fill="#6366f1" opacity="0.8"/>
+        <text x="380" y="244" text-anchor="middle" fill="white" font-size="7">AI Safety</text>
+
+        <circle cx="420" cy="170" r="12" fill="#8b5cf6" opacity="0.8"/>
+        <text x="420" y="174" text-anchor="middle" fill="white" font-size="8">Anthropic</text>
+
+        <!-- Note node (distinct shape - rounded rect) -->
+        <rect x="62" y="152" width="56" height="36" rx="8" fill="var(--bg-secondary, #1a1a2e)" stroke="#f59e0b" stroke-width="2" opacity="0.9"/>
+        <text x="90" y="168" text-anchor="middle" fill="var(--text-primary, #eee)" font-size="7" font-style="italic">AI Safety</text>
+        <text x="90" y="178" text-anchor="middle" fill="var(--text-primary, #eee)" font-size="7" font-style="italic">Research</text>
+      </svg>
+
+      <!-- Legend -->
+      <div style="position: absolute; bottom: 10px; right: 14px; font-size: 10px; opacity: 0.6; display: flex; gap: 12px; align-items: center;">
+        <span style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 16px; height: 2px; background: var(--text-secondary, #666);"></span> extracted</span>
+        <span style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 16px; height: 3px; background: #f59e0b;"></span> your links</span>
+        <span style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; border: 2px solid #f59e0b; background: transparent;"></span> note</span>
+      </div>
+
+      <!-- Popover (shown on node click) -->
+      <div style="position: absolute; top: 24px; right: 20px; width: 220px; background: var(--bg-secondary, #1a1a2e); border: 1px solid var(--bg-tertiary, #333); border-radius: 8px; padding: 14px; font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.4);">
+        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+          <div>
+            <div style="font-weight: 700; font-size: 14px;">Sam Altman</div>
+            <span style="font-size: 10px; padding: 1px 5px; border-radius: 3px; background: #3b82f6; color: white;">person</span>
+          </div>
+          <span style="cursor: pointer; opacity: 0.5; font-size: 16px;">&times;</span>
+        </div>
+        <p style="font-size: 11px; opacity: 0.7; margin: 6px 0 10px;">CEO of OpenAI. Mentioned in 18 articles across AI policy, product launches, and corporate governance.</p>
+        <div style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.4; margin-bottom: 4px;">Mentioned in</div>
+        <div style="font-size: 11px;">
+          <div style="padding: 3px 0; opacity: 0.8;"><span style="color: #10b981;">&#9679;</span> OpenAI Announces GPT-5</div>
+          <div style="padding: 3px 0; opacity: 0.8;"><span style="color: #ef4444;">&#9679;</span> The Case Against AI Consolidation</div>
+          <div style="padding: 3px 0; opacity: 0.8;"><span style="color: #888;">&#9679;</span> Senate Hearing on AI Regulation</div>
+        </div>
+        <div style="margin-top: 8px; font-size: 10px; color: var(--accent, #f59e0b); cursor: pointer;">View all 18 mentions &rarr;</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 1.5rem;">
+  <h3>Key design decisions in this wireframe:</h3>
+  <ul style="font-size: 14px; line-height: 1.8;">
+    <li><strong>Sidebar collapses from 3 panels to 1</strong> — search, filters, layer toggle, entity list, and tensions all stack vertically</li>
+    <li><strong>Graph fills remaining space</strong> — always visible, not hidden behind a modal</li>
+    <li><strong>Notes are rounded rectangles</strong> (not circles) — visually distinct from entity nodes without adding color noise</li>
+    <li><strong>User-created edges are thick amber</strong>, extracted edges are thin gray — weight conveys source at a glance</li>
+    <li><strong>Highlight-boosted entities get thicker edges</strong> from the extraction graph too (e.g., "Anthropic" above)</li>
+    <li><strong>Entity detail is a popover</strong> on node click, not a dedicated panel — keeps graph focus</li>
+    <li><strong>Clicking entity in sidebar highlights it in graph</strong> (and vice versa)</li>
+  </ul>
+</div>

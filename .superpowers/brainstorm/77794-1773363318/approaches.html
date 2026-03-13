@@ -1,0 +1,74 @@
+<h2>Three Approaches to Knowledge Graph Evolution</h2>
+<p class="subtitle">How to evolve the Research tab to treat notes, highlights, and articles as distinct data types with a persistent graph panel</p>
+
+<div class="options">
+  <div class="option" data-choice="incremental" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Incremental: Evolve the Current Tab</h3>
+      <p>Keep the existing three-panel Research layout. Replace the right panel (currently empty/modal) with a persistent live graph. Add note and highlight extraction to the existing pipeline. Edge weight reflects source type.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Smallest change — builds on working code</li>
+          <li>Entity list stays as primary nav (proven usable)</li>
+          <li>Graph becomes ambient without redesigning the tab</li>
+          <li>Notes/highlights feed into existing entity + edge schema</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Three panels can feel cramped, especially graph</li>
+          <li>Notes as graph nodes are bolted on, not native</li>
+          <li>Doesn't address the "database browser" feel</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="unified" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Unified: Graph + Detail with Adaptive Sidebar</h3>
+      <p>Two-panel layout: left sidebar (entity list + filters + layer toggle), right is a large persistent graph with detail popovers. The sidebar adapts context — clicking a graph node shows its details inline. Notes appear as distinct node shapes. Highlights boost edge thickness.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Graph gets much more space — feels like THE view</li>
+          <li>Two panels instead of three reduces cramping</li>
+          <li>Detail as popover keeps focus on graph</li>
+          <li>Layer toggle ("All" / "My connections") fits naturally in sidebar</li>
+          <li>Notes as distinct nodes feel native, not bolted on</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Bigger UI change — detail panel becomes popover</li>
+          <li>Must handle graph rendering performance carefully</li>
+          <li>Popover UX needs to feel solid, not janky</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="contextual" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Contextual: Graph Appears Everywhere</h3>
+      <p>Instead of a dedicated Research tab, embed mini-graphs throughout the app. Article view shows a small entity graph for that article. Notebook shows connections between referenced articles. Home shows a "your attention this week" graph. The Research tab becomes a full-screen version of these contextual graphs.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Graph becomes ambient — you stumble into insights (Harper's ideal)</li>
+          <li>Context-sensitive: you see what's relevant where you are</li>
+          <li>Notes and highlights naturally surface in their own context</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Much larger scope — touches every view</li>
+          <li>Multiple graph instances = performance risk</li>
+          <li>May feel cluttered if not executed perfectly</li>
+          <li>Hard to get right incrementally</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 2rem; padding: 1.5rem; border-radius: 8px; border: 2px solid var(--accent, #f59e0b); background: var(--bg-secondary, #1a1a2e);">
+  <h3 style="margin-top:0;">Recommendation: B (Unified)</h3>
+  <p>B hits the sweet spot. It gives the graph the prominence Harper advocates without the hairball risk of a graph-only view. The two-panel layout gives the graph breathing room while keeping structured browse accessible. Notes as distinct node shapes and edge weighting from highlights are architecturally clean — they extend the existing PDS schema rather than replacing it. And the layer toggle ("All" / "My connections") is a natural fit for the sidebar.</p>
+  <p>C is the long-term vision but too much scope right now. A is safe but doesn't move the needle on the "database browser" feel. B is the meaningful step forward.</p>
+</div>
