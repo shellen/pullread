@@ -58,7 +58,7 @@ interface ArticleInput {
   publishedAt?: string;
 }
 
-const VALID_ENTITY_TYPES = new Set(['person', 'company', 'technology', 'place', 'event', 'concept']);
+const VALID_ENTITY_TYPES = new Set(['person', 'company', 'technology', 'place', 'event', 'concept', 'note']);
 
 const TYPE_ALIASES: Record<string, string> = {
   organization: 'company', org: 'company', brand: 'company', band: 'company',

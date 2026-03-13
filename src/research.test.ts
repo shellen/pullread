@@ -663,6 +663,28 @@ describe('entity name normalization', () => {
     expect(directsEdge!.value.from).toBe('Trump');
     pds.close();
   });
+
+  test('normalizeEntityType preserves "note" type', async () => {
+    const pds = createResearchPDS(':memory:');
+    mockSummarize.mockResolvedValue({
+      summary: JSON.stringify({
+        entities: [{ name: 'My Research Note', type: 'note' }],
+        relationships: [],
+        themes: [],
+      }),
+      model: 'test',
+    });
+
+    await extractArticle(pds, {
+      filename: 'note-type-test.md',
+      title: 'Note Type Test',
+      body: 'Testing note type preservation.',
+    });
+
+    const entities = pds.listRecords('app.pullread.entity');
+    expect(entities[0].value.type).toBe('note');
+    pds.close();
+  });
 });
 
 describe('entity brief', () => {
