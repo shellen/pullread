@@ -1,5 +1,5 @@
 // ABOUTME: Research tab — knowledge graph dashboard for browsing extracted entities
-// ABOUTME: Three-panel layout: entity list, entity detail, and related articles
+// ABOUTME: Two-panel layout: sidebar with entity list, persistent Cytoscape graph with popovers
 
 function showResearch() {
   var prevActive = activeFile;
@@ -39,33 +39,30 @@ function showResearch() {
 function researchRenderBrowser() {
   var html = '<div class="article-header"><h1>Research</h1></div>';
 
-  // URL import bar
-  html += '<div class="research-url-bar">';
-  html += '<input type="text" id="research-url-input" placeholder="Paste a URL to extract entities..." />';
-  html += '<button class="btn-primary" id="research-url-btn" onclick="researchExtractUrl()" style="font-size:13px;padding:6px 14px">Extract</button>';
-  html += '</div>';
-
-  // New for you (watch matches)
-  html += '<div id="research-new-for-you"></div>';
-
-  // Tensions section
-  html += '<div id="research-tensions"></div>';
-
   html += '<div class="research-layout">';
 
-  // Entity list panel
-  html += '<div class="research-panel research-entity-list">';
+  // Sidebar: search, filters, entities, tensions, watch matches, URL import
+  html += '<div class="research-sidebar">';
   html += '<div class="research-search-bar">';
   html += '<input type="text" id="research-search" placeholder="Search entities..." oninput="researchSearchEntitiesWithClear()" />';
   html += '<button class="research-search-clear" id="research-search-clear" onclick="researchClearSearch()" style="display:none" title="Clear search">&times;</button>';
   html += '</div>';
   html += '<div class="research-type-filters" id="research-type-filters"></div>';
   html += '<div id="research-entity-items" class="research-entity-items"></div>';
+  html += '<div id="research-tensions"></div>';
+  html += '<div id="research-new-for-you"></div>';
+  html += '<div class="research-url-bar">';
+  html += '<input type="text" id="research-url-input" placeholder="Paste a URL to extract entities..." />';
+  html += '<button class="btn-primary" id="research-url-btn" onclick="researchExtractUrl()" style="font-size:13px;padding:6px 14px">Extract</button>';
+  html += '</div>';
   html += '</div>';
 
-  // Detail panel
-  html += '<div class="research-panel research-detail" id="research-detail">';
-  html += '<p class="briefing-hint">Select an entity to view details</p>';
+  // Graph panel with Cytoscape container
+  html += '<div class="research-graph-panel">';
+  html += '<div class="research-graph-cy" id="research-graph-cy"></div>';
+  html += '<div class="research-graph-legend"><span class="research-graph-legend-line"></span> relationship</div>';
+  html += '<div class="research-graph-overflow" id="research-graph-overflow" style="display:none"></div>';
+  html += '<div class="research-popover" id="research-popover"></div>';
   html += '</div>';
 
   html += '</div>'; // .research-layout
@@ -76,6 +73,13 @@ function researchRenderBrowser() {
   researchLoadEntities();
   researchLoadTensions();
   researchLoadMatches();
+  researchLoadGraph();
+}
+
+var _researchCy = null;
+
+function researchLoadGraph() {
+  // Stub — replaced in Task 5
 }
 
 function researchShowEmptyState(status) {
