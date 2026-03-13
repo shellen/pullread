@@ -750,6 +750,36 @@ describe('entity brief', () => {
   });
 });
 
+describe('origin field', () => {
+  beforeEach(() => mockSummarize.mockReset());
+
+  test('extractArticle stores origin "extracted" on mentions and edges', async () => {
+    const pds = createResearchPDS(':memory:');
+    mockSummarize.mockResolvedValue({
+      summary: JSON.stringify({
+        entities: [{ name: 'Apple', type: 'company' }, { name: 'Tim Cook', type: 'person' }],
+        relationships: [{ from: 'Apple', to: 'Tim Cook', type: 'employs' }],
+        themes: ['tech'],
+      }),
+      model: 'test',
+    });
+
+    await extractArticle(pds, {
+      filename: 'origin-test.md',
+      title: 'Origin Test',
+      body: 'Apple and Tim Cook.',
+    });
+
+    const mentions = pds.listRecords('app.pullread.mention');
+    for (const m of mentions) {
+      expect((m as any).value.origin).toBe('extracted');
+    }
+    const edges = pds.listRecords('app.pullread.edge');
+    expect((edges[0] as any).value.origin).toBe('extracted');
+    pds.close();
+  });
+});
+
 describe('resetResearchData', () => {
   test('clears all records from the PDS', () => {
     const pds = createResearchPDS(':memory:');

@@ -201,6 +201,7 @@ ${article.body.slice(0, 8000)}`;
       filename: article.filename,
       title: article.title,
       source: article.source || 'feed',
+      origin: 'extracted',
       sentiment,
       stance: sentiment === 'neutral' ? null : (entity.stance || null),
       publishedAt: article.publishedAt || null,
@@ -212,6 +213,7 @@ ${article.body.slice(0, 8000)}`;
       from: nameMap.get(rel.from) || rel.from,
       to: nameMap.get(rel.to) || rel.to,
       type: rel.type,
+      origin: 'extracted',
       sourceFilename: article.filename,
     });
   }
