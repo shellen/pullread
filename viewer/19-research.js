@@ -84,7 +84,7 @@ var _researchCy = null;
 
 function researchLoadGraph() {
   if (typeof cytoscape === 'undefined') return;
-  fetch('/api/research/graph')
+  fetch('/api/research/graph?maxNodes=50')
     .then(function(r) { return r.json(); })
     .then(function(graph) {
       if (!graph.entities || graph.entities.length < 3) {
@@ -167,7 +167,7 @@ function _researchRenderGraphInner(graph) {
     edgeMap[pairKey].labels[normLabel] = (edgeMap[pairKey].labels[normLabel] || 0) + 1;
   }
   var edgeKeys = Object.keys(edgeMap);
-  var maxEdges = 500;
+  var maxEdges = 150;
   for (var i = 0; i < edgeKeys.length && i < maxEdges; i++) {
     var entry = edgeMap[edgeKeys[i]];
     var bestLabel = '';
