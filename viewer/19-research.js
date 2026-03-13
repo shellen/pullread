@@ -1,5 +1,5 @@
 // ABOUTME: Research tab — knowledge graph dashboard for browsing extracted entities
-// ABOUTME: Two-panel layout: sidebar with entity list, persistent Cytoscape graph with popovers
+// ABOUTME: Two-panel layout: sidebar with entity list, canvas force-graph with popovers
 
 function showResearch() {
   var prevActive = activeFile;
@@ -57,7 +57,7 @@ function researchRenderBrowser() {
   html += '</div>';
   html += '</div>';
 
-  // Graph panel with Cytoscape container
+  // Graph panel with force-graph canvas container
   html += '<div class="research-graph-panel">';
   html += '<div class="research-graph-cy" id="research-graph-cy"></div>';
   html += '<div class="research-graph-legend">';
@@ -80,16 +80,27 @@ function researchRenderBrowser() {
   researchLoadGraph();
 }
 
-var _researchCy = null;
+var _researchGraph = null;
+var _researchGraphData = null; // { nodes: [], links: [] }
+var _researchNodeOpacity = {}; // id -> opacity override
+
+var _researchTypeColors = {
+  person: '#3b82f6',
+  company: '#8b5cf6',
+  technology: '#10b981',
+  place: '#f59e0b',
+  event: '#ef4444',
+  concept: '#6366f1'
+};
 
 function researchLoadGraph() {
-  if (typeof cytoscape === 'undefined') return;
+  if (typeof ForceGraph === 'undefined') return;
   fetch('/api/research/graph?maxNodes=50')
     .then(function(r) { return r.json(); })
     .then(function(graph) {
       if (!graph.entities || graph.entities.length < 3) {
-        var cy = document.getElementById('research-graph-cy');
-        if (cy) cy.innerHTML = '<p class="briefing-hint" style="text-align:center;padding-top:40px">Not enough entities to render a graph yet.</p>';
+        var el = document.getElementById('research-graph-cy');
+        if (el) el.innerHTML = '<p class="briefing-hint" style="text-align:center;padding-top:40px">Not enough entities to render a graph yet.</p>';
         return;
       }
       researchRenderGraph(graph);
@@ -110,15 +121,6 @@ function researchMixHex(color, bgColor, pct) {
   return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
 }
 
-var _researchTypeColors = {
-  person: '#3b82f6',
-  company: '#8b5cf6',
-  technology: '#10b981',
-  place: '#f59e0b',
-  event: '#ef4444',
-  concept: '#6366f1'
-};
-
 function researchRenderGraph(graph) {
   try { _researchRenderGraphInner(graph); }
   catch (err) { console.error('researchRenderGraph error:', err); }
@@ -127,32 +129,32 @@ function researchRenderGraph(graph) {
 function _researchRenderGraphInner(graph) {
   var isDark = document.documentElement.dataset.theme === 'dark';
   var bgHex = isDark ? '#1a1a2e' : '#f8f9fa';
-  var elements = [];
 
-  // Build node elements with pre-computed colors
+  // Build nodes
   var entityByName = {};
+  var nodes = [];
   for (var i = 0; i < graph.entities.length; i++) {
     var e = graph.entities[i];
     entityByName[e.name] = e;
     var baseColor = _researchTypeColors[e.type] || '#6366f1';
-    var bgColor = researchMixHex(baseColor, bgHex, 0.35);
-    var borderColor = researchMixHex(baseColor, bgHex, 0.50);
     var wmc = e.weightedMentionCount || e.mentionCount || 0;
     var fontSize = Math.max(9, Math.min(16, 9 + Math.log(1 + wmc) * 1.5));
-    elements.push({
-      data: {
-        id: e.name,
-        label: e.name,
-        rkey: e.rkey,
-        type: e.type,
-        bgColor: bgColor,
-        borderColor: borderColor,
-        fontSize: fontSize
-      }
+    var nodeSize = Math.max(14, Math.min(30, 14 + Math.log(1 + wmc) * 3));
+    nodes.push({
+      id: e.name,
+      rkey: e.rkey,
+      type: e.type,
+      bgColor: researchMixHex(baseColor, bgHex, 0.35),
+      borderColor: researchMixHex(baseColor, bgHex, 0.50),
+      fontSize: fontSize,
+      nodeSize: nodeSize,
+      isNote: e.type === 'note',
+      neighbors: [],
+      links: []
     });
   }
 
-  // Deduplicate edges
+  // Deduplicate edges into links
   var edgeMap = {};
   for (var i = 0; i < graph.edges.length; i++) {
     var edge = graph.edges[i];
@@ -168,6 +170,7 @@ function _researchRenderGraphInner(graph) {
   }
   var edgeKeys = Object.keys(edgeMap);
   var maxEdges = 150;
+  var links = [];
   for (var i = 0; i < edgeKeys.length && i < maxEdges; i++) {
     var entry = edgeMap[edgeKeys[i]];
     var bestLabel = '';
@@ -179,106 +182,116 @@ function _researchRenderGraphInner(graph) {
         bestLabel = labelKeys[j];
       }
     }
-    elements.push({
-      data: {
-        id: 'e' + i,
-        source: entry.from,
-        target: entry.to,
-        label: bestLabel,
-        edgeWidth: entry.hasNoteOrigin ? 2.5 : 1,
-        edgeColor: entry.hasNoteOrigin ? '#8a6d20' : (isDark ? '#3a3a4a' : '#cbd5e1')
-      }
+    links.push({
+      source: entry.from,
+      target: entry.to,
+      label: bestLabel,
+      width: entry.hasNoteOrigin ? 2.5 : 1,
+      color: entry.hasNoteOrigin ? '#8a6d20' : (isDark ? '#3a3a4a' : '#cbd5e1')
     });
   }
-  console.log('Research graph: ' + graph.entities.length + ' nodes, ' + edgeKeys.length + ' unique edges (' + Math.min(edgeKeys.length, maxEdges) + ' rendered), ' + graph.edges.length + ' raw edges');
+  console.log('Research graph: ' + nodes.length + ' nodes, ' + edgeKeys.length + ' unique edges (' + links.length + ' rendered), ' + graph.edges.length + ' raw edges');
 
-  if (_researchCy) {
-    _researchCy.destroy();
-    _researchCy = null;
+  // Cross-reference neighbors for highlight
+  var nodeById = {};
+  for (var i = 0; i < nodes.length; i++) nodeById[nodes[i].id] = nodes[i];
+  for (var i = 0; i < links.length; i++) {
+    var srcId = typeof links[i].source === 'object' ? links[i].source.id : links[i].source;
+    var tgtId = typeof links[i].target === 'object' ? links[i].target.id : links[i].target;
+    if (nodeById[srcId] && nodeById[tgtId]) {
+      nodeById[srcId].neighbors.push(nodeById[tgtId]);
+      nodeById[tgtId].neighbors.push(nodeById[srcId]);
+      nodeById[srcId].links.push(links[i]);
+      nodeById[tgtId].links.push(links[i]);
+    }
   }
 
-  _researchCy = cytoscape({
-    container: document.getElementById('research-graph-cy'),
-    elements: elements,
-    style: [
-      {
-        selector: 'node',
-        style: {
-          'label': 'data(label)',
-          'text-valign': 'center',
-          'text-halign': 'center',
-          'background-color': 'data(bgColor)',
-          'color': isDark ? '#e0e0e0' : '#1e3a5f',
-          'border-width': 1,
-          'border-color': 'data(borderColor)',
-          'font-size': 10,
-          'text-wrap': 'wrap',
-          'text-max-width': 80,
-          'padding': 8,
-          'shape': 'round-rectangle'
-        }
-      },
-      {
-        selector: 'node[type="note"]',
-        style: {
-          'background-color': 'transparent',
-          'border-color': '#8a6d20',
-          'border-width': 1.5,
-          'color': isDark ? '#9a8a5a' : '#6a5a2a',
-          'font-style': 'italic',
-          'font-size': 9
-        }
-      },
-      {
-        selector: 'edge',
-        style: {
-          'width': 1,
-          'line-color': isDark ? '#3a3a4a' : '#cbd5e1',
-          'target-arrow-color': isDark ? '#3a3a4a' : '#cbd5e1',
-          'target-arrow-shape': 'triangle',
-          'curve-style': 'bezier',
-          'font-size': 8,
-          'color': isDark ? '#666' : '#94a3b8',
-          'text-rotation': 'autorotate',
-          'text-margin-y': -6
-        }
+  _researchGraphData = { nodes: nodes, links: links };
+  _researchNodeOpacity = {};
+
+  // Clean up previous graph
+  var container = document.getElementById('research-graph-cy');
+  if (_researchGraph) {
+    _researchGraph._destructor();
+    _researchGraph = null;
+  }
+  container.innerHTML = '';
+
+  var textColor = isDark ? '#e0e0e0' : '#1e3a5f';
+  var noteTextColor = isDark ? '#9a8a5a' : '#6a5a2a';
+
+  _researchGraph = ForceGraph()(container)
+    .graphData({ nodes: nodes, links: links })
+    .backgroundColor(bgHex)
+    .nodeRelSize(1)
+    .nodeVal(function(n) { return n.nodeSize * n.nodeSize; })
+    .nodeCanvasObject(function(node, ctx, globalScale) {
+      var opacity = _researchNodeOpacity[node.id] !== undefined ? _researchNodeOpacity[node.id] : 1;
+      ctx.globalAlpha = opacity;
+
+      var size = node.nodeSize || 16;
+      var halfW = size * 0.8;
+      var halfH = size * 0.5;
+      var r = 4;
+
+      // Rounded rectangle
+      ctx.beginPath();
+      ctx.moveTo(node.x - halfW + r, node.y - halfH);
+      ctx.lineTo(node.x + halfW - r, node.y - halfH);
+      ctx.quadraticCurveTo(node.x + halfW, node.y - halfH, node.x + halfW, node.y - halfH + r);
+      ctx.lineTo(node.x + halfW, node.y + halfH - r);
+      ctx.quadraticCurveTo(node.x + halfW, node.y + halfH, node.x + halfW - r, node.y + halfH);
+      ctx.lineTo(node.x - halfW + r, node.y + halfH);
+      ctx.quadraticCurveTo(node.x - halfW, node.y + halfH, node.x - halfW, node.y + halfH - r);
+      ctx.lineTo(node.x - halfW, node.y - halfH + r);
+      ctx.quadraticCurveTo(node.x - halfW, node.y - halfH, node.x - halfW + r, node.y - halfH);
+      ctx.closePath();
+
+      if (node.isNote) {
+        ctx.fillStyle = 'transparent';
+        ctx.fill();
+        ctx.strokeStyle = '#8a6d20';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = node.bgColor;
+        ctx.fill();
+        ctx.strokeStyle = node.borderColor;
+        ctx.lineWidth = 1;
+        ctx.stroke();
       }
-    ],
-    layout: {
-      name: 'cose',
-      animate: false,
-      randomize: true,
-      nodeRepulsion: function() { return 12000; },
-      idealEdgeLength: function() { return 100; },
-      numIter: 200,
-      padding: 40
-    },
-    minZoom: 0.2,
-    maxZoom: 3,
-    wheelSensitivity: 0.3
-  });
 
-  // Node click shows popover
-  _researchCy.on('tap', 'node', function(evt) {
-    var node = evt.target;
-    researchShowPopover(node);
-    researchHighlightSidebarEntity(node.data('rkey'));
-  });
-
-  // Background click dismisses popover
-  _researchCy.on('tap', function(evt) {
-    if (evt.target === _researchCy) {
+      // Label
+      var fontSize = node.fontSize / globalScale;
+      if (fontSize < 2) { ctx.globalAlpha = 1; return; }
+      ctx.font = (node.isNote ? 'italic ' : '') + fontSize + 'px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = node.isNote ? noteTextColor : textColor;
+      ctx.fillText(node.id, node.x, node.y);
+      ctx.globalAlpha = 1;
+    })
+    .nodePointerAreaPaint(function(node, color, ctx) {
+      var size = node.nodeSize || 16;
+      ctx.fillStyle = color;
+      ctx.fillRect(node.x - size * 0.8, node.y - size * 0.5, size * 1.6, size);
+    })
+    .linkWidth(function(link) { return link.width; })
+    .linkColor(function(link) { return link.color; })
+    .linkDirectionalArrowLength(4)
+    .linkDirectionalArrowRelPos(1)
+    .onNodeClick(function(node) {
+      researchShowPopoverForNode(node);
+      researchHighlightSidebarEntity(node.rkey);
+    })
+    .onBackgroundClick(function() {
       researchDismissPopover();
-    }
-  });
-
-  // Hover cursor
-  _researchCy.on('mouseover', 'node', function() {
-    document.getElementById('research-graph-cy').style.cursor = 'pointer';
-  });
-  _researchCy.on('mouseout', 'node', function() {
-    document.getElementById('research-graph-cy').style.cursor = 'default';
-  });
+    })
+    .onNodeHover(function(node) {
+      container.style.cursor = node ? 'pointer' : 'default';
+    })
+    .cooldownTicks(100)
+    .warmupTicks(50);
 
   // Overflow badge
   var overflowEl = document.getElementById('research-graph-overflow');
@@ -292,13 +305,13 @@ function _researchRenderGraphInner(graph) {
   }
 }
 
-function researchShowPopover(node) {
+function researchShowPopoverForNode(node) {
   var popover = document.getElementById('research-popover');
-  if (!popover || !_researchCy) return;
+  if (!popover || !_researchGraph) return;
 
-  var rkey = node.data('rkey');
-  var name = node.data('label');
-  var type = node.data('type');
+  var rkey = node.rkey;
+  var name = node.id;
+  var type = node.type;
 
   // Build initial popover content
   var html = '<button class="research-popover-close" onclick="researchDismissPopover()">&times;</button>';
@@ -308,8 +321,8 @@ function researchShowPopover(node) {
   html += '<div id="research-popover-mentions"></div>';
   popover.innerHTML = html;
 
-  // Position near node
-  var pos = node.renderedPosition();
+  // Position near node using screen coordinates
+  var pos = _researchGraph.graph2ScreenCoords(node.x, node.y);
   var graphPanel = document.querySelector('.research-graph-panel');
   var panelRect = graphPanel ? graphPanel.getBoundingClientRect() : { left: 0, top: 0, width: 800, height: 600 };
   var popLeft = pos.x + 20;
@@ -323,9 +336,23 @@ function researchShowPopover(node) {
   popover.style.display = 'block';
 
   // Highlight selected node + neighbors, fade others
-  _researchCy.elements().style('opacity', 0.15);
-  node.style('opacity', 1);
-  node.neighborhood().style('opacity', 1);
+  var neighborIds = {};
+  neighborIds[node.id] = true;
+  for (var i = 0; i < (node.neighbors || []).length; i++) {
+    neighborIds[node.neighbors[i].id] = true;
+  }
+  _researchNodeOpacity = {};
+  if (_researchGraphData) {
+    for (var i = 0; i < _researchGraphData.nodes.length; i++) {
+      var n = _researchGraphData.nodes[i];
+      _researchNodeOpacity[n.id] = neighborIds[n.id] ? 1 : 0.15;
+    }
+  }
+  if (_researchGraph) _researchGraph.linkVisibility(function(link) {
+    var srcId = typeof link.source === 'object' ? link.source.id : link.source;
+    var tgtId = typeof link.target === 'object' ? link.target.id : link.target;
+    return neighborIds[srcId] && neighborIds[tgtId];
+  });
 
   // Load brief via direct fetch
   fetch('/api/research/brief/' + encodeURIComponent(name))
@@ -368,9 +395,8 @@ function researchShowPopover(node) {
 function researchDismissPopover() {
   var popover = document.getElementById('research-popover');
   if (popover) popover.style.display = 'none';
-  if (_researchCy) {
-    _researchCy.elements().style('opacity', 1);
-  }
+  _researchNodeOpacity = {};
+  if (_researchGraph) _researchGraph.linkVisibility(true);
 }
 
 document.addEventListener('keydown', function(ev) {
@@ -496,14 +522,16 @@ function researchFilterByType(type) {
   researchLoadEntities(term || undefined, type || undefined);
 
   // Fade non-matching graph nodes
-  if (_researchCy) {
-    if (!type) {
-      _researchCy.elements().style('opacity', 1);
+  if (_researchGraph && _researchGraphData) {
+    _researchNodeOpacity = {};
+    if (type) {
+      for (var i = 0; i < _researchGraphData.nodes.length; i++) {
+        var n = _researchGraphData.nodes[i];
+        _researchNodeOpacity[n.id] = n.type === type ? 1 : 0.15;
+      }
+      _researchGraph.linkVisibility(false);
     } else {
-      _researchCy.nodes().forEach(function(n) {
-        n.style('opacity', n.data('type') === type ? 1 : 0.15);
-      });
-      _researchCy.edges().style('opacity', 0.1);
+      _researchGraph.linkVisibility(true);
     }
   }
 }
@@ -514,16 +542,18 @@ function researchSearchEntities() {
   researchLoadEntities(term || undefined, _researchTypeFilter || undefined);
 
   // Highlight matching nodes in graph
-  if (_researchCy) {
-    if (!term) {
-      _researchCy.elements().style('opacity', 1);
-    } else {
+  if (_researchGraph && _researchGraphData) {
+    _researchNodeOpacity = {};
+    if (term) {
       var lowerTerm = term.toLowerCase();
-      _researchCy.nodes().forEach(function(n) {
-        var matches = n.data('label').toLowerCase().indexOf(lowerTerm) >= 0;
-        n.style('opacity', matches ? 1 : 0.2);
-      });
-      _researchCy.edges().style('opacity', 0.1);
+      for (var i = 0; i < _researchGraphData.nodes.length; i++) {
+        var n = _researchGraphData.nodes[i];
+        var matches = n.id.toLowerCase().indexOf(lowerTerm) >= 0;
+        _researchNodeOpacity[n.id] = matches ? 1 : 0.2;
+      }
+      _researchGraph.linkVisibility(false);
+    } else {
+      _researchGraph.linkVisibility(true);
     }
   }
 }
@@ -551,11 +581,15 @@ function researchLoadDetail(rkey, name) {
   researchHighlightSidebarEntity(rkey);
 
   // Center graph on entity node and show popover
-  if (_researchCy && name) {
-    var node = _researchCy.getElementById(name);
-    if (node && node.length > 0) {
-      _researchCy.animate({ center: { eles: node }, duration: 300 });
-      researchShowPopover(node);
+  if (_researchGraph && _researchGraphData && name) {
+    var found = null;
+    for (var i = 0; i < _researchGraphData.nodes.length; i++) {
+      if (_researchGraphData.nodes[i].id === name) { found = _researchGraphData.nodes[i]; break; }
+    }
+    if (found) {
+      _researchGraph.centerAt(found.x, found.y, 300);
+      _researchGraph.zoom(2, 300);
+      setTimeout(function() { researchShowPopoverForNode(found); }, 350);
     }
   }
 }
@@ -686,7 +720,8 @@ function researchClearSearch() {
   _researchTypeFilter = null;
   researchLoadEntities();
   researchUpdateClearBtn();
-  if (_researchCy) _researchCy.elements().style('opacity', 1);
+  _researchNodeOpacity = {};
+  if (_researchGraph) _researchGraph.linkVisibility(true);
 }
 
 function researchUpdateClearBtn() {
