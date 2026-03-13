@@ -485,6 +485,20 @@ function researchSearchEntities() {
   var search = document.getElementById('research-search');
   var term = search ? search.value.trim() : '';
   researchLoadEntities(term || undefined, _researchTypeFilter || undefined);
+
+  // Highlight matching nodes in graph
+  if (_researchCy) {
+    if (!term) {
+      _researchCy.elements().style('opacity', 1);
+    } else {
+      var lowerTerm = term.toLowerCase();
+      _researchCy.nodes().forEach(function(n) {
+        var matches = n.data('label').toLowerCase().indexOf(lowerTerm) >= 0;
+        n.style('opacity', matches ? 1 : 0.2);
+      });
+      _researchCy.edges().style('opacity', 0.1);
+    }
+  }
 }
 
 function researchRenderEntityList(entities) {
