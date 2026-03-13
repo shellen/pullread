@@ -6888,6 +6888,7 @@
   .research-type-place { background: color-mix(in srgb, #f59e0b 12%, var(--bg)); color: #f59e0b; }
   .research-type-event { background: color-mix(in srgb, #ef4444 12%, var(--bg)); color: #ef4444; }
   .research-type-concept { background: color-mix(in srgb, #6366f1 12%, var(--bg)); color: #6366f1; }
+  .research-type-note { background: color-mix(in srgb, #b8860b 10%, var(--bg)); color: #9a7a3a; }
   .research-mention-count {
     font-size: 11px;
     color: var(--muted);
