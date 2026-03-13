@@ -2604,6 +2604,15 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
       return;
     }
 
+    if (url.pathname === '/api/research/graph' && req.method === 'GET') {
+      const { getResearchPDS, queryGraphData } = await import('./research');
+      const pds = getResearchPDS();
+      const maxNodes = parseInt(url.searchParams.get('maxNodes') || '200', 10);
+      const graph = queryGraphData(pds, { maxNodes });
+      sendJson(res, graph);
+      return;
+    }
+
     if (url.pathname === '/api/research/tensions' && req.method === 'GET') {
       const { getResearchPDS, queryTensions } = await import('./research');
       const pds = getResearchPDS();
