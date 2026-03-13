@@ -1,7 +1,7 @@
 // ABOUTME: Tests for research knowledge graph — PDS lifecycle, extraction, entity queries
 // ABOUTME: Verifies createResearchPDS initializes storage and closes without error
 
-import { createResearchPDS, extractArticle, runBackgroundExtraction, queryEntities, queryEntityProfile, queryRelatedEntities, queryTensions, addWatch, removeWatch, listWatches, checkWatchMatches, getUnseenMatches, markMatchesSeen, resetResearchData, extractFromUrl, normalizeEntityName, generateEntityBrief, gatherEntityContext } from './research';
+import { createResearchPDS, extractArticle, runBackgroundExtraction, queryEntities, queryEntityProfile, queryRelatedEntities, queryGraphData, queryTensions, addWatch, removeWatch, listWatches, checkWatchMatches, getUnseenMatches, markMatchesSeen, resetResearchData, extractFromUrl, normalizeEntityName, generateEntityBrief, gatherEntityContext } from './research';
 import { summarizeText } from './summarizer';
 import { listMarkdownFiles } from './writer';
 import { readFileSync } from 'fs';
@@ -276,6 +276,41 @@ describe('graph queries', () => {
     const related = queryRelatedEntities(pds, 'a.md');
     expect(related.length).toBe(1);
     expect(related[0].name).toBe('Apple');
+    pds.close();
+  });
+});
+
+describe('queryGraphData', () => {
+  test('returns all entities with mention counts and all edges', () => {
+    const pds = createResearchPDS(':memory:');
+    pds.putRecord('app.pullread.entity', null, { name: 'Apple', type: 'company' });
+    pds.putRecord('app.pullread.entity', null, { name: 'Tim Cook', type: 'person' });
+    pds.putRecord('app.pullread.mention', null, { entityName: 'Apple', filename: 'a.md', title: 'A' });
+    pds.putRecord('app.pullread.mention', null, { entityName: 'Apple', filename: 'b.md', title: 'B' });
+    pds.putRecord('app.pullread.mention', null, { entityName: 'Tim Cook', filename: 'a.md', title: 'A' });
+    pds.putRecord('app.pullread.edge', null, { from: 'Apple', to: 'Tim Cook', type: 'employs', sourceFilename: 'a.md' });
+
+    const graph = queryGraphData(pds);
+    expect(graph.entities.length).toBe(2);
+    expect(graph.entities.find((e: any) => e.name === 'Apple')!.mentionCount).toBe(2);
+    expect(graph.edges.length).toBe(1);
+    expect(graph.edges[0].value.from).toBe('Apple');
+    pds.close();
+  });
+
+  test('caps entities at maxNodes, sorted by mention count', () => {
+    const pds = createResearchPDS(':memory:');
+    for (let i = 0; i < 5; i++) {
+      pds.putRecord('app.pullread.entity', null, { name: `Entity${i}`, type: 'concept' });
+      for (let j = 0; j <= i; j++) {
+        pds.putRecord('app.pullread.mention', null, { entityName: `Entity${i}`, filename: `${j}.md`, title: `T${j}` });
+      }
+    }
+
+    const graph = queryGraphData(pds, { maxNodes: 3 });
+    expect(graph.entities.length).toBe(3);
+    expect(graph.entities[0].name).toBe('Entity4'); // 5 mentions
+    expect(graph.overflow).toBe(2);
     pds.close();
   });
 });

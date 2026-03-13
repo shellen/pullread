@@ -361,6 +361,23 @@ export function queryEntities(pds: PDS, opts: QueryOptions): EntityResult[] {
   return opts.limit ? results.slice(0, opts.limit) : results;
 }
 
+interface GraphData {
+  entities: EntityResult[];
+  edges: any[];
+  overflow: number;
+}
+
+export function queryGraphData(pds: PDS, opts?: { maxNodes?: number }): GraphData {
+  const maxNodes = opts?.maxNodes || 200;
+  const allEntities = queryEntities(pds, {});
+  const overflow = Math.max(0, allEntities.length - maxNodes);
+  const entities = allEntities.slice(0, maxNodes);
+  const entityNames = new Set(entities.map(e => e.name));
+  const edges = pds.listRecords('app.pullread.edge')
+    .filter((e: any) => entityNames.has(e.value.from) && entityNames.has(e.value.to));
+  return { entities, edges, overflow };
+}
+
 export function queryEntityProfile(pds: PDS, rkey: string) {
   const entity = pds.getRecord('app.pullread.entity', rkey);
   if (!entity) return null;
