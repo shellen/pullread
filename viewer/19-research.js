@@ -467,6 +467,18 @@ function researchFilterByType(type) {
   var search = document.getElementById('research-search');
   var term = search ? search.value.trim() : '';
   researchLoadEntities(term || undefined, type || undefined);
+
+  // Fade non-matching graph nodes
+  if (_researchCy) {
+    if (!type) {
+      _researchCy.elements().style('opacity', 1);
+    } else {
+      _researchCy.nodes().forEach(function(n) {
+        n.style('opacity', n.data('type') === type ? 1 : 0.15);
+      });
+      _researchCy.edges().style('opacity', 0.1);
+    }
+  }
 }
 
 function researchSearchEntities() {
@@ -485,7 +497,7 @@ function researchRenderEntityList(entities) {
   var html = '';
   for (var i = 0; i < entities.length; i++) {
     var e = entities[i];
-    html += '<div class="research-entity-row" data-rkey="' + e.rkey + '" onclick="researchLoadDetail(\'' + escapeJsStr(e.rkey) + '\')">';
+    html += '<div class="research-entity-row" data-rkey="' + e.rkey + '" data-name="' + escapeHtml(e.name) + '" onclick="researchLoadDetail(\'' + escapeJsStr(e.rkey) + '\', \'' + escapeJsStr(e.name) + '\')">';
     html += '<span class="research-entity-name">' + escapeHtml(e.name) + '</span>';
     html += '<span class="research-entity-badge research-type-' + escapeHtml(e.type) + '">' + escapeHtml(e.type) + '</span>';
     html += '<span class="research-mention-count">' + e.mentionCount + '</span>';
@@ -494,17 +506,26 @@ function researchRenderEntityList(entities) {
   container.innerHTML = html;
 }
 
-function researchLoadDetail(rkey) {
-  // Highlight selected row
+function researchLoadDetail(rkey, name) {
+  researchHighlightSidebarEntity(rkey);
+
+  // Center graph on entity node and show popover
+  if (_researchCy && name) {
+    var node = _researchCy.getElementById(name);
+    if (node && node.length > 0) {
+      _researchCy.animate({ center: { eles: node }, duration: 300 });
+      researchShowPopover(node);
+    }
+  }
+}
+
+function researchHighlightSidebarEntity(rkey) {
   document.querySelectorAll('.research-entity-row').forEach(function(row) {
     row.classList.toggle('active', row.dataset.rkey === rkey);
   });
-
-  fetch('/api/research/entity/' + rkey)
-    .then(function(r) { return r.json(); })
-    .then(function(profile) {
-      researchRenderDetail(profile);
-    });
+  // Scroll active row into view
+  var activeRow = document.querySelector('.research-entity-row.active');
+  if (activeRow) activeRow.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
 function researchRenderDetail(profile) {
