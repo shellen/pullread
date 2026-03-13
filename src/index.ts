@@ -6,7 +6,7 @@ import { join, basename, dirname } from 'path';
 import { homedir } from 'os';
 import { fetchFeed, FeedEntry } from './feed';
 import { fetchAndExtract, FetchOptions, shouldSkipUrl, isBinaryUrl, classifyFetchError, htmlToMarkdown } from './extractor';
-import { writeArticle, listMarkdownFiles, resolveFilePath, setOutputPath } from './writer';
+import { writeArticle, listMarkdownFiles, resolveFilePath, setOutputPath, needsRepair, markRepairAttempted } from './writer';
 import { Storage } from './storage';
 import { startViewer, reprocessFile, parseFrontmatter } from './viewer';
 import { summarizeText, loadLLMConfig } from './summarizer';
@@ -471,20 +471,20 @@ async function sync(feedFilter?: string, retryFailed = false): Promise<void> {
     }
 
     // Post-sync repair: re-extract articles with suspiciously short content
+    const MAX_REPAIRS_PER_SYNC = 10;
     const allArticles = listMarkdownFiles(config.outputPath);
     let repaired = 0;
+    let repairAttempts = 0;
     for (const filePath of allArticles) {
+      if (repairAttempts >= MAX_REPAIRS_PER_SYNC) break;
       const fileContent = readFileSync(filePath, 'utf-8');
-      const fmMatch = fileContent.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-      if (!fmMatch) continue;
-      const meta = parseFrontmatter(fileContent);
-      const body = fmMatch[2];
-      if (meta.url && meta.source !== 'feed' && body.trim().length < 200) {
-        console.log(`  Repairing: ${basename(filePath)}`);
-        const result = await reprocessFile(filePath);
-        if (result.ok) repaired++;
-        await new Promise(r => setTimeout(r, 2_000));
-      }
+      if (!needsRepair(fileContent)) continue;
+      repairAttempts++;
+      console.log(`  Repairing: ${basename(filePath)}`);
+      const result = await reprocessFile(filePath);
+      if (result.ok) repaired++;
+      markRepairAttempted(filePath);
+      await new Promise(r => setTimeout(r, 2_000));
     }
     if (repaired > 0) console.log(`  Repaired ${repaired} short articles`);
 

@@ -1,7 +1,7 @@
 // ABOUTME: Tests for markdown file generation and filesystem write guard
 // ABOUTME: Verifies filename slugification, frontmatter, enclosure formatting, and path restrictions
 
-import { generateFilename, generateMarkdown, fileSubpath, resolveFilePath, listMarkdownFiles, listEpubFiles, writeArticle, migrateToDateFolders, exportNotebook, assertWritablePath, setOutputPath, resetWriteGuard } from './writer';
+import { generateFilename, generateMarkdown, fileSubpath, resolveFilePath, listMarkdownFiles, listEpubFiles, writeArticle, migrateToDateFolders, exportNotebook, assertWritablePath, setOutputPath, resetWriteGuard, needsRepair, markRepairAttempted } from './writer';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'fs';
 import { join, resolve, sep } from 'path';
 import { homedir } from 'os';
@@ -639,6 +639,104 @@ describe('exportNotebook', () => {
     const separators = content.split('---').length - 1;
     // frontmatter has 2 ---, plus one note separator = 3
     expect(separators).toBe(3);
+  });
+});
+
+describe('needsRepair', () => {
+  test('returns true for short article with url and no repairAttempted flag', () => {
+    const content = `---
+title: "Short Article"
+url: https://example.com/article
+domain: example.com
+bookmarked: 2024-01-29T12:00:00Z
+---
+Brief content.`;
+    expect(needsRepair(content)).toBe(true);
+  });
+
+  test('returns false when repairAttempted is true', () => {
+    const content = `---
+title: "Short Article"
+url: https://example.com/article
+domain: example.com
+repairAttempted: true
+---
+Brief content.`;
+    expect(needsRepair(content)).toBe(false);
+  });
+
+  test('returns false when source is feed', () => {
+    const content = `---
+title: "Feed Article"
+url: https://example.com/feed
+source: feed
+---
+Brief.`;
+    expect(needsRepair(content)).toBe(false);
+  });
+
+  test('returns false when no url', () => {
+    const content = `---
+title: "No URL Article"
+domain: example.com
+---
+Brief.`;
+    expect(needsRepair(content)).toBe(false);
+  });
+
+  test('returns false when body is 200+ chars', () => {
+    const longBody = 'x'.repeat(200);
+    const content = `---
+title: "Long Article"
+url: https://example.com/long
+---
+${longBody}`;
+    expect(needsRepair(content)).toBe(false);
+  });
+
+  test('returns false for content without frontmatter', () => {
+    expect(needsRepair('# Just a heading\nSome text')).toBe(false);
+  });
+});
+
+describe('markRepairAttempted', () => {
+  beforeEach(() => {
+    cleanTestDir();
+    mkdirSync(TEST_DIR, { recursive: true });
+    setOutputPath(TEST_DIR);
+  });
+  afterAll(cleanTestDir);
+
+  test('adds repairAttempted field to frontmatter', () => {
+    const filePath = join(TEST_DIR, 'article.md');
+    writeFileSync(filePath, `---
+title: "Test"
+url: https://example.com
+---
+Short content.`);
+
+    markRepairAttempted(filePath);
+
+    const updated = readFileSync(filePath, 'utf-8');
+    expect(updated).toContain('repairAttempted: true');
+    // Preserves existing fields
+    expect(updated).toContain('title: "Test"');
+    expect(updated).toContain('url: https://example.com');
+  });
+
+  test('does not duplicate if already marked', () => {
+    const filePath = join(TEST_DIR, 'already-marked.md');
+    writeFileSync(filePath, `---
+title: "Test"
+repairAttempted: true
+---
+Content.`);
+
+    markRepairAttempted(filePath);
+
+    const updated = readFileSync(filePath, 'utf-8');
+    const matches = updated.match(/repairAttempted/g);
+    expect(matches).toHaveLength(1);
   });
 });
 
