@@ -207,6 +207,17 @@ function researchRenderGraph(graph) {
         }
       },
       {
+        selector: 'node[type="note"]',
+        style: {
+          'background-color': 'transparent',
+          'border-color': '#8a6d20',
+          'border-width': 1.5,
+          'color': isDark ? '#9a8a5a' : '#6a5a2a',
+          'font-style': 'italic',
+          'font-size': '9px'
+        }
+      },
+      {
         selector: 'edge',
         style: {
           'label': 'data(label)',
