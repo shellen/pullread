@@ -659,6 +659,7 @@ function researchClearSearch() {
   _researchTypeFilter = null;
   researchLoadEntities();
   researchUpdateClearBtn();
+  if (_researchCy) _researchCy.elements().style('opacity', 1);
 }
 
 function researchUpdateClearBtn() {
