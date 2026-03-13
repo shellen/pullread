@@ -128,6 +128,8 @@ function researchRenderGraph(graph) {
     var baseColor = _researchTypeColors[e.type] || '#6366f1';
     var bgColor = researchMixHex(baseColor, bgHex, 0.35);
     var borderColor = researchMixHex(baseColor, bgHex, 0.50);
+    var wmc = e.weightedMentionCount || e.mentionCount || 0;
+    var nodeSize = Math.max(8, 8 + Math.log(1 + wmc) * 4);
     elements.push({
       data: {
         id: e.name,
@@ -135,7 +137,8 @@ function researchRenderGraph(graph) {
         rkey: e.rkey,
         type: e.type,
         bgColor: bgColor,
-        borderColor: borderColor
+        borderColor: borderColor,
+        nodeSize: nodeSize
       }
     });
   }
@@ -199,7 +202,7 @@ function researchRenderGraph(graph) {
           'text-max-width': '80px',
           'width': 'label',
           'height': 'label',
-          'padding': '8px',
+          'padding': 'data(nodeSize)',
           'shape': 'round-rectangle'
         }
       },

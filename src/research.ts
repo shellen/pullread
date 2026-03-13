@@ -509,19 +509,42 @@ export function queryEntities(pds: PDS, opts: QueryOptions): EntityResult[] {
 }
 
 interface GraphData {
-  entities: EntityResult[];
+  entities: any[];
   edges: any[];
   overflow: number;
 }
 
 export function queryGraphData(pds: PDS, opts?: { maxNodes?: number }): GraphData {
   const maxNodes = opts?.maxNodes || 200;
-  const allEntities = queryEntities(pds, {});
-  const overflow = Math.max(0, allEntities.length - maxNodes);
-  const entities = allEntities.slice(0, maxNodes);
-  const entityNames = new Set(entities.map(e => e.name));
+
+  // Compute weighted mention counts per entity
+  const mentions = pds.listRecords('app.pullread.mention');
+  const weightedCounts = new Map<string, number>();
+  const rawCounts = new Map<string, number>();
+  for (const m of mentions) {
+    const name = (m as any).value.entityName;
+    const origin = (m as any).value.origin || 'extracted';
+    const weight = origin === 'note' ? 2 : origin === 'highlight' ? 3 : 1;
+    weightedCounts.set(name, (weightedCounts.get(name) || 0) + weight);
+    rawCounts.set(name, (rawCounts.get(name) || 0) + 1);
+  }
+
+  let entities = pds.listRecords('app.pullread.entity').map((e: any) => ({
+    rkey: e.rkey,
+    name: e.value.name,
+    type: e.value.type,
+    mentionCount: rawCounts.get(e.value.name) || 0,
+    weightedMentionCount: weightedCounts.get(e.value.name) || 0,
+  }));
+
+  entities.sort((a: any, b: any) => b.weightedMentionCount - a.weightedMentionCount);
+  const overflow = Math.max(0, entities.length - maxNodes);
+  entities = entities.slice(0, maxNodes);
+
+  const entityNames = new Set(entities.map((e: any) => e.name));
   const edges = pds.listRecords('app.pullread.edge')
     .filter((e: any) => entityNames.has(e.value.from) && entityNames.has(e.value.to));
+
   return { entities, edges, overflow };
 }
 

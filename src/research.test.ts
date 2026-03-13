@@ -313,6 +313,25 @@ describe('queryGraphData', () => {
     expect(graph.overflow).toBe(2);
     pds.close();
   });
+
+  test('applies 2x weight multiplier to note-origin mentions', () => {
+    const pds = createResearchPDS(':memory:');
+    pds.putRecord('app.pullread.entity', null, { name: 'Apple', type: 'company' });
+    pds.putRecord('app.pullread.entity', null, { name: 'Google', type: 'company' });
+    // Apple: 1 extracted mention
+    pds.putRecord('app.pullread.mention', null, { entityName: 'Apple', filename: 'a.md', title: 'A', origin: 'extracted' });
+    // Google: 1 note mention (should count as 2)
+    pds.putRecord('app.pullread.mention', null, { entityName: 'Google', filename: 'note:n1', title: 'N', origin: 'note' });
+
+    const graph = queryGraphData(pds);
+    const apple = graph.entities.find((e: any) => e.name === 'Apple')!;
+    const google = graph.entities.find((e: any) => e.name === 'Google')!;
+    expect(google.weightedMentionCount).toBe(2); // 1 note x 2
+    expect(apple.weightedMentionCount).toBe(1);  // 1 extracted x 1
+    // Google should sort before Apple due to higher weighted count
+    expect(graph.entities[0].name).toBe('Google');
+    pds.close();
+  });
 });
 
 describe('sentiment extraction', () => {
