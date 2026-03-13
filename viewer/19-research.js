@@ -79,7 +79,190 @@ function researchRenderBrowser() {
 var _researchCy = null;
 
 function researchLoadGraph() {
-  // Stub — replaced in Task 5
+  if (typeof cytoscape === 'undefined') return;
+  fetch('/api/research/graph')
+    .then(function(r) { return r.json(); })
+    .then(function(graph) {
+      if (!graph.entities || graph.entities.length < 3) {
+        var cy = document.getElementById('research-graph-cy');
+        if (cy) cy.innerHTML = '<p class="briefing-hint" style="text-align:center;padding-top:40px">Not enough entities to render a graph yet.</p>';
+        return;
+      }
+      researchRenderGraph(graph);
+    })
+    .catch(function() {});
+}
+
+function researchMixHex(color, bgColor, pct) {
+  function parseHex(h) {
+    h = h.replace('#', '');
+    return [parseInt(h.substring(0, 2), 16), parseInt(h.substring(2, 4), 16), parseInt(h.substring(4, 6), 16)];
+  }
+  var c = parseHex(color);
+  var bg = parseHex(bgColor);
+  var r = Math.round(c[0] * pct + bg[0] * (1 - pct));
+  var g = Math.round(c[1] * pct + bg[1] * (1 - pct));
+  var b = Math.round(c[2] * pct + bg[2] * (1 - pct));
+  return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+}
+
+var _researchTypeColors = {
+  person: '#3b82f6',
+  company: '#8b5cf6',
+  technology: '#10b981',
+  place: '#f59e0b',
+  event: '#ef4444',
+  concept: '#6366f1'
+};
+
+function researchRenderGraph(graph) {
+  var isDark = document.documentElement.dataset.theme === 'dark';
+  var bgHex = isDark ? '#1a1a2e' : '#f8f9fa';
+  var elements = [];
+
+  // Build node elements with pre-computed colors
+  var entityByName = {};
+  for (var i = 0; i < graph.entities.length; i++) {
+    var e = graph.entities[i];
+    entityByName[e.name] = e;
+    var baseColor = _researchTypeColors[e.type] || '#6366f1';
+    var bgColor = researchMixHex(baseColor, bgHex, 0.35);
+    var borderColor = researchMixHex(baseColor, bgHex, 0.50);
+    elements.push({
+      data: {
+        id: e.name,
+        label: e.name,
+        rkey: e.rkey,
+        type: e.type,
+        bgColor: bgColor,
+        borderColor: borderColor
+      }
+    });
+  }
+
+  // Deduplicate edges
+  var edgeMap = {};
+  for (var i = 0; i < graph.edges.length; i++) {
+    var edge = graph.edges[i];
+    var from = edge.value.from;
+    var to = edge.value.to;
+    if (from === to) continue;
+    if (!entityByName[from] || !entityByName[to]) continue;
+    var pairKey = [from, to].sort().join('\0');
+    var normLabel = edge.value.type.toLowerCase().replace(/s$/, '');
+    if (!edgeMap[pairKey]) edgeMap[pairKey] = { from: from, to: to, labels: {} };
+    edgeMap[pairKey].labels[normLabel] = (edgeMap[pairKey].labels[normLabel] || 0) + 1;
+  }
+  var edgeKeys = Object.keys(edgeMap);
+  for (var i = 0; i < edgeKeys.length; i++) {
+    var entry = edgeMap[edgeKeys[i]];
+    var bestLabel = '';
+    var bestCount = 0;
+    var labelKeys = Object.keys(entry.labels);
+    for (var j = 0; j < labelKeys.length; j++) {
+      if (entry.labels[labelKeys[j]] > bestCount) {
+        bestCount = entry.labels[labelKeys[j]];
+        bestLabel = labelKeys[j];
+      }
+    }
+    elements.push({
+      data: {
+        id: 'e' + i,
+        source: entry.from,
+        target: entry.to,
+        label: bestLabel
+      }
+    });
+  }
+
+  if (_researchCy) {
+    _researchCy.destroy();
+    _researchCy = null;
+  }
+
+  _researchCy = cytoscape({
+    container: document.getElementById('research-graph-cy'),
+    elements: elements,
+    style: [
+      {
+        selector: 'node',
+        style: {
+          'label': 'data(label)',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'background-color': 'data(bgColor)',
+          'color': isDark ? '#e0e0e0' : '#1e3a5f',
+          'border-width': 1,
+          'border-color': 'data(borderColor)',
+          'font-size': '10px',
+          'text-wrap': 'wrap',
+          'text-max-width': '80px',
+          'width': 'label',
+          'height': 'label',
+          'padding': '8px',
+          'shape': 'round-rectangle'
+        }
+      },
+      {
+        selector: 'edge',
+        style: {
+          'label': 'data(label)',
+          'width': 1,
+          'line-color': isDark ? '#3a3a4a' : '#cbd5e1',
+          'target-arrow-color': isDark ? '#3a3a4a' : '#cbd5e1',
+          'target-arrow-shape': 'triangle',
+          'curve-style': 'bezier',
+          'font-size': '8px',
+          'color': isDark ? '#666' : '#94a3b8',
+          'text-rotation': 'autorotate',
+          'text-margin-y': -6
+        }
+      }
+    ],
+    layout: {
+      name: 'cose',
+      animate: false,
+      nodeRepulsion: function() { return 8000; },
+      idealEdgeLength: function() { return 120; },
+      padding: 40
+    },
+    minZoom: 0.2,
+    maxZoom: 3,
+    wheelSensitivity: 0.3
+  });
+
+  // Node click shows popover
+  _researchCy.on('tap', 'node', function(evt) {
+    var node = evt.target;
+    researchShowPopover(node);
+    researchHighlightSidebarEntity(node.data('rkey'));
+  });
+
+  // Background click dismisses popover
+  _researchCy.on('tap', function(evt) {
+    if (evt.target === _researchCy) {
+      researchDismissPopover();
+    }
+  });
+
+  // Hover cursor
+  _researchCy.on('mouseover', 'node', function() {
+    document.getElementById('research-graph-cy').style.cursor = 'pointer';
+  });
+  _researchCy.on('mouseout', 'node', function() {
+    document.getElementById('research-graph-cy').style.cursor = 'default';
+  });
+
+  // Overflow badge
+  var overflowEl = document.getElementById('research-graph-overflow');
+  if (overflowEl) {
+    if (graph.overflow > 0) {
+      overflowEl.textContent = '+' + graph.overflow + ' more entities';
+      overflowEl.style.display = '';
+    } else {
+      overflowEl.style.display = 'none';
+    }
+  }
 }
 
 function researchShowEmptyState(status) {
@@ -365,218 +548,6 @@ function researchRenderDetail(profile) {
   container.innerHTML = html;
 }
 
-var _researchGraphProfile = null;
-
-function researchOpenGraph(centerName) {
-  // Find the edges from the currently displayed detail
-  var container = document.getElementById('research-detail');
-  if (!container || typeof cytoscape === 'undefined') return;
-
-  // Fetch fresh profile to get edges
-  var rows = document.querySelectorAll('.research-entity-row.active');
-  var rkey = rows.length > 0 ? rows[0].dataset.rkey : null;
-  if (!rkey) return;
-
-  fetch('/api/research/entity/' + rkey)
-    .then(function(r) { return r.json(); })
-    .then(function(profile) {
-      if (!profile.edges || profile.edges.length === 0) return;
-      researchShowGraphModal(profile.entity.name, profile.edges);
-    });
-}
-
-function researchShowGraphModal(centerName, edges) {
-  // Remove any existing modal
-  var existing = document.getElementById('research-graph-modal');
-  if (existing) existing.remove();
-
-  var modal = document.createElement('div');
-  modal.id = 'research-graph-modal';
-  modal.className = 'research-graph-modal';
-  modal.innerHTML = '<div class="research-graph-modal-header">' +
-    '<h2>' + escapeHtml(centerName) + '</h2>' +
-    '<button class="research-graph-modal-close" onclick="researchCloseGraph()" title="Close">&times;</button>' +
-    '</div>' +
-    '<div class="research-graph-container" id="research-graph-cy"></div>';
-  document.body.appendChild(modal);
-
-  // Close on Escape
-  modal._escHandler = function(ev) {
-    if (ev.key === 'Escape') researchCloseGraph();
-  };
-  document.addEventListener('keydown', modal._escHandler);
-
-  // Normalize node names to merge variants (Trump/President Trump/Donald Trump)
-  var nodeCanonical = {}; // normalized form -> first display name seen
-  function graphNormName(n) {
-    return n.trim().toLowerCase()
-      .replace(/\./g, '')
-      .replace(/^(the|a|an)\s+/i, '')
-      .replace(/^(president|dr|mr|mrs|ms|sir|lord|senator|rep|gov|gen|col|sgt)\s+/i, '')
-      .replace(/\s+/g, ' ').trim();
-  }
-  function graphCanonical(name) {
-    var norm = graphNormName(name);
-    if (!nodeCanonical[norm]) nodeCanonical[norm] = name;
-    return nodeCanonical[norm];
-  }
-
-  // Pre-scan edges to pick the shortest display name per normalized group
-  // (prefer "Trump" over "Donald Trump" over "President Trump")
-  var nameGroups = {};
-  nameGroups[graphNormName(centerName)] = [centerName];
-  for (var i = 0; i < edges.length; i++) {
-    var edge = edges[i];
-    var names = [edge.value.from, edge.value.to];
-    for (var j = 0; j < names.length; j++) {
-      var norm = graphNormName(names[j]);
-      if (!nameGroups[norm]) nameGroups[norm] = [];
-      if (nameGroups[norm].indexOf(names[j]) < 0) nameGroups[norm].push(names[j]);
-    }
-  }
-  // Pick the shortest name as canonical display name
-  var normKeys = Object.keys(nameGroups);
-  for (var i = 0; i < normKeys.length; i++) {
-    var group = nameGroups[normKeys[i]];
-    group.sort(function(a, b) { return a.length - b.length; });
-    nodeCanonical[normKeys[i]] = group[0];
-  }
-
-  var canonCenter = graphCanonical(centerName);
-  var nodes = {};
-  var elements = [];
-  nodes[canonCenter] = true;
-  elements.push({ data: { id: canonCenter, label: canonCenter }, classes: 'center' });
-
-  // Deduplicate edges between same canonical node pairs
-  var edgeMap = {};
-  for (var i = 0; i < edges.length; i++) {
-    var edge = edges[i];
-    var from = graphCanonical(edge.value.from);
-    var to = graphCanonical(edge.value.to);
-    // Skip self-loops created by merging
-    if (from === to) continue;
-    if (!nodes[from]) {
-      nodes[from] = true;
-      elements.push({ data: { id: from, label: from } });
-    }
-    if (!nodes[to]) {
-      nodes[to] = true;
-      elements.push({ data: { id: to, label: to } });
-    }
-    var pairKey = [from, to].sort().join('\0');
-    var normLabel = edge.value.type.toLowerCase().replace(/s$/, '');
-    if (!edgeMap[pairKey]) edgeMap[pairKey] = { from: from, to: to, labels: {} };
-    edgeMap[pairKey].labels[normLabel] = (edgeMap[pairKey].labels[normLabel] || 0) + 1;
-  }
-
-  var edgeKeys = Object.keys(edgeMap);
-  for (var i = 0; i < edgeKeys.length; i++) {
-    var entry = edgeMap[edgeKeys[i]];
-    var bestLabel = '';
-    var bestCount = 0;
-    var labelKeys = Object.keys(entry.labels);
-    for (var j = 0; j < labelKeys.length; j++) {
-      if (entry.labels[labelKeys[j]] > bestCount) {
-        bestCount = entry.labels[labelKeys[j]];
-        bestLabel = labelKeys[j];
-      }
-    }
-    elements.push({
-      data: {
-        id: 'e' + i,
-        source: entry.from,
-        target: entry.to,
-        label: bestLabel,
-      }
-    });
-  }
-
-  var isDark = document.documentElement.dataset.theme === 'dark';
-
-  var cy = cytoscape({
-    container: document.getElementById('research-graph-cy'),
-    elements: elements,
-    style: [
-      {
-        selector: 'node',
-        style: {
-          'label': 'data(label)',
-          'text-valign': 'center',
-          'text-halign': 'center',
-          'background-color': isDark ? '#4a5568' : '#dbeafe',
-          'color': isDark ? '#e0e0e0' : '#1e3a5f',
-          'border-width': 1,
-          'border-color': isDark ? '#718096' : '#93c5fd',
-          'font-size': '12px',
-          'text-wrap': 'wrap',
-          'text-max-width': '100px',
-          'width': 'label',
-          'height': 'label',
-          'padding': '10px',
-          'shape': 'round-rectangle',
-        }
-      },
-      {
-        selector: 'node.center',
-        style: {
-          'background-color': '#f59e0b',
-          'border-color': '#d97706',
-          'color': '#000',
-          'font-weight': 'bold',
-          'font-size': '14px',
-        }
-      },
-      {
-        selector: 'edge',
-        style: {
-          'label': 'data(label)',
-          'width': 1.5,
-          'line-color': isDark ? '#555' : '#cbd5e1',
-          'target-arrow-color': isDark ? '#555' : '#cbd5e1',
-          'target-arrow-shape': 'triangle',
-          'curve-style': 'bezier',
-          'font-size': '10px',
-          'color': isDark ? '#999' : '#64748b',
-          'text-rotation': 'autorotate',
-          'text-margin-y': -8,
-        }
-      },
-    ],
-    layout: {
-      name: 'cose',
-      animate: false,
-      nodeRepulsion: function() { return 8000; },
-      idealEdgeLength: function() { return 120; },
-      padding: 40,
-    },
-    minZoom: 0.2,
-    maxZoom: 3,
-    wheelSensitivity: 0.3,
-  });
-
-  // Click node to search
-  cy.on('tap', 'node', function(evt) {
-    var name = evt.target.data('label');
-    researchCloseGraph();
-    researchSearchFor(name);
-  });
-
-  // Hover cursor
-  cy.on('mouseover', 'node', function() {
-    document.getElementById('research-graph-cy').style.cursor = 'pointer';
-  });
-  cy.on('mouseout', 'node', function() {
-    document.getElementById('research-graph-cy').style.cursor = 'default';
-  });
-}
-
-function researchCloseGraph() {
-  var modal = document.getElementById('research-graph-modal');
-  if (!modal) return;
-  if (modal._escHandler) document.removeEventListener('keydown', modal._escHandler);
-  modal.remove();
-}
 
 function researchLoadTensions() {
   fetch('/api/research/tensions')
