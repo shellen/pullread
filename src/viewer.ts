@@ -2700,6 +2700,29 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
       return;
     }
 
+    if (url.pathname === '/api/research/extract-note' && req.method === 'POST') {
+      try {
+        const body = JSON.parse(await readBody(req));
+        if (!body.noteId || !body.content) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'noteId and content required' }));
+          return;
+        }
+        const { getResearchPDS, extractNote } = await import('./research');
+        const pds = getResearchPDS();
+        const result = await extractNote(pds, {
+          noteId: body.noteId,
+          content: body.content,
+          sourceArticle: body.sourceArticle || '',
+        });
+        sendJson(res, result || { entities: [], relationships: [], themes: [] });
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err instanceof Error ? err.message : 'Note extraction failed' }));
+      }
+      return;
+    }
+
     if (url.pathname === '/api/research/reset' && req.method === 'POST') {
       const { getResearchPDS, resetResearchData } = await import('./research');
       const pds = getResearchPDS();
