@@ -265,6 +265,91 @@ function researchRenderGraph(graph) {
   }
 }
 
+function researchShowPopover(node) {
+  var popover = document.getElementById('research-popover');
+  if (!popover || !_researchCy) return;
+
+  var rkey = node.data('rkey');
+  var name = node.data('label');
+  var type = node.data('type');
+
+  // Build initial popover content
+  var html = '<button class="research-popover-close" onclick="researchDismissPopover()">&times;</button>';
+  html += '<h3>' + escapeHtml(name) + '</h3>';
+  html += '<span class="research-entity-badge research-type-' + escapeHtml(type) + '">' + escapeHtml(type) + '</span>';
+  html += '<div id="research-popover-brief" class="research-brief" style="margin:8px 0 0"></div>';
+  html += '<div id="research-popover-mentions"></div>';
+  popover.innerHTML = html;
+
+  // Position near node
+  var pos = node.renderedPosition();
+  var graphPanel = document.querySelector('.research-graph-panel');
+  var panelRect = graphPanel ? graphPanel.getBoundingClientRect() : { left: 0, top: 0, width: 800, height: 600 };
+  var popLeft = pos.x + 20;
+  var popTop = pos.y - 20;
+  // Keep within panel bounds
+  if (popLeft + 240 > panelRect.width) popLeft = pos.x - 260;
+  if (popTop + 200 > panelRect.height) popTop = panelRect.height - 210;
+  if (popTop < 10) popTop = 10;
+  popover.style.left = popLeft + 'px';
+  popover.style.top = popTop + 'px';
+  popover.style.display = 'block';
+
+  // Highlight selected node + neighbors, fade others
+  _researchCy.elements().style('opacity', 0.15);
+  node.style('opacity', 1);
+  node.neighborhood().style('opacity', 1);
+
+  // Load brief via direct fetch
+  fetch('/api/research/brief/' + encodeURIComponent(name))
+    .then(function(r) { return r.json(); })
+    .then(function(brief) {
+      var el = document.getElementById('research-popover-brief');
+      if (!el || !brief.summary) return;
+      el.innerHTML = '<p class="research-brief-text">' + escapeHtml(brief.summary) + '</p>';
+    })
+    .catch(function() {});
+
+  // Load entity profile for mentions
+  fetch('/api/research/entity/' + rkey)
+    .then(function(r) { return r.json(); })
+    .then(function(profile) {
+      var mentionsEl = document.getElementById('research-popover-mentions');
+      if (!mentionsEl || !profile.mentions || profile.mentions.length === 0) return;
+      var mHtml = '<div class="research-popover-section-title">Mentions</div>';
+      var limit = Math.min(profile.mentions.length, 3);
+      for (var i = 0; i < limit; i++) {
+        var m = profile.mentions[i];
+        var sentiment = m.value.sentiment || 'neutral';
+        var dot = sentiment === 'positive' ? 'research-sentiment-positive'
+          : sentiment === 'negative' ? 'research-sentiment-negative'
+          : sentiment === 'mixed' ? 'research-sentiment-mixed'
+          : 'research-sentiment-neutral';
+        mHtml += '<div class="research-popover-mention">';
+        mHtml += '<span class="research-sentiment-dot ' + dot + '"></span>';
+        mHtml += '<a href="#" onclick="loadFileByName(\'' + escapeJsStr(m.value.filename) + '\');return false">' + escapeHtml(m.value.title) + '</a>';
+        mHtml += '</div>';
+      }
+      if (profile.mentions.length > 3) {
+        mHtml += '<a class="research-popover-viewall" href="#" onclick="researchSearchFor(\'' + escapeJsStr(name) + '\');return false">View all ' + profile.mentions.length + ' mentions</a>';
+      }
+      mentionsEl.innerHTML = mHtml;
+    })
+    .catch(function() {});
+}
+
+function researchDismissPopover() {
+  var popover = document.getElementById('research-popover');
+  if (popover) popover.style.display = 'none';
+  if (_researchCy) {
+    _researchCy.elements().style('opacity', 1);
+  }
+}
+
+document.addEventListener('keydown', function(ev) {
+  if (ev.key === 'Escape') researchDismissPopover();
+});
+
 function researchShowEmptyState(status) {
   var content = document.getElementById('content');
   if (!content) return;
