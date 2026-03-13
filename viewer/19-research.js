@@ -94,7 +94,7 @@ function researchLoadGraph() {
       }
       researchRenderGraph(graph);
     })
-    .catch(function() {});
+    .catch(function(err) { console.error('researchLoadGraph error:', err); });
 }
 
 function researchMixHex(color, bgColor, pct) {
@@ -120,6 +120,11 @@ var _researchTypeColors = {
 };
 
 function researchRenderGraph(graph) {
+  try { _researchRenderGraphInner(graph); }
+  catch (err) { console.error('researchRenderGraph error:', err); }
+}
+
+function _researchRenderGraphInner(graph) {
   var isDark = document.documentElement.dataset.theme === 'dark';
   var bgHex = isDark ? '#1a1a2e' : '#f8f9fa';
   var elements = [];
@@ -133,7 +138,7 @@ function researchRenderGraph(graph) {
     var bgColor = researchMixHex(baseColor, bgHex, 0.35);
     var borderColor = researchMixHex(baseColor, bgHex, 0.50);
     var wmc = e.weightedMentionCount || e.mentionCount || 0;
-    var nodeSize = Math.max(8, 8 + Math.log(1 + wmc) * 4);
+    var fontSize = Math.max(9, Math.min(16, 9 + Math.log(1 + wmc) * 1.5));
     elements.push({
       data: {
         id: e.name,
@@ -142,7 +147,7 @@ function researchRenderGraph(graph) {
         type: e.type,
         bgColor: bgColor,
         borderColor: borderColor,
-        nodeSize: nodeSize
+        fontSize: fontSize
       }
     });
   }
@@ -162,7 +167,8 @@ function researchRenderGraph(graph) {
     edgeMap[pairKey].labels[normLabel] = (edgeMap[pairKey].labels[normLabel] || 0) + 1;
   }
   var edgeKeys = Object.keys(edgeMap);
-  for (var i = 0; i < edgeKeys.length; i++) {
+  var maxEdges = 500;
+  for (var i = 0; i < edgeKeys.length && i < maxEdges; i++) {
     var entry = edgeMap[edgeKeys[i]];
     var bestLabel = '';
     var bestCount = 0;
@@ -184,6 +190,7 @@ function researchRenderGraph(graph) {
       }
     });
   }
+  console.log('Research graph: ' + graph.entities.length + ' nodes, ' + edgeKeys.length + ' unique edges (' + Math.min(edgeKeys.length, maxEdges) + ' rendered), ' + graph.edges.length + ' raw edges');
 
   if (_researchCy) {
     _researchCy.destroy();
@@ -204,12 +211,12 @@ function researchRenderGraph(graph) {
           'color': isDark ? '#e0e0e0' : '#1e3a5f',
           'border-width': 1,
           'border-color': 'data(borderColor)',
-          'font-size': '10px',
+          'font-size': 'data(fontSize)',
           'text-wrap': 'wrap',
           'text-max-width': '80px',
           'width': 'label',
           'height': 'label',
-          'padding': 'data(nodeSize)',
+          'padding': '8px',
           'shape': 'round-rectangle'
         }
       },
