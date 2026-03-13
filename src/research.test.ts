@@ -1,7 +1,7 @@
 // ABOUTME: Tests for research knowledge graph — PDS lifecycle, extraction, entity queries
 // ABOUTME: Verifies createResearchPDS initializes storage and closes without error
 
-import { createResearchPDS, extractArticle, runBackgroundExtraction, queryEntities, queryEntityProfile, queryRelatedEntities, queryGraphData, queryTensions, addWatch, removeWatch, listWatches, checkWatchMatches, getUnseenMatches, markMatchesSeen, resetResearchData, extractFromUrl, normalizeEntityName, generateEntityBrief, gatherEntityContext } from './research';
+import { createResearchPDS, extractArticle, extractNote, runBackgroundExtraction, queryEntities, queryEntityProfile, queryRelatedEntities, queryGraphData, queryTensions, addWatch, removeWatch, listWatches, checkWatchMatches, getUnseenMatches, markMatchesSeen, resetResearchData, extractFromUrl, normalizeEntityName, generateEntityBrief, gatherEntityContext } from './research';
 import { summarizeText } from './summarizer';
 import { listMarkdownFiles } from './writer';
 import { readFileSync } from 'fs';
@@ -860,6 +860,112 @@ describe('extractFromUrl', () => {
     const result = await extractFromUrl(pds, 'https://example.com/bad');
     expect(result).toBeNull();
     expect(mockSummarize).not.toHaveBeenCalled();
+    pds.close();
+  });
+});
+
+describe('extractNote', () => {
+  beforeEach(() => mockSummarize.mockReset());
+
+  test('extracts entities from note content with origin "note"', async () => {
+    const pds = createResearchPDS(':memory:');
+    mockSummarize.mockResolvedValue({
+      summary: JSON.stringify({
+        entities: [{ name: 'OpenAI', type: 'company', sentiment: 'positive', stance: 'leading AI' }],
+        relationships: [],
+        themes: ['AI'],
+      }),
+      model: 'test',
+    });
+
+    await extractNote(pds, {
+      noteId: 'note-abc123',
+      content: 'My thoughts on OpenAI and their approach to AI safety.',
+      sourceArticle: '',
+    });
+
+    const entities = pds.listRecords('app.pullread.entity');
+    expect(entities.length).toBe(2); // OpenAI + the note entity itself
+    const noteEntity = entities.find((e: any) => e.value.type === 'note');
+    expect(noteEntity).toBeDefined();
+    expect(noteEntity!.value.name).toContain('note-abc123');
+
+    const mentions = pds.listRecords('app.pullread.mention');
+    const noteMentions = mentions.filter((m: any) => m.value.origin === 'note');
+    expect(noteMentions.length).toBeGreaterThanOrEqual(1);
+    pds.close();
+  });
+
+  test('creates edges from note to source article entities with origin "note"', async () => {
+    const pds = createResearchPDS(':memory:');
+
+    // Pre-populate: article extraction created an entity
+    pds.putRecord('app.pullread.entity', null, { name: 'OpenAI', type: 'company' });
+    pds.putRecord('app.pullread.mention', null, {
+      entityName: 'OpenAI', filename: 'source-article.md', title: 'About OpenAI',
+      origin: 'extracted', sentiment: 'neutral', stance: null,
+    });
+
+    mockSummarize.mockResolvedValue({
+      summary: JSON.stringify({
+        entities: [{ name: 'OpenAI', type: 'company' }],
+        relationships: [],
+        themes: ['AI'],
+      }),
+      model: 'test',
+    });
+
+    await extractNote(pds, {
+      noteId: 'note-xyz789',
+      content: 'Interesting take on OpenAI.',
+      sourceArticle: 'source-article.md',
+    });
+
+    const edges = pds.listRecords('app.pullread.edge');
+    const noteEdges = edges.filter((e: any) => e.value.origin === 'note');
+    expect(noteEdges.length).toBeGreaterThanOrEqual(1);
+    pds.close();
+  });
+
+  test('re-extraction clears only this note origin mentions and edges', async () => {
+    const pds = createResearchPDS(':memory:');
+    mockSummarize.mockResolvedValue({
+      summary: JSON.stringify({
+        entities: [{ name: 'Apple', type: 'company' }],
+        relationships: [],
+        themes: ['tech'],
+      }),
+      model: 'test',
+    });
+
+    await extractNote(pds, { noteId: 'note-1', content: 'Apple notes content here', sourceArticle: '' });
+
+    // Also add an extracted mention for Apple (from article extraction)
+    pds.putRecord('app.pullread.mention', null, {
+      entityName: 'Apple', filename: 'article.md', title: 'Article',
+      origin: 'extracted', sentiment: 'neutral', stance: null,
+    });
+
+    // Re-extract the note with different content
+    mockSummarize.mockResolvedValue({
+      summary: JSON.stringify({
+        entities: [{ name: 'Google', type: 'company' }],
+        relationships: [],
+        themes: ['tech'],
+      }),
+      model: 'test',
+    });
+
+    await extractNote(pds, { noteId: 'note-1', content: 'Google notes content here', sourceArticle: '' });
+
+    const mentions = pds.listRecords('app.pullread.mention');
+    const extractedMentions = mentions.filter((m: any) => m.value.origin === 'extracted');
+    expect(extractedMentions.length).toBe(1); // article mention preserved
+    expect(extractedMentions[0].value.entityName).toBe('Apple');
+
+    const noteMentions = mentions.filter((m: any) => m.value.origin === 'note');
+    expect(noteMentions.some((m: any) => m.value.entityName === 'Google')).toBe(true);
+    expect(noteMentions.some((m: any) => m.value.entityName === 'Apple')).toBe(false);
     pds.close();
   });
 });

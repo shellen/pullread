@@ -245,6 +245,151 @@ export async function extractFromUrl(
   });
 }
 
+interface NoteInput {
+  noteId: string;
+  content: string;
+  sourceArticle: string;
+}
+
+export async function extractNote(
+  pds: PDS,
+  note: NoteInput,
+): Promise<ExtractionResult | null> {
+  const noteFilename = `note:${note.noteId}`;
+
+  // Clear previous note-origin mentions and edges for this note
+  const existingMentions = pds.listRecords('app.pullread.mention')
+    .filter((m: any) => m.value.origin === 'note' && m.value.filename === noteFilename);
+  for (const m of existingMentions) {
+    pds.deleteRecord('app.pullread.mention', m.rkey);
+  }
+  const existingEdges = pds.listRecords('app.pullread.edge')
+    .filter((e: any) => e.value.origin === 'note' && e.value.sourceFilename === noteFilename);
+  for (const e of existingEdges) {
+    pds.deleteRecord('app.pullread.edge', e.rkey);
+  }
+
+  // Delete previous extraction record for this note
+  const prevExtraction = pds.listRecords('app.pullread.extraction')
+    .filter((ex: any) => ex.value.filename === noteFilename);
+  for (const ex of prevExtraction) {
+    pds.deleteRecord('app.pullread.extraction', ex.rkey);
+  }
+
+  if (!note.content || note.content.trim().length < 10) return null;
+
+  const prompt = `This is the user's own notes. Entities here represent the user's active interests.
+
+Extract structured information from this note as JSON.
+
+STRICT RULES:
+- entities: array of { name, type, sentiment, stance } where:
+  - type MUST be exactly one of: person, company, technology, place, event, concept
+  - sentiment MUST be exactly one of: positive, negative, neutral, mixed
+  - stance: a short phrase (3-6 words) or null
+- relationships: array of { from, to, type } connecting entity names
+- themes: array of short topic strings
+
+Note content:
+
+${note.content.slice(0, 4000)}`;
+
+  const result = await summarizeText(prompt);
+  let parsed: ExtractionResult;
+  try {
+    parsed = JSON.parse(result.summary);
+  } catch {
+    const jsonMatch = result.summary.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonMatch) {
+      try { parsed = JSON.parse(jsonMatch[1]); } catch { return null; }
+    } else { return null; }
+  }
+
+  if (!parsed.entities || !Array.isArray(parsed.entities)) return null;
+  if (!parsed.relationships) parsed.relationships = [];
+  if (!parsed.themes) parsed.themes = [];
+
+  for (const entity of parsed.entities) {
+    entity.type = normalizeEntityType(entity.type);
+  }
+
+  // Create the note entity itself
+  const noteEntityName = `note:${note.noteId}`;
+  const existingNoteEntity = findExistingEntityName(pds, noteEntityName);
+  if (!existingNoteEntity) {
+    pds.putRecord('app.pullread.entity', null, {
+      name: noteEntityName,
+      type: 'note',
+      role: null,
+      source: 'note',
+    });
+  }
+
+  const nameMap = new Map<string, string>();
+
+  for (const entity of parsed.entities) {
+    if (!entity.name || !entity.type) continue;
+    const existingName = findExistingEntityName(pds, entity.name);
+    const canonicalName = existingName || entity.name;
+    nameMap.set(entity.name, canonicalName);
+
+    if (!existingName) {
+      pds.putRecord('app.pullread.entity', null, {
+        name: canonicalName,
+        type: entity.type,
+        role: entity.role || null,
+        source: 'note',
+      });
+    }
+
+    const sentiment = normalizeSentiment(entity.sentiment);
+    pds.putRecord('app.pullread.mention', null, {
+      entityName: canonicalName,
+      filename: noteFilename,
+      title: note.content.slice(0, 60),
+      source: 'note',
+      origin: 'note',
+      sentiment,
+      stance: sentiment === 'neutral' ? null : (entity.stance || null),
+      publishedAt: null,
+    });
+  }
+
+  for (const rel of parsed.relationships) {
+    pds.putRecord('app.pullread.edge', null, {
+      from: nameMap.get(rel.from) || rel.from,
+      to: nameMap.get(rel.to) || rel.to,
+      type: rel.type,
+      origin: 'note',
+      sourceFilename: noteFilename,
+    });
+  }
+
+  // If note has a source article, create edges from note entity to article entities
+  if (note.sourceArticle) {
+    const articleEntities = queryRelatedEntities(pds, note.sourceArticle);
+    for (const ae of articleEntities) {
+      pds.putRecord('app.pullread.edge', null, {
+        from: noteEntityName,
+        to: ae.name,
+        type: 'references',
+        origin: 'note',
+        sourceFilename: noteFilename,
+      });
+    }
+  }
+
+  pds.putRecord('app.pullread.extraction', null, {
+    filename: noteFilename,
+    extractedAt: new Date().toISOString(),
+    entityCount: parsed.entities.length,
+    themes: parsed.themes,
+    source: 'note',
+  });
+
+  return parsed;
+}
+
 // Dynamic require for optional loxodonta-core modules (embeddings, resolver, graph)
 // that pull in native deps like sqlite-vec — only loaded when actually called
 const _loxBase = ['loxodonta-core-monorepo', 'packages', 'loxodonta-core', 'src'].join('/');
