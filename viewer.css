@@ -6798,6 +6798,9 @@
   }
 
   /* ---- Research tab ---- */
+  .research-browser {
+    padding: 0 4px;
+  }
   .research-layout {
     display: grid;
     grid-template-columns: 260px 1fr;
@@ -7183,14 +7186,25 @@
     .research-sidebar {
       max-height: 40vh;
     }
-    .research-graph-panel {
-      min-height: 300px;
-    }
     .research-tensions-cards {
       flex-direction: column;
     }
     .research-tension-card {
       max-width: none;
+    }
+    .research-graph-modal-card {
+      width: 100vw;
+      height: 100vh;
+      border-radius: 0;
+    }
+    .research-graph-modal-body {
+      flex-direction: column;
+    }
+    .research-detail-panel {
+      width: 100%;
+      max-height: 40vh;
+      border-left: none;
+      border-top: 1px solid var(--border);
     }
   }
 
@@ -7244,15 +7258,138 @@
   .research-fact-source:hover {
     color: var(--link);
   }
-  /* Persistent graph panel */
-  .research-graph-panel {
+  /* Full-screen graph modal */
+  .research-graph-modal {
+    z-index: 200;
+  }
+  .research-graph-modal-card {
     position: relative;
-    background: color-mix(in srgb, var(--fg) 3%, var(--bg));
+    width: 95vw;
+    height: 90vh;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.3);
+  }
+  .research-graph-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .research-graph-modal-header h2 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .research-graph-modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 4px 8px;
+    line-height: 1;
+    border-radius: 6px;
+  }
+  .research-graph-modal-close:hover {
+    color: var(--fg);
+    background: color-mix(in srgb, var(--fg) 8%, var(--bg));
+  }
+  .research-graph-btn {
+    font-size: 13px;
+    padding: 6px 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .research-graph-modal-body {
+    display: flex;
+    height: calc(100% - 48px);
+  }
+  .research-graph-canvas-area {
+    flex: 1;
+    position: relative;
+    min-width: 0;
+    overflow: hidden;
   }
   .research-graph-cy {
     width: 100%;
     height: 100%;
-    min-height: 500px;
+  }
+  /* Pinned detail panel */
+  .research-detail-panel {
+    width: 300px;
+    border-left: 1px solid var(--border);
+    background: var(--bg);
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  .research-detail-panel-header {
+    display: flex;
+    justify-content: flex-end;
+    padding: 6px 8px 0;
+  }
+  .research-detail-panel-close {
+    background: none;
+    border: none;
+    font-size: 20px;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 2px 6px;
+    line-height: 1;
+    border-radius: 6px;
+  }
+  .research-detail-panel-close:hover {
+    color: var(--fg);
+    background: color-mix(in srgb, var(--fg) 8%, var(--bg));
+  }
+  .research-detail-panel-content {
+    padding: 0 16px 16px;
+  }
+  .research-detail-panel-content h3 {
+    margin: 0 0 4px;
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .research-detail-section-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin: 16px 0 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+  }
+  .research-detail-mention {
+    padding: 6px 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 30%, transparent);
+  }
+  .research-detail-mention a {
+    color: var(--link);
+    text-decoration: none;
+    font-size: 13px;
+  }
+  .research-detail-mention a:hover { text-decoration: underline; }
+  .research-detail-context {
+    font-size: 12px;
+    color: var(--muted);
+    margin: 4px 0 0;
+    line-height: 1.4;
+  }
+  .research-detail-connection {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 0;
+    cursor: pointer;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 30%, transparent);
+  }
+  .research-detail-connection:hover {
+    background: color-mix(in srgb, var(--fg) 4%, var(--bg));
   }
   .research-graph-legend {
     position: absolute;

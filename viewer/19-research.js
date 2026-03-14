@@ -37,12 +37,12 @@ function showResearch() {
 }
 
 function researchRenderBrowser() {
-  var html = '<div class="article-header"><h1>Research</h1></div>';
+  var html = '<div class="article-header"><h1>Research</h1>';
+  html += '<button class="btn-secondary research-graph-btn" onclick="researchOpenGraphModal()"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-globe"/></svg> View Graph</button>';
+  html += '</div>';
 
-  html += '<div class="research-layout">';
-
-  // Sidebar: search, filters, entities, tensions, watch matches, URL import
-  html += '<div class="research-sidebar">';
+  // Single-column entity browser
+  html += '<div class="research-browser">';
   html += '<div class="research-search-bar">';
   html += '<input type="text" id="research-search" placeholder="Search entities..." oninput="researchSearchEntitiesWithClear()" />';
   html += '<button class="research-search-clear" id="research-search-clear" onclick="researchClearSearch()" style="display:none" title="Clear search">&times;</button>';
@@ -57,32 +57,75 @@ function researchRenderBrowser() {
   html += '</div>';
   html += '</div>';
 
-  // Graph panel with force-graph canvas container
-  html += '<div class="research-graph-panel">';
-  html += '<div class="research-graph-cy" id="research-graph-cy"></div>';
-  html += '<div class="research-graph-legend">';
-  html += '<span><span class="research-graph-legend-line"></span> extracted</span>';
-  html += '<span><span class="research-graph-legend-line" style="height:2.5px;background:#8a6d20;border-radius:1px"></span> your links</span>';
-  html += '<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;border:1.5px solid #8a6d20;background:transparent;vertical-align:middle"></span> note</span>';
-  html += '</div>';
-  html += '<div class="research-graph-overflow" id="research-graph-overflow" style="display:none"></div>';
-  html += '<div class="research-popover" id="research-popover"></div>';
-  html += '</div>';
-
-  html += '</div>'; // .research-layout
-
   var content = document.getElementById('content');
   content.innerHTML = html;
   document.getElementById('content-scroll').scrollTop = 0;
   researchLoadEntities();
   researchLoadTensions();
   researchLoadMatches();
+}
+
+function researchOpenGraphModal() {
+  closeModal();
+  _modalReturnFocus = document.activeElement;
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay research-graph-modal';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Knowledge graph');
+  overlay.onclick = function(e) { if (e.target === overlay) researchCloseGraphModal(); };
+  overlay.innerHTML =
+    '<div class="research-graph-modal-card">' +
+      '<div class="research-graph-modal-header">' +
+        '<h2>Knowledge Graph</h2>' +
+        '<button class="research-graph-modal-close" onclick="researchCloseGraphModal()" title="Close">&times;</button>' +
+      '</div>' +
+      '<div class="research-graph-modal-body">' +
+        '<div class="research-graph-canvas-area">' +
+          '<div class="research-graph-cy" id="research-graph-cy"></div>' +
+          '<div class="research-graph-legend">' +
+            '<span><span class="research-graph-legend-line"></span> extracted</span>' +
+            '<span><span class="research-graph-legend-line" style="height:2.5px;background:#8a6d20;border-radius:1px"></span> your links</span>' +
+            '<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;border:1.5px solid #8a6d20;background:transparent;vertical-align:middle"></span> note</span>' +
+          '</div>' +
+          '<div class="research-graph-overflow" id="research-graph-overflow" style="display:none"></div>' +
+        '</div>' +
+        '<div class="research-detail-panel" id="research-detail-panel" style="display:none">' +
+          '<div class="research-detail-panel-header">' +
+            '<button class="research-detail-panel-close" onclick="researchDismissDetail()" title="Close panel">&times;</button>' +
+          '</div>' +
+          '<div class="research-detail-panel-content" id="research-detail-panel-content"></div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
   researchLoadGraph();
+}
+
+function researchCloseGraphModal() {
+  if (_researchGraph) {
+    _researchGraph._destructor();
+    _researchGraph = null;
+  }
+  _researchGraphData = null;
+  _researchNodeOpacity = {};
+  var overlay = document.querySelector('.research-graph-modal');
+  if (overlay) overlay.remove();
+  if (_modalReturnFocus) { _modalReturnFocus.focus(); _modalReturnFocus = null; }
 }
 
 var _researchGraph = null;
 var _researchGraphData = null; // { nodes: [], links: [] }
 var _researchNodeOpacity = {}; // id -> opacity override
+
+function researchResizeGraph() {
+  if (!_researchGraph) return;
+  var canvasArea = document.querySelector('.research-graph-canvas-area');
+  if (canvasArea) {
+    _researchGraph.width(canvasArea.clientWidth);
+    _researchGraph.height(canvasArea.clientHeight);
+  }
+}
 
 var _researchTypeColors = {
   person: '#3b82f6',
@@ -285,7 +328,7 @@ function _researchRenderGraphInner(graph) {
       researchHighlightSidebarEntity(node.rkey);
     })
     .onBackgroundClick(function() {
-      researchDismissPopover();
+      researchDismissDetail();
     })
     .onNodeHover(function(node) {
       container.style.cursor = node ? 'pointer' : 'default';
@@ -303,37 +346,39 @@ function _researchRenderGraphInner(graph) {
       overflowEl.style.display = 'none';
     }
   }
+
+  // Focus on a pending entity if opened from sidebar
+  if (_researchPendingFocus && _researchGraphData) {
+    var focusName = _researchPendingFocus;
+    _researchPendingFocus = null;
+    setTimeout(function() {
+      researchLoadDetail(null, focusName);
+    }, 500);
+  }
 }
 
 function researchShowPopoverForNode(node) {
-  var popover = document.getElementById('research-popover');
-  if (!popover || !_researchGraph) return;
+  var panel = document.getElementById('research-detail-panel');
+  var content = document.getElementById('research-detail-panel-content');
+  if (!panel || !content || !_researchGraph) return;
 
   var rkey = node.rkey;
   var name = node.id;
   var type = node.type;
 
-  // Build initial popover content
-  var html = '<button class="research-popover-close" onclick="researchDismissPopover()">&times;</button>';
-  html += '<h3>' + escapeHtml(name) + '</h3>';
+  // Build panel content
+  var html = '<h3>' + escapeHtml(name) + '</h3>';
   html += '<span class="research-entity-badge research-type-' + escapeHtml(type) + '">' + escapeHtml(type) + '</span>';
-  html += '<div id="research-popover-brief" class="research-brief" style="margin:8px 0 0"></div>';
-  html += '<div id="research-popover-mentions"></div>';
-  popover.innerHTML = html;
+  html += '<div id="research-detail-brief" class="research-brief" style="margin:12px 0 0"></div>';
+  html += '<div id="research-detail-mentions"></div>';
+  html += '<div id="research-detail-connections"></div>';
+  content.innerHTML = html;
+  panel.style.display = '';
 
-  // Position near node using screen coordinates
-  var pos = _researchGraph.graph2ScreenCoords(node.x, node.y);
-  var graphPanel = document.querySelector('.research-graph-panel');
-  var panelRect = graphPanel ? graphPanel.getBoundingClientRect() : { left: 0, top: 0, width: 800, height: 600 };
-  var popLeft = pos.x + 20;
-  var popTop = pos.y - 20;
-  // Keep within panel bounds
-  if (popLeft + 240 > panelRect.width) popLeft = pos.x - 260;
-  if (popTop + 200 > panelRect.height) popTop = panelRect.height - 210;
-  if (popTop < 10) popTop = 10;
-  popover.style.left = popLeft + 'px';
-  popover.style.top = popTop + 'px';
-  popover.style.display = 'block';
+  // Resize graph to account for panel
+  if (_researchGraph) {
+    setTimeout(function() { researchResizeGraph(); }, 50);
+  }
 
   // Highlight selected node + neighbors, fade others
   var neighborIds = {};
@@ -354,11 +399,11 @@ function researchShowPopoverForNode(node) {
     return neighborIds[srcId] && neighborIds[tgtId];
   });
 
-  // Load brief via direct fetch
+  // Load brief
   fetch('/api/research/brief/' + encodeURIComponent(name))
     .then(function(r) { return r.json(); })
     .then(function(brief) {
-      var el = document.getElementById('research-popover-brief');
+      var el = document.getElementById('research-detail-brief');
       if (!el || !brief.summary) return;
       el.innerHTML = '<p class="research-brief-text">' + escapeHtml(brief.summary) + '</p>';
     })
@@ -368,39 +413,75 @@ function researchShowPopoverForNode(node) {
   fetch('/api/research/entity/' + rkey)
     .then(function(r) { return r.json(); })
     .then(function(profile) {
-      var mentionsEl = document.getElementById('research-popover-mentions');
-      if (!mentionsEl || !profile.mentions || profile.mentions.length === 0) return;
-      var mHtml = '<div class="research-popover-section-title">Mentions</div>';
-      var limit = Math.min(profile.mentions.length, 3);
-      for (var i = 0; i < limit; i++) {
-        var m = profile.mentions[i];
-        var sentiment = m.value.sentiment || 'neutral';
-        var dot = sentiment === 'positive' ? 'research-sentiment-positive'
-          : sentiment === 'negative' ? 'research-sentiment-negative'
-          : sentiment === 'mixed' ? 'research-sentiment-mixed'
-          : 'research-sentiment-neutral';
-        mHtml += '<div class="research-popover-mention">';
-        mHtml += '<span class="research-sentiment-dot ' + dot + '"></span>';
-        mHtml += '<a href="#" onclick="loadFileByName(\'' + escapeJsStr(m.value.filename) + '\');return false">' + escapeHtml(m.value.title) + '</a>';
-        mHtml += '</div>';
+      // Mentions section
+      var mentionsEl = document.getElementById('research-detail-mentions');
+      if (mentionsEl && profile.mentions && profile.mentions.length > 0) {
+        var mHtml = '<div class="research-detail-section-title">Mentions</div>';
+        for (var i = 0; i < profile.mentions.length; i++) {
+          var m = profile.mentions[i];
+          var sentiment = m.value.sentiment || 'neutral';
+          var dot = sentiment === 'positive' ? 'research-sentiment-positive'
+            : sentiment === 'negative' ? 'research-sentiment-negative'
+            : sentiment === 'mixed' ? 'research-sentiment-mixed'
+            : 'research-sentiment-neutral';
+          mHtml += '<div class="research-detail-mention">';
+          mHtml += '<span class="research-sentiment-dot ' + dot + '"></span>';
+          mHtml += '<a href="#" onclick="researchCloseGraphModal();loadFileByName(\'' + escapeJsStr(m.value.filename) + '\');return false">' + escapeHtml(m.value.title) + '</a>';
+          if (m.value.context) mHtml += '<p class="research-detail-context">' + escapeHtml(m.value.context) + '</p>';
+          mHtml += '</div>';
+        }
+        mentionsEl.innerHTML = mHtml;
       }
-      if (profile.mentions.length > 3) {
-        mHtml += '<a class="research-popover-viewall" href="#" onclick="researchSearchFor(\'' + escapeJsStr(name) + '\');return false">View all ' + profile.mentions.length + ' mentions</a>';
+
+      // Connections section from neighbors
+      var connectionsEl = document.getElementById('research-detail-connections');
+      if (connectionsEl && node.neighbors && node.neighbors.length > 0) {
+        var cHtml = '<div class="research-detail-section-title">Connections</div>';
+        for (var i = 0; i < node.neighbors.length; i++) {
+          var nb = node.neighbors[i];
+          cHtml += '<div class="research-detail-connection" onclick="researchFocusGraphNode(\'' + escapeJsStr(nb.id) + '\')">';
+          cHtml += '<span class="research-entity-name">' + escapeHtml(nb.id) + '</span>';
+          cHtml += '<span class="research-entity-badge research-type-' + escapeHtml(nb.type) + '">' + escapeHtml(nb.type) + '</span>';
+          cHtml += '</div>';
+        }
+        connectionsEl.innerHTML = cHtml;
       }
-      mentionsEl.innerHTML = mHtml;
     })
     .catch(function() {});
 }
 
-function researchDismissPopover() {
-  var popover = document.getElementById('research-popover');
-  if (popover) popover.style.display = 'none';
+function researchFocusGraphNode(name) {
+  if (!_researchGraph || !_researchGraphData) return;
+  var found = null;
+  for (var i = 0; i < _researchGraphData.nodes.length; i++) {
+    if (_researchGraphData.nodes[i].id === name) { found = _researchGraphData.nodes[i]; break; }
+  }
+  if (found) {
+    _researchGraph.centerAt(found.x, found.y, 300);
+    _researchGraph.zoom(2, 300);
+    setTimeout(function() { researchShowPopoverForNode(found); }, 350);
+  }
+}
+
+function researchDismissDetail() {
+  var panel = document.getElementById('research-detail-panel');
+  if (panel) panel.style.display = 'none';
   _researchNodeOpacity = {};
-  if (_researchGraph) _researchGraph.linkVisibility(true);
+  if (_researchGraph) {
+    _researchGraph.linkVisibility(true);
+    setTimeout(function() { researchResizeGraph(); }, 50);
+  }
 }
 
 document.addEventListener('keydown', function(ev) {
-  if (ev.key === 'Escape') researchDismissPopover();
+  if (ev.key === 'Escape') {
+    var panel = document.getElementById('research-detail-panel');
+    if (panel && panel.style.display !== 'none') {
+      researchDismissDetail();
+    } else if (document.querySelector('.research-graph-modal')) {
+      researchCloseGraphModal();
+    }
+  }
 });
 
 function researchShowEmptyState(status) {
@@ -577,8 +658,17 @@ function researchRenderEntityList(entities) {
   container.innerHTML = html;
 }
 
+var _researchPendingFocus = null;
+
 function researchLoadDetail(rkey, name) {
-  researchHighlightSidebarEntity(rkey);
+  if (rkey) researchHighlightSidebarEntity(rkey);
+
+  // Open graph modal if not already open, then center on node
+  if (!document.querySelector('.research-graph-modal')) {
+    _researchPendingFocus = name;
+    researchOpenGraphModal();
+    return;
+  }
 
   // Center graph on entity node and show popover
   if (_researchGraph && _researchGraphData && name) {
