@@ -155,15 +155,17 @@ export function htmlToMarkdown(html: string, baseUrl: string): string {
 }
 
 export function stripEmbedNoise(markdown: string): string {
-  // Remove lines containing raw <iframe as visible text
-  markdown = markdown.replace(/^.*<\s*iframe\b[^]*?(?:>|$).*$/gm, '');
+  // Remove lines containing raw <iframe as visible text (including Turndown-mangled
+  // bold/backtick variants like **`**<**iframe ...`**)
+  markdown = markdown.replace(/^.*(?:<\s*iframe\b|<\*\*iframe\b)[^]*?(?:>|$).*$/gm, '');
 
-  // Remove "Embed" followed by iframe-like code on subsequent lines
-  markdown = markdown.replace(/^#+\s*Embed\s*\n(?:.*<\s*iframe\b.*\n?)*/gm, '');
+  // Remove "Embed" bullet/heading lines (with or without trailing iframe junk)
+  markdown = markdown.replace(/^\*\s+\*?\*?Embed\*?\*?.*$/gm, '');
+  markdown = markdown.replace(/^#+\s*Embed\s*\n(?:.*(?:<\s*iframe|<\*\*iframe).*\n?)*/gm, '');
 
-  // Remove standalone "Download" and "Transcript" list items from player UI
-  // (only when they appear as bare bullets with no meaningful content after)
-  markdown = markdown.replace(/^\*\s+\*?\*?Download\*?\*?\s*$/gm, '');
+  // Remove Download/Transcript list items from player UI
+  // (bare bullets or bullets containing only a download link)
+  markdown = markdown.replace(/^\*\s+(?:\[?\*?\*?Download\*?\*?\]?\(.*?\)|\*?\*?Download\*?\*?)\s*$/gm, '');
 
   // Fix broken Instagram embed blockquotes: Turndown produces multi-line
   // links from <blockquote class="instagram-media"> where [text](url) spans lines.
