@@ -163,6 +163,14 @@ impl SidecarState {
             .to_string()
     }
 
+    /// Get email roundup config from settings.json
+    pub fn get_email_config_raw(&self) -> Option<serde_json::Value> {
+        let path = self.config_dir.join("settings.json");
+        let content = std::fs::read_to_string(&path).ok()?;
+        let config: serde_json::Value = serde_json::from_str(&content).ok()?;
+        config.get("emailRoundup").cloned()
+    }
+
     /// Check if viewer should open in the default browser instead of the WebView
     pub fn should_open_in_browser(&self) -> bool {
         let path = self.config_dir.join("settings.json");

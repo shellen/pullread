@@ -1,13 +1,14 @@
-// ABOUTME: Scheduled sync and review timers
+// ABOUTME: Scheduled sync, review, and email roundup timers
 // ABOUTME: Reads intervals from config and runs periodic operations
 
-use crate::{notifications, sidecar, tray};
+use crate::{email, notifications, sidecar, tray};
 use tauri::{AppHandle, Manager};
 
-/// Start sync and review timers based on user configuration
+/// Start sync, review, and email roundup timers based on user configuration
 pub fn start_timers(app: &AppHandle) {
     start_sync_timer(app);
     start_review_timer(app);
+    start_email_timer(app);
 }
 
 /// Start the periodic sync timer
@@ -85,6 +86,69 @@ fn start_review_timer(app: &AppHandle) {
             }
         }
     });
+}
+
+/// Start the email roundup timer — sends at a specific time of day
+fn start_email_timer(app: &AppHandle) {
+    let config = email::load_email_config(app);
+    if !config.enabled || config.smtp_host.is_empty() || config.to_address.is_empty() {
+        return;
+    }
+
+    let send_time = config.send_time.clone();
+    log::info!("Starting email roundup timer: daily at {}", send_time);
+
+    let handle = app.clone();
+    tauri::async_runtime::spawn(async move {
+        loop {
+            // Calculate duration until next send time
+            let wait = duration_until_time(&send_time);
+            log::info!(
+                "Email roundup: next send in {} minutes",
+                wait.as_secs() / 60
+            );
+
+            tokio::time::sleep(wait).await;
+
+            log::info!("Scheduled email roundup triggered");
+            match email::send_roundup(&handle).await {
+                Ok(summary) => {
+                    log::info!("Email roundup sent: {}", summary);
+                    notifications::notify(&handle, "Roundup Sent", &summary);
+                }
+                Err(e) => {
+                    log::error!("Email roundup failed: {}", e);
+                }
+            }
+
+            // Sleep a bit to avoid firing twice in the same minute
+            tokio::time::sleep(std::time::Duration::from_secs(61)).await;
+        }
+    });
+}
+
+/// Calculate how long to wait until a given HH:MM time today (or tomorrow if past)
+fn duration_until_time(time_str: &str) -> std::time::Duration {
+    let parts: Vec<&str> = time_str.split(':').collect();
+    let target_hour: u32 = parts.first().and_then(|h| h.parse().ok()).unwrap_or(8);
+    let target_min: u32 = parts.get(1).and_then(|m| m.parse().ok()).unwrap_or(0);
+
+    let now = chrono::Local::now();
+    let today_target = now
+        .date_naive()
+        .and_hms_opt(target_hour, target_min, 0)
+        .unwrap_or_else(|| now.naive_local());
+
+    let target = if today_target > now.naive_local() {
+        today_target
+    } else {
+        // Already past today's time, schedule for tomorrow
+        today_target + chrono::Duration::days(1)
+    };
+
+    let diff = target - now.naive_local();
+    diff.to_std()
+        .unwrap_or(std::time::Duration::from_secs(3600))
 }
 
 /// Parse interval strings like "30m", "1h", "4h", "90m" into a Duration.
