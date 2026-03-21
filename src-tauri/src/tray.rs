@@ -54,7 +54,7 @@ pub fn create_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         .icon_as_template(true)
         .tooltip("Pull Read")
         .menu(&menu)
-        .show_menu_on_left_click(true)
+        .show_menu_on_left_click(false)
         .on_menu_event(|app, event| {
             let id = event.id().as_ref();
             let handle = app.clone();
@@ -94,7 +94,10 @@ pub fn create_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                 ..
             } = event
             {
-                let _ = tray;
+                let handle = tray.app_handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    let _ = commands::open_viewer_inner(&handle).await;
+                });
             }
         })
         .build(app)?;

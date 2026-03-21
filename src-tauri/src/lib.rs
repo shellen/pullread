@@ -32,9 +32,9 @@ pub fn run() {
         ))
         .manage(SidecarState::new())
         .setup(|app| {
-            // Menu-bar-only: hide dock icon on macOS
+            // Show dock icon so notification clicks and dock clicks open the viewer
             #[cfg(target_os = "macos")]
-            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            app.set_activation_policy(tauri::ActivationPolicy::Regular);
 
             // Build system tray
             tray::create_tray(app)?;
@@ -106,6 +106,15 @@ pub fn run() {
             tauri::RunEvent::Exit => {
                 let state = app_handle.state::<SidecarState>();
                 state.stop_all();
+            }
+            #[cfg(target_os = "macos")]
+            tauri::RunEvent::Reopen { has_visible_windows, .. } => {
+                if !has_visible_windows {
+                    let handle = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let _ = commands::open_viewer_inner(&handle).await;
+                    });
+                }
             }
             _ => {}
         });

@@ -66,28 +66,11 @@ pub async fn open_viewer_at(app: &AppHandle, hash: Option<&str>) -> Result<(), S
         .min_inner_size(600.0, 400.0)
         .build()
         .map_err(|e| format!("Failed to create viewer window: {}", e))?;
-
-        // Show in dock when viewer is open
-        #[cfg(target_os = "macos")]
-        let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
     }
 
     Ok(())
 }
 
-/// Handle the viewer window being closed — hide dock icon again
-#[allow(dead_code)]
-pub fn on_viewer_closed(app: &AppHandle) {
-    #[cfg(target_os = "macos")]
-    {
-        // Only hide dock icon if no other windows are open
-        let windows: Vec<_> = app.webview_windows().into_keys().collect();
-        if windows.is_empty() {
-            let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-        }
-    }
-    let _ = app;
-}
 
 /// Tauri command: open the viewer
 #[tauri::command]
