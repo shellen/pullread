@@ -1,7 +1,7 @@
 // ABOUTME: Tests for markdown file generation and filesystem write guard
 // ABOUTME: Verifies filename slugification, frontmatter, enclosure formatting, and path restrictions
 
-import { generateFilename, generateMarkdown, fileSubpath, resolveFilePath, listMarkdownFiles, listEpubFiles, writeArticle, migrateToDateFolders, exportNotebook, assertWritablePath, setOutputPath, resetWriteGuard, needsRepair, markRepairAttempted } from './writer';
+import { generateFilename, generateMarkdown, fileSubpath, resolveFilePath, listMarkdownFiles, listEpubFiles, writeArticle, migrateToDateFolders, exportNotebook, assertWritablePath, setOutputPath, resetWriteGuard, needsRepair, markRepairAttempted, markShortExtractedArticles } from './writer';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'fs';
 import { join, resolve, sep } from 'path';
 import { homedir } from 'os';
@@ -737,6 +737,98 @@ Content.`);
     const updated = readFileSync(filePath, 'utf-8');
     const matches = updated.match(/repairAttempted/g);
     expect(matches).toHaveLength(1);
+  });
+});
+
+describe('markShortExtractedArticles', () => {
+  beforeEach(() => {
+    cleanTestDir();
+    mkdirSync(TEST_DIR, { recursive: true });
+    setOutputPath(TEST_DIR);
+  });
+  afterAll(cleanTestDir);
+
+  test('marks short extracted articles as repairAttempted', () => {
+    // Short extracted article — should be marked
+    writeFileSync(join(TEST_DIR, 'short-extracted.md'), `---
+title: "Short"
+url: https://example.com/short
+domain: example.com
+source: extracted
+---
+Brief.`);
+
+    // Short feed article — should NOT be marked
+    writeFileSync(join(TEST_DIR, 'short-feed.md'), `---
+title: "Feed Article"
+url: https://example.com/feed
+domain: example.com
+source: feed
+---
+Brief.`);
+
+    // Long extracted article — should NOT be marked
+    const longBody = 'x'.repeat(250);
+    writeFileSync(join(TEST_DIR, 'long-extracted.md'), `---
+title: "Long"
+url: https://example.com/long
+domain: example.com
+source: extracted
+---
+${longBody}`);
+
+    // Already marked — should NOT be double-marked
+    writeFileSync(join(TEST_DIR, 'already-marked.md'), `---
+title: "Already"
+url: https://example.com/already
+domain: example.com
+source: extracted
+repairAttempted: true
+---
+Brief.`);
+
+    const count = markShortExtractedArticles(TEST_DIR);
+    expect(count).toBe(1);
+
+    const shortContent = readFileSync(join(TEST_DIR, 'short-extracted.md'), 'utf-8');
+    expect(shortContent).toContain('repairAttempted: true');
+
+    const feedContent = readFileSync(join(TEST_DIR, 'short-feed.md'), 'utf-8');
+    expect(feedContent).not.toContain('repairAttempted');
+
+    const longContent = readFileSync(join(TEST_DIR, 'long-extracted.md'), 'utf-8');
+    expect(longContent).not.toContain('repairAttempted');
+
+    const alreadyContent = readFileSync(join(TEST_DIR, 'already-marked.md'), 'utf-8');
+    const matches = alreadyContent.match(/repairAttempted/g);
+    expect(matches).toHaveLength(1);
+  });
+
+  test('returns 0 when no articles need marking', () => {
+    writeFileSync(join(TEST_DIR, 'good.md'), `---
+title: "Good"
+url: https://example.com
+source: extracted
+---
+${'x'.repeat(250)}`);
+    expect(markShortExtractedArticles(TEST_DIR)).toBe(0);
+  });
+
+  test('handles nested date folders', () => {
+    const subdir = join(TEST_DIR, '2025', '03');
+    mkdirSync(subdir, { recursive: true });
+    writeFileSync(join(subdir, 'short-nested.md'), `---
+title: "Nested"
+url: https://example.com/nested
+source: extracted
+---
+Brief.`);
+
+    const count = markShortExtractedArticles(TEST_DIR);
+    expect(count).toBe(1);
+
+    const content = readFileSync(join(subdir, 'short-nested.md'), 'utf-8');
+    expect(content).toContain('repairAttempted: true');
   });
 });
 

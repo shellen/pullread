@@ -460,6 +460,20 @@ export function needsRepair(content: string): boolean {
   return body.trim().length < 200;
 }
 
+/** Batch-mark all short extracted articles as repairAttempted so the repair loop skips them. */
+export function markShortExtractedArticles(outputPath: string): number {
+  const files = listMarkdownFiles(outputPath);
+  let marked = 0;
+  for (const filePath of files) {
+    const content = readFileSync(filePath, 'utf-8');
+    if (content.includes('repairAttempted:')) continue;
+    if (!needsRepair(content)) continue;
+    markRepairAttempted(filePath);
+    marked++;
+  }
+  return marked;
+}
+
 /** Add repairAttempted: true to an article's YAML frontmatter. */
 export function markRepairAttempted(filePath: string): void {
   assertWritablePath(filePath);

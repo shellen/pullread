@@ -12,7 +12,7 @@ import { autotagText, autotagBatch, saveMachineTags, hasMachineTags, migrateDash
 import { initAnnotations, loadAnnotation, saveAnnotation, allHighlights, allNotes, migrateMonolithicFiles } from './annotations';
 import { APP_ICON } from './app-icon';
 import { fetchAndExtract } from './extractor';
-import { generateMarkdown, writeArticle, ArticleData, downloadFavicon, resolveFilePath, listMarkdownFiles, listEpubFiles, migrateToDateFolders, exportNotebook, removeExportedNotebook, assertWritablePath, setOutputPath } from './writer';
+import { generateMarkdown, writeArticle, ArticleData, downloadFavicon, resolveFilePath, listMarkdownFiles, listEpubFiles, migrateToDateFolders, markShortExtractedArticles, exportNotebook, removeExportedNotebook, assertWritablePath, setOutputPath } from './writer';
 import { loadTTSConfig, saveTTSConfig, generateSpeech, getAudioContentType, getCachedAudioPath, createTtsSession, generateSessionChunk, TTS_VOICES, TTS_MODELS } from './tts';
 import { deleteFromKeychain } from './keychain';
 import { listSiteLogins, removeSiteLogin, saveSiteLoginCookies } from './cookies';
@@ -805,6 +805,12 @@ export function startViewer(initialOutputPath: string, port = 7777, openBrowser 
   const migrated = migrateToDateFolders(outputPath);
   if (migrated > 0) {
     console.log(`[Storage] Migrated ${migrated} articles to dated folders`);
+  }
+
+  // Mark accumulated short extracted articles so the repair loop skips them
+  const bulkMarked = markShortExtractedArticles(outputPath);
+  if (bulkMarked > 0) {
+    console.log(`[Storage] Marked ${bulkMarked} short articles as repair-attempted`);
   }
 
   // Migrate monolithic highlights.json + notes.json to per-article .annot.json sidecars

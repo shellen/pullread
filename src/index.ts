@@ -6,7 +6,7 @@ import { join, basename, dirname } from 'path';
 import { homedir } from 'os';
 import { fetchFeed, FeedEntry } from './feed';
 import { fetchAndExtract, FetchOptions, shouldSkipUrl, isBinaryUrl, classifyFetchError, htmlToMarkdown } from './extractor';
-import { writeArticle, listMarkdownFiles, resolveFilePath, setOutputPath, needsRepair, markRepairAttempted } from './writer';
+import { writeArticle, listMarkdownFiles, resolveFilePath, setOutputPath, needsRepair, markRepairAttempted, markShortExtractedArticles } from './writer';
 import { Storage } from './storage';
 import { startViewer, reprocessFile, parseFrontmatter } from './viewer';
 import { summarizeText, loadLLMConfig } from './summarizer';
@@ -476,13 +476,23 @@ async function sync(feedFilter?: string, retryFailed = false): Promise<void> {
       } catch {}
     }
 
+    // Mark accumulated short extracted articles so the repair loop skips them
+    const bulkMarked = markShortExtractedArticles(config.outputPath);
+    if (bulkMarked > 0) console.log(`  Marked ${bulkMarked} short articles as repair-attempted`);
+
     // Post-sync repair: re-extract articles with suspiciously short content
     const MAX_REPAIRS_PER_SYNC = 10;
+    const REPAIR_TIME_BUDGET_MS = 120_000; // 2 minutes max for repairs
+    const repairStart = Date.now();
     const allArticles = listMarkdownFiles(config.outputPath);
     let repaired = 0;
     let repairAttempts = 0;
     for (const filePath of allArticles) {
       if (repairAttempts >= MAX_REPAIRS_PER_SYNC) break;
+      if (Date.now() - repairStart > REPAIR_TIME_BUDGET_MS) {
+        console.log(`  Repair time budget exceeded (${Math.round(REPAIR_TIME_BUDGET_MS / 1000)}s), stopping`);
+        break;
+      }
       const fileContent = readFileSync(filePath, 'utf-8');
       if (!needsRepair(fileContent)) continue;
       repairAttempts++;
