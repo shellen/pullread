@@ -74,6 +74,42 @@ describe('extractArticle', () => {
     pds.close();
   });
 
+  test('parses JSON wrapped in markdown fences', async () => {
+    const pds = createResearchPDS(':memory:');
+    mockSummarize.mockResolvedValue({
+      summary: '```json\n' + JSON.stringify({
+        entities: [{ name: 'Fenced', type: 'company' }],
+        relationships: [],
+        themes: [],
+      }) + '\n```',
+      model: 'test',
+    });
+
+    const result = await extractArticle(pds, {
+      filename: 'fenced.md', title: 'Fenced', body: 'x',
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.entities[0].name).toBe('Fenced');
+    pds.close();
+  });
+
+  test('logs warning and returns null on malformed JSON', async () => {
+    const pds = createResearchPDS(':memory:');
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockSummarize.mockResolvedValue({ summary: 'not json at all', model: 'test' });
+
+    const result = await extractArticle(pds, {
+      filename: 'bad.md', title: 'Bad', body: 'x',
+    });
+
+    expect(result).toBeNull();
+    expect(warnSpy).toHaveBeenCalled();
+    expect(warnSpy.mock.calls[0][0]).toMatch(/research.*parse/i);
+    warnSpy.mockRestore();
+    pds.close();
+  });
+
   test('deduplicates entities across multiple articles', async () => {
     const pds = createResearchPDS(':memory:');
     mockSummarize.mockResolvedValue({

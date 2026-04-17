@@ -355,23 +355,24 @@ Articles:
 `;
 
 export async function generateRoundupSummary(articles: ArticleMeta[]): Promise<string | null> {
+  const { summarizeText, loadLLMConfig } = await import('./summarizer');
+  const config = loadLLMConfig();
+  if (!config) return null;
+
+  const articleList = articles
+    .slice(0, 15)
+    .map(a => {
+      const excerpt = a.excerpt ? ` — ${a.excerpt.slice(0, 100)}` : '';
+      return `- ${a.title} (${a.domain || a.feed || ''})${excerpt}`;
+    })
+    .join('\n');
+
+  const prompt = ROUNDUP_SUMMARY_PROMPT + articleList;
   try {
-    const { summarizeText, loadLLMConfig } = await import('./summarizer');
-    const config = loadLLMConfig();
-    if (!config) return null;
-
-    const articleList = articles
-      .slice(0, 15)
-      .map(a => {
-        const excerpt = a.excerpt ? ` — ${a.excerpt.slice(0, 100)}` : '';
-        return `- ${a.title} (${a.domain || a.feed || ''})${excerpt}`;
-      })
-      .join('\n');
-
-    const prompt = ROUNDUP_SUMMARY_PROMPT + articleList;
     const result = await summarizeText(prompt, config);
     return result.summary;
-  } catch {
+  } catch (err) {
+    console.warn('[email] Failed to generate roundup summary:', err instanceof Error ? err.message : err);
     return null;
   }
 }

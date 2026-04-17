@@ -120,6 +120,19 @@ interface ExtractionResult {
   themes: string[];
 }
 
+function parseExtractionJson(text: string, context: string): ExtractionResult | null {
+  try {
+    return JSON.parse(text);
+  } catch {
+    const match = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (match) {
+      try { return JSON.parse(match[1]); } catch {}
+    }
+    console.warn(`[research] Failed to parse JSON from LLM (${context}):`, text.slice(0, 200));
+    return null;
+  }
+}
+
 export async function extractArticle(
   pds: PDS,
   article: ArticleInput,
@@ -152,23 +165,8 @@ Document title: ${article.title}
 ${article.body.slice(0, 8000)}`;
 
   const result = await summarizeText(prompt);
-  let parsed: ExtractionResult;
-  try {
-    parsed = JSON.parse(result.summary);
-  } catch {
-    const jsonMatch = result.summary.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (jsonMatch) {
-      try {
-        parsed = JSON.parse(jsonMatch[1]);
-      } catch {
-        return null;
-      }
-    } else {
-      return null;
-    }
-  }
-
-  if (!parsed.entities || !Array.isArray(parsed.entities)) return null;
+  const parsed = parseExtractionJson(result.summary, `article:${article.filename}`);
+  if (!parsed || !parsed.entities || !Array.isArray(parsed.entities)) return null;
   if (!parsed.relationships) parsed.relationships = [];
   if (!parsed.themes) parsed.themes = [];
 
@@ -295,17 +293,8 @@ Note content:
 ${note.content.slice(0, 4000)}`;
 
   const result = await summarizeText(prompt);
-  let parsed: ExtractionResult;
-  try {
-    parsed = JSON.parse(result.summary);
-  } catch {
-    const jsonMatch = result.summary.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (jsonMatch) {
-      try { parsed = JSON.parse(jsonMatch[1]); } catch { return null; }
-    } else { return null; }
-  }
-
-  if (!parsed.entities || !Array.isArray(parsed.entities)) return null;
+  const parsed = parseExtractionJson(result.summary, `note:${note.noteId}`);
+  if (!parsed || !parsed.entities || !Array.isArray(parsed.entities)) return null;
   if (!parsed.relationships) parsed.relationships = [];
   if (!parsed.themes) parsed.themes = [];
 
