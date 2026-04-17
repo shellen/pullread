@@ -37,7 +37,7 @@ function loadModelsConfig(): Record<string, { models: string[]; default: string 
   } catch {
     // Fallback if models.json is missing (e.g. standalone binary)
     return {
-      anthropic: { models: ['claude-haiku-4-5-20251001', 'claude-sonnet-4-5-20250929', 'claude-opus-4-6'], default: 'claude-haiku-4-5-20251001' },
+      anthropic: { models: ['claude-haiku-4-5-20251001', 'claude-sonnet-4-5-20250929', 'claude-sonnet-4-6', 'claude-opus-4-6', 'claude-opus-4-7'], default: 'claude-haiku-4-5-20251001' },
       openai: { models: ['gpt-5-nano', 'gpt-5-mini', 'gpt-5', 'o3-mini'], default: 'gpt-5-nano' },
       gemini: { models: ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro'], default: 'gemini-2.5-flash-lite' },
       openrouter: { models: ['anthropic/claude-haiku-4.5', 'google/gemini-2.5-flash', 'anthropic/claude-sonnet-4.5'], default: 'anthropic/claude-haiku-4.5' },
