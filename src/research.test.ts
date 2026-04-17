@@ -994,6 +994,41 @@ describe('extractNote', () => {
     pds.close();
   });
 
+  test('serializes concurrent extractNote calls for the same noteId', async () => {
+    const pds = createResearchPDS(':memory:');
+    let resolveFirst: (v: any) => void;
+    const firstPromise = new Promise<any>((res) => { resolveFirst = res; });
+
+    mockSummarize.mockImplementationOnce(() => firstPromise);
+    mockSummarize.mockResolvedValueOnce({
+      summary: JSON.stringify({
+        entities: [{ name: 'Second', type: 'concept' }],
+        relationships: [], themes: [],
+      }),
+      model: 'test',
+    });
+
+    const p1 = extractNote(pds, { noteId: 'race', content: 'first call content', sourceArticle: '' });
+    const p2 = extractNote(pds, { noteId: 'race', content: 'second call content', sourceArticle: '' });
+
+    resolveFirst!({
+      summary: JSON.stringify({
+        entities: [{ name: 'First', type: 'concept' }],
+        relationships: [], themes: [],
+      }),
+      model: 'test',
+    });
+
+    await Promise.all([p1, p2]);
+
+    const noteMentions = pds.listRecords('app.pullread.mention')
+      .filter((m: any) => m.value.origin === 'note');
+    const names = new Set(noteMentions.map((m: any) => m.value.entityName));
+    expect(names.size).toBe(1);
+    expect(names.has('Second')).toBe(true);
+    pds.close();
+  });
+
   test('re-extraction clears only this note origin mentions and edges', async () => {
     const pds = createResearchPDS(':memory:');
     mockSummarize.mockResolvedValue({

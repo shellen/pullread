@@ -249,7 +249,28 @@ interface NoteInput {
   sourceArticle: string;
 }
 
+const noteExtractLocks = new Map<string, Promise<ExtractionResult | null>>();
+
 export async function extractNote(
+  pds: PDS,
+  note: NoteInput,
+): Promise<ExtractionResult | null> {
+  const prior = noteExtractLocks.get(note.noteId);
+  const mine = (async () => {
+    if (prior) await prior.catch(() => {});
+    return doExtractNote(pds, note);
+  })();
+  noteExtractLocks.set(note.noteId, mine);
+  try {
+    return await mine;
+  } finally {
+    if (noteExtractLocks.get(note.noteId) === mine) {
+      noteExtractLocks.delete(note.noteId);
+    }
+  }
+}
+
+async function doExtractNote(
   pds: PDS,
   note: NoteInput,
 ): Promise<ExtractionResult | null> {
