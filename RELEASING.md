@@ -166,13 +166,83 @@ The CLI binary (`pullread-cli`) is signed with `src-tauri/entitlements.plist` wh
 
 ## Recovering from a Failed Release
 
+The pipeline can fail at four points. Your response depends on whether users have seen the release yet.
+
+### Triage
+
 ```bash
-# Fix the issue on a branch, merge to main, then:
-gh release delete vX.Y.Z --yes          # delete the broken release
-git push --delete origin vX.Y.Z         # delete the remote tag
-git tag -d vX.Y.Z                       # delete the local tag
-git tag vX.Y.Z && git push origin vX.Y.Z  # re-tag and push
+gh release view vX.Y.Z                    # check artifacts + draft/prerelease flags
+gh run list --limit 10                    # find the failing workflow run
+gh run view <run-id> --log-failed         # read the error
 ```
+
+If `gh release view` shows `isDraft: true`, users have seen nothing yet — safe to delete. If the release is published (non-draft) and non-prerelease, assume users may have auto-updated.
+
+### Case 1 — Release is still a draft (build or sign step failed)
+
+Nobody's seen it. Delete and retry.
+
+```bash
+gh release delete vX.Y.Z --yes
+git push --delete origin vX.Y.Z
+git tag -d vX.Y.Z
+# Fix the problem on a branch, merge to main, then re-tag:
+git tag vX.Y.Z && git push origin vX.Y.Z
+```
+
+### Case 2 — Release published but `latest.json` broken
+
+Auto-updater can't validate the update, so users won't actually receive it. Same fix as Case 1.
+
+```bash
+gh release delete vX.Y.Z --yes
+git push --delete origin vX.Y.Z
+git tag -d vX.Y.Z
+# Fix whatever broke publish-updater, then re-tag.
+```
+
+### Case 3 — Catastrophic: bug reaches users
+
+A published release is shipping broken behavior and users may have auto-updated. **Do not delete the tag** — the auto-updater treats tags as immutable and users need a path forward. Roll forward with a patch release.
+
+```bash
+# 1. Demote the broken release so the homepage stops pointing at it.
+gh release edit vX.Y.Z --prerelease=true
+
+# 2. Revert the problem commits (or craft a fix) on main.
+git checkout main && git pull
+git revert <commit-sha>           # or a targeted fix commit
+git push
+
+# 3. Bump and ship a patch release.
+bun scripts/bump-version.ts X.Y.(Z+1)
+# Add a short note to site/releases.html describing the fix.
+git add -A && git commit -m "Bump version to X.Y.(Z+1)"
+git push
+git tag vX.Y.(Z+1) && git push origin vX.Y.(Z+1)
+```
+
+Users on the broken version will be prompted to update within ~24 hours (Tauri updater check interval). If the problem is severe enough that waiting isn't acceptable, coordinate a notice on pullread.com and in the Feedback modal.
+
+### Case 4 — Rolling `latest` build is serving a bad DMG
+
+The homepage download button pulls from `releases/download/latest/PullRead.dmg`. If `main` broke and CI published a bad rolling build, the homepage is actively handing out a broken binary.
+
+```bash
+# Fastest path: overwrite latest with a known-good DMG from the previous release.
+mkdir -p /tmp/rollback && cd /tmp/rollback
+gh release download vX.Y.(Z-1) -p "PullRead*.dmg"
+gh release upload latest PullRead.dmg PullRead_Intel.dmg --clobber
+
+# Then fix main so the next CI run restores a healthy rolling build.
+```
+
+### What not to do
+
+- **Do not delete a tag users have already received.** The Tauri updater keyed off that version; deleting it causes "no update available" confusion and orphans users on the bad build.
+- **Do not force-push to main.** Always revert. History is an audit trail.
+- **Do not ship a re-tag over an existing version** in Case 3. Users who already updated won't re-download the same tag — you need `Z+1`.
+- **Do not skip the `--prerelease=true` demotion** on a broken release. `releases/latest` should always resolve to a working version.
 
 ## Keeping LLM Models Up to Date
 
