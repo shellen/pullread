@@ -403,37 +403,6 @@ ${note.content.slice(0, 4000)}`;
   return parsed;
 }
 
-// Dynamic require for optional loxodonta-core modules (embeddings, resolver, graph)
-// that pull in native deps like sqlite-vec — only loaded when actually called
-const _loxBase = ['loxodonta-core-monorepo', 'packages', 'loxodonta-core', 'src'].join('/');
-const _loxModule = (mod: string) => require(`${_loxBase}/${mod}`);
-
-export function initResolver(
-  pds: PDS,
-  geminiApiKey: string | null,
-) {
-  if (!geminiApiKey) return null;
-
-  const { createEmbedder } = _loxModule('embeddings/index.js');
-  const { geminiEmbeddings } = _loxModule('embeddings/gemini.js');
-  const { createResolver } = _loxModule('resolve/index.js');
-
-  const embedder = createEmbedder({
-    provider: geminiEmbeddings({
-      apiKey: geminiApiKey,
-      model: 'gemini-embedding-001',
-    }),
-    dimensions: 768,
-  });
-
-  return createResolver({ pds, embedder, threshold: 0.5 });
-}
-
-export function createResearchGraph(pds: PDS) {
-  const { createGraph } = _loxModule('graph/index.js');
-  return createGraph(pds);
-}
-
 function parseFrontmatterTitle(text: string): { title: string; body: string } | null {
   const match = text.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)/);
   if (!match) return null;

@@ -30,7 +30,6 @@
     "heroicons": "^2.2.0",
     "hls.js": "^1.6.15",
     "linkedom": "^0.18.12",
-    "loxodonta-core-monorepo": "github:shellen/loxodonta-core",
     "marked": "^17.0.3",
     "mermaid": "^11.12.3",
     "nodemailer": "^8.0.1",

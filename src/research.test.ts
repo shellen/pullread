@@ -199,16 +199,6 @@ describe('extractArticle', () => {
   });
 });
 
-describe('entity resolution', () => {
-  test('resolver returns null without API key', () => {
-    const pds = createResearchPDS(':memory:');
-    const { initResolver } = require('./research');
-    const resolver = initResolver(pds, null);
-    expect(resolver).toBeNull();
-    pds.close();
-  });
-});
-
 describe('runBackgroundExtraction', () => {
   beforeEach(() => {
     mockSummarize.mockReset();
