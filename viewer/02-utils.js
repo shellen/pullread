@@ -83,6 +83,11 @@ function parseFrontmatter(text) {
     }
   });
   if (meta.title) meta.title = stripTags(meta.title);
+  // Normalize Defuddle field names to PullRead equivalents
+  if (meta.source && !meta.url) meta.url = meta.source;
+  if (meta.published && !meta.bookmarked) meta.bookmarked = meta.published;
+  if (meta.description && !meta.excerpt) meta.excerpt = meta.description;
+  if (meta.image && !meta.thumbnail) meta.thumbnail = meta.image;
   return { meta, body: match[2] };
 }
 

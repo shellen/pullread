@@ -66,28 +66,11 @@ pub async fn open_viewer_at(app: &AppHandle, hash: Option<&str>) -> Result<(), S
         .min_inner_size(600.0, 400.0)
         .build()
         .map_err(|e| format!("Failed to create viewer window: {}", e))?;
-
-        // Show in dock when viewer is open
-        #[cfg(target_os = "macos")]
-        let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
     }
 
     Ok(())
 }
 
-/// Handle the viewer window being closed — hide dock icon again
-#[allow(dead_code)]
-pub fn on_viewer_closed(app: &AppHandle) {
-    #[cfg(target_os = "macos")]
-    {
-        // Only hide dock icon if no other windows are open
-        let windows: Vec<_> = app.webview_windows().into_keys().collect();
-        if windows.is_empty() {
-            let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-        }
-    }
-    let _ = app;
-}
 
 /// Tauri command: open the viewer
 #[tauri::command]
@@ -151,11 +134,17 @@ pub async fn handle_deep_link(app: &AppHandle, url: &str) {
 
     match host {
         "open" => {
-            // pullread://open or pullread://open?file=filename.md
+            // pullread://open, pullread://open?file=filename.md, or pullread://open?url=<article_url>
             let hash = parsed
                 .query_pairs()
                 .find(|(k, _)| k == "file")
-                .map(|(_, v)| format!("file={}", urlencoding::encode(&v)));
+                .map(|(_, v)| format!("file={}", urlencoding::encode(&v)))
+                .or_else(|| {
+                    parsed
+                        .query_pairs()
+                        .find(|(k, _)| k == "url")
+                        .map(|(_, v)| format!("url={}", urlencoding::encode(&v)))
+                });
             let _ = open_viewer_at(app, hash.as_deref()).await;
         }
         "save" => {
@@ -170,8 +159,38 @@ pub async fn handle_deep_link(app: &AppHandle, url: &str) {
                 .map(|(_, v)| v.to_string());
 
             if let Some(article_url) = save_url {
-                save_to_inbox(app, &article_url, title.as_deref());
-                notifications::notify(app, "Article Saved", "Added to inbox for next sync.");
+                // Try immediate processing via the viewer's /api/save endpoint
+                let mut saved_immediately = false;
+                if let Ok(port) = sidecar::ensure_viewer_running(app).await {
+                    let api_url = format!("http://127.0.0.1:{}/api/save", port);
+                    let body = serde_json::json!({ "url": article_url }).to_string();
+                    let result = reqwest::Client::new()
+                        .post(&api_url)
+                        .header("Content-Type", "application/json")
+                        .body(body)
+                        .send()
+                        .await;
+                    match result {
+                        Ok(resp) => {
+                            if resp.status().is_success() {
+                                saved_immediately = true;
+                                log::info!("Article saved immediately via viewer API");
+                                notifications::notify(app, "Article Saved", "Ready to read now.");
+                                let _ = open_viewer_at(app, None).await;
+                            } else {
+                                log::warn!("Viewer /api/save returned {}", resp.status());
+                            }
+                        }
+                        Err(e) => {
+                            log::warn!("Viewer /api/save failed: {}", e);
+                        }
+                    }
+                }
+                // Fall back to inbox if immediate processing failed
+                if !saved_immediately {
+                    save_to_inbox(app, &article_url, title.as_deref());
+                    notifications::notify(app, "Article Saved", "Added to inbox for next sync.");
+                }
             }
         }
         "sync" => {

@@ -64,6 +64,10 @@ jobs:
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
+        with:
+          # Pinned: 1.3.12 has a codesign regression that breaks the signed
+          # sidecar build on macOS (oven-sh/bun#29361). Revisit when fixed.
+          bun-version: 1.3.11
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable

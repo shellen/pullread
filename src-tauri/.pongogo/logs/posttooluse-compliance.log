@@ -1,0 +1,1 @@
+2026-03-07 16:44:00,292 [ERROR] mcp_server.hooks.posttooluse_compliance_hook: Database error querying pending requirements: no such column: enforcement_phase

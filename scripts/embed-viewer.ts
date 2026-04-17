@@ -88,6 +88,7 @@ const CHEVRON_ATTRS = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 const ICON_MAP: Array<{ id: string; file: string; variant?: 'solid' | 'chevron' }> = [
   { id: 'i-backward', file: 'backward.svg' },
   { id: 'i-bars', file: 'bars-3.svg' },
+  { id: 'i-beaker', file: 'beaker.svg' },
   { id: 'i-book', file: 'book-open.svg' },
   { id: 'i-bookmark', file: 'bookmark.svg' },
   { id: 'i-calendar', file: 'calendar.svg' },
@@ -126,6 +127,8 @@ const ICON_MAP: Array<{ id: string; file: string; variant?: 'solid' | 'chevron' 
   { id: 'i-share', file: 'arrow-up-tray.svg' },
   { id: 'i-sliders', file: 'adjustments-horizontal.svg' },
   { id: 'i-squares', file: 'squares-2x2.svg' },
+  { id: 'i-star', file: 'star.svg' },
+  { id: 'i-star-solid', file: 'star.svg', variant: 'solid' },
   { id: 'i-stop', file: 'stop.svg' },
   { id: 'i-tags', file: 'tag.svg' },
   { id: 'i-video', file: 'video-camera.svg' },
@@ -181,6 +184,7 @@ const vendorLibs: Array<{ name: string; path: string; required: boolean }> = [
   { name: 'highlight.js', path: '@highlightjs/cdn-assets/highlight.min.js',        required: true },
   { name: 'DOMPurify',   path: 'dompurify/dist/purify.min.js',                    required: true },
   { name: 'mermaid',     path: 'mermaid/dist/mermaid.min.js',                      required: false },
+  { name: 'ForceGraph',  path: 'force-graph/dist/force-graph.min.js',              required: false },
 ];
 
 const vendorJs: string[] = [];

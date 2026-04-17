@@ -1,7 +1,7 @@
 // ABOUTME: Generates markdown files with YAML frontmatter and enforces filesystem write boundaries
 // ABOUTME: Handles filename slugification, content formatting, and path validation
 
-import { writeFileSync, existsSync, mkdirSync, readdirSync, statSync, renameSync, unlinkSync } from 'fs';
+import { writeFileSync, readFileSync, existsSync, mkdirSync, readdirSync, statSync, renameSync, unlinkSync } from 'fs';
 import { join, dirname, basename, extname, resolve, sep } from 'path';
 import { homedir } from 'os';
 import { Enclosure } from './feed';
@@ -46,6 +46,7 @@ export interface ArticleData {
   author?: string;
   excerpt?: string;
   thumbnail?: string;
+  favicon?: string;
   lang?: string;
   categories?: string[];
   source?: string;
@@ -81,6 +82,7 @@ export function generateMarkdown(data: ArticleData): string {
 title: "${escapeQuotes(data.title)}"
 url: ${data.url}
 bookmarked: ${data.bookmarkedAt}
+published: ${data.bookmarkedAt}
 domain: ${data.domain}`;
 
   if (data.feed) {
@@ -104,7 +106,11 @@ domain: ${data.domain}`;
   }
 
   if (data.thumbnail) {
-    frontmatter += `\nthumbnail: ${data.thumbnail}`;
+    frontmatter += `\nimage: ${data.thumbnail}`;
+  }
+
+  if (data.favicon) {
+    frontmatter += `\nfavicon: ${data.favicon}`;
   }
 
   if (data.annotation) {
@@ -429,4 +435,50 @@ export async function downloadFavicon(domain: string, outputPath: string): Promi
       continue;
     }
   }
+}
+
+/** Check if an article's markdown content qualifies for repair (short body, has url, not feed-sourced, not already attempted). */
+export function needsRepair(content: string): boolean {
+  const fmMatch = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  if (!fmMatch) return false;
+
+  const meta: Record<string, string> = {};
+  for (const line of fmMatch[1].split('\n')) {
+    const idx = line.indexOf(':');
+    if (idx > 0) {
+      const key = line.slice(0, idx).trim();
+      const val = line.slice(idx + 1).trim();
+      meta[key] = val;
+    }
+  }
+
+  if (!meta.url) return false;
+  if (meta.source === 'feed') return false;
+  if (meta.repairAttempted === 'true') return false;
+
+  const body = fmMatch[2];
+  return body.trim().length < 200;
+}
+
+/** Batch-mark all short extracted articles as repairAttempted so the repair loop skips them. */
+export function markShortExtractedArticles(outputPath: string): number {
+  const files = listMarkdownFiles(outputPath);
+  let marked = 0;
+  for (const filePath of files) {
+    const content = readFileSync(filePath, 'utf-8');
+    if (content.includes('repairAttempted:')) continue;
+    if (!needsRepair(content)) continue;
+    markRepairAttempted(filePath);
+    marked++;
+  }
+  return marked;
+}
+
+/** Add repairAttempted: true to an article's YAML frontmatter. */
+export function markRepairAttempted(filePath: string): void {
+  assertWritablePath(filePath);
+  const content = readFileSync(filePath, 'utf-8');
+  if (content.includes('repairAttempted:')) return;
+  const updated = content.replace(/\n---\n/, '\nrepairAttempted: true\n---\n');
+  writeFileSync(filePath, updated, 'utf-8');
 }

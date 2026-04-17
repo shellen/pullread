@@ -21,6 +21,11 @@ describe('models.json schema validation', () => {
     }
   });
 
+  test('anthropic list includes current Opus and Sonnet', () => {
+    expect(providers.anthropic.models).toContain('claude-opus-4-7');
+    expect(providers.anthropic.models).toContain('claude-sonnet-4-6');
+  });
+
   for (const [id, provider] of Object.entries(providers) as [string, any][]) {
     describe(`provider: ${id}`, () => {
       test('has label', () => {

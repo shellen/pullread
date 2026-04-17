@@ -307,6 +307,31 @@ describe('stripEmbedNoise', () => {
     expect(result).toContain('Intro.');
     expect(result).toContain('Body text.');
   });
+
+  test('strips Turndown-mangled iframe with bold/backtick escaping', () => {
+    const md = '*   **Embed** **`**<**iframe src="https://www.npr.org/player/embed/1246593556/1269202156" width="100%" height="290" frameborder="0" scrolling="no" title="NPR embedded audio player">`**\n    \n\nActual content.';
+    const result = stripEmbedNoise(md);
+    expect(result).not.toContain('Embed');
+    expect(result).not.toContain('iframe');
+    expect(result).toContain('Actual content.');
+  });
+
+  test('strips Download bullet that contains a link', () => {
+    const md = '*   [**Download**](https://example.com/audio.mp3)\n*   **Embed** stuff\n\nArticle content.';
+    const result = stripEmbedNoise(md);
+    expect(result).not.toContain('Download');
+    expect(result).not.toContain('Embed');
+    expect(result).toContain('Article content.');
+  });
+
+  test('strips NPR player UI block (Download + Embed + heading)', () => {
+    const md = '#### Global Economic Forecast\n\n*   [**Download**](https://example.com/audio.mp3)\n*   **Embed** **`**<**iframe src="https://www.npr.org/player/embed/123/456" width="100%" height="290">`**\n    \n\nEconomists warned about a slowdown.';
+    const result = stripEmbedNoise(md);
+    expect(result).not.toContain('Download');
+    expect(result).not.toContain('Embed');
+    expect(result).not.toContain('iframe');
+    expect(result).toContain('Economists warned');
+  });
 });
 
 describe('htmlToMarkdown', () => {

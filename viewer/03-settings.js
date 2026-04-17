@@ -423,6 +423,7 @@ var _settingsTabMap = {
   'settings-voice': 'reading',
   'settings-ai': 'reading',
   'settings-breaks': 'reading',
+  'settings-email': 'general',
   'settings-backup': 'advanced',
   'settings-site-logins': 'advanced',
   'settings-beta': 'advanced',
@@ -506,6 +507,107 @@ function settingsSaveBreakActivity(input) {
 function settingsSaveBeta(enabled) {
   if (enabled) localStorage.setItem('pr-beta-features', 'true');
   else localStorage.removeItem('pr-beta-features');
+  var researchNav = document.getElementById('nav-research');
+  if (researchNav) researchNav.style.display = enabled ? '' : 'none';
+}
+
+function settingsEmailToggle(enabled) {
+  var fields = document.getElementById('email-smtp-fields');
+  if (fields) fields.style.display = enabled ? '' : 'none';
+  settingsSaveEmailConfig();
+}
+
+function settingsAutoSaveEmail(input) {
+  settingsSaveEmailConfig().then(function() {
+    if (input && input.parentNode) {
+      var indicator = input.parentNode.querySelector('.save-indicator');
+      if (indicator) indicator.classList.add('visible');
+    }
+  });
+}
+
+function settingsSaveEmailConfig() {
+  var provider = (document.getElementById('sp-email-provider') || {}).value || 'gmail';
+  var body = {
+    enabled: document.getElementById('sp-email-enabled') ? document.getElementById('sp-email-enabled').checked : false,
+    smtpProvider: provider,
+    toAddress: (document.getElementById('sp-email-to') || {}).value || '',
+    fromAddress: (document.getElementById('sp-email-from') || {}).value || '',
+    frequency: (document.getElementById('sp-email-frequency') || {}).value || 'daily',
+    sendTime: (document.getElementById('sp-email-time') || {}).value || '08:00',
+    sendTime2: (document.getElementById('sp-email-time2') || {}).value || '17:00',
+    lookbackDays: parseInt((document.getElementById('sp-email-lookback') || {}).value || '1', 10),
+    smtpHost: provider === 'custom' ? ((document.getElementById('sp-email-smtp-host') || {}).value || '') : '',
+    smtpPort: provider === 'custom' ? parseInt((document.getElementById('sp-email-smtp-port') || {}).value || '587', 10) : 587,
+    smtpUser: (document.getElementById('sp-email-smtp-user') || {}).value || '',
+    smtpPass: (document.getElementById('sp-email-smtp-pass') || {}).value || '',
+    useTls: provider === 'custom' ? (document.getElementById('sp-email-tls') ? document.getElementById('sp-email-tls').checked : true) : true
+  };
+  return fetch('/api/email-settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  }).then(function(r) { return r.json(); });
+}
+
+function settingsProviderChange(provider) {
+  var customFields = document.getElementById('email-custom-smtp');
+  var providerHelp = document.getElementById('email-provider-help');
+  var fromRow = document.getElementById('email-from-row');
+  if (customFields) customFields.style.display = provider === 'custom' ? '' : 'none';
+  if (fromRow) fromRow.style.display = provider === 'custom' ? '' : 'none';
+  if (providerHelp) {
+    if (provider === 'gmail') {
+      providerHelp.innerHTML = '<div style="font-size:13px;color:var(--muted);line-height:1.5;padding:8px 12px;background:var(--bg-secondary, var(--bg));border-radius:6px;border:1px solid var(--border)">'
+        + '<strong style="color:var(--fg)">Gmail setup:</strong><br>'
+        + '1. Enable <a href="https://myaccount.google.com/signinoptions/two-step-verification" target="_blank" rel="noopener" style="color:var(--link)">2-Step Verification</a> on your Google account<br>'
+        + '2. Create an <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener" style="color:var(--link)">App Password</a> (select Mail)<br>'
+        + '3. Use your Gmail address and the 16-character app password below'
+        + '</div>';
+    } else if (provider === 'outlook') {
+      providerHelp.innerHTML = '<div style="font-size:13px;color:var(--muted);line-height:1.5;padding:8px 12px;background:var(--bg-secondary, var(--bg));border-radius:6px;border:1px solid var(--border)">'
+        + '<strong style="color:var(--fg)">Outlook setup:</strong><br>'
+        + 'Use your Outlook/Microsoft email address and password below. '
+        + 'If you have 2FA enabled, create an <a href="https://account.live.com/proofs/AppPassword" target="_blank" rel="noopener" style="color:var(--link)">app password</a>.'
+        + '</div>';
+    } else {
+      providerHelp.innerHTML = '';
+    }
+  }
+  settingsAutoSaveEmail(null);
+}
+
+function settingsTestEmail() {
+  var status = document.getElementById('email-test-status');
+  if (status) status.textContent = 'Sending test email\u2026';
+  settingsSaveEmailConfig().then(function() {
+    return fetch('/api/email/test', { method: 'POST' }).then(function(r) { return r.json(); });
+  }).then(function(data) {
+    if (data.error) throw data.error;
+    if (status) { status.textContent = data.message || 'Test email sent!'; status.style.color = 'var(--green, #2a9d4a)'; }
+  }).catch(function(err) {
+    if (status) { status.textContent = 'Error: ' + (err || 'Failed to send'); status.style.color = 'var(--red, #c44)'; }
+  });
+}
+
+function settingsFrequencyChange(freq) {
+  var sep = document.getElementById('email-time2-sep');
+  var time2 = document.getElementById('sp-email-time2');
+  if (sep) sep.style.display = freq === 'twice' ? '' : 'none';
+  if (time2) time2.style.display = freq === 'twice' ? '' : 'none';
+}
+
+function settingsSendRoundup() {
+  var status = document.getElementById('email-test-status');
+  if (status) status.textContent = 'Sending rundown\u2026';
+  settingsSaveEmailConfig().then(function() {
+    return fetch('/api/email/send-roundup', { method: 'POST' }).then(function(r) { return r.json(); });
+  }).then(function(data) {
+    if (data.error) throw data.error;
+    if (status) { status.textContent = data.message || 'Rundown sent!'; status.style.color = 'var(--green, #2a9d4a)'; }
+  }).catch(function(err) {
+    if (status) { status.textContent = 'Error: ' + (err || 'Failed to send'); status.style.color = 'var(--red, #c44)'; }
+  });
 }
 
 function settingsAutoSaveSync(input) {
@@ -514,6 +616,7 @@ function settingsAutoSaveSync(input) {
       var indicator = input.parentNode.querySelector('.save-indicator');
       if (indicator) indicator.classList.add('visible');
     }
+    if (input && input.id === 'sp-output-path') refreshArticleList(true);
   });
 }
 
@@ -612,6 +715,13 @@ function showSettingsPage(scrollToSection) {
   html += '<span style="flex-shrink:0;font-size:14px">&#9881;</span>';
   html += '<span>To change notification preferences, go to <strong style="color:var(--fg)">System Settings &rarr; Notifications &rarr; PullRead</strong>. You can enable or disable alerts, banners, and sounds there.</span>';
   html += '</div>';
+  html += '</div>';
+
+  // -- Email Rundown card (loaded async) --
+  html += '<div class="card" id="settings-email">';
+  html += '<div class="card-title">The Rundown</div>';
+  html += '<div class="card-desc">Get a daily email digest of new articles with links back to Pull Read.</div>';
+  html += '<p style="color:var(--muted);font-size:13px">Loading email settings\u2026</p>';
   html += '</div>';
 
 
@@ -781,6 +891,21 @@ function showSettingsPage(scrollToSection) {
   html += '</div>';
   html += '</div>';
 
+  // -- Research card (beta only) --
+  if (localStorage.getItem('pr-beta-features') === 'true') {
+  html += '<div class="card" id="settings-research">';
+  html += '<div class="card-title">Research</div>';
+  html += '<div class="card-desc">The knowledge graph extracts entities, viewpoints, and relationships from your articles.</div>';
+  html += '<div id="research-settings-status" style="font-size:13px;color:var(--muted);margin-bottom:12px">Loading\u2026</div>';
+  html += '<div class="setting-row" style="margin-bottom:12px"><div class="setting-label"><label>Auto-extract after sync</label>';
+  html += '<div class="setting-desc">Automatically extract entities from new articles after each sync</div></div>';
+  html += '<div class="setting-control"><label class="toggle"><input type="checkbox" id="research-auto-extract" onchange="settingsSaveResearchAutoExtract()" checked /><span class="toggle-slider"></span></label></div></div>';
+  html += '<div style="display:flex;gap:10px;flex-wrap:wrap">';
+  html += '<button onclick="settingsResetResearch()" style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit">Reset &amp; Re-extract</button>';
+  html += '</div>';
+  html += '</div>';
+  } // end beta Research card
+
   // -- Backup & Restore card --
   html += '<div class="card" id="settings-backup">';
   html += '<div class="card-title">Backup &amp; Restore</div>';
@@ -832,7 +957,7 @@ function showSettingsPage(scrollToSection) {
   html += '</div>';
   html += '<div style="display:flex;gap:12px;flex-wrap:wrap;padding:8px 0">';
   html += '<a href="https://pullread.com" target="_blank" rel="noopener" style="font-size:13px;color:var(--link)">pullread.com</a>';
-  html += '<a href="#" onclick="prOpenExternal(\'https://pullread.com/releases#v\' + (window._prCurrentVersion || \'0.4.7\'));return false" style="font-size:13px;color:var(--link)">What\'s New</a>';
+  html += '<a href="#" onclick="prOpenExternal(\'https://pullread.com/releases#v\' + (window._prCurrentVersion || \'0.4.8\'));return false" style="font-size:13px;color:var(--link)">What\'s New</a>';
   html += '<a href="/api/log" target="_blank" style="font-size:13px;color:var(--link)">View Logs</a>';
   html += '<button style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit" onclick="showTour()">Show Tour</button>';
   html += '</div>';
@@ -948,6 +1073,154 @@ function showSettingsPage(scrollToSection) {
     });
   }
 
+  // Load Email Roundup settings async
+  if (serverMode) {
+    fetch('/api/email-settings').then(function(r) { return r.json(); }).then(function(data) {
+      var sec = document.getElementById('settings-email');
+      if (!sec) return;
+
+      var h = '<div class="card-title">The Rundown</div>';
+      h += '<div class="card-desc">Get a daily email digest of new articles with links back to Pull Read.</div>';
+
+      // Enable toggle
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Enable The Rundown</label><div class="setting-desc">Send a daily digest email at a scheduled time</div></div>';
+      h += '<div class="setting-control"><input type="checkbox" id="sp-email-enabled"' + (data.enabled ? ' checked' : '') + ' onchange="settingsEmailToggle(this.checked)" style="width:18px;height:18px;accent-color:var(--link)"></div>';
+      h += '</div>';
+
+      // SMTP fields (collapsible, shown when enabled)
+      h += '<div id="email-smtp-fields" style="' + (data.enabled ? '' : 'display:none') + '">';
+
+      // To address
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Send to</label><div class="setting-desc">Email address to receive The Rundown</div></div>';
+      h += '<div class="setting-control"><div class="input-wrap"><input type="email" id="sp-email-to" value="' + escapeHtml(data.toAddress || '') + '" placeholder="you@example.com" class="input-field" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveEmail(this)"><span class="save-indicator">\u2713</span></div></div>';
+      h += '</div>';
+
+      // From address (only shown for custom provider)
+      var providerVal = data.smtpProvider || 'gmail';
+      h += '<div class="setting-row" id="email-from-row" style="' + (providerVal === 'custom' ? '' : 'display:none') + '">';
+      h += '<div class="setting-label"><label>From address</label><div class="setting-desc">Sender address (must match SMTP credentials)</div></div>';
+      h += '<div class="setting-control"><div class="input-wrap"><input type="email" id="sp-email-from" value="' + escapeHtml(data.fromAddress || '') + '" placeholder="pullread@example.com" class="input-field" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveEmail(this)"><span class="save-indicator">\u2713</span></div></div>';
+      h += '</div>';
+
+      // Frequency
+      var frequency = data.frequency || 'daily';
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Frequency</label><div class="setting-desc">How often to send The Rundown</div></div>';
+      h += '<div class="setting-control"><div class="pill-group">';
+      var freqs = [['daily','Daily'],['twice','Twice daily'],['weekly','Weekly']];
+      for (var fi = 0; fi < freqs.length; fi++) {
+        h += '<button class="pill' + (frequency === freqs[fi][0] ? ' active' : '') + '" data-val="' + freqs[fi][0] + '" onclick="settingsBtnSelect(this,\'sp-email-frequency\',\'' + freqs[fi][0] + '\');settingsFrequencyChange(\'' + freqs[fi][0] + '\');settingsAutoSaveEmail(this)">' + freqs[fi][1] + '</button>';
+      }
+      h += '</div><input type="hidden" id="sp-email-frequency" value="' + frequency + '"></div>';
+      h += '</div>';
+
+      // Send time(s)
+      var sendTime = data.sendTime || '08:00';
+      var sendTime2 = data.sendTime2 || '17:00';
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Send time</label><div class="setting-desc" id="email-time-desc">Time of day to send The Rundown</div></div>';
+      h += '<div class="setting-control"><div style="display:flex;gap:8px;align-items:center">';
+      h += '<input type="time" id="sp-email-time" value="' + escapeHtml(sendTime) + '" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;font-family:inherit" onchange="settingsAutoSaveEmail(this)">';
+      h += '<span id="email-time2-sep" style="color:var(--muted);font-size:12px;' + (frequency === 'twice' ? '' : 'display:none') + '">&amp;</span>';
+      h += '<input type="time" id="sp-email-time2" value="' + escapeHtml(sendTime2) + '" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;font-family:inherit;' + (frequency === 'twice' ? '' : 'display:none') + '" onchange="settingsAutoSaveEmail(this)">';
+      h += '</div></div>';
+      h += '</div>';
+
+      // Lookback days
+      var lookbackDays = data.lookbackDays || 1;
+      var lookbacks = [['1','1 day'],['2','2 days'],['3','3 days'],['7','1 week']];
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Include articles from</label><div class="setting-desc">How far back to include articles</div></div>';
+      h += '<div class="setting-control"><div class="pill-group">';
+      for (var li = 0; li < lookbacks.length; li++) {
+        h += '<button class="pill' + (String(lookbackDays) === lookbacks[li][0] ? ' active' : '') + '" data-val="' + lookbacks[li][0] + '" onclick="settingsBtnSelect(this,\'sp-email-lookback\',\'' + lookbacks[li][0] + '\');settingsAutoSaveEmail(this)">' + lookbacks[li][1] + '</button>';
+      }
+      h += '</div><input type="hidden" id="sp-email-lookback" value="' + lookbackDays + '"></div>';
+      h += '</div>';
+
+      // Email provider
+      h += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">';
+      h += '<div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em">Email Provider</div>';
+      h += '</div>';
+
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Provider</label><div class="setting-desc">Select your email service</div></div>';
+      h += '<div class="setting-control"><select id="sp-email-provider" onchange="settingsProviderChange(this.value)" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font-size:13px;font-family:inherit">';
+      h += '<option value="gmail"' + (providerVal === 'gmail' ? ' selected' : '') + '>Gmail</option>';
+      h += '<option value="outlook"' + (providerVal === 'outlook' ? ' selected' : '') + '>Outlook</option>';
+      h += '<option value="custom"' + (providerVal === 'custom' ? ' selected' : '') + '>Custom SMTP</option>';
+      h += '</select></div>';
+      h += '</div>';
+
+      // Provider setup help
+      h += '<div id="email-provider-help" style="margin-bottom:8px">';
+      if (providerVal === 'gmail') {
+        h += '<div style="font-size:13px;color:var(--muted);line-height:1.5;padding:8px 12px;background:var(--bg-secondary, var(--bg));border-radius:6px;border:1px solid var(--border)">';
+        h += '<strong style="color:var(--fg)">Gmail setup:</strong><br>';
+        h += '1. Enable <a href="https://myaccount.google.com/signinoptions/two-step-verification" target="_blank" rel="noopener" style="color:var(--link)">2-Step Verification</a> on your Google account<br>';
+        h += '2. Create an <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener" style="color:var(--link)">App Password</a> (select Mail)<br>';
+        h += '3. Use your Gmail address and the 16-character app password below';
+        h += '</div>';
+      } else if (providerVal === 'outlook') {
+        h += '<div style="font-size:13px;color:var(--muted);line-height:1.5;padding:8px 12px;background:var(--bg-secondary, var(--bg));border-radius:6px;border:1px solid var(--border)">';
+        h += '<strong style="color:var(--fg)">Outlook setup:</strong><br>';
+        h += 'Use your Outlook/Microsoft email address and password below. ';
+        h += 'If you have 2FA enabled, create an <a href="https://account.live.com/proofs/AppPassword" target="_blank" rel="noopener" style="color:var(--link)">app password</a>.';
+        h += '</div>';
+      }
+      h += '</div>';
+
+      // Username + Password (shown for all providers)
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Email address</label></div>';
+      h += '<div class="setting-control"><div class="input-wrap"><input type="text" id="sp-email-smtp-user" value="' + escapeHtml(data.smtpUser || '') + '" placeholder="your-email@gmail.com" class="input-field" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveEmail(this)"><span class="save-indicator">\u2713</span></div></div>';
+      h += '</div>';
+
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>App password</label></div>';
+      h += '<div class="setting-control"><div class="input-wrap"><input type="password" id="sp-email-smtp-pass" value="' + escapeHtml(data.smtpPass || '') + '" placeholder="xxxx xxxx xxxx xxxx" class="input-field" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveEmail(this)"><span class="save-indicator">\u2713</span></div></div>';
+      h += '</div>';
+
+      // Custom SMTP fields (only shown for custom provider)
+      h += '<div id="email-custom-smtp" style="' + (providerVal === 'custom' ? '' : 'display:none') + '">';
+
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Host</label></div>';
+      h += '<div class="setting-control"><div class="input-wrap"><input type="text" id="sp-email-smtp-host" value="' + escapeHtml(data.smtpHost || '') + '" placeholder="smtp.example.com" class="input-field" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveEmail(this)"><span class="save-indicator">\u2713</span></div></div>';
+      h += '</div>';
+
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Port</label></div>';
+      h += '<div class="setting-control"><div class="input-wrap"><input type="number" id="sp-email-smtp-port" value="' + (data.smtpPort || 587) + '" placeholder="587" class="input-field" style="width:80px" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveEmail(this)"><span class="save-indicator">\u2713</span></div></div>';
+      h += '</div>';
+
+      h += '<div class="setting-row">';
+      h += '<div class="setting-label"><label>Use TLS</label><div class="setting-desc">Recommended for most providers</div></div>';
+      h += '<div class="setting-control"><input type="checkbox" id="sp-email-tls"' + (data.useTls !== false ? ' checked' : '') + ' onchange="settingsAutoSaveEmail(this)" style="width:18px;height:18px;accent-color:var(--link)"></div>';
+      h += '</div>';
+
+      h += '</div>'; // end custom smtp
+
+      // Test & Send buttons
+      h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">';
+      h += '<button onclick="settingsTestEmail()" style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit">Send Test Email</button>';
+      h += '<button onclick="settingsSendRoundup()" style="font-size:13px;padding:6px 16px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit">Send Rundown Now</button>';
+      h += '</div>';
+      h += '<div id="email-test-status" style="font-size:12px;color:var(--muted);padding-top:8px"></div>';
+
+      h += '</div>'; // end smtp fields
+
+      sec.innerHTML = h;
+    }).catch(function() {
+      var sec = document.getElementById('settings-email');
+      if (sec) {
+        sec.innerHTML = '<div class="card-title">The Rundown</div><p style="color:var(--muted);font-size:13px">Could not load email settings.</p>';
+      }
+    });
+  }
+
   // Load Site Logins
   if (window.PR_TAURI) {
     loadSiteLogins();
@@ -955,6 +1228,9 @@ function showSettingsPage(scrollToSection) {
 
   // Load Storage info
   loadStorageInfo();
+
+  // Load Research status
+  settingsLoadResearchStatus();
 
   // Load TTS settings async
   if (serverMode) {
@@ -1517,6 +1793,7 @@ function pickOutputFolder(inputId) {
     .then(function(data) {
       if (data.path) {
         document.getElementById(inputId).value = data.path;
+        settingsPageSaveConfig(true).then(function() { refreshArticleList(true); });
       }
     })
     .catch(function() { /* osascript not available — user can type manually */ });
@@ -1772,6 +2049,60 @@ function formatBytes(bytes) {
   if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
   if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
   return (bytes / 1073741824).toFixed(1) + ' GB';
+}
+
+function settingsSaveResearchAutoExtract() {
+  var cb = document.getElementById('research-auto-extract');
+  var enabled = cb ? cb.checked : true;
+  fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ researchAutoExtract: enabled }),
+  });
+}
+
+function settingsLoadResearchStatus() {
+  fetch('/api/research/status')
+    .then(function(r) { return r.json(); })
+    .then(function(status) {
+      var el = document.getElementById('research-settings-status');
+      if (!el) return;
+      if (status.entityCount > 0) {
+        el.textContent = status.entityCount + ' entities from ' + status.extractedCount + ' of ' + status.totalArticles + ' articles';
+      } else if (status.extractedCount > 0) {
+        el.textContent = status.extractedCount + ' articles extracted, no entities yet';
+      } else {
+        el.textContent = status.totalArticles + ' articles available, none extracted yet';
+      }
+    })
+    .catch(function() {
+      var el = document.getElementById('research-settings-status');
+      if (el) el.textContent = 'Could not load status';
+    });
+
+  // Load auto-extract toggle state
+  fetch('/api/settings')
+    .then(function(r) { return r.json(); })
+    .then(function(settings) {
+      var cb = document.getElementById('research-auto-extract');
+      if (cb) cb.checked = settings.researchAutoExtract !== false;
+    })
+    .catch(function() {});
+}
+
+async function settingsResetResearch() {
+  if (!confirm('Reset the research knowledge graph? This deletes all extracted entities, mentions, and relationships. They will be re-extracted on next sync.')) return;
+  try {
+    var res = await fetch('/api/research/reset', { method: 'POST' });
+    if (res.ok) {
+      showToast('Research data cleared. Run a sync or click Extract in the Research tab to rebuild.');
+      settingsLoadResearchStatus();
+    } else {
+      showToast('Could not reset research data');
+    }
+  } catch {
+    showToast('Could not reset research data');
+  }
 }
 
 async function clearVideoCache() {

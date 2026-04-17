@@ -10,7 +10,7 @@ module.exports = {
     "node_modules/.+\\.js$": "babel-jest",
   },
   transformIgnorePatterns: [
-    "node_modules/(?!(entities|defuddle)/)"
+    "node_modules/(?!(entities|defuddle|loxodonta-core-monorepo|better-sqlite3)/)"
   ],
   moduleNameMapper: {
     "^bun:sqlite$": "<rootDir>/src/__mocks__/bun-sqlite.js",

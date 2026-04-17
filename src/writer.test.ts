@@ -1,7 +1,7 @@
 // ABOUTME: Tests for markdown file generation and filesystem write guard
 // ABOUTME: Verifies filename slugification, frontmatter, enclosure formatting, and path restrictions
 
-import { generateFilename, generateMarkdown, fileSubpath, resolveFilePath, listMarkdownFiles, listEpubFiles, writeArticle, migrateToDateFolders, exportNotebook, assertWritablePath, setOutputPath, resetWriteGuard } from './writer';
+import { generateFilename, generateMarkdown, fileSubpath, resolveFilePath, listMarkdownFiles, listEpubFiles, writeArticle, migrateToDateFolders, exportNotebook, assertWritablePath, setOutputPath, resetWriteGuard, needsRepair, markRepairAttempted, markShortExtractedArticles } from './writer';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'fs';
 import { join, resolve, sep } from 'path';
 import { homedir } from 'os';
@@ -244,6 +244,46 @@ describe('generateMarkdown', () => {
 
     expect(md).toContain('enclosure_url: https://cdn.example.com/ep2.mp3');
     expect(md).not.toContain('video_enclosure');
+  });
+
+  test('writes image instead of thumbnail', () => {
+    const md = generateMarkdown({
+      title: 'Article With Hero',
+      url: 'https://example.com/hero',
+      bookmarkedAt: '2024-01-29T12:00:00Z',
+      domain: 'example.com',
+      content: 'Content',
+      thumbnail: 'https://example.com/hero.jpg'
+    });
+
+    expect(md).toContain('image: https://example.com/hero.jpg');
+    expect(md).not.toContain('thumbnail:');
+  });
+
+  test('writes published alongside bookmarked', () => {
+    const md = generateMarkdown({
+      title: 'Test',
+      url: 'https://example.com',
+      bookmarkedAt: '2024-01-29T12:00:00Z',
+      domain: 'example.com',
+      content: 'Content'
+    });
+
+    expect(md).toContain('bookmarked: 2024-01-29T12:00:00Z');
+    expect(md).toContain('published: 2024-01-29T12:00:00Z');
+  });
+
+  test('includes favicon when present', () => {
+    const md = generateMarkdown({
+      title: 'Test',
+      url: 'https://example.com',
+      bookmarkedAt: '2024-01-29T12:00:00Z',
+      domain: 'example.com',
+      content: 'Content',
+      favicon: 'https://example.com/favicon.ico'
+    });
+
+    expect(md).toContain('favicon: https://example.com/favicon.ico');
   });
 
   test('omits enclosure_duration when not provided', () => {
@@ -599,6 +639,196 @@ describe('exportNotebook', () => {
     const separators = content.split('---').length - 1;
     // frontmatter has 2 ---, plus one note separator = 3
     expect(separators).toBe(3);
+  });
+});
+
+describe('needsRepair', () => {
+  test('returns true for short article with url and no repairAttempted flag', () => {
+    const content = `---
+title: "Short Article"
+url: https://example.com/article
+domain: example.com
+bookmarked: 2024-01-29T12:00:00Z
+---
+Brief content.`;
+    expect(needsRepair(content)).toBe(true);
+  });
+
+  test('returns false when repairAttempted is true', () => {
+    const content = `---
+title: "Short Article"
+url: https://example.com/article
+domain: example.com
+repairAttempted: true
+---
+Brief content.`;
+    expect(needsRepair(content)).toBe(false);
+  });
+
+  test('returns false when source is feed', () => {
+    const content = `---
+title: "Feed Article"
+url: https://example.com/feed
+source: feed
+---
+Brief.`;
+    expect(needsRepair(content)).toBe(false);
+  });
+
+  test('returns false when no url', () => {
+    const content = `---
+title: "No URL Article"
+domain: example.com
+---
+Brief.`;
+    expect(needsRepair(content)).toBe(false);
+  });
+
+  test('returns false when body is 200+ chars', () => {
+    const longBody = 'x'.repeat(200);
+    const content = `---
+title: "Long Article"
+url: https://example.com/long
+---
+${longBody}`;
+    expect(needsRepair(content)).toBe(false);
+  });
+
+  test('returns false for content without frontmatter', () => {
+    expect(needsRepair('# Just a heading\nSome text')).toBe(false);
+  });
+});
+
+describe('markRepairAttempted', () => {
+  beforeEach(() => {
+    cleanTestDir();
+    mkdirSync(TEST_DIR, { recursive: true });
+    setOutputPath(TEST_DIR);
+  });
+  afterAll(cleanTestDir);
+
+  test('adds repairAttempted field to frontmatter', () => {
+    const filePath = join(TEST_DIR, 'article.md');
+    writeFileSync(filePath, `---
+title: "Test"
+url: https://example.com
+---
+Short content.`);
+
+    markRepairAttempted(filePath);
+
+    const updated = readFileSync(filePath, 'utf-8');
+    expect(updated).toContain('repairAttempted: true');
+    // Preserves existing fields
+    expect(updated).toContain('title: "Test"');
+    expect(updated).toContain('url: https://example.com');
+  });
+
+  test('does not duplicate if already marked', () => {
+    const filePath = join(TEST_DIR, 'already-marked.md');
+    writeFileSync(filePath, `---
+title: "Test"
+repairAttempted: true
+---
+Content.`);
+
+    markRepairAttempted(filePath);
+
+    const updated = readFileSync(filePath, 'utf-8');
+    const matches = updated.match(/repairAttempted/g);
+    expect(matches).toHaveLength(1);
+  });
+});
+
+describe('markShortExtractedArticles', () => {
+  beforeEach(() => {
+    cleanTestDir();
+    mkdirSync(TEST_DIR, { recursive: true });
+    setOutputPath(TEST_DIR);
+  });
+  afterAll(cleanTestDir);
+
+  test('marks short extracted articles as repairAttempted', () => {
+    // Short extracted article — should be marked
+    writeFileSync(join(TEST_DIR, 'short-extracted.md'), `---
+title: "Short"
+url: https://example.com/short
+domain: example.com
+source: extracted
+---
+Brief.`);
+
+    // Short feed article — should NOT be marked
+    writeFileSync(join(TEST_DIR, 'short-feed.md'), `---
+title: "Feed Article"
+url: https://example.com/feed
+domain: example.com
+source: feed
+---
+Brief.`);
+
+    // Long extracted article — should NOT be marked
+    const longBody = 'x'.repeat(250);
+    writeFileSync(join(TEST_DIR, 'long-extracted.md'), `---
+title: "Long"
+url: https://example.com/long
+domain: example.com
+source: extracted
+---
+${longBody}`);
+
+    // Already marked — should NOT be double-marked
+    writeFileSync(join(TEST_DIR, 'already-marked.md'), `---
+title: "Already"
+url: https://example.com/already
+domain: example.com
+source: extracted
+repairAttempted: true
+---
+Brief.`);
+
+    const count = markShortExtractedArticles(TEST_DIR);
+    expect(count).toBe(1);
+
+    const shortContent = readFileSync(join(TEST_DIR, 'short-extracted.md'), 'utf-8');
+    expect(shortContent).toContain('repairAttempted: true');
+
+    const feedContent = readFileSync(join(TEST_DIR, 'short-feed.md'), 'utf-8');
+    expect(feedContent).not.toContain('repairAttempted');
+
+    const longContent = readFileSync(join(TEST_DIR, 'long-extracted.md'), 'utf-8');
+    expect(longContent).not.toContain('repairAttempted');
+
+    const alreadyContent = readFileSync(join(TEST_DIR, 'already-marked.md'), 'utf-8');
+    const matches = alreadyContent.match(/repairAttempted/g);
+    expect(matches).toHaveLength(1);
+  });
+
+  test('returns 0 when no articles need marking', () => {
+    writeFileSync(join(TEST_DIR, 'good.md'), `---
+title: "Good"
+url: https://example.com
+source: extracted
+---
+${'x'.repeat(250)}`);
+    expect(markShortExtractedArticles(TEST_DIR)).toBe(0);
+  });
+
+  test('handles nested date folders', () => {
+    const subdir = join(TEST_DIR, '2025', '03');
+    mkdirSync(subdir, { recursive: true });
+    writeFileSync(join(subdir, 'short-nested.md'), `---
+title: "Nested"
+url: https://example.com/nested
+source: extracted
+---
+Brief.`);
+
+    const count = markShortExtractedArticles(TEST_DIR);
+    expect(count).toBe(1);
+
+    const content = readFileSync(join(subdir, 'short-nested.md'), 'utf-8');
+    expect(content).toContain('repairAttempted: true');
   });
 });
 

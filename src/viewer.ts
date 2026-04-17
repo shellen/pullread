@@ -12,7 +12,7 @@ import { autotagText, autotagBatch, saveMachineTags, hasMachineTags, migrateDash
 import { initAnnotations, loadAnnotation, saveAnnotation, allHighlights, allNotes, migrateMonolithicFiles } from './annotations';
 import { APP_ICON } from './app-icon';
 import { fetchAndExtract } from './extractor';
-import { generateMarkdown, writeArticle, ArticleData, downloadFavicon, resolveFilePath, listMarkdownFiles, listEpubFiles, migrateToDateFolders, exportNotebook, removeExportedNotebook, assertWritablePath, setOutputPath } from './writer';
+import { generateMarkdown, writeArticle, ArticleData, downloadFavicon, resolveFilePath, listMarkdownFiles, listEpubFiles, migrateToDateFolders, markShortExtractedArticles, exportNotebook, removeExportedNotebook, assertWritablePath, setOutputPath } from './writer';
 import { loadTTSConfig, saveTTSConfig, generateSpeech, getAudioContentType, getCachedAudioPath, createTtsSession, generateSessionChunk, TTS_VOICES, TTS_MODELS } from './tts';
 import { deleteFromKeychain } from './keychain';
 import { listSiteLogins, removeSiteLogin, saveSiteLoginCookies } from './cookies';
@@ -31,6 +31,7 @@ interface FileMeta {
   summaryModel: string;
   excerpt: string;
   image: string;
+  favicon: string;
   enclosureUrl: string;
   enclosureType: string;
   enclosureDuration: string;
@@ -53,6 +54,11 @@ export function parseFrontmatter(content: string): Record<string, string> {
       meta[key] = val;
     }
   }
+  // Normalize Defuddle field names to PullRead equivalents
+  if (meta.source && !meta.url) meta.url = meta.source;
+  if (meta.published && !meta.bookmarked) meta.bookmarked = meta.published;
+  if (meta.description && !meta.excerpt) meta.excerpt = meta.description;
+  if (meta.image && !meta.thumbnail) meta.thumbnail = meta.image;
   return meta;
 }
 
@@ -503,6 +509,7 @@ function listFiles(outputPath: string): FileMeta[] {
         summaryModel: meta.summaryModel || '',
         excerpt: meta.excerpt || '',
         image,
+        favicon: meta.favicon || '',
         enclosureUrl: meta.enclosure_url || '',
         enclosureType: meta.enclosure_type || '',
         enclosureDuration: meta.enclosure_duration || '',
@@ -543,6 +550,7 @@ function listFiles(outputPath: string): FileMeta[] {
         summaryModel: '',
         excerpt: meta.description || '',
         image: coverImage,
+        favicon: '',
         enclosureUrl: '',
         enclosureType: '',
         enclosureDuration: '',
@@ -651,7 +659,11 @@ function installBundledBooks(outputPath: string): void {
   for (const filename of entries) {
     const dest = join(outputPath, filename);
     if (!existsSync(dest)) {
-      copyFileSync(join(booksDir, filename), dest);
+      try {
+        copyFileSync(join(booksDir, filename), dest);
+      } catch {
+        continue;
+      }
     }
 
     // Ensure "classicbooks" tag exists in annotation sidecar
@@ -775,7 +787,8 @@ export async function reprocessFile(filePath: string, options?: { force?: boolea
   }
 }
 
-export function startViewer(outputPath: string, port = 7777, openBrowser = true): void {
+export function startViewer(initialOutputPath: string, port = 7777, openBrowser = true): ReturnType<typeof createServer> {
+  let outputPath = initialOutputPath;
   setOutputPath(outputPath);
 
   // Watch output directory for .md file changes
@@ -792,6 +805,12 @@ export function startViewer(outputPath: string, port = 7777, openBrowser = true)
   const migrated = migrateToDateFolders(outputPath);
   if (migrated > 0) {
     console.log(`[Storage] Migrated ${migrated} articles to dated folders`);
+  }
+
+  // Mark accumulated short extracted articles so the repair loop skips them
+  const bulkMarked = markShortExtractedArticles(outputPath);
+  if (bulkMarked > 0) {
+    console.log(`[Storage] Marked ${bulkMarked} short articles as repair-attempted`);
   }
 
   // Migrate monolithic highlights.json + notes.json to per-article .annot.json sidecars
@@ -1340,19 +1359,20 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
           if (body.maxAgeDays !== undefined) existing.maxAgeDays = body.maxAgeDays;
           saveJsonFile(FEEDS_PATH, existing);
 
-          // Register and create output directory when outputPath is set
+          // Register and switch to the new output directory
           if (existing.outputPath) {
             const expandedPath = (existing.outputPath as string).replace(/^~/, homedir());
-            setOutputPath(expandedPath);
-            if (!existsSync(expandedPath)) {
-              mkdirSync(expandedPath, { recursive: true });
+            outputPath = expandedPath;
+            setOutputPath(outputPath);
+            if (!existsSync(outputPath)) {
+              mkdirSync(outputPath, { recursive: true });
             }
           }
 
           sendJson(res, { ok: true });
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Invalid request body';
-          log(`[api/config] POST error: ${msg}`);
+          console.log(`[api/config] POST error: ${msg}`);
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: msg }));
         }
@@ -1404,7 +1424,8 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
           },
           viewerMode: (appSettings.viewerMode as string) || 'app',
           timeFormat: (appSettings.timeFormat as string) || '12h',
-          autoTag: appSettings.autoTag === true
+          autoTag: appSettings.autoTag === true,
+          researchAutoExtract: appSettings.researchAutoExtract !== false
         });
         return;
       }
@@ -1434,6 +1455,14 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
           if (body.autoTag !== undefined) {
             const appSettings = loadJsonFile(APP_SETTINGS_PATH);
             appSettings.autoTag = body.autoTag === true;
+            saveJsonFile(APP_SETTINGS_PATH, appSettings);
+            sendJson(res, { ok: true });
+            return;
+          }
+
+          if (body.researchAutoExtract !== undefined) {
+            const appSettings = loadJsonFile(APP_SETTINGS_PATH);
+            appSettings.researchAutoExtract = body.researchAutoExtract === true;
             saveJsonFile(APP_SETTINGS_PATH, appSettings);
             sendJson(res, { ok: true });
             return;
@@ -1503,6 +1532,70 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
         }
         return;
       }
+    }
+
+    // Email roundup settings API
+    if (url.pathname === '/api/email-settings') {
+      if (req.method === 'GET') {
+        const appSettings = loadJsonFile(APP_SETTINGS_PATH);
+        sendJson(res, (appSettings.emailRoundup as Record<string, unknown>) || {
+          enabled: false,
+          smtpHost: '',
+          smtpPort: 587,
+          smtpUser: '',
+          smtpPass: '',
+          useTls: true,
+          fromAddress: '',
+          toAddress: '',
+          sendTime: '08:00',
+          lookbackDays: 1
+        });
+        return;
+      }
+      if (req.method === 'POST') {
+        try {
+          const body = JSON.parse(await readBody(req));
+          const appSettings = loadJsonFile(APP_SETTINGS_PATH);
+          const existing = (appSettings.emailRoundup as Record<string, unknown>) || {};
+          // Merge — only update fields that are present in the request
+          const updated: Record<string, unknown> = { ...existing };
+          const fields = ['enabled', 'smtpProvider', 'smtpHost', 'smtpPort', 'smtpUser', 'smtpPass', 'useTls', 'fromAddress', 'toAddress', 'frequency', 'sendTime', 'sendTime2', 'lookbackDays'];
+          for (const f of fields) {
+            if (body[f] !== undefined) updated[f] = body[f];
+          }
+          appSettings.emailRoundup = updated;
+          saveJsonFile(APP_SETTINGS_PATH, appSettings);
+          sendJson(res, { ok: true });
+        } catch (err) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid request body' }));
+        }
+        return;
+      }
+    }
+
+    if (url.pathname === '/api/email/test' && req.method === 'POST') {
+      try {
+        const { sendTestEmail } = await import('./email');
+        const msg = await sendTestEmail();
+        sendJson(res, { ok: true, message: msg });
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/email/send-roundup' && req.method === 'POST') {
+      try {
+        const { sendRoundup } = await import('./email');
+        const msg = await sendRoundup(undefined, undefined, port);
+        sendJson(res, { ok: true, message: msg });
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+      }
+      return;
     }
 
     // Model catalog for Settings UI
@@ -2453,6 +2546,197 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
       return;
     }
 
+    // Research API
+    if (url.pathname === '/api/research/entities' && req.method === 'GET') {
+      const { getResearchPDS, queryEntities } = await import('./research');
+      const pds = getResearchPDS();
+      const results = queryEntities(pds, {
+        search: url.searchParams.get('search') || undefined,
+        type: url.searchParams.get('type') || undefined,
+        limit: url.searchParams.get('limit') ? parseInt(url.searchParams.get('limit')!, 10) : undefined,
+      });
+      sendJson(res, results);
+      return;
+    }
+
+    if (url.pathname.startsWith('/api/research/entity/') && req.method === 'GET') {
+      const parts = url.pathname.split('/');
+      const rkey = parts[4];
+      const { getResearchPDS, queryEntityProfile } = await import('./research');
+      const pds = getResearchPDS();
+      const profile = queryEntityProfile(pds, rkey);
+      if (!profile) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Entity not found' }));
+        return;
+      }
+      sendJson(res, profile);
+      return;
+    }
+
+    if (url.pathname.startsWith('/api/research/brief/') && req.method === 'GET') {
+      const entityName = decodeURIComponent(url.pathname.split('/').slice(4).join('/'));
+      const { getResearchPDS, generateEntityBrief } = await import('./research');
+      const pds = getResearchPDS();
+      const brief = await generateEntityBrief(pds, entityName);
+      sendJson(res, brief || { summary: null, wikipediaUrl: null, mentionCount: 0 });
+      return;
+    }
+
+    if (url.pathname.startsWith('/api/research/related/') && req.method === 'GET') {
+      const filename = decodeURIComponent(url.pathname.split('/').pop()!);
+      const { getResearchPDS, queryRelatedEntities } = await import('./research');
+      const pds = getResearchPDS();
+      const entities = queryRelatedEntities(pds, filename);
+      sendJson(res, entities);
+      return;
+    }
+
+    if (url.pathname === '/api/research/status' && req.method === 'GET') {
+      const { getResearchPDS } = await import('./research');
+      const { listMarkdownFiles } = await import('./writer');
+      const pds = getResearchPDS();
+      const extractions = pds.listRecords('app.pullread.extraction');
+      const entities = pds.listRecords('app.pullread.entity');
+      const totalArticles = listMarkdownFiles(outputPath).length;
+      sendJson(res, {
+        extractedCount: extractions.length,
+        entityCount: entities.length,
+        totalArticles,
+        lastExtraction: extractions.length > 0
+          ? extractions[extractions.length - 1].value.extractedAt
+          : null,
+      });
+      return;
+    }
+
+    if (url.pathname === '/api/research/graph' && req.method === 'GET') {
+      const { getResearchPDS, queryGraphData } = await import('./research');
+      const pds = getResearchPDS();
+      const maxNodes = parseInt(url.searchParams.get('maxNodes') || '200', 10);
+      const graph = queryGraphData(pds, { maxNodes });
+      sendJson(res, graph);
+      return;
+    }
+
+    if (url.pathname === '/api/research/tensions' && req.method === 'GET') {
+      const { getResearchPDS, queryTensions } = await import('./research');
+      const pds = getResearchPDS();
+      const tensions = queryTensions(pds);
+      sendJson(res, tensions);
+      return;
+    }
+
+    if (url.pathname === '/api/research/extract' && req.method === 'POST') {
+      const { getResearchPDS, runBackgroundExtraction } = await import('./research');
+      const pds = getResearchPDS();
+      // Run extraction (non-blocking response — send progress via status polling)
+      runBackgroundExtraction(pds, outputPath).then(async function(stats) {
+        console.log(`  Research extraction complete: ${stats.extracted} extracted, ${stats.skipped} skipped, ${stats.errors} errors`);
+        const { checkWatchMatches } = await import('./research');
+        const newMatches = checkWatchMatches(pds);
+        if (newMatches > 0) console.log(`  Watchlist: ${newMatches} new matches`);
+      }).catch(function(err) {
+        console.log(`  Research extraction failed: ${err instanceof Error ? err.message : err}`);
+      });
+      sendJson(res, { started: true });
+      return;
+    }
+
+    if (url.pathname === '/api/research/watches' && req.method === 'GET') {
+      const { getResearchPDS, listWatches, getUnseenMatches } = await import('./research');
+      const pds = getResearchPDS();
+      const watches = listWatches(pds);
+      const unseen = getUnseenMatches(pds);
+      sendJson(res, { watches: watches.map((w: any) => ({ rkey: w.rkey, ...w.value })), unseenCount: unseen.length });
+      return;
+    }
+
+    if (url.pathname === '/api/research/watches' && req.method === 'POST') {
+      const body = await readBody(req);
+      const data = JSON.parse(body);
+      const { getResearchPDS, addWatch } = await import('./research');
+      const pds = getResearchPDS();
+      const watch = addWatch(pds, data);
+      sendJson(res, { rkey: watch.rkey });
+      return;
+    }
+
+    if (url.pathname.startsWith('/api/research/watches/') && req.method === 'DELETE') {
+      const rkey = url.pathname.split('/').pop()!;
+      const { getResearchPDS, removeWatch } = await import('./research');
+      const pds = getResearchPDS();
+      removeWatch(pds, rkey);
+      sendJson(res, { ok: true });
+      return;
+    }
+
+    if (url.pathname === '/api/research/matches' && req.method === 'GET') {
+      const { getResearchPDS, getUnseenMatches } = await import('./research');
+      const pds = getResearchPDS();
+      const matches = getUnseenMatches(pds);
+      sendJson(res, matches.map((m: any) => ({ rkey: m.rkey, ...m.value })));
+      return;
+    }
+
+    if (url.pathname === '/api/research/matches/seen' && req.method === 'POST') {
+      const { getResearchPDS, markMatchesSeen } = await import('./research');
+      const pds = getResearchPDS();
+      markMatchesSeen(pds);
+      sendJson(res, { ok: true });
+      return;
+    }
+
+    if (url.pathname === '/api/research/extract-url' && req.method === 'POST') {
+      try {
+        const body = JSON.parse(await readBody(req));
+        if (!body.url) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'url is required' }));
+          return;
+        }
+        const { getResearchPDS, extractFromUrl } = await import('./research');
+        const pds = getResearchPDS();
+        const result = await extractFromUrl(pds, body.url);
+        sendJson(res, result || { entities: [], relationships: [], themes: [] });
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err instanceof Error ? err.message : 'Extraction failed' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/research/extract-note' && req.method === 'POST') {
+      try {
+        const body = JSON.parse(await readBody(req));
+        if (!body.noteId || !body.content) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'noteId and content required' }));
+          return;
+        }
+        const { getResearchPDS, extractNote } = await import('./research');
+        const pds = getResearchPDS();
+        const result = await extractNote(pds, {
+          noteId: body.noteId,
+          content: body.content,
+          sourceArticle: body.sourceArticle || '',
+        });
+        sendJson(res, result || { entities: [], relationships: [], themes: [] });
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err instanceof Error ? err.message : 'Note extraction failed' }));
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/research/reset' && req.method === 'POST') {
+      const { getResearchPDS, resetResearchData } = await import('./research');
+      const pds = getResearchPDS();
+      resetResearchData(pds);
+      sendJson(res, { ok: true });
+      return;
+    }
+
     send404(res);
   });
 
@@ -2469,4 +2753,6 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
       execFile(cmd, [url]);
     }
   });
+
+  return server;
 }

@@ -1,6 +1,6 @@
 {
   "name": "pullread",
-  "version": "0.4.7",
+  "version": "0.4.8",
   "description": "Sync Drafty bookmarks to markdown files",
   "main": "src/index.ts",
   "scripts": {
@@ -18,17 +18,21 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@atproto/syntax": "^0.5.0",
     "@fontsource/instrument-serif": "^5.2.8",
     "@highlightjs/cdn-assets": "^11.11.1",
     "@mozilla/readability": "^0.6.0",
+    "better-sqlite3": "^12.6.2",
     "defuddle": "^0.8.0",
     "dompurify": "^3.3.1",
     "fast-xml-parser": "^5.3.3",
+    "force-graph": "^1.51.2",
     "heroicons": "^2.2.0",
     "hls.js": "^1.6.15",
     "linkedom": "^0.18.12",
     "marked": "^17.0.3",
     "mermaid": "^11.12.3",
+    "nodemailer": "^8.0.1",
     "turndown": "^7.2.2",
     "unpdf": "^1.4.0"
   },
@@ -45,6 +49,7 @@
     "@types/bun": "^1.3.8",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.1.0",
+    "@types/nodemailer": "^7.0.11",
     "@types/turndown": "^5.0.6",
     "babel-jest": "^30.2.0",
     "jest": "^30.2.0",

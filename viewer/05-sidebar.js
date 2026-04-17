@@ -378,6 +378,11 @@ function magicScore(f, engagement, mixerConfig) {
 
   var rawScore = 100 * (wR * recency + wS * source + wU * unread + wSig * Math.min(signals, 1));
 
+  // Boost recently bookmarked inbox items — users save articles to read right away
+  if (f.feed === 'inbox' && age < 1) {
+    rawScore *= 2.5;
+  }
+
   // Section boost multiplier — match against editorial section from AI auto-tagging
   var boosts = mixerConfig.tagBoosts;
   if (boosts && Object.keys(boosts).length > 0 && notes && notes.section) {
@@ -855,6 +860,10 @@ function sidebarNavFilter(filter) {
   if (filter === 'explore') {
     closeDrawer();
     switchSidebarView('home');
+    return;
+  } else if (filter === 'research') {
+    closeDrawer();
+    showResearch();
     return;
   } else if (filter === 'notebook') {
     closeDrawer();
