@@ -256,20 +256,23 @@ export async function extractNote(
   const noteFilename = `note:${note.noteId}`;
 
   // Clear previous note-origin mentions and edges for this note
-  const existingMentions = pds.listRecords('app.pullread.mention')
-    .filter((m: any) => m.value.origin === 'note' && m.value.filename === noteFilename);
+  const existingMentions = pds.query('app.pullread.mention', {
+    where: { origin: 'note', filename: noteFilename },
+  });
   for (const m of existingMentions) {
     pds.deleteRecord('app.pullread.mention', m.rkey);
   }
-  const existingEdges = pds.listRecords('app.pullread.edge')
-    .filter((e: any) => e.value.origin === 'note' && e.value.sourceFilename === noteFilename);
+  const existingEdges = pds.query('app.pullread.edge', {
+    where: { origin: 'note', sourceFilename: noteFilename },
+  });
   for (const e of existingEdges) {
     pds.deleteRecord('app.pullread.edge', e.rkey);
   }
 
   // Delete previous extraction record for this note
-  const prevExtraction = pds.listRecords('app.pullread.extraction')
-    .filter((ex: any) => ex.value.filename === noteFilename);
+  const prevExtraction = pds.query('app.pullread.extraction', {
+    where: { filename: noteFilename },
+  });
   for (const ex of prevExtraction) {
     pds.deleteRecord('app.pullread.extraction', ex.rkey);
   }
@@ -469,11 +472,10 @@ interface QueryOptions {
 }
 
 export function queryEntities(pds: PDS, opts: QueryOptions): EntityResult[] {
-  let entities = pds.listRecords('app.pullread.entity');
+  let entities = opts.type
+    ? pds.query('app.pullread.entity', { where: { type: opts.type } })
+    : pds.listRecords('app.pullread.entity');
 
-  if (opts.type) {
-    entities = entities.filter((e: any) => e.value.type === opts.type);
-  }
   if (opts.search) {
     const term = opts.search.toLowerCase();
     entities = entities.filter((e: any) => e.value.name.toLowerCase().includes(term));
@@ -541,19 +543,16 @@ export function queryEntityProfile(pds: PDS, rkey: string) {
   const entity = pds.getRecord('app.pullread.entity', rkey);
   if (!entity) return null;
 
-  const mentions = pds.listRecords('app.pullread.mention')
-    .filter((m: any) => m.value.entityName === entity.value.name);
-
-  const edges = pds.listRecords('app.pullread.edge')
-    .filter((e: any) => e.value.from === entity.value.name || e.value.to === entity.value.name);
+  const mentions = pds.query('app.pullread.mention', {
+    where: { entityName: entity.value.name },
+  });
+  const edges = edgesTouching(pds, entity.value.name);
 
   return { entity: entity.value, rkey, mentions, edges };
 }
 
 export function queryRelatedEntities(pds: PDS, filename: string) {
-  const mentions = pds.listRecords('app.pullread.mention')
-    .filter((m: any) => m.value.filename === filename);
-
+  const mentions = pds.query('app.pullread.mention', { where: { filename } });
   const entityNames = new Set(mentions.map((m: any) => m.value.entityName));
   const entities = pds.listRecords('app.pullread.entity')
     .filter((e: any) => entityNames.has(e.value.name));
@@ -563,6 +562,15 @@ export function queryRelatedEntities(pds: PDS, filename: string) {
     name: e.value.name,
     type: e.value.type,
   }));
+}
+
+function edgesTouching(pds: PDS, entityName: string): any[] {
+  const fromEdges = pds.query('app.pullread.edge', { where: { from: entityName } });
+  const toEdges = pds.query('app.pullread.edge', { where: { to: entityName } });
+  const byRkey = new Map<string, any>();
+  for (const e of fromEdges) byRkey.set(e.rkey, e);
+  for (const e of toEdges) byRkey.set(e.rkey, e);
+  return [...byRkey.values()].sort((a, b) => a.rkey < b.rkey ? -1 : a.rkey > b.rkey ? 1 : 0);
 }
 
 interface TensionMention {
@@ -643,15 +651,12 @@ export function gatherEntityContext(pds: PDS, entityName: string): {
   stances: string[];
   relatedEntities: Array<{ name: string; relationship: string }>;
 } | null {
-  const entities = pds.listRecords('app.pullread.entity');
-  const entity = entities.find((e: any) => e.value.name === entityName);
+  const matches = pds.query('app.pullread.entity', { where: { name: entityName }, limit: 1 });
+  const entity = matches[0];
   if (!entity) return null;
 
-  const mentions = pds.listRecords('app.pullread.mention')
-    .filter((m: any) => m.value.entityName === entityName);
-
-  const edges = pds.listRecords('app.pullread.edge')
-    .filter((e: any) => e.value.from === entityName || e.value.to === entityName);
+  const mentions = pds.query('app.pullread.mention', { where: { entityName } });
+  const edges = edgesTouching(pds, entityName);
 
   const sentimentBreakdown: Record<string, number> = {};
   const stances: string[] = [];
