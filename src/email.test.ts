@@ -1,8 +1,19 @@
 // ABOUTME: Tests for the email roundup module
 // ABOUTME: Covers HTML generation, escaping, provider resolution, curation, summary, and send logic
 
-import { escapeHtml, buildRoundupHtml, sendTestEmail, sendRoundup, resolveSmtpConfig, SMTP_PROVIDERS, curateArticles } from './email';
+import { escapeHtml, buildRoundupHtml, sendTestEmail, sendRoundup, resolveSmtpConfig, SMTP_PROVIDERS, curateArticles, generateRoundupSummary } from './email';
 import type { EmailConfig, ArticleMeta } from './email';
+
+jest.mock('./summarizer', () => ({
+  // Default: no LLM configured, so generateRoundupSummary short-circuits to null.
+  // Individual tests override these mocks as needed.
+  loadLLMConfig: jest.fn(() => null),
+  promptLLM: jest.fn(),
+  summarizeText: jest.fn(),
+}));
+import { loadLLMConfig, promptLLM } from './summarizer';
+const mockLoadLLMConfig = loadLLMConfig as jest.MockedFunction<typeof loadLLMConfig>;
+const mockPromptLLM = promptLLM as jest.MockedFunction<typeof promptLLM>;
 
 const baseConfig: EmailConfig = {
   enabled: true,
@@ -323,4 +334,55 @@ describe('sendRoundup', () => {
       async () => articles,
     )).rejects.toThrow();
   }, 45000);
+});
+
+describe('generateRoundupSummary', () => {
+  beforeEach(() => {
+    mockLoadLLMConfig.mockReset();
+    mockPromptLLM.mockReset();
+    mockLoadLLMConfig.mockReturnValue(null);
+  });
+
+  test('returns null when no LLM is configured', async () => {
+    mockLoadLLMConfig.mockReturnValue(null);
+    const result = await generateRoundupSummary([article({ title: 'A' })]);
+    expect(result).toBeNull();
+    expect(mockPromptLLM).not.toHaveBeenCalled();
+  });
+
+  test('sends the roundup prompt as an instruction (not wrapped as article text to summarize)', async () => {
+    mockLoadLLMConfig.mockReturnValue({ provider: 'openai', apiKey: 'k', model: 'gpt-5' });
+    mockPromptLLM.mockResolvedValue({ text: 'A fresh, article-aware blurb.', model: 'gpt-5' });
+
+    const articles = [
+      article({ title: 'Quantum chips ship', domain: 'chip.news' }),
+      article({ title: 'New transit plan', domain: 'city.gov' }),
+    ];
+    const result = await generateRoundupSummary(articles);
+
+    expect(result).toBe('A fresh, article-aware blurb.');
+    // Must route through promptLLM, which sends the prompt verbatim — NOT summarizeText,
+    // which would prepend "Summarize this article…" and yield a near-static blurb.
+    expect(mockPromptLLM).toHaveBeenCalledTimes(1);
+    const prompt = mockPromptLLM.mock.calls[0][0];
+    // The actual article titles are present so the model can write a fresh rundown.
+    expect(prompt).toContain('Quantum chips ship');
+    expect(prompt).toContain('New transit plan');
+    // The roundup instructions are present as instructions.
+    expect(prompt).toContain('opening note for a daily reading rundown');
+  });
+
+  test('returns null when the model yields empty text', async () => {
+    mockLoadLLMConfig.mockReturnValue({ provider: 'openai', apiKey: 'k', model: 'gpt-5' });
+    mockPromptLLM.mockResolvedValue({ text: '   ', model: 'gpt-5' });
+    const result = await generateRoundupSummary([article({ title: 'A' })]);
+    expect(result).toBeNull();
+  });
+
+  test('returns null when the model call throws', async () => {
+    mockLoadLLMConfig.mockReturnValue({ provider: 'openai', apiKey: 'k', model: 'gpt-5' });
+    mockPromptLLM.mockRejectedValue(new Error('rate limited'));
+    const result = await generateRoundupSummary([article({ title: 'A' })]);
+    expect(result).toBeNull();
+  });
 });

@@ -355,7 +355,7 @@ Articles:
 `;
 
 export async function generateRoundupSummary(articles: ArticleMeta[]): Promise<string | null> {
-  const { summarizeText, loadLLMConfig } = await import('./summarizer');
+  const { promptLLM, loadLLMConfig } = await import('./summarizer');
   const config = loadLLMConfig();
   if (!config) return null;
 
@@ -367,10 +367,14 @@ export async function generateRoundupSummary(articles: ArticleMeta[]): Promise<s
     })
     .join('\n');
 
+  // Use promptLLM (not summarizeText): the roundup prompt IS the instruction.
+  // summarizeText would prepend its own "Summarize this article…" wrapper, so the
+  // model would summarize our instructions instead of following them — producing a
+  // near-static blurb anchored on the example lines in ROUNDUP_SUMMARY_PROMPT.
   const prompt = ROUNDUP_SUMMARY_PROMPT + articleList;
   try {
-    const result = await summarizeText(prompt, config);
-    return result.summary;
+    const result = await promptLLM(prompt, config, 300);
+    return result.text.trim() || null;
   } catch (err) {
     console.warn('[email] Failed to generate roundup summary:', err instanceof Error ? err.message : err);
     return null;
