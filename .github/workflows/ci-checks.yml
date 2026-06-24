@@ -1,0 +1,60 @@
+# ABOUTME: Fast PR/main gate that runs typecheck and the test suite before the expensive Tauri build
+# ABOUTME: Catches type errors and broken tests that build-tauri.yml (which only compiles) would miss
+
+name: CI Checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'worker/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'bun.lock'
+      - 'tsconfig.json'
+      - 'jest.config.js'
+      - '.github/workflows/ci-checks.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'worker/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'bun.lock'
+      - 'tsconfig.json'
+      - 'jest.config.js'
+      - '.github/workflows/ci-checks.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          # Match the build workflow's pinned version.
+          bun-version: 1.3.11
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test (jest)
+        run: npm test
+
+      - name: Test (bun:test files)
+        run: npm run test:bun
