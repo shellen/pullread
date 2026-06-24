@@ -444,7 +444,7 @@ function resolveRelPath(base: string, rel: string): string {
   return resolved.join('/');
 }
 
-function listFiles(outputPath: string): FileMeta[] {
+export function listFiles(outputPath: string): FileMeta[] {
   if (!existsSync(outputPath)) return [];
 
   const files: FileMeta[] = [];

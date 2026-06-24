@@ -2,13 +2,13 @@
 // ABOUTME: Syncs RSS and Atom feeds to markdown files
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
-import { join, basename, dirname } from 'path';
+import { join, basename, dirname, resolve } from 'path';
 import { homedir } from 'os';
 import { fetchFeed, FeedEntry } from './feed';
 import { fetchAndExtract, FetchOptions, shouldSkipUrl, isBinaryUrl, classifyFetchError, htmlToMarkdown } from './extractor';
 import { writeArticle, listMarkdownFiles, resolveFilePath, setOutputPath, needsRepair, markRepairAttempted, markShortExtractedArticles } from './writer';
 import { Storage } from './storage';
-import { startViewer, reprocessFile, parseFrontmatter } from './viewer';
+import { startViewer, reprocessFile, parseFrontmatter, listFiles } from './viewer';
 import { summarizeText, loadLLMConfig } from './summarizer';
 import { autotagBatch } from './autotagger';
 import { parseBookmarksHtml, bookmarksToEntries } from './bookmarks';
@@ -571,6 +571,35 @@ if (command === 'sync') {
     : 7777;
   const openBrowser = !process.argv.includes('--no-open');
   startViewer(config.outputPath, port, openBrowser);
+} else if (command === 'preview-rundown') {
+  // Render the email roundup (curation + AI editorial note + HTML) to a file
+  // without sending any email or needing a running viewer. Handy for verifying
+  // the rundown summary locally. Use --out to set the path (default: rundown-preview.html).
+  const config = loadOrBootstrapConfig();
+  const outIndex = args.indexOf('--out');
+  const outPath = outIndex !== -1 && args[outIndex + 1]
+    ? resolve(args[outIndex + 1].replace(/^~/, process.env.HOME || ''))
+    : resolve('rundown-preview.html');
+
+  (async () => {
+    const { buildRoundup, filterByLookback, loadEmailConfig } = await import('./email');
+    const cfg = loadEmailConfig();
+    const fetchArticles = async () => filterByLookback(listFiles(config.outputPath), cfg.lookbackDays);
+    const result = await buildRoundup(cfg, fetchArticles);
+
+    writeFileSync(outPath, result.html);
+    console.log(`Articles in last ${cfg.lookbackDays} day${cfg.lookbackDays === 1 ? '' : 's'}: ${result.articles.length}`);
+    console.log(`Editorial note: ${result.summary ?? '(none — no LLM configured, or generation failed)'}`);
+    console.log(`Wrote preview to ${outPath}`);
+    if (result.articles.length === 0) {
+      console.log('Note: no bookmarked articles in the window, so the summary will be empty. Bookmark a few recent articles and re-run.');
+    }
+    // Open resources (research DB, etc.) can keep the event loop alive — exit explicitly.
+    process.exit(0);
+  })().catch(err => {
+    console.error('Fatal error:', err instanceof Error ? err.message : err);
+    process.exit(1);
+  });
 } else if (command === 'summarize') {
   const config = loadConfig();
   const batchMode = args.includes('--batch');
@@ -833,5 +862,7 @@ Commands:
   import <file.html>      Import bookmarks from HTML file (Netscape format)
   review                  Generate a weekly review of recent articles
   review --days N         Review the past N days (default: 7)
+  preview-rundown         Render the email rundown to an HTML file (no email sent)
+  preview-rundown --out <path>  Write the preview to a custom path
 `);
 }

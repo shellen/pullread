@@ -1,7 +1,7 @@
 // ABOUTME: Tests for the email roundup module
 // ABOUTME: Covers HTML generation, escaping, provider resolution, curation, summary, and send logic
 
-import { escapeHtml, buildRoundupHtml, sendTestEmail, sendRoundup, resolveSmtpConfig, SMTP_PROVIDERS, curateArticles, generateRoundupSummary } from './email';
+import { escapeHtml, buildRoundupHtml, sendTestEmail, sendRoundup, resolveSmtpConfig, SMTP_PROVIDERS, curateArticles, generateRoundupSummary, buildRoundup, filterByLookback } from './email';
 import type { EmailConfig, ArticleMeta } from './email';
 
 jest.mock('./summarizer', () => ({
@@ -384,5 +384,67 @@ describe('generateRoundupSummary', () => {
     mockPromptLLM.mockRejectedValue(new Error('rate limited'));
     const result = await generateRoundupSummary([article({ title: 'A' })]);
     expect(result).toBeNull();
+  });
+});
+
+describe('filterByLookback', () => {
+  const iso = (daysAgo: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - daysAgo);
+    return d.toISOString();
+  };
+
+  test('keeps articles bookmarked within the window, drops older ones', () => {
+    const articles = [
+      article({ title: 'today', bookmarked: iso(0) }),
+      article({ title: 'yesterday', bookmarked: iso(1) }),
+      article({ title: 'last week', bookmarked: iso(7) }),
+    ];
+    const kept = filterByLookback(articles, 2).map(a => a.title);
+    expect(kept).toContain('today');
+    expect(kept).toContain('yesterday');
+    expect(kept).not.toContain('last week');
+  });
+
+  test('drops articles with no bookmarked date', () => {
+    const kept = filterByLookback([article({ title: 'undated' })], 30);
+    expect(kept).toHaveLength(0);
+  });
+});
+
+describe('buildRoundup', () => {
+  beforeEach(() => {
+    mockLoadLLMConfig.mockReset();
+    mockPromptLLM.mockReset();
+    mockLoadLLMConfig.mockReturnValue(null);
+  });
+
+  const cfg = (): EmailConfig => ({ ...baseConfig });
+
+  test('renders article titles and the editorial note into the HTML', async () => {
+    mockLoadLLMConfig.mockReturnValue({ provider: 'openai', apiKey: 'k', model: 'gpt-5' });
+    mockPromptLLM.mockResolvedValue({ text: 'A fresh editorial note.', model: 'gpt-5' });
+
+    const articles = [
+      article({ title: 'Quantum chips ship', bookmarked: new Date().toISOString() }),
+      article({ title: 'New transit plan', bookmarked: new Date().toISOString() }),
+    ];
+    const result = await buildRoundup(cfg(), async () => articles);
+
+    expect(result.summary).toBe('A fresh editorial note.');
+    expect(result.articles).toHaveLength(2);
+    expect(result.html).toContain('Quantum chips ship');
+    expect(result.html).toContain('New transit plan');
+    expect(result.html).toContain('A fresh editorial note.');
+    expect(result.subject).toContain('The Pull Read Rundown');
+  });
+
+  test('still renders (no note) when no LLM is configured', async () => {
+    const articles = [article({ title: 'Solo story', bookmarked: new Date().toISOString() })];
+    const result = await buildRoundup(cfg(), async () => articles);
+
+    expect(result.summary).toBeNull();
+    expect(result.html).toContain('Solo story');
+    expect(mockPromptLLM).not.toHaveBeenCalled();
   });
 });
