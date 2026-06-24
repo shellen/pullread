@@ -51,7 +51,8 @@ interface SyncProgress {
   saved: number;
   failed: number;
   startedAt: string;
-  updatedAt: string;
+  // Stamped by writeSyncProgress() on every write, so call sites don't set it.
+  updatedAt?: string;
 }
 
 function writeSyncProgress(progress: SyncProgress): void {

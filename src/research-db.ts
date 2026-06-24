@@ -25,7 +25,7 @@ function generateTid(): string {
   return encoded;
 }
 
-interface PdsRecord {
+export interface PdsRecord {
   collection: string;
   rkey: string;
   value: any;
