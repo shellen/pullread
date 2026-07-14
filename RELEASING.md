@@ -110,18 +110,21 @@ laptop) and some environments can't push tags at all.
 
 ### 8. Wait for release CI
 
-The release build runs four jobs:
+The tag build (`Build Tauri App`) runs three jobs:
 
 | Job | What it does |
 |-----|-------------|
 | **build** (matrix) | Builds ARM64 + Intel sidecars, signs, notarizes, creates draft release with DMGs |
 | **publish-updater** | Signs update bundles, builds `latest.json`, publishes the release (marks as non-draft) |
 | **verify-release** | Fails loudly if the release is still draft, missing a DMG, missing `latest.json`, or the manifest version mismatches the tag |
-| **deploy-site** | Deploys pullread.com to GitHub Pages |
 
 Monitor with `gh run list --limit 5`. The whole pipeline takes ~12 minutes.
 
 **There is no manual publish step.** The `publish-updater` job calls `gh release edit --draft=false` automatically, and `verify-release` confirms the result.
+
+The site (pullread.com/releases) is **not** deployed by the tag build — `deploy-site.yml`
+runs on every push to `main`, so the release notes go live when the version-bump PR
+merges (step 5), before you tag. Nothing extra to do.
 
 ### 9. Verify
 
