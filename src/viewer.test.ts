@@ -1456,3 +1456,30 @@ describe('Hub and Manage Sources consolidation', () => {
     expect(js).not.toMatch(/function\s+addSuggestedFeed/);
   });
 });
+
+describe('cleanBrokenFragments preserves bracketed titles', () => {
+  // Regression: titles starting with "[" (e.g. Daring Fireball "[Sponsor] …"
+  // posts) or ending with "]" had their brackets stripped by the broken-markdown
+  // cleanup, which treated any leading "[" / trailing "]" as an artifact.
+  const rootDir = join(__dirname, '..');
+  const js = () => readFileSync(join(rootDir, 'viewer', '04-article.js'), 'utf-8');
+
+  test('skips text nodes inside the article header', () => {
+    expect(js()).toMatch(/cleanBrokenFragments[\s\S]*?closest\('\.article-header'\)/);
+  });
+
+  test('no unconditional leading-[ / trailing-] strip on mixed text', () => {
+    expect(js()).not.toContain("text.replace(/^\\s*\\[\\s*/, '')");
+    expect(js()).not.toContain("replace(/\\s*\\]\\s*$/, '')");
+  });
+
+  test('bracket strip is conditioned on adjacent media elements', () => {
+    const src = js();
+    expect(src).toMatch(/isMedia\(node\.nextSibling\)/);
+    expect(src).toMatch(/isMedia\(node\.previousSibling\)/);
+  });
+
+  test('lone-bracket text node removal is still present', () => {
+    expect(js()).toContain('/^\\s*[\\[\\]]\\s*$/.test(text)');
+  });
+});

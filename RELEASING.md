@@ -9,7 +9,8 @@ git tag --sort=-v:refname | head -1       # e.g. v0.4.5 → next is 0.4.6
 # 1. Review Guide, FAQ, release notes — draft user-facing bullets
 # 2. Bump version + rebuild + test
 bun scripts/bump-version.ts X.Y.Z
-bun run scripts/embed-viewer.ts && bun test
+bun run scripts/embed-viewer.ts
+npm run typecheck && npm test && npm run test:bun   # tsc + jest suite + the two bun:test files
 # 3. Update site/releases.html and _prCurrentVersion fallback
 # 4. Commit, push, create PR → wait for CI ✓
 # 5. Merge PR to main → wait for CI ✓
@@ -39,8 +40,14 @@ bun scripts/bump-version.ts X.Y.Z
 # Rebuild the embedded viewer (picks up any viewer changes)
 bun run scripts/embed-viewer.ts
 
-# Run the test suite
-bun test
+# Typecheck, then run the test suite.
+# The suite is split across runners: most files are jest, two (models, shell-open)
+# import from `bun:test`, the worker uses vitest, and tests/e2e uses Playwright.
+# `bun test` alone fails on the jest-mock files and `jest` alone can't load the
+# bun:test files — so run both. tsc is not wired into CI, so check it here.
+npm run typecheck    # tsc --noEmit
+npm test             # jest
+npm run test:bun     # the two bun:test files
 ```
 
 ### 3. Update release notes

@@ -1,6 +1,6 @@
 {
   "name": "pullread",
-  "version": "0.4.9",
+  "version": "0.4.10",
   "description": "Sync Drafty bookmarks to markdown files",
   "main": "src/index.ts",
   "scripts": {
@@ -12,7 +12,9 @@
     "build:macos-arm64": "bun build src/index.ts --compile --target=bun-darwin-arm64 --outfile dist/pullread-arm64",
     "build:macos-x64": "bun build src/index.ts --compile --target=bun-darwin-x64 --outfile dist/pullread-x64",
     "sync:models": "bun scripts/sync-swift-models.ts",
-    "test": "jest"
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:bun": "bun test src/models.test.ts src/shell-open.test.ts"
   },
   "keywords": [],
   "author": "",

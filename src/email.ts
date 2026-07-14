@@ -355,7 +355,7 @@ Articles:
 `;
 
 export async function generateRoundupSummary(articles: ArticleMeta[]): Promise<string | null> {
-  const { summarizeText, loadLLMConfig } = await import('./summarizer');
+  const { promptLLM, loadLLMConfig } = await import('./summarizer');
   const config = loadLLMConfig();
   if (!config) return null;
 
@@ -367,27 +367,47 @@ export async function generateRoundupSummary(articles: ArticleMeta[]): Promise<s
     })
     .join('\n');
 
+  // Use promptLLM (not summarizeText): the roundup prompt IS the instruction.
+  // summarizeText would prepend its own "Summarize this article…" wrapper, so the
+  // model would summarize our instructions instead of following them — producing a
+  // near-static blurb anchored on the example lines in ROUNDUP_SUMMARY_PROMPT.
   const prompt = ROUNDUP_SUMMARY_PROMPT + articleList;
   try {
-    const result = await summarizeText(prompt, config);
-    return result.summary;
+    const result = await promptLLM(prompt, config, 300);
+    return result.text.trim() || null;
   } catch (err) {
     console.warn('[email] Failed to generate roundup summary:', err instanceof Error ? err.message : err);
     return null;
   }
 }
 
-export async function sendRoundup(
-  config?: EmailConfig,
+export interface RoundupResult {
+  html: string;
+  subject: string;
+  summary: string | null;
+  articles: ArticleMeta[];
+}
+
+/** Keep only articles bookmarked within the lookback window. */
+export function filterByLookback(articles: ArticleMeta[], lookbackDays: number): ArticleMeta[] {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - lookbackDays);
+  const cutoffStr = cutoff.toISOString();
+  return articles.filter(a => a.bookmarked && a.bookmarked >= cutoffStr);
+}
+
+/**
+ * Gather, curate, summarize, and render the roundup HTML — everything except the
+ * actual email send. Shared by sendRoundup (which mails it) and the preview-rundown
+ * CLI command (which writes it to a file). Provide `fetchArticles` to supply articles
+ * directly; otherwise articles are pulled from a running viewer on `port` and filtered
+ * to the lookback window.
+ */
+export async function buildRoundup(
+  cfg: EmailConfig,
   fetchArticles?: () => Promise<ArticleMeta[]>,
   port = 7777,
-): Promise<string> {
-  const cfg = config || loadEmailConfig();
-  const smtp = resolveSmtpConfig(cfg);
-  if (!smtp.host || !cfg.toAddress) {
-    throw new Error('Email not configured: missing SMTP host or recipient');
-  }
-
+): Promise<RoundupResult> {
   let articles: ArticleMeta[] = [];
   if (fetchArticles) {
     articles = await fetchArticles();
@@ -395,10 +415,7 @@ export async function sendRoundup(
     try {
       const resp = await fetch(`http://127.0.0.1:${port}/api/files`);
       const allArticles = (await resp.json()) as ArticleMeta[];
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - cfg.lookbackDays);
-      const cutoffStr = cutoff.toISOString();
-      articles = allArticles.filter(a => a.bookmarked && a.bookmarked >= cutoffStr);
+      articles = filterByLookback(allArticles, cfg.lookbackDays);
     } catch (err) {
       throw new Error(`Failed to fetch articles: ${err instanceof Error ? err.message : err}`);
     }
@@ -427,12 +444,28 @@ export async function sendRoundup(
   // Validate article images — strip broken URLs to avoid broken image icons
   await validateArticleImages(curated);
 
-  // Generate AI editorial summary (non-blocking — email sends even if this fails)
+  // Generate AI editorial summary (non-blocking — roundup renders even if this fails)
   const summary = await generateRoundupSummary(curated);
 
   const html = buildRoundupHtml(curated, cfg.lookbackDays, summary);
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   const subject = `The Pull Read Rundown — ${today}`;
+
+  return { html, subject, summary, articles: curated };
+}
+
+export async function sendRoundup(
+  config?: EmailConfig,
+  fetchArticles?: () => Promise<ArticleMeta[]>,
+  port = 7777,
+): Promise<string> {
+  const cfg = config || loadEmailConfig();
+  const smtp = resolveSmtpConfig(cfg);
+  if (!smtp.host || !cfg.toAddress) {
+    throw new Error('Email not configured: missing SMTP host or recipient');
+  }
+
+  const { html, subject, articles } = await buildRoundup(cfg, fetchArticles, port);
 
   const transport = createSmtpTransport(cfg);
   const mailOptions: Record<string, unknown> = {
@@ -452,5 +485,5 @@ export async function sendRoundup(
 
   await transport.sendMail(mailOptions);
 
-  return `Rundown sent with ${curated.length} article${curated.length === 1 ? '' : 's'}`;
+  return `Rundown sent with ${articles.length} article${articles.length === 1 ? '' : 's'}`;
 }

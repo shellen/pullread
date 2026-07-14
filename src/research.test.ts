@@ -17,7 +17,7 @@ jest.mock('./writer', () => ({
 const mockListFiles = listMarkdownFiles as jest.MockedFunction<typeof listMarkdownFiles>;
 
 jest.mock('fs', () => {
-  const actual = require('fs');
+  const actual = jest.requireActual('fs');
   return { ...actual, readFileSync: jest.fn() };
 });
 const mockReadFile = readFileSync as jest.MockedFunction<typeof readFileSync>;

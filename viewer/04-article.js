@@ -1221,15 +1221,23 @@ function renderArticle(text, filename) {
   (function cleanBrokenFragments(root) {
     var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
     var removals = [];
+    var isMedia = function(n) { return n && n.nodeType === 1 && /^(IMG|A|IFRAME|VIDEO)$/.test(n.tagName); };
     while (walker.nextNode()) {
       var node = walker.currentNode;
+      // The header is app-generated, never broken markdown — and titles
+      // legitimately start with "[" (e.g. Daring Fireball "[Sponsor]" posts)
+      if (node.parentElement && node.parentElement.closest('.article-header')) continue;
       var text = node.textContent;
       // Remove text nodes that are just lone brackets
       if (/^\s*[\[\]]\s*$/.test(text)) { removals.push(node); continue; }
       // Remove text nodes that are just a parenthesized URL
       if (/^\s*\(https?:\/\/[^)]+\)\s*$/.test(text)) { removals.push(node); continue; }
-      // Remove leading/trailing lone brackets in mixed text
-      var cleaned = text.replace(/^\s*\[\s*/, '').replace(/\s*\]\s*$/, '');
+      // Strip brackets only where they hug an image/link — the signature of
+      // broken markdown syntax. Position alone is not enough: prose and titles
+      // often legitimately start with "[" or end with "]".
+      var cleaned = text;
+      if (isMedia(node.nextSibling)) cleaned = cleaned.replace(/\[\s*$/, '');
+      if (isMedia(node.previousSibling)) cleaned = cleaned.replace(/^\s*\]/, '');
       if (cleaned !== text) node.textContent = cleaned;
     }
     removals.forEach(function(n) {
