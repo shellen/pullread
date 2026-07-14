@@ -14,11 +14,25 @@ npm run typecheck && npm test && npm run test:bun   # tsc + jest suite + the two
 # 3. Update site/releases.html and _prCurrentVersion fallback
 # 4. Commit, push, create PR → wait for CI ✓
 # 5. Merge PR to main → wait for CI ✓
-# 6. Tag
-git checkout main && git pull
-git tag vX.Y.Z && git push origin vX.Y.Z
-# CI builds, signs, notarizes, and publishes — no manual steps after tagging
+# 6. Test the pre-release build from the rolling "latest" prerelease (see below)
+# 7. Cut the release: Actions → "Cut Release" → Run workflow → enter X.Y.Z
+#    (or: gh workflow run cut-release.yml -f version=X.Y.Z)
+# CI validates, tags, builds, signs, notarizes, publishes, and verifies — no manual steps after
 ```
+
+## Testing a pre-release before cutting
+
+Every green push to main refreshes the rolling **`latest` prerelease** with signed,
+notarized DMGs built from that exact commit. Download and test the real build
+**before** tagging:
+
+- Apple Silicon: <https://github.com/shellen/pullread/releases/download/latest/PullRead.dmg>
+- Intel: <https://github.com/shellen/pullread/releases/download/latest/PullRead_Intel.dmg>
+
+The release page (<https://github.com/shellen/pullread/releases/tag/latest>) shows
+which commit the build came from — confirm it matches your merge before testing.
+PR builds also upload `.dmg`/`.app` artifacts to their workflow runs (30-day
+retention) if you need to test before merging.
 
 ## Step by Step
 
@@ -73,30 +87,48 @@ gh pr merge --merge
 
 **Wait for the main branch build to succeed.** This ensures the `latest` rolling build is healthy before tagging. Check with `gh run list --limit 3`.
 
-### 6. Tag the release
+### 6. Test the pre-release build
+
+Download the DMG from the rolling `latest` prerelease (see "Testing a pre-release"
+above), confirm its commit matches your merge, and smoke-test the release-critical
+paths before tagging.
+
+### 7. Cut the release
+
+Go to **Actions → Cut Release → Run workflow**, enter the version (e.g. `0.4.10`),
+and run. Or from any machine with `gh`:
 
 ```bash
-git checkout main && git pull
-git tag vX.Y.Z && git push origin vX.Y.Z
+gh workflow run cut-release.yml -f version=X.Y.Z
 ```
 
-### 7. Wait for release CI
+The workflow refuses to run if the version doesn't match `package.json` on main,
+the tag already exists, or the latest main build is red — then it creates the tag
+and dispatches the release build. **Do not tag manually** — local tag pushes are
+easy to forget (a release once stalled for hours because the tag never left a
+laptop) and some environments can't push tags at all.
 
-The tag push triggers three jobs:
+### 8. Wait for release CI
+
+The tag build (`Build Tauri App`) runs three jobs:
 
 | Job | What it does |
 |-----|-------------|
 | **build** (matrix) | Builds ARM64 + Intel sidecars, signs, notarizes, creates draft release with DMGs |
 | **publish-updater** | Signs update bundles, builds `latest.json`, publishes the release (marks as non-draft) |
-| **deploy-site** | Deploys pullread.com to GitHub Pages |
+| **verify-release** | Fails loudly if the release is still draft, missing a DMG, missing `latest.json`, or the manifest version mismatches the tag |
 
 Monitor with `gh run list --limit 5`. The whole pipeline takes ~12 minutes.
 
-**There is no manual publish step.** The `publish-updater` job calls `gh release edit --draft=false` automatically.
+**There is no manual publish step.** The `publish-updater` job calls `gh release edit --draft=false` automatically, and `verify-release` confirms the result.
 
-### 8. Verify
+The site (pullread.com/releases) is **not** deployed by the tag build — `deploy-site.yml`
+runs on every push to `main`, so the release notes go live when the version-bump PR
+merges (step 5), before you tag. Nothing extra to do.
 
-- [ ] `gh release view vX.Y.Z` shows both DMGs + `latest.json`
+### 9. Verify
+
+- [ ] The **verify-release** job is green (checks DMGs + `latest.json` + version automatically)
 - [ ] Auto-updater: open an older version of Pull Read, check for update prompt
 - [ ] Site: visit pullread.com/releases and verify the new version appears
 
