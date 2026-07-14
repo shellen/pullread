@@ -1,0 +1,69 @@
+# ABOUTME: Cuts a release from the GitHub UI/API — validates, tags, and dispatches the release build
+# ABOUTME: Removes the manual local tag-push step so releases can't stall half-finished
+
+name: Cut Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 0.4.10) — must match package.json on main'
+        required: true
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  cut:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Validate version
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Invalid version '$VERSION' (expected X.Y.Z)"
+            exit 1
+          fi
+          PKG=$(node -p "require('./package.json').version")
+          if [ "$PKG" != "$VERSION" ]; then
+            echo "::error::package.json on main is $PKG, not $VERSION — run bump-version and merge first"
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" > /dev/null 2>&1; then
+            echo "::error::Tag v$VERSION already exists"
+            exit 1
+          fi
+
+      - name: Verify latest main build succeeded
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CONCLUSION=$(gh run list --workflow build-tauri.yml --branch main --event push --limit 1 --json conclusion --jq '.[0].conclusion')
+          if [ "$CONCLUSION" != "success" ]; then
+            echo "::error::Latest main build concluded '$CONCLUSION' — fix main before releasing"
+            exit 1
+          fi
+
+      - name: Create and push tag
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
+
+      # A tag pushed with GITHUB_TOKEN does not fire on:push workflows
+      # (recursion prevention), so dispatch the release build explicitly.
+      - name: Dispatch release build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          gh workflow run build-tauri.yml --ref "refs/tags/v$VERSION"
+          echo "Release build dispatched for v$VERSION — watch the Build Tauri App workflow"

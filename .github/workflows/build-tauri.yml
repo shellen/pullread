@@ -254,6 +254,49 @@ jobs:
           gh release edit "$TAG" --draft=false
           echo "Published release $TAG"
 
+  # Fail loudly if the published release is missing assets or mismatched —
+  # a release that "succeeded" but shipped nothing is worse than a red build.
+  verify-release:
+    needs: publish-updater
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Verify published release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+
+          INFO=$(gh release view "$TAG" --repo "${{ github.repository }}" --json isDraft,isPrerelease,assets)
+          echo "$INFO" | jq .
+
+          if [ "$(echo "$INFO" | jq -r '.isDraft')" != "false" ]; then
+            echo "::error::Release $TAG is still a draft"
+            exit 1
+          fi
+
+          DMG_COUNT=$(echo "$INFO" | jq '[.assets[].name | select(endswith(".dmg"))] | length')
+          if [ "$DMG_COUNT" -lt 2 ]; then
+            echo "::error::Expected 2 DMGs (ARM64 + Intel), found $DMG_COUNT"
+            exit 1
+          fi
+
+          if ! echo "$INFO" | jq -e '.assets[] | select(.name == "latest.json")' > /dev/null; then
+            echo "::error::latest.json missing from release — auto-updater will not work"
+            exit 1
+          fi
+
+          MANIFEST_VERSION=$(gh release download "$TAG" --repo "${{ github.repository }}" -p latest.json -O - | jq -r '.version')
+          if [ "$MANIFEST_VERSION" != "$VERSION" ]; then
+            echo "::error::latest.json version is $MANIFEST_VERSION but tag is $VERSION"
+            exit 1
+          fi
+
+          echo "Release $TAG verified: published, $DMG_COUNT DMGs, latest.json at $MANIFEST_VERSION"
+
   # Auto-update "latest" pre-release on every push to main
   latest-release:
     needs: build
