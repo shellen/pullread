@@ -1,7 +1,7 @@
 // ABOUTME: Tests for the email roundup module
 // ABOUTME: Covers HTML generation, escaping, provider resolution, curation, summary, and send logic
 
-import { escapeHtml, buildRoundupHtml, sendTestEmail, sendRoundup, resolveSmtpConfig, SMTP_PROVIDERS, curateArticles, generateRoundupSummary, buildRoundup, filterByLookback } from './email';
+import { escapeHtml, buildRoundupHtml, sendTestEmail, sendRoundup, resolveSmtpConfig, SMTP_PROVIDERS, curateArticles, generateRoundupSummary, buildRoundup, filterByLookback, formatModelDisclosure } from './email';
 import type { EmailConfig, ArticleMeta } from './email';
 
 jest.mock('./summarizer', () => ({
@@ -137,11 +137,17 @@ describe('buildRoundupHtml', () => {
     expect(html).toContain('My RSS Feed');
   });
 
-  test('includes both PullRead and direct links', () => {
+  test('headline opens in Pull Read (matching the in-app rundown), with the source as a secondary link', () => {
     const html = buildRoundupHtml([article({ url: 'https://example.com/article?id=1' })], 1);
+    // Primary action: open in the Pull Read reader (deep link), like tapping a headline in-app.
     expect(html).toContain('pullread.com/link');
     expect(html).toContain('Open in Pull Read');
-    expect(html).toContain('Read &rarr;');
+    // The headline itself links to Pull Read, not straight to the publisher.
+    const prLink = `https://pullread.com/link?url=${encodeURIComponent('https://example.com/article?id=1')}`;
+    expect(html).toContain(prLink);
+    // Secondary action: the original source is still one click away.
+    expect(html).toContain('Read the original');
+    expect(html).toContain('https://example.com/article?id=1');
   });
 
   test('escapes HTML in article titles', () => {
@@ -184,7 +190,7 @@ describe('buildRoundupHtml', () => {
     })], 1);
     expect(html).toContain('https://example.com/photo.jpg');
     expect(html).toContain('A fascinating look at something.');
-    expect(html).toContain('width="130"');
+    expect(html).toContain('width="140"');
   });
 
   test('renders hero without image gracefully', () => {
@@ -194,7 +200,7 @@ describe('buildRoundupHtml', () => {
     })], 1);
     expect(html).toContain('No image here.');
     // Should not contain an article thumbnail (header image is fine)
-    expect(html).not.toContain('width="130"');
+    expect(html).not.toContain('width="140"');
   });
 
   test('truncates long excerpts', () => {
@@ -225,6 +231,28 @@ describe('buildRoundupHtml', () => {
   test('renders without summary when null', () => {
     const html = buildRoundupHtml([article()], 1, null);
     expect(html).not.toContain('border-left:3px solid #b45535');
+  });
+
+  test('splits the intro into paragraphs on blank lines', () => {
+    const summary = 'First para, the throughline.\n\nSecond para, the tension.\n\nThird para, the payoff.';
+    const html = buildRoundupHtml([article()], 1, summary);
+    // Each paragraph becomes its own <p> so the note reads like a briefing.
+    const paraCount = (html.match(/<p style="margin:0 0 [^"]*;font-size:16px/g) || []).length;
+    expect(paraCount).toBe(3);
+    expect(html).toContain('First para, the throughline.');
+    expect(html).toContain('Second para, the tension.');
+    expect(html).toContain('Third para, the payoff.');
+  });
+
+  test('discloses the AI model that wrote the intro when provided', () => {
+    const html = buildRoundupHtml([article()], 1, 'A sharp little briefing.', 'Claude Haiku 4.5');
+    expect(html).toContain('This intro was written by');
+    expect(html).toContain('Claude Haiku 4.5');
+  });
+
+  test('omits the AI disclosure when no model is provided', () => {
+    const html = buildRoundupHtml([article()], 1, 'A sharp little briefing.');
+    expect(html).not.toContain('This intro was written by');
   });
 });
 
@@ -360,7 +388,8 @@ describe('generateRoundupSummary', () => {
     ];
     const result = await generateRoundupSummary(articles);
 
-    expect(result).toBe('A fresh, article-aware blurb.');
+    // Returns the text plus the model/provider that produced it, for AI disclosure.
+    expect(result).toEqual({ text: 'A fresh, article-aware blurb.', model: 'gpt-5', provider: 'openai' });
     // Must route through promptLLM, which sends the prompt verbatim — NOT summarizeText,
     // which would prepend "Summarize this article…" and yield a near-static blurb.
     expect(mockPromptLLM).toHaveBeenCalledTimes(1);
@@ -370,6 +399,8 @@ describe('generateRoundupSummary', () => {
     expect(prompt).toContain('New transit plan');
     // The roundup instructions are present as instructions.
     expect(prompt).toContain('opening note for a daily reading rundown');
+    // The prompt asks for real paragraph structure.
+    expect(prompt).toContain('SHORT paragraphs');
   });
 
   test('returns null when the model yields empty text', async () => {
@@ -421,7 +452,7 @@ describe('buildRoundup', () => {
 
   const cfg = (): EmailConfig => ({ ...baseConfig });
 
-  test('renders article titles and the editorial note into the HTML', async () => {
+  test('renders article titles and the editorial note into the HTML, and discloses the model', async () => {
     mockLoadLLMConfig.mockReturnValue({ provider: 'openai', apiKey: 'k', model: 'gpt-5' });
     mockPromptLLM.mockResolvedValue({ text: 'A fresh editorial note.', model: 'gpt-5' });
 
@@ -432,10 +463,14 @@ describe('buildRoundup', () => {
     const result = await buildRoundup(cfg(), async () => articles);
 
     expect(result.summary).toBe('A fresh editorial note.');
+    expect(result.summaryModel).toBe('GPT-5');
     expect(result.articles).toHaveLength(2);
     expect(result.html).toContain('Quantum chips ship');
     expect(result.html).toContain('New transit plan');
     expect(result.html).toContain('A fresh editorial note.');
+    // The AI-written intro discloses which model produced it.
+    expect(result.html).toContain('This intro was written by');
+    expect(result.html).toContain('GPT-5');
     expect(result.subject).toContain('The Pull Read Rundown');
   });
 
@@ -444,7 +479,40 @@ describe('buildRoundup', () => {
     const result = await buildRoundup(cfg(), async () => articles);
 
     expect(result.summary).toBeNull();
+    expect(result.summaryModel).toBeNull();
     expect(result.html).toContain('Solo story');
+    expect(result.html).not.toContain('This intro was written by');
     expect(mockPromptLLM).not.toHaveBeenCalled();
+  });
+});
+
+describe('formatModelDisclosure', () => {
+  test('formats Anthropic Claude model ids', () => {
+    expect(formatModelDisclosure('anthropic', 'claude-haiku-4-5-20251001')).toBe('Claude Haiku 4.5');
+    expect(formatModelDisclosure('anthropic', 'claude-opus-4-7')).toBe('Claude Opus 4.7');
+  });
+
+  test('formats OpenAI model ids', () => {
+    expect(formatModelDisclosure('openai', 'gpt-5')).toBe('GPT-5');
+    expect(formatModelDisclosure('openai', 'gpt-5-mini')).toBe('GPT-5 mini');
+    expect(formatModelDisclosure('openai', 'gpt-4.1-nano')).toBe('GPT-4.1 nano');
+  });
+
+  test('formats Gemini model ids', () => {
+    expect(formatModelDisclosure('gemini', 'gemini-2.5-flash-lite')).toBe('Gemini 2.5 Flash Lite');
+    expect(formatModelDisclosure('gemini', 'gemini-2.5-pro')).toBe('Gemini 2.5 Pro');
+  });
+
+  test('names Apple Intelligence as on-device', () => {
+    expect(formatModelDisclosure('apple', 'on-device')).toBe('Apple Intelligence (on-device)');
+    expect(formatModelDisclosure('apple', 'apple-on-device')).toBe('Apple Intelligence (on-device)');
+  });
+
+  test('keeps the OpenRouter routing visible', () => {
+    expect(formatModelDisclosure('openrouter', 'anthropic/claude-haiku-4.5')).toBe('Claude Haiku 4.5 (via OpenRouter)');
+  });
+
+  test('falls back to a clean title-case name for unknown models', () => {
+    expect(formatModelDisclosure('openrouter', 'meta-llama/llama-3.3-70b-instruct:free')).toBe('Llama 3.3 70b Instruct (via OpenRouter)');
   });
 });

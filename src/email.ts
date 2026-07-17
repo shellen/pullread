@@ -138,61 +138,72 @@ function groupByCategory(articles: ArticleMeta[]): Map<string, ArticleMeta[]> {
   return sorted;
 }
 
+/**
+ * Deep link that opens an article inside Pull Read's reader — the email
+ * equivalent of the in-app rundown, where tapping a headline opens the piece in
+ * the reader rather than the raw publisher page. Headlines link here so the
+ * email behaves like the app; a secondary link still offers the original source.
+ */
+function pullReadLink(article: ArticleMeta): string {
+  return `https://pullread.com/link?url=${encodeURIComponent(article.url)}&title=${encodeURIComponent(article.title)}`;
+}
+
 function articleLinks(article: ArticleMeta): string {
-  const prLink = `https://pullread.com/link?url=${encodeURIComponent(article.url)}&title=${encodeURIComponent(article.title)}`;
-  return `<a href="${escapeHtml(prLink)}" style="color:#b45535;text-decoration:none;font-size:12px;font-weight:500">Open in Pull Read</a>`
-    + `<span style="color:#ccc;margin:0 6px">&middot;</span>`
-    + `<a href="${escapeHtml(article.url)}" style="color:#888;text-decoration:none;font-size:12px">Read &rarr;</a>`;
+  return `<a href="${escapeHtml(pullReadLink(article))}" style="color:#b45535;text-decoration:none;font-size:12px;font-weight:600">Open in Pull Read &rarr;</a>`
+    + `<span style="color:#d8d0c8;margin:0 8px">&middot;</span>`
+    + `<a href="${escapeHtml(article.url)}" style="color:#9a938c;text-decoration:none;font-size:12px">Read the original &#8599;</a>`;
 }
 
 function metaLine(article: ArticleMeta): string {
   const source = escapeHtml(article.domain || article.feed || '');
-  const author = article.author ? ` <span style="color:#999">&middot;</span> ${escapeHtml(article.author)}` : '';
-  return `<div style="font-size:12px;color:#999;margin-top:2px">${source}${author}</div>`;
+  const author = article.author ? ` <span style="color:#c9c1b9">&middot;</span> ${escapeHtml(article.author)}` : '';
+  return `<div style="font-size:12px;color:#9a938c;margin-top:5px">${source}${author}</div>`;
 }
 
 function heroArticleHtml(article: ArticleMeta): string {
   const excerpt = truncateExcerpt(article.excerpt || '');
   const hasImage = article.image && article.image.startsWith('http');
+  const link = escapeHtml(pullReadLink(article));
 
   if (hasImage) {
     // Image + text side by side using table layout (email-safe)
-    return `<table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:16px"><tr>
-<td width="130" valign="top" style="padding-right:16px;background:#f0ebe7;width:130px;height:90px">
-<a href="${escapeHtml(article.url)}" style="text-decoration:none"><img src="${escapeHtml(article.image!)}" width="130" height="90" alt="" style="object-fit:cover;display:block;width:130px;height:90px;border:0" /></a>
+    return `<table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:22px"><tr>
+<td width="140" valign="top" style="padding-right:18px;width:140px">
+<a href="${link}" style="text-decoration:none"><img src="${escapeHtml(article.image!)}" width="140" height="96" alt="" style="object-fit:cover;display:block;width:140px;height:96px;border:0;border-radius:8px;background:#f0ebe7" /></a>
 </td>
 <td valign="top">
-<a href="${escapeHtml(article.url)}" style="font-size:16px;color:#1a1a1a;text-decoration:none;font-weight:600;line-height:1.3">${escapeHtml(article.title)}</a>
-${excerpt ? `<div style="font-size:13px;color:#666;margin-top:4px;line-height:1.4">${escapeHtml(excerpt)}</div>` : ''}
+<a href="${link}" style="font-size:17px;color:#1a1a1a;text-decoration:none;font-weight:600;line-height:1.35">${escapeHtml(article.title)}</a>
+${excerpt ? `<div style="font-size:13.5px;color:#6b6560;margin-top:6px;line-height:1.55">${escapeHtml(excerpt)}</div>` : ''}
 ${metaLine(article)}
-<div style="margin-top:6px">${articleLinks(article)}</div>
+<div style="margin-top:9px">${articleLinks(article)}</div>
 </td>
 </tr></table>`;
   }
 
   // No image — full-width text hero
-  return `<div style="margin-bottom:16px">
-<a href="${escapeHtml(article.url)}" style="font-size:16px;color:#1a1a1a;text-decoration:none;font-weight:600;line-height:1.3">${escapeHtml(article.title)}</a>
-${excerpt ? `<div style="font-size:13px;color:#666;margin-top:4px;line-height:1.4">${escapeHtml(excerpt)}</div>` : ''}
+  return `<div style="margin-bottom:22px">
+<a href="${link}" style="font-size:17px;color:#1a1a1a;text-decoration:none;font-weight:600;line-height:1.35">${escapeHtml(article.title)}</a>
+${excerpt ? `<div style="font-size:13.5px;color:#6b6560;margin-top:6px;line-height:1.55">${escapeHtml(excerpt)}</div>` : ''}
 ${metaLine(article)}
-<div style="margin-top:6px">${articleLinks(article)}</div>
+<div style="margin-top:9px">${articleLinks(article)}</div>
 </div>`;
 }
 
 function compactArticleHtml(article: ArticleMeta): string {
   const excerpt = truncateExcerpt(article.excerpt || '');
-  return `<div style="padding:10px 0;border-top:1px solid #f0ebe7">
-<a href="${escapeHtml(article.url)}" style="font-size:15px;color:#1a1a1a;text-decoration:none;font-weight:500;line-height:1.3">${escapeHtml(article.title)}</a>
-${excerpt ? `<div style="font-size:13px;color:#666;margin-top:3px;line-height:1.4">${escapeHtml(excerpt)}</div>` : ''}
+  const link = escapeHtml(pullReadLink(article));
+  return `<div style="padding:16px 0;border-top:1px solid #f0ebe6">
+<a href="${link}" style="font-size:15px;color:#1a1a1a;text-decoration:none;font-weight:600;line-height:1.4">${escapeHtml(article.title)}</a>
+${excerpt ? `<div style="font-size:13px;color:#6b6560;margin-top:5px;line-height:1.5">${escapeHtml(excerpt)}</div>` : ''}
 ${metaLine(article)}
-<div style="margin-top:4px">${articleLinks(article)}</div>
+<div style="margin-top:8px">${articleLinks(article)}</div>
 </div>`;
 }
 
 function categorySection(name: string, articles: ArticleMeta[]): string {
   const label = name.toUpperCase();
-  let html = `<div style="margin-top:28px;margin-bottom:12px">
-<div style="font-size:11px;font-weight:700;color:#b45535;letter-spacing:0.08em;text-transform:uppercase;padding-bottom:8px;border-bottom:2px solid #b45535">${escapeHtml(label)}</div>
+  let html = `<div style="margin:38px 0 20px">
+<div style="font-size:11px;font-weight:700;color:#b45535;letter-spacing:0.12em;text-transform:uppercase;padding-bottom:10px;border-bottom:1px solid #ece7e2">${escapeHtml(label)}</div>
 </div>`;
 
   // First article gets hero treatment
@@ -205,7 +216,31 @@ function categorySection(name: string, articles: ArticleMeta[]): string {
   return html;
 }
 
-export function buildRoundupHtml(articles: ArticleMeta[], lookbackDays: number, summary?: string | null): string {
+/**
+ * Split the AI editorial note into paragraphs so it reads like a reporter's
+ * briefing rather than one dense block. Honors blank-line paragraph breaks,
+ * falling back to single newlines, then to the whole note as one paragraph.
+ */
+function renderSummaryParagraphs(summary: string): string {
+  const byBlank = summary.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean);
+  const paras = byBlank.length > 1
+    ? byBlank
+    : summary.split(/\n+/).map(s => s.trim()).filter(Boolean);
+  const finalParas = paras.length ? paras : [summary.trim()];
+  return finalParas
+    .map((p, i) => {
+      const mb = i === finalParas.length - 1 ? '0' : '15px';
+      return `<p style="margin:0 0 ${mb};font-size:16px;line-height:1.72;color:#33302d">${escapeHtml(p)}</p>`;
+    })
+    .join('\n');
+}
+
+export function buildRoundupHtml(
+  articles: ArticleMeta[],
+  lookbackDays: number,
+  summary?: string | null,
+  summaryModel?: string | null,
+): string {
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
   });
@@ -220,29 +255,36 @@ export function buildRoundupHtml(articles: ArticleMeta[], lookbackDays: number, 
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only">
 <style>:root{color-scheme:light only}body,table,td,div,p,a,span{color-scheme:light only}</style>
 </head>
-<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background-color:#f7f5f3;color:#1a1a1a">
-<div style="max-width:600px;margin:0 auto;padding:20px;background-color:#f7f5f3">
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background-color:#f7f5f3;color:#1a1a1a;-webkit-font-smoothing:antialiased">
+<div style="max-width:600px;margin:0 auto;padding:28px 20px 32px;background-color:#f7f5f3">
 
-<div style="text-align:center;padding:24px 0 16px">
+<div style="text-align:center;padding:8px 0 22px">
 <a href="https://pullread.com" style="text-decoration:none"><img src="cid:header" width="300" height="55" alt="Pull Read — The Rundown" style="display:inline-block" /></a>
 </div>
 
-<div style="background:#ffffff;padding:32px;border:1px solid #e8e3de">
+<div style="background:#ffffff;padding:40px;border:1px solid #ebe5df;border-radius:14px">
 
-<div style="text-align:center;margin-bottom:24px">
-<div style="font-size:20px;font-weight:600;color:#1a1a1a;font-family:Georgia,'Times New Roman',serif;margin-bottom:4px">The Rundown</div>
-<div style="font-size:13px;color:#999">${escapeHtml(today)} &middot; ${count} article${count === 1 ? '' : 's'} from ${period}</div>
+<div style="text-align:center;padding-bottom:24px;margin-bottom:30px;border-bottom:1px solid #ece7e2">
+<div style="font-size:27px;font-weight:600;color:#1a1a1a;font-family:Georgia,'Times New Roman',serif;letter-spacing:-0.01em;margin-bottom:6px">The Rundown</div>
+<div style="font-size:13px;color:#9a938c;letter-spacing:0.01em">${escapeHtml(today)} &middot; ${count} article${count === 1 ? '' : 's'} from ${period}</div>
 </div>
 `;
 
   if (summary) {
-    html += `<div style="font-size:15px;color:#444;line-height:1.6;padding:16px 20px;background:#faf8f6;border-left:3px solid #b45535;margin-bottom:24px;font-style:italic">${escapeHtml(summary)}</div>`;
+    const disclosure = summaryModel
+      ? `\n<div style="margin-top:20px;padding-top:15px;border-top:1px solid #efe4dc;font-size:12px;color:#a99f95;letter-spacing:0.01em">`
+        + `<span style="color:#b45535">&#10022;</span> This intro was written by `
+        + `<span style="color:#7d746b;font-weight:600">${escapeHtml(summaryModel)}</span></div>`
+      : '';
+    html += `<div style="background:#faf8f6;border:1px solid #efe7df;border-left:3px solid #b45535;border-radius:10px;padding:26px 28px;margin-bottom:34px">
+${renderSummaryParagraphs(summary)}${disclosure}
+</div>`;
   }
 
   if (articles.length === 0) {
-    html += `<div style="text-align:center;padding:32px 0">
-<div style="font-size:24px;margin-bottom:12px">&mdash;</div>
-<div style="font-size:15px;color:#666;line-height:1.5">Nothing new ${lookbackDays === 1 ? 'today' : 'recently'}. Enjoy the quiet.</div>
+    html += `<div style="text-align:center;padding:40px 0">
+<div style="font-size:26px;margin-bottom:14px;color:#c9c1b9">&mdash;</div>
+<div style="font-size:15px;color:#6b6560;line-height:1.5">Nothing new ${lookbackDays === 1 ? 'today' : 'recently'}. Enjoy the quiet.</div>
 </div>`;
   } else {
     const groups = groupByCategory(articles);
@@ -253,8 +295,8 @@ export function buildRoundupHtml(articles: ArticleMeta[], lookbackDays: number, 
 
   html += `</div>
 
-<div style="text-align:center;padding:20px 0 8px">
-<div style="font-size:11px;color:#b3a99e">Sent by <a href="https://pullread.com" style="color:#b3a99e;text-decoration:none">Pull Read</a></div>
+<div style="text-align:center;padding:24px 0 8px">
+<div style="font-size:11px;color:#b3a99e;letter-spacing:0.02em">Sent by <a href="https://pullread.com" style="color:#b45535;text-decoration:none;font-weight:500">Pull Read</a></div>
 </div>
 
 </div>
@@ -266,6 +308,75 @@ export function buildRoundupHtml(articles: ArticleMeta[], lookbackDays: number, 
 
 export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/**
+ * Turn a raw model id into a reader-friendly name for the AI-disclosure byline
+ * (e.g. `claude-haiku-4-5-20251001` → "Claude Haiku 4.5", `gpt-5-mini` → "GPT-5
+ * mini"). Falls back to a title-cased cleanup for models we don't special-case.
+ */
+function prettyModelName(model: string): string {
+  const raw = (model || '').trim();
+  if (!raw) return 'an AI model';
+  const lower = raw.toLowerCase();
+
+  // Claude: claude-haiku-4-5-20251001 / claude-opus-4.7 → Claude Haiku 4.5 / Claude Opus 4.7
+  let m = lower.match(/^claude-(haiku|sonnet|opus)-(\d+)[-.](\d+)/);
+  if (m) {
+    const tier = m[1].charAt(0).toUpperCase() + m[1].slice(1);
+    return `Claude ${tier} ${m[2]}.${m[3]}`;
+  }
+  if (lower.startsWith('claude')) return 'Claude';
+
+  // OpenAI GPT: gpt-5 / gpt-5-mini / gpt-4.1-nano → GPT-5 / GPT-5 mini / GPT-4.1 nano
+  m = lower.match(/^gpt-(\d+(?:\.\d+)?)(?:-(nano|mini|turbo))?/);
+  if (m) {
+    return `GPT-${m[1]}${m[2] ? ` ${m[2]}` : ''}`;
+  }
+  // OpenAI o-series: o3-mini → o3-mini
+  m = lower.match(/^o(\d+)(?:-(nano|mini))?/);
+  if (m) {
+    return `o${m[1]}${m[2] ? `-${m[2]}` : ''}`;
+  }
+
+  // Gemini: gemini-2.5-flash-lite → Gemini 2.5 Flash Lite
+  m = lower.match(/^gemini-(\d+(?:\.\d+)?)-(flash-lite|flash|pro)/);
+  if (m) {
+    const tierMap: Record<string, string> = { 'flash-lite': 'Flash Lite', 'flash': 'Flash', 'pro': 'Pro' };
+    return `Gemini ${m[1]} ${tierMap[m[2]]}`;
+  }
+  if (lower.startsWith('gemini')) return 'Gemini';
+
+  // Fallback: strip an OpenRouter ":free" tag, split on separators, title-case words.
+  return raw
+    .replace(/:free$/i, '')
+    .replace(/[-_/]+/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(w => (/^\d/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)))
+    .join(' ')
+    .trim() || 'an AI model';
+}
+
+/**
+ * Human-readable disclosure of which model wrote the editorial intro. Keeps the
+ * hosting provider visible when it isn't obvious from the model name (Apple's
+ * on-device model, OpenRouter-routed models).
+ */
+export function formatModelDisclosure(provider: string, model: string): string {
+  const raw = (model || '').trim();
+  const lower = raw.toLowerCase();
+
+  if (provider === 'apple' || lower === 'on-device' || lower.includes('apple')) {
+    return 'Apple Intelligence (on-device)';
+  }
+
+  if (provider === 'openrouter') {
+    const base = raw.includes('/') ? raw.split('/').pop() || raw : raw;
+    return `${prettyModelName(base)} (via OpenRouter)`;
+  }
+
+  return prettyModelName(raw);
 }
 
 async function validateArticleImages(articles: ArticleMeta[]): Promise<void> {
@@ -341,20 +452,32 @@ export function curateArticles(
   return picked;
 }
 
-const ROUNDUP_SUMMARY_PROMPT = `You're writing the opening note for a daily reading rundown. Think of yourself as the reader's sharpest, most well-read friend — someone who genuinely finds this stuff fascinating and wants to share why. Your voice is warm but not saccharine, opinionated but not preachy, witty but never try-hard.
+const ROUNDUP_SUMMARY_PROMPT = `You're writing the opening note for a daily reading rundown — the short briefing that sits at the very top of the newsletter. Write like a sharp, well-read reporter giving a curious friend the lay of the land: warm, direct, and genuinely interested, never breathless or salesy.
 
-Rules:
-- Write 2-3 sentences. No more.
-- Dive straight in. No "Welcome to" or "In today's rundown" throat-clearing.
-- Don't list articles or name-drop every piece. Synthesize the themes.
-- Be direct. "This matters because..." is better than "It's interesting to note that..."
-- A good line has texture. "The AI safety debate is heating up" is flat. Give it life.
-- Never use: "dive in", "buckle up", "without further ado", "let's get started", "here's what caught my eye".
+Structure:
+- Write 2 to 3 SHORT paragraphs. Separate every paragraph with a blank line.
+- Keep each paragraph to 1-2 sentences. Tight beats long.
+- Open with the day's throughline — the theme or tension tying the stories together — not a roll call.
 
-Articles:
+Voice:
+- Synthesize; don't enumerate. Never march down the list tacking "and it's a reminder that…" onto each item. That pattern is the single worst thing you can do here.
+- Be specific. Name the real stakes. "The AI debate is heating up" is flat — say what actually shifted and why it lands.
+- Opinions welcome, clichés not.
+- Don't name every article or count how many there are.
+
+Never use: "dive in", "buckle up", "without further ado", "let's get started", "here's what caught my eye", "in today's rundown", "welcome to".
+
+Today's articles:
 `;
 
-export async function generateRoundupSummary(articles: ArticleMeta[]): Promise<string | null> {
+/** The editorial intro plus the model that wrote it, for AI disclosure. */
+export interface RoundupSummary {
+  text: string;
+  model: string;
+  provider: string;
+}
+
+export async function generateRoundupSummary(articles: ArticleMeta[]): Promise<RoundupSummary | null> {
   const { promptLLM, loadLLMConfig } = await import('./summarizer');
   const config = loadLLMConfig();
   if (!config) return null;
@@ -371,10 +494,13 @@ export async function generateRoundupSummary(articles: ArticleMeta[]): Promise<s
   // summarizeText would prepend its own "Summarize this article…" wrapper, so the
   // model would summarize our instructions instead of following them — producing a
   // near-static blurb anchored on the example lines in ROUNDUP_SUMMARY_PROMPT.
+  // A slightly higher token budget lets the model write 2-3 short paragraphs.
   const prompt = ROUNDUP_SUMMARY_PROMPT + articleList;
   try {
-    const result = await promptLLM(prompt, config, 300);
-    return result.text.trim() || null;
+    const result = await promptLLM(prompt, config, 400);
+    const text = result.text.trim();
+    if (!text) return null;
+    return { text, model: result.model, provider: config.provider };
   } catch (err) {
     console.warn('[email] Failed to generate roundup summary:', err instanceof Error ? err.message : err);
     return null;
@@ -385,6 +511,8 @@ export interface RoundupResult {
   html: string;
   subject: string;
   summary: string | null;
+  /** Reader-friendly name of the model that wrote the intro, if any. */
+  summaryModel: string | null;
   articles: ArticleMeta[];
 }
 
@@ -445,13 +573,17 @@ export async function buildRoundup(
   await validateArticleImages(curated);
 
   // Generate AI editorial summary (non-blocking — roundup renders even if this fails)
-  const summary = await generateRoundupSummary(curated);
+  const summaryResult = await generateRoundupSummary(curated);
+  const summary = summaryResult?.text ?? null;
+  const summaryModel = summaryResult
+    ? formatModelDisclosure(summaryResult.provider, summaryResult.model)
+    : null;
 
-  const html = buildRoundupHtml(curated, cfg.lookbackDays, summary);
+  const html = buildRoundupHtml(curated, cfg.lookbackDays, summary, summaryModel);
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   const subject = `The Pull Read Rundown — ${today}`;
 
-  return { html, subject, summary, articles: curated };
+  return { html, subject, summary, summaryModel, articles: curated };
 }
 
 export async function sendRoundup(

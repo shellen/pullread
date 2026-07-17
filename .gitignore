@@ -9,6 +9,9 @@ dist/
 src/viewer-html.ts
 src-tauri/resources/
 
+# Local rundown email preview (written by `preview-rundown`)
+rundown-preview.html
+
 # Environment
 .env
 .dev.vars
