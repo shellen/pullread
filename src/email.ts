@@ -138,46 +138,29 @@ function groupByCategory(articles: ArticleMeta[]): Map<string, ArticleMeta[]> {
   return sorted;
 }
 
-/**
- * Deep link that opens an article inside Pull Read's reader on desktop. It's
- * offered as a secondary, desktop-only action (hidden on mobile via the media
- * query in the document head, since there's no Pull Read mobile app yet) —
- * headlines themselves link straight to the source so every recipient can read.
- */
-function pullReadLink(article: ArticleMeta): string {
-  return `https://pullread.com/link?url=${encodeURIComponent(article.url)}&title=${encodeURIComponent(article.title)}`;
-}
-
-// "Open in Pull Read" — desktop only. The .pr-desktop-only class is hidden on
-// small screens by the media query in buildRoundupHtml's <head>.
-function openInPullRead(article: ArticleMeta): string {
-  return `<div class="pr-desktop-only" style="margin-top:9px">`
-    + `<a href="${escapeHtml(pullReadLink(article))}" style="color:#b45535;text-decoration:none;font-size:12px;font-weight:600">Open in Pull Read &rarr;</a>`
-    + `</div>`;
-}
-
 function metaLine(article: ArticleMeta): string {
   const source = escapeHtml(article.domain || article.feed || '');
   const author = article.author ? ` <span style="color:#c9c1b9">&middot;</span> ${escapeHtml(article.author)}` : '';
   return `<div style="font-size:12px;color:#9a938c;margin-top:5px">${source}${author}</div>`;
 }
 
+// The whole headline is the link, straight to the source — no per-item CTA. On
+// mobile the image stacks above the text (.hero-cell / .hero-img in the head).
 function heroArticleHtml(article: ArticleMeta): string {
   const excerpt = truncateExcerpt(article.excerpt || '');
   const hasImage = article.image && article.image.startsWith('http');
   const link = escapeHtml(article.url);
 
   if (hasImage) {
-    // Image + text side by side using table layout (email-safe)
+    // Image + text side by side on desktop; stacked (image on top) on mobile.
     return `<table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:22px"><tr>
-<td width="140" valign="top" style="padding-right:18px;width:140px">
+<td class="hero-cell hero-img" width="140" valign="top" style="padding-right:18px;width:140px">
 <a href="${link}" style="text-decoration:none"><img src="${escapeHtml(article.image!)}" width="140" height="96" alt="" style="object-fit:cover;display:block;width:140px;height:96px;border:0;border-radius:8px;background:#f0ebe7" /></a>
 </td>
-<td valign="top">
+<td class="hero-cell" valign="top">
 <a href="${link}" style="font-size:17px;color:#1a1a1a;text-decoration:none;font-weight:600;line-height:1.35">${escapeHtml(article.title)}</a>
 ${excerpt ? `<div style="font-size:13.5px;color:#6b6560;margin-top:6px;line-height:1.55">${escapeHtml(excerpt)}</div>` : ''}
 ${metaLine(article)}
-${openInPullRead(article)}
 </td>
 </tr></table>`;
   }
@@ -187,7 +170,6 @@ ${openInPullRead(article)}
 <a href="${link}" style="font-size:17px;color:#1a1a1a;text-decoration:none;font-weight:600;line-height:1.35">${escapeHtml(article.title)}</a>
 ${excerpt ? `<div style="font-size:13.5px;color:#6b6560;margin-top:6px;line-height:1.55">${escapeHtml(excerpt)}</div>` : ''}
 ${metaLine(article)}
-${openInPullRead(article)}
 </div>`;
 }
 
@@ -198,7 +180,6 @@ function compactArticleHtml(article: ArticleMeta): string {
 <a href="${link}" style="font-size:15px;color:#1a1a1a;text-decoration:none;font-weight:600;line-height:1.4">${escapeHtml(article.title)}</a>
 ${excerpt ? `<div style="font-size:13px;color:#6b6560;margin-top:5px;line-height:1.5">${escapeHtml(excerpt)}</div>` : ''}
 ${metaLine(article)}
-${openInPullRead(article)}
 </div>`;
 }
 
@@ -267,7 +248,7 @@ export function buildRoundupHtml(
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only">
 <style>:root{color-scheme:light only}body,table,td,div,p,a,span{color-scheme:light only}
-@media only screen and (max-width:600px){.pr-desktop-only{display:none !important}}</style>
+@media only screen and (max-width:600px){.hero-cell{display:block !important;width:100% !important;padding-right:0 !important}.hero-img{padding-bottom:14px !important}.hero-img img{width:100% !important;height:180px !important;max-width:100% !important}}</style>
 </head>
 <body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background-color:#f7f5f3;color:#1a1a1a;-webkit-font-smoothing:antialiased">
 <div style="max-width:600px;margin:0 auto;padding:28px 20px 32px;background-color:#f7f5f3">

@@ -137,17 +137,21 @@ describe('buildRoundupHtml', () => {
     expect(html).toContain('My RSS Feed');
   });
 
-  test('headline links to the source; Open in Pull Read is a desktop-only extra', () => {
+  test('headline is the only link (to the source); no per-item Pull Read CTA', () => {
     const url = 'https://example.com/article?id=1';
-    const html = buildRoundupHtml([article({ url })], 1);
-    // The headline links straight to the original source, so it works on any device.
+    const html = buildRoundupHtml([article({ url, image: 'https://example.com/p.jpg', excerpt: 'x' })], 1);
+    // The headline links straight to the source, so it works on any device.
     expect(html).toContain(`<a href="${url}"`);
-    // Open in Pull Read is still offered, but only on desktop (no Pull Read on mobile yet).
-    expect(html).toContain('Open in Pull Read');
-    expect(html).toContain('pullread.com/link');
-    expect(html).toContain('class="pr-desktop-only"');
-    // The media query that hides it on small screens is present.
-    expect(html).toContain('.pr-desktop-only{display:none');
+    // No repeated "Open in Pull Read" label / deep link on every item.
+    expect(html).not.toContain('Open in Pull Read');
+    expect(html).not.toContain('pullread.com/link');
+  });
+
+  test('hero image/text stack on mobile via responsive classes', () => {
+    const html = buildRoundupHtml([article({ image: 'https://example.com/p.jpg', excerpt: 'x' })], 1);
+    expect(html).toContain('class="hero-cell hero-img"');
+    // The media query that stacks the cells on small screens is present.
+    expect(html).toContain('.hero-cell{display:block');
   });
 
   test('escapes HTML in article titles', () => {
