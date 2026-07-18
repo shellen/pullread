@@ -29,6 +29,8 @@ interface FileMeta {
   hasSummary: boolean;
   summaryProvider: string;
   summaryModel: string;
+  /** Stored AI summary text — only populated when listFiles is asked for it. */
+  summary?: string;
   excerpt: string;
   image: string;
   favicon: string;
@@ -444,7 +446,7 @@ function resolveRelPath(base: string, rel: string): string {
   return resolved.join('/');
 }
 
-export function listFiles(outputPath: string): FileMeta[] {
+export function listFiles(outputPath: string, includeSummaries = false): FileMeta[] {
   if (!existsSync(outputPath)) return [];
 
   const files: FileMeta[] = [];
@@ -507,6 +509,7 @@ export function listFiles(outputPath: string): FileMeta[] {
         hasSummary: !!meta.summary,
         summaryProvider: meta.summaryProvider || '',
         summaryModel: meta.summaryModel || '',
+        ...(includeSummaries && meta.summary ? { summary: meta.summary.slice(0, 500) } : {}),
         excerpt: meta.excerpt || '',
         image,
         favicon: meta.favicon || '',
@@ -951,7 +954,7 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
     }
 
     if (url.pathname === '/api/files') {
-      sendJson(res, listFiles(outputPath));
+      sendJson(res, listFiles(outputPath, url.searchParams.get('summaries') === '1'));
       return;
     }
 

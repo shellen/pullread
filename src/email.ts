@@ -111,6 +111,7 @@ export interface ArticleMeta {
   feed?: string;
   bookmarked?: string;
   excerpt?: string;
+  summary?: string;
   image?: string;
   categories?: string[];
 }
@@ -246,32 +247,217 @@ function categorySection(name: string, articles: ArticleMeta[]): string {
   return html;
 }
 
+const SUMMARY_LINK_STYLE = 'color:#b45535;text-decoration:underline;text-underline-offset:2px';
+
+/** Case/quote/whitespace-insensitive form for comparing a mention to a title. */
+function normalizeForTitleMatch(s: string): string {
+  return s.toLowerCase().replace(/[’‘]/g, "'").replace(/[“”]/g, '"')
+    .replace(/\s+/g, ' ').trim().replace(/[.,;:!?]+$/, '');
+}
+
+/** The distinctive part of a title — before any " | Show Name" / " (Full Episode)" suffix. */
+function titleCore(title: string): string {
+  return title.split(' | ')[0].split(' (')[0].trim();
+}
+
+/**
+ * Does a quoted span from the model's prose name this title? Exact match, the
+ * title's core, or a shortened form covering at least half the title all count;
+ * short generic fragments (a show name shared by many titles) do not.
+ */
+function quotedSpanNamesTitle(spanNorm: string, escapedTitle: string, escapedCore: string): boolean {
+  const t = normalizeForTitleMatch(escapedTitle);
+  if (!spanNorm || !t) return false;
+  if (spanNorm === t || spanNorm.includes(t)) return true;
+  if (spanNorm === normalizeForTitleMatch(escapedCore)) return true;
+  return t.includes(spanNorm) && spanNorm.length >= t.length / 2;
+}
+
+/** Normalize one whitespace-delimited token from escaped HTML for word matching. */
+function normalizeToken(raw: string): string {
+  return raw.toLowerCase()
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
+    .replace(/[’‘]/g, "'").replace(/[“”]/g, '"')
+    .replace(/^[^a-z0-9&]+/, '').replace(/[^a-z0-9&]+$/, '');
+}
+
+/**
+ * Find a run of words in `segment` (escaped HTML, no anchors) matching the
+ * beginning of the title core — how prose naturally shortens a long title
+ * ("Nordstrom Anniversary Sale 2026" for "Nordstrom Anniversary Sale 2026 –
+ * Picks for Men | Dapper"). Returns the [start, end) span to link, or null.
+ * Requires at least 3 matched words and 14 matched characters (or the whole
+ * core) so common short phrases never false-match.
+ */
+function findTitleCoreRun(segment: string, core: string): { start: number; end: number } | null {
+  const coreWords = core.split(/\s+/).map(normalizeToken).filter(Boolean);
+  if (coreWords.length === 0) return null;
+
+  const tokens: Array<{ norm: string; start: number; end: number }> = [];
+  const tokenRe = /\S+/g;
+  let m: RegExpExecArray | null;
+  while ((m = tokenRe.exec(segment)) !== null) {
+    tokens.push({ norm: normalizeToken(m[0]), start: m.index, end: m.index + m[0].length });
+  }
+
+  const stopwords = new Set(['the', 'a', 'an', 'of', 'to', 'in', 'on', 'at', 'and', '&', 'or', 'for', 'with', 'by', 'is', 'are', 'was', 'vs', '-', '–', '—']);
+  for (let i = 0; i < tokens.length; i++) {
+    if (!tokens[i].norm || tokens[i].norm !== coreWords[0]) continue;
+    let len = 1;
+    while (len < coreWords.length && i + len < tokens.length && tokens[i + len].norm === coreWords[len]) len++;
+    // A partial match must not end on a stopword — "Jake Johnson, the beloved
+    // actor" matching title "Jake Johnson - The Dink" through "the" reads broken.
+    while (len > 0 && len < coreWords.length && stopwords.has(coreWords[len - 1])) len--;
+    if (len === 0) continue;
+    const last = tokens[i + len - 1];
+    const matchedChars = last.end - tokens[i].start;
+    if (len === coreWords.length || (len >= 3 && matchedChars >= 14)) {
+      // Trim trailing punctuation off the final token so it stays outside the link.
+      const rawRun = segment.slice(tokens[i].start, last.end);
+      const trimmed = rawRun.replace(/(?:&(?:quot|amp|#39);|[^A-Za-z0-9)])+$/, '');
+      return { start: tokens[i].start, end: tokens[i].start + (trimmed.length || rawRun.length) };
+    }
+  }
+  return null;
+}
+
+/**
+ * Wrap the first plain-text occurrence of `escapedTitle` (already HTML-escaped,
+ * matched case-insensitively outside existing <a> tags) in a link. Returns the
+ * updated HTML, or null if the title isn't mentioned.
+ */
+function linkTitleOutsideAnchors(html: string, escapedTitle: string, url: string): string | null {
+  const segments = html.split(/(<a\b[^>]*>[\s\S]*?<\/a>)/);
+  for (let i = 0; i < segments.length; i++) {
+    if (segments[i].startsWith('<a')) continue;
+    const idx = segments[i].toLowerCase().indexOf(escapedTitle.toLowerCase());
+    if (idx === -1) continue;
+    const matched = segments[i].slice(idx, idx + escapedTitle.length);
+    segments[i] = segments[i].slice(0, idx)
+      + `<a href="${escapeHtml(url)}" style="${SUMMARY_LINK_STYLE}">${matched}</a>`
+      + segments[i].slice(idx + escapedTitle.length);
+    return segments.join('');
+  }
+  return null;
+}
+
 /**
  * Render the AI editorial note. Splits into paragraphs (blank-line breaks, then
  * single newlines) so it reads like a reporter's briefing, and turns the model's
  * inline story references — written as `{{linked words|N}}` — into links to the
- * matching article (by 1-based index into `citationUrls`). Markers that point at
+ * matching article (by 1-based index into `citations`). Markers that point at
  * a missing story, or any stray/unbalanced braces, are stripped so nothing leaks.
+ * Stories the model mentions by exact title without a marker (Apple Intelligence
+ * ignores the marker convention) are linked too, same as the in-app briefing.
  */
-function renderSummaryParagraphs(summary: string, citationUrls: string[] = []): string {
+function renderSummaryParagraphs(summary: string, citations: Array<{ title: string; url: string }> = []): string {
+  // Parity with the in-app briefing: drop the generic preamble line some models prepend.
+  const cleaned = summary.replace(/^(?:here(?:'s|\s+is)|below\s+is|this\s+is)\s+(?:a|the|your)?\s*(?:summary|overview|briefing|rundown|opening\s+note|editorial\s+note)[^\n]*\n+/i, '');
+
+  const linkedUrls = new Set<string>();
+
+  // Models sometimes number markers wrong (e.g. renumbering their mentions
+  // 1, 2, 3… regardless of the list). When the linked phrase itself names a
+  // story — it matches a title, or a title matches it — trust the words over
+  // the number. `phrase` arrives already HTML-escaped, so compare escaped.
+  const citationByPhrase = (escapedPhrase: string): { title: string; url: string } | undefined => {
+    const p = escapedPhrase.trim().toLowerCase();
+    if (p.length < 8) return undefined;
+    return citations.find(c => {
+      if (!c.title || !c.url) return false;
+      const t = escapeHtml(c.title).trim().toLowerCase();
+      return t === p || p.includes(t) || (t.includes(p) && p.length >= t.length / 2);
+    });
+  };
+
   const linkify = (escaped: string): string =>
     escaped
       .replace(/\{\{([^{}|]+)\|(\d+)\}\}/g, (_m, phrase: string, n: string) => {
-        const url = citationUrls[parseInt(n, 10) - 1];
-        if (!url) return phrase; // out of range — keep the words, drop the marker
-        return `<a href="${escapeHtml(url)}" style="color:#b45535;text-decoration:underline;text-underline-offset:2px">${phrase}</a>`;
+        const cite = citationByPhrase(phrase) || citations[parseInt(n, 10) - 1];
+        if (!cite?.url) return phrase; // out of range — keep the words, drop the marker
+        linkedUrls.add(cite.url);
+        return `<a href="${escapeHtml(cite.url)}" style="${SUMMARY_LINK_STYLE}">${phrase}</a>`;
       })
       .replace(/\{\{|\}\}/g, ''); // drop any leftover markers
 
-  const byBlank = summary.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean);
+  const byBlank = cleaned.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean);
   const paras = byBlank.length > 1
     ? byBlank
-    : summary.split(/\n+/).map(s => s.trim()).filter(Boolean);
-  const finalParas = paras.length ? paras : [summary.trim()];
-  return finalParas
+    : cleaned.split(/\n+/).map(s => s.trim()).filter(Boolean);
+  const finalParas = paras.length ? paras : [cleaned.trim()];
+  const htmlParas = finalParas.map(p => linkify(escapeHtml(p)));
+
+  // Fallback linking for models that skip the {{…|N}} convention but still name
+  // stories by title: link the first mention of each not-yet-linked title.
+  for (const cite of citations) {
+    if (!cite.url || !cite.title || linkedUrls.has(cite.url)) continue;
+    const escapedTitle = escapeHtml(cite.title);
+    for (let i = 0; i < htmlParas.length; i++) {
+      const replaced = linkTitleOutsideAnchors(htmlParas[i], escapedTitle, cite.url);
+      if (replaced) {
+        htmlParas[i] = replaced;
+        linkedUrls.add(cite.url);
+        break;
+      }
+    }
+  }
+
+  // Second fallback: models often QUOTE a shortened form of a title ("Story
+  // Name" without the | Show Name suffix). Link quoted spans that clearly
+  // name a story, matched fuzzily.
+  const quoteRe = /(&quot;|“)(.{8,180}?)(&quot;|”)/g;
+  for (const cite of citations) {
+    if (!cite.url || !cite.title || linkedUrls.has(cite.url)) continue;
+    const escapedTitle = escapeHtml(cite.title);
+    const escapedCore = escapeHtml(titleCore(cite.title));
+    let done = false;
+    for (let i = 0; i < htmlParas.length && !done; i++) {
+      const segments = htmlParas[i].split(/(<a\b[^>]*>[\s\S]*?<\/a>)/);
+      for (let s = 0; s < segments.length && !done; s++) {
+        if (segments[s].startsWith('<a')) continue;
+        quoteRe.lastIndex = 0;
+        let m: RegExpExecArray | null;
+        while ((m = quoteRe.exec(segments[s])) !== null) {
+          if (!quotedSpanNamesTitle(normalizeForTitleMatch(m[2]), escapedTitle, escapedCore)) continue;
+          const start = m.index + m[1].length;
+          segments[s] = segments[s].slice(0, start)
+            + `<a href="${escapeHtml(cite.url)}" style="${SUMMARY_LINK_STYLE}">${m[2]}</a>`
+            + segments[s].slice(start + m[2].length);
+          htmlParas[i] = segments.join('');
+          linkedUrls.add(cite.url);
+          done = true;
+          break;
+        }
+      }
+    }
+  }
+
+  // Last fallback: unquoted shortened mentions — a word run matching the start
+  // of a story's title ("the Nordstrom Anniversary Sale 2026 promises…").
+  for (const cite of citations) {
+    if (!cite.url || !cite.title || linkedUrls.has(cite.url)) continue;
+    const escapedCore = escapeHtml(titleCore(cite.title));
+    let done = false;
+    for (let i = 0; i < htmlParas.length && !done; i++) {
+      const segments = htmlParas[i].split(/(<a\b[^>]*>[\s\S]*?<\/a>)/);
+      for (let s = 0; s < segments.length && !done; s++) {
+        if (segments[s].startsWith('<a')) continue;
+        const run = findTitleCoreRun(segments[s], escapedCore);
+        if (!run) continue;
+        segments[s] = segments[s].slice(0, run.start)
+          + `<a href="${escapeHtml(cite.url)}" style="${SUMMARY_LINK_STYLE}">${segments[s].slice(run.start, run.end)}</a>`
+          + segments[s].slice(run.end);
+        htmlParas[i] = segments.join('');
+        linkedUrls.add(cite.url);
+        done = true;
+      }
+    }
+  }
+
+  return htmlParas
     .map((p, i) => {
-      const mb = i === finalParas.length - 1 ? '0' : '15px';
-      return `<p style="margin:0 0 ${mb};font-size:16px;line-height:1.72;color:#33302d">${linkify(escapeHtml(p))}</p>`;
+      const mb = i === htmlParas.length - 1 ? '0' : '15px';
+      return `<p style="margin:0 0 ${mb};font-size:16px;line-height:1.72;color:#33302d">${p}</p>`;
     })
     .join('\n');
 }
@@ -316,14 +502,14 @@ export function buildRoundupHtml(
   if (summary) {
     // The note reads as a newsletter lede straight on the card — no bounding box.
     // Story references written as {{words|N}} link to the Nth article below.
-    const citationUrls = articles.map(a => a.url);
+    const citations = articles.map(a => ({ title: a.title, url: a.url }));
     const credit = summaryCredit
       ? `\n<div style="margin-top:16px;font-size:12px;color:#a99f95;letter-spacing:0.01em">`
         + `<span style="color:#b45535">&#10022;</span> Summary by `
         + `<span style="color:#7d746b;font-weight:600">${escapeHtml(summaryCredit)}</span></div>`
       : '';
     html += `<div style="margin:0 0 6px">
-${renderSummaryParagraphs(summary, citationUrls)}${credit}
+${renderSummaryParagraphs(summary, citations)}${credit}
 </div>`;
   }
 
@@ -493,27 +679,61 @@ export function curateArticles(
   return picked;
 }
 
-const ROUNDUP_SUMMARY_PROMPT = `You're writing the opening note for a daily reading rundown — the short briefing that sits at the very top of the newsletter. Write like a sharp, well-read reporter giving a curious friend the lay of the land: warm, direct, and genuinely interested, never breathless or salesy.
+/**
+ * Build the editorial-intro prompt. `strictTitles` swaps the {{phrase|N}} marker
+ * convention for a "copy the exact title" rule — small on-device models (Apple
+ * Intelligence) ignore the marker syntax, but do repeat titles verbatim, which
+ * the renderer's title-matching fallback then turns into links (the same
+ * approach the in-app briefing uses).
+ */
+function roundupSummaryPrompt(strictTitles: boolean): string {
+  const linking = strictTitles
+    ? `Linking (important):
+- LINKING RULE — THIS IS CRITICAL: every story you reference MUST be named by its exact title, copied word-for-word from the list below, wrapped in double quotes. Do not shorten, reword, or retitle it.
+- Reference 2 to 4 stories this way across the whole note, woven into the prose.`
+    : `Linking (important):
+- The stories below are numbered. When you reference a specific one, link the exact words that name it by wrapping them like {{these words|N}}, where N is that story's number from the list — write {{a short phrase naming story three|3}} to link story 3.
+- Link 2 to 4 stories across the whole note. Keep each linked phrase short (a noun phrase, not a full sentence), never link the same story twice, and double-check each N matches the story you're naming.
+- If you mention a story without a {{…|N}} marker, name it by its exact title as listed so it can be linked automatically.`;
+
+  return `You're writing the opening note for a daily reading rundown — the short briefing that sits at the very top of the newsletter. Write like a sharp, well-read reporter giving a curious friend the lay of the land: warm, direct, and genuinely interested, never breathless or salesy.
 
 Structure:
-- Write 2 to 3 SHORT paragraphs. Separate every paragraph with a blank line.
+- Write 2 to 3 SHORT paragraphs of flowing prose. Separate every paragraph with a blank line.
 - Keep each paragraph to 1-2 sentences. Tight beats long.
 - Open with the day's throughline — the theme or tension tying the stories together — not a roll call.
+- NEVER output bullet points, numbered lists, or a "quick updates" section. Every story you mention gets woven into a sentence.
 
 Voice:
 - Synthesize; don't enumerate. Never march down the list tacking "and it's a reminder that…" onto each item. That pattern is the single worst thing you can do here.
-- Be specific. Name the real stakes. "The AI debate is heating up" is flat — say what actually shifted and why it lands.
+- Be specific: name who did what and the real stakes. No vague trend-talk about debates heating up or landscapes shifting.
+- Cover the day's actual range — don't fixate on a single theme. If a strong story sits outside the throughline, give it one good sentence.
+- Write only about the stories listed below. Do not invent stories, and do not reuse any wording from these instructions.
 - Opinions welcome, clichés not.
 - Don't name every article or count how many there are.
 
-Linking (important):
-- The stories below are numbered. When you reference a specific one, link the exact words that name it by wrapping them like {{these words|N}}, where N is that story's number — e.g. {{Brussels forcing Google to share search data|3}}.
-- Link 2 to 4 stories across the whole note. Keep each linked phrase short (a noun phrase, not a full sentence), never link the same story twice, and never use a number that isn't in the list.
+${linking}
 
-Never use: "dive in", "buckle up", "without further ado", "let's get started", "here's what caught my eye", "in today's rundown", "welcome to".
+Never use: "dive in", "buckle up", "without further ado", "let's get started", "here's what caught my eye", "in today's rundown", "welcome to". No greetings, no sign-offs, no "that's the rundown" — start with the news and end with the news.
 
 Today's stories (numbered for linking):
 `;
+}
+
+/**
+ * Drop the throat-clearing and sign-off paragraphs small models tack on despite
+ * instructions ("Let's get started, shall we?", "So, there you have it, folks…").
+ * Only whole paragraphs that are clearly filler are removed; the news survives.
+ */
+export function stripFillerParagraphs(text: string): string {
+  const paras = text.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+  const greeting = /^(let'?s (get started|dive|begin)|welcome( to| back)?\b|good (morning|afternoon|evening)|hello|hi there|hey (there|folks|everyone)|alright,? (folks|everyone)|shall we|today,? we'?re diving|here(?:'s| is) (a |the |your )?(opening note|note|briefing|summary|rundown))/i;
+  const signoff = /(that'?s (today'?s|the|your) (rundown|briefing|roundup)|that'?s all for (today|now|this week)|until next time|don'?t forget to (share|subscribe|comment)|there you have it|happy reading|stay (tuned|curious)|keep (exploring|reading|questioning)|see you (tomorrow|next))/i;
+
+  while (paras.length > 1 && greeting.test(paras[0]) && paras[0].length < 160) paras.shift();
+  while (paras.length > 1 && signoff.test(paras[paras.length - 1])) paras.pop();
+  return paras.join('\n\n');
+}
 
 /** The editorial intro plus the model that wrote it, for AI disclosure. */
 export interface RoundupSummary {
@@ -529,27 +749,56 @@ export async function generateRoundupSummary(articles: ArticleMeta[]): Promise<R
 
   // Number the stories so the model can cite them inline as {{words|N}};
   // renderSummaryParagraphs maps N back to this same (curated) article order.
-  const articleList = articles
-    .slice(0, 15)
+  // Feed each story's summary (or excerpt) like the in-app briefing does —
+  // titles alone push small models toward vague filler prose.
+  const buildList = (maxArticles: number, gistCap: number) => articles
+    .slice(0, maxArticles)
     .map((a, i) => {
-      const excerpt = a.excerpt ? ` — ${a.excerpt.slice(0, 100)}` : '';
-      return `${i + 1}. ${a.title} (${a.domain || a.feed || ''})${excerpt}`;
+      const gist = a.summary || a.excerpt || '';
+      const detail = gist && gistCap > 0 ? `\n   ${a.summary ? 'Summary' : 'Excerpt'}: ${gist.slice(0, gistCap)}` : '';
+      return `${i + 1}. "${a.title}" (${a.domain || a.feed || ''})${detail}`;
     })
     .join('\n');
+
+  const base = roundupSummaryPrompt(config.provider === 'apple');
+  let articleList = buildList(15, 300);
+
+  if (config.provider === 'apple') {
+    // Apple Intelligence has a hard 4096-token window shared with the ~400-token
+    // reply, and roughly 3 chars/token on mixed text — a rich prompt overflows it
+    // and the whole intro is lost. Shrink the story gists (then the list) until
+    // the prompt fits comfortably.
+    const budget = 7000; // total prompt chars
+    for (const [n, cap] of [[15, 120], [12, 80], [10, 40], [8, 0], [5, 0]] as const) {
+      articleList = buildList(n, cap);
+      if (base.length + articleList.length <= budget) break;
+    }
+  }
 
   // Use promptLLM (not summarizeText): the roundup prompt IS the instruction.
   // summarizeText would prepend its own "Summarize this article…" wrapper, so the
   // model would summarize our instructions instead of following them — producing a
-  // near-static blurb anchored on the example lines in ROUNDUP_SUMMARY_PROMPT.
+  // near-static blurb anchored on the example lines in the prompt.
   // A slightly higher token budget lets the model write 2-3 short paragraphs.
-  const prompt = ROUNDUP_SUMMARY_PROMPT + articleList;
+  const run = async (list: string) => {
+    const result = await promptLLM(base + list, config, 400);
+    const text = stripFillerParagraphs(result.text.trim());
+    return text ? { text, model: result.model, provider: config.provider } : null;
+  };
   try {
-    const result = await promptLLM(prompt, config, 400);
-    const text = result.text.trim();
-    if (!text) return null;
-    return { text, model: result.model, provider: config.provider };
+    return await run(articleList);
   } catch (err) {
-    console.warn('[email] Failed to generate roundup summary:', err instanceof Error ? err.message : err);
+    const msg = err instanceof Error ? err.message : String(err);
+    // Last resort: a bare titles-only list still beats an email with no intro.
+    if (/context window/i.test(msg)) {
+      try {
+        return await run(buildList(5, 0));
+      } catch (retryErr) {
+        console.warn('[email] Roundup summary retry failed:', retryErr instanceof Error ? retryErr.message : retryErr);
+        return null;
+      }
+    }
+    console.warn('[email] Failed to generate roundup summary:', msg);
     return null;
   }
 }
@@ -588,7 +837,9 @@ export async function buildRoundup(
     articles = await fetchArticles();
   } else {
     try {
-      const resp = await fetch(`http://127.0.0.1:${port}/api/files`);
+      // summaries=1 includes each article's stored AI summary — the editorial
+      // intro prompt needs real content, not just titles, to stay specific.
+      const resp = await fetch(`http://127.0.0.1:${port}/api/files?summaries=1`);
       const allArticles = (await resp.json()) as ArticleMeta[];
       articles = filterByLookback(allArticles, cfg.lookbackDays);
     } catch (err) {

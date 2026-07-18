@@ -254,6 +254,114 @@ describe('buildRoundupHtml', () => {
     expect(html).not.toContain('|1}}');
   });
 
+  test('links plain title mentions when the model skips the {{…|N}} markers', () => {
+    // Apple Intelligence ignores the marker convention but names stories by
+    // title — the renderer links those mentions, same as the in-app briefing.
+    const arts = [
+      article({ title: 'Apple Does Fusion', url: 'https://a.com/fusion' }),
+      article({ title: 'EU Fines Google', url: 'https://b.com/eu' }),
+    ];
+    const summary = 'The article "Apple Does Fusion" digs into fusion energy, while "EU fines Google" covers the antitrust ruling.';
+    const html = buildRoundupHtml(arts, 1, summary);
+    expect(html).toContain('<a href="https://a.com/fusion"');
+    // Case-insensitive match, original casing preserved in the link text.
+    expect(html).toContain('<a href="https://b.com/eu"');
+    expect(html).toContain('>EU fines Google</a>');
+  });
+
+  test('trusts the phrase over the number when a marker names a different story', () => {
+    // Regression: Apple Intelligence renumbered its mentions 1, 2, 3… so every
+    // marker pointed at the wrong article. When the phrase IS a story's title,
+    // the words win over the number.
+    const arts = [
+      article({ title: 'EU Fines Google', url: 'https://a.com/eu' }),
+      article({ title: 'Quake Strikes Border Region', url: 'https://b.com/quake' }),
+    ];
+    const summary = 'Big day: {{Quake Strikes Border Region|1}} and more.';
+    const html = buildRoundupHtml(arts, 1, summary);
+    expect(html).toContain('<a href="https://b.com/quake" style="color:#b45535;text-decoration:underline');
+    expect(html).not.toContain('<a href="https://a.com/eu" style="color:#b45535;text-decoration:underline');
+  });
+
+  test('links a quoted, shortened title mention to the right story', () => {
+    // Small models quote titles but drop the "| Show Name" suffix.
+    const arts = [article({
+      title: "Analyzing Portugal's Devastating Wildfire (Full Episode) | Witness to Disaster",
+      url: 'https://y.com/wildfire',
+    })];
+    const summary = 'The documentary "Analyzing Portugal’s Devastating Wildfire" explores the largest fire in the country’s history.';
+    const html = buildRoundupHtml(arts, 1, summary);
+    expect(html).toContain('<a href="https://y.com/wildfire" style="color:#b45535;text-decoration:underline');
+  });
+
+  test('links an unquoted word run matching the start of a long title', () => {
+    const arts = [article({
+      title: 'Nordstrom Anniversary Sale 2026 – Picks for Men | Dapper',
+      url: 'https://d.com/nordstrom',
+    })];
+    const summary = 'Meanwhile the Nordstrom Anniversary Sale 2026 promises a shopping paradise.';
+    const html = buildRoundupHtml(arts, 1, summary);
+    expect(html).toContain('<a href="https://d.com/nordstrom" style="color:#b45535;text-decoration:underline');
+    expect(html).toContain('>Nordstrom Anniversary Sale 2026</a>');
+  });
+
+  test('does not produce a link ending on a stopword from a partial title match', () => {
+    const arts = [article({ title: 'Jake Johnson - “The Dink” | The Daily Show', url: 'https://y.com/dink' })];
+    const summary = 'Jake Johnson, the beloved actor, discusses his new project.';
+    const html = buildRoundupHtml(arts, 1, summary);
+    expect(html).not.toContain('<a href="https://y.com/dink" style="color:#b45535;text-decoration:underline');
+  });
+
+  test('does not link a short common word run', () => {
+    const arts = [article({ title: 'How to Fix Your Sleep | Wired', url: 'https://w.com/sleep' })];
+    const summary = 'Someone explains how to fix the power grid this decade.';
+    const html = buildRoundupHtml(arts, 1, summary);
+    expect(html).not.toContain('<a href="https://w.com/sleep" style="color:#b45535;text-decoration:underline');
+  });
+
+  test('does not link a short generic quoted fragment shared by many titles', () => {
+    const arts = [article({
+      title: 'Sports War: Norway Fan Hates Rowing | The Daily Show',
+      url: 'https://y.com/sports',
+    })];
+    const summary = 'Michael Kosta on "The Daily Show" covers the tournament.';
+    const html = buildRoundupHtml(arts, 1, summary);
+    expect(html).not.toContain('<a href="https://y.com/sports" style="color:#b45535;text-decoration:underline');
+  });
+
+  test('does not double-link a story cited via marker and also named by title', () => {
+    const arts = [article({ title: 'Apple Does Fusion', url: 'https://a.com/fusion' })];
+    const summary = 'Om Malik on {{fusion energy|1}} — Apple Does Fusion is worth your time.';
+    const html = buildRoundupHtml(arts, 1, summary);
+    // Count intro-styled links only (the article card below links the URL too).
+    const introLinks = html.match(/href="https:\/\/a\.com\/fusion" style="color:#b45535;text-decoration:underline/g) || [];
+    expect(introLinks.length).toBe(1);
+  });
+
+  test('strips greeting and sign-off filler paragraphs but keeps the news', () => {
+    const { stripFillerParagraphs } = require('./email');
+    const text = "Let's get started, shall we?\n\nPortugal's 2017 wildfires get the documentary treatment.\n\nSo, there you have it, folks. That's today's rundown. Until next time, keep exploring.";
+    const cleaned = stripFillerParagraphs(text);
+    expect(cleaned).toBe("Portugal's 2017 wildfires get the documentary treatment.");
+  });
+
+  test('never strips the only paragraph even if it pattern-matches filler', () => {
+    const { stripFillerParagraphs } = require('./email');
+    expect(stripFillerParagraphs("Welcome to the future: robots now file taxes.")).toBe("Welcome to the future: robots now file taxes.");
+  });
+
+  test("strips a \"Here's the opening note\" preamble paragraph", () => {
+    const { stripFillerParagraphs } = require('./email');
+    const text = "Here's the opening note for your daily reading rundown:\n\nWashington had a loud day.";
+    expect(stripFillerParagraphs(text)).toBe('Washington had a loud day.');
+  });
+
+  test('strips a generic preamble line before rendering the intro', () => {
+    const html = buildRoundupHtml([article()], 1, 'Here is a summary of your reading queue:\n\nThe real briefing starts here.');
+    expect(html).toContain('The real briefing starts here.');
+    expect(html).not.toContain('Here is a summary');
+  });
+
   test('strips citation markers that reference a missing story, keeping the words', () => {
     const html = buildRoundupHtml([article({ url: 'https://a.com/x' })], 1, 'A claim about {{something big|9}} today.');
     expect(html).toContain('something big');

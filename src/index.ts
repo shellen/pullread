@@ -584,7 +584,7 @@ if (command === 'sync') {
   (async () => {
     const { buildRoundup, filterByLookback, loadEmailConfig } = await import('./email');
     const cfg = loadEmailConfig();
-    const fetchArticles = async () => filterByLookback(listFiles(config.outputPath), cfg.lookbackDays);
+    const fetchArticles = async () => filterByLookback(listFiles(config.outputPath, true), cfg.lookbackDays);
     const result = await buildRoundup(cfg, fetchArticles);
 
     writeFileSync(outPath, result.html);
