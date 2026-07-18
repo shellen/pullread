@@ -584,12 +584,13 @@ if (command === 'sync') {
   (async () => {
     const { buildRoundup, filterByLookback, loadEmailConfig } = await import('./email');
     const cfg = loadEmailConfig();
-    const fetchArticles = async () => filterByLookback(listFiles(config.outputPath), cfg.lookbackDays);
+    const fetchArticles = async () => filterByLookback(listFiles(config.outputPath, true), cfg.lookbackDays);
     const result = await buildRoundup(cfg, fetchArticles);
 
     writeFileSync(outPath, result.html);
     console.log(`Articles in last ${cfg.lookbackDays} day${cfg.lookbackDays === 1 ? '' : 's'}: ${result.articles.length}`);
     console.log(`Editorial note: ${result.summary ?? '(none — no LLM configured, or generation failed)'}`);
+    if (result.summaryCredit) console.log(`Summary by: ${result.summaryCredit}`);
     console.log(`Wrote preview to ${outPath}`);
     if (result.articles.length === 0) {
       console.log('Note: no bookmarked articles in the window, so the summary will be empty. Bookmark a few recent articles and re-run.');

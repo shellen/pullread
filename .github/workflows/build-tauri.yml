@@ -12,7 +12,7 @@ on:
       - 'src-tauri/**'
       - 'scripts/**'
       - 'package.json'
-      - 'bun.lockb'
+      - 'bun.lock'
       - 'viewer.html'
       - '.github/workflows/build-tauri.yml'
   pull_request:
@@ -22,7 +22,7 @@ on:
       - 'src-tauri/**'
       - 'scripts/**'
       - 'package.json'
-      - 'bun.lockb'
+      - 'bun.lock'
       - 'viewer.html'
       - '.github/workflows/build-tauri.yml'
   workflow_dispatch:

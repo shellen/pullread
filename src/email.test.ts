@@ -1,8 +1,17 @@
 // ABOUTME: Tests for the email roundup module
 // ABOUTME: Covers HTML generation, escaping, provider resolution, curation, summary, and send logic
 
-import { escapeHtml, buildRoundupHtml, sendTestEmail, sendRoundup, resolveSmtpConfig, SMTP_PROVIDERS, curateArticles, generateRoundupSummary, buildRoundup, filterByLookback } from './email';
+import { escapeHtml, buildRoundupHtml, sendTestEmail, sendRoundup, resolveSmtpConfig, SMTP_PROVIDERS, curateArticles, generateRoundupSummary, buildRoundup, filterByLookback, formatSummaryCredit, scoreArticle, groupByCategory } from './email';
 import type { EmailConfig, ArticleMeta } from './email';
+
+jest.mock('nodemailer', () => ({
+  // No test should ever open a real socket — a connect attempt in offline
+  // environments hangs until the Jest timeout (issue #106). Send paths that
+  // pass config validation reject with this marker error instead.
+  createTransport: jest.fn(() => ({
+    sendMail: jest.fn(() => Promise.reject(new Error('mock transport: network disabled in tests'))),
+  })),
+}));
 
 jest.mock('./summarizer', () => ({
   // Default: no LLM configured, so generateRoundupSummary short-circuits to null.
@@ -137,11 +146,21 @@ describe('buildRoundupHtml', () => {
     expect(html).toContain('My RSS Feed');
   });
 
-  test('includes both PullRead and direct links', () => {
-    const html = buildRoundupHtml([article({ url: 'https://example.com/article?id=1' })], 1);
-    expect(html).toContain('pullread.com/link');
-    expect(html).toContain('Open in Pull Read');
-    expect(html).toContain('Read &rarr;');
+  test('headline is the only link (to the source); no per-item Pull Read CTA', () => {
+    const url = 'https://example.com/article?id=1';
+    const html = buildRoundupHtml([article({ url, image: 'https://example.com/p.jpg', excerpt: 'x' })], 1);
+    // The headline links straight to the source, so it works on any device.
+    expect(html).toContain(`<a href="${url}"`);
+    // No repeated "Open in Pull Read" label / deep link on every item.
+    expect(html).not.toContain('Open in Pull Read');
+    expect(html).not.toContain('pullread.com/link');
+  });
+
+  test('hero image/text stack on mobile via responsive classes', () => {
+    const html = buildRoundupHtml([article({ image: 'https://example.com/p.jpg', excerpt: 'x' })], 1);
+    expect(html).toContain('class="hero-cell hero-img"');
+    // The media query that stacks the cells on small screens is present.
+    expect(html).toContain('.hero-cell{display:block');
   });
 
   test('escapes HTML in article titles', () => {
@@ -184,7 +203,7 @@ describe('buildRoundupHtml', () => {
     })], 1);
     expect(html).toContain('https://example.com/photo.jpg');
     expect(html).toContain('A fascinating look at something.');
-    expect(html).toContain('width="130"');
+    expect(html).toContain('width="140"');
   });
 
   test('renders hero without image gracefully', () => {
@@ -194,7 +213,7 @@ describe('buildRoundupHtml', () => {
     })], 1);
     expect(html).toContain('No image here.');
     // Should not contain an article thumbnail (header image is fine)
-    expect(html).not.toContain('width="130"');
+    expect(html).not.toContain('width="140"');
   });
 
   test('truncates long excerpts', () => {
@@ -216,15 +235,169 @@ describe('buildRoundupHtml', () => {
     expect(html).toContain('Pull Read');
   });
 
-  test('renders AI summary when provided', () => {
+  test('renders the AI intro as a plain newsletter lede (no bounding box)', () => {
     const html = buildRoundupHtml([article()], 1, 'AI is reshaping how we read and write.');
     expect(html).toContain('AI is reshaping how we read and write.');
-    expect(html).toContain('border-left:3px solid #b45535');
+    // No boxed callout — the intro sits on the card like a lede.
+    expect(html).not.toContain('border-left:3px solid #b45535');
+    expect(html).not.toContain('background:#faf8f6');
   });
 
   test('renders without summary when null', () => {
     const html = buildRoundupHtml([article()], 1, null);
-    expect(html).not.toContain('border-left:3px solid #b45535');
+    expect(html).not.toContain('Summary by');
+  });
+
+  test('links story references in the intro to the matching article', () => {
+    const arts = [
+      article({ title: 'EU forces Google', url: 'https://a.com/eu' }),
+      article({ title: 'Self-parking EV', url: 'https://b.com/ev' }),
+    ];
+    const summary = 'Regulators moved on {{Google’s search data|1}} while carmakers bet on {{a self-parking EV|2}}.';
+    const html = buildRoundupHtml(arts, 1, summary);
+    expect(html).toContain('<a href="https://a.com/eu"');
+    expect(html).toContain('<a href="https://b.com/ev"');
+    expect(html).toContain('a self-parking EV');
+    // The raw {{...|n}} markers never leak into the output.
+    expect(html).not.toContain('{{');
+    expect(html).not.toContain('|1}}');
+  });
+
+  test('links plain title mentions when the model skips the {{…|N}} markers', () => {
+    // Apple Intelligence ignores the marker convention but names stories by
+    // title — the renderer links those mentions, same as the in-app briefing.
+    const arts = [
+      article({ title: 'Apple Does Fusion', url: 'https://a.com/fusion' }),
+      article({ title: 'EU Fines Google', url: 'https://b.com/eu' }),
+    ];
+    const summary = 'The article "Apple Does Fusion" digs into fusion energy, while "EU fines Google" covers the antitrust ruling.';
+    const html = buildRoundupHtml(arts, 1, summary);
+    expect(html).toContain('<a href="https://a.com/fusion"');
+    // Case-insensitive match, original casing preserved in the link text.
+    expect(html).toContain('<a href="https://b.com/eu"');
+    expect(html).toContain('>EU fines Google</a>');
+  });
+
+  test('trusts the phrase over the number when a marker names a different story', () => {
+    // Regression: Apple Intelligence renumbered its mentions 1, 2, 3… so every
+    // marker pointed at the wrong article. When the phrase IS a story's title,
+    // the words win over the number.
+    const arts = [
+      article({ title: 'EU Fines Google', url: 'https://a.com/eu' }),
+      article({ title: 'Quake Strikes Border Region', url: 'https://b.com/quake' }),
+    ];
+    const summary = 'Big day: {{Quake Strikes Border Region|1}} and more.';
+    const html = buildRoundupHtml(arts, 1, summary);
+    expect(html).toContain('<a href="https://b.com/quake" style="color:#b45535;text-decoration:underline');
+    expect(html).not.toContain('<a href="https://a.com/eu" style="color:#b45535;text-decoration:underline');
+  });
+
+  test('links a quoted, shortened title mention to the right story', () => {
+    // Small models quote titles but drop the "| Show Name" suffix.
+    const arts = [article({
+      title: "Analyzing Portugal's Devastating Wildfire (Full Episode) | Witness to Disaster",
+      url: 'https://y.com/wildfire',
+    })];
+    const summary = 'The documentary "Analyzing Portugal’s Devastating Wildfire" explores the largest fire in the country’s history.';
+    const html = buildRoundupHtml(arts, 1, summary);
+    expect(html).toContain('<a href="https://y.com/wildfire" style="color:#b45535;text-decoration:underline');
+  });
+
+  test('links an unquoted word run matching the start of a long title', () => {
+    const arts = [article({
+      title: 'Nordstrom Anniversary Sale 2026 – Picks for Men | Dapper',
+      url: 'https://d.com/nordstrom',
+    })];
+    const summary = 'Meanwhile the Nordstrom Anniversary Sale 2026 promises a shopping paradise.';
+    const html = buildRoundupHtml(arts, 1, summary);
+    expect(html).toContain('<a href="https://d.com/nordstrom" style="color:#b45535;text-decoration:underline');
+    expect(html).toContain('>Nordstrom Anniversary Sale 2026</a>');
+  });
+
+  test('does not produce a link ending on a stopword from a partial title match', () => {
+    const arts = [article({ title: 'Jake Johnson - “The Dink” | The Daily Show', url: 'https://y.com/dink' })];
+    const summary = 'Jake Johnson, the beloved actor, discusses his new project.';
+    const html = buildRoundupHtml(arts, 1, summary);
+    expect(html).not.toContain('<a href="https://y.com/dink" style="color:#b45535;text-decoration:underline');
+  });
+
+  test('does not link a short common word run', () => {
+    const arts = [article({ title: 'How to Fix Your Sleep | Wired', url: 'https://w.com/sleep' })];
+    const summary = 'Someone explains how to fix the power grid this decade.';
+    const html = buildRoundupHtml(arts, 1, summary);
+    expect(html).not.toContain('<a href="https://w.com/sleep" style="color:#b45535;text-decoration:underline');
+  });
+
+  test('does not link a short generic quoted fragment shared by many titles', () => {
+    const arts = [article({
+      title: 'Sports War: Norway Fan Hates Rowing | The Daily Show',
+      url: 'https://y.com/sports',
+    })];
+    const summary = 'Michael Kosta on "The Daily Show" covers the tournament.';
+    const html = buildRoundupHtml(arts, 1, summary);
+    expect(html).not.toContain('<a href="https://y.com/sports" style="color:#b45535;text-decoration:underline');
+  });
+
+  test('does not double-link a story cited via marker and also named by title', () => {
+    const arts = [article({ title: 'Apple Does Fusion', url: 'https://a.com/fusion' })];
+    const summary = 'Om Malik on {{fusion energy|1}} — Apple Does Fusion is worth your time.';
+    const html = buildRoundupHtml(arts, 1, summary);
+    // Count intro-styled links only (the article card below links the URL too).
+    const introLinks = html.match(/href="https:\/\/a\.com\/fusion" style="color:#b45535;text-decoration:underline/g) || [];
+    expect(introLinks.length).toBe(1);
+  });
+
+  test('strips greeting and sign-off filler paragraphs but keeps the news', () => {
+    const { stripFillerParagraphs } = require('./email');
+    const text = "Let's get started, shall we?\n\nPortugal's 2017 wildfires get the documentary treatment.\n\nSo, there you have it, folks. That's today's rundown. Until next time, keep exploring.";
+    const cleaned = stripFillerParagraphs(text);
+    expect(cleaned).toBe("Portugal's 2017 wildfires get the documentary treatment.");
+  });
+
+  test('never strips the only paragraph even if it pattern-matches filler', () => {
+    const { stripFillerParagraphs } = require('./email');
+    expect(stripFillerParagraphs("Welcome to the future: robots now file taxes.")).toBe("Welcome to the future: robots now file taxes.");
+  });
+
+  test("strips a \"Here's the opening note\" preamble paragraph", () => {
+    const { stripFillerParagraphs } = require('./email');
+    const text = "Here's the opening note for your daily reading rundown:\n\nWashington had a loud day.";
+    expect(stripFillerParagraphs(text)).toBe('Washington had a loud day.');
+  });
+
+  test('strips a generic preamble line before rendering the intro', () => {
+    const html = buildRoundupHtml([article()], 1, 'Here is a summary of your reading queue:\n\nThe real briefing starts here.');
+    expect(html).toContain('The real briefing starts here.');
+    expect(html).not.toContain('Here is a summary');
+  });
+
+  test('strips citation markers that reference a missing story, keeping the words', () => {
+    const html = buildRoundupHtml([article({ url: 'https://a.com/x' })], 1, 'A claim about {{something big|9}} today.');
+    expect(html).toContain('something big');
+    expect(html).not.toContain('{{');
+    expect(html).not.toContain('|9');
+  });
+
+  test('splits the intro into paragraphs on blank lines', () => {
+    const summary = 'First para, the throughline.\n\nSecond para, the tension.\n\nThird para, the payoff.';
+    const html = buildRoundupHtml([article()], 1, summary);
+    // Each paragraph becomes its own <p> so the note reads like a briefing.
+    const paraCount = (html.match(/<p style="margin:0 0 [^"]*;font-size:16px/g) || []).length;
+    expect(paraCount).toBe(3);
+    expect(html).toContain('First para, the throughline.');
+    expect(html).toContain('Second para, the tension.');
+    expect(html).toContain('Third para, the payoff.');
+  });
+
+  test('credits the AI that wrote the intro when provided', () => {
+    const html = buildRoundupHtml([article()], 1, 'A sharp little briefing.', 'Claude');
+    expect(html).toContain('Summary by');
+    expect(html).toContain('Claude');
+  });
+
+  test('omits the AI credit when none is provided', () => {
+    const html = buildRoundupHtml([article()], 1, 'A sharp little briefing.');
+    expect(html).not.toContain('Summary by');
   });
 });
 
@@ -274,6 +447,99 @@ describe('curateArticles', () => {
   });
 });
 
+describe('scoreArticle', () => {
+  const now = Date.parse('2026-07-18T12:00:00Z');
+
+  test('rewards fresher stories', () => {
+    const fresh = scoreArticle(article({ bookmarked: '2026-07-18T11:00:00Z' }), { now });
+    const old = scoreArticle(article({ bookmarked: '2026-07-17T12:00:00Z' }), { now });
+    expect(fresh).toBeGreaterThan(old);
+  });
+
+  test('rewards richer content and watched entities', () => {
+    const plain = scoreArticle(article({ title: 'Plain' }), { now });
+    const rich = scoreArticle(article({ title: 'Plain', excerpt: 'x', image: 'https://i/x.jpg' }), { now });
+    expect(rich).toBeGreaterThan(plain);
+
+    const watched = scoreArticle(
+      article({ title: 'Apple ships a thing' }),
+      { now, mentionCounts: new Map(), watchedEntities: new Set(['Apple']) },
+    );
+    expect(watched).toBeGreaterThan(plain);
+  });
+
+  test('missing or unparseable bookmark contributes no recency', () => {
+    expect(scoreArticle(article({}), { now })).toBe(0);
+    expect(scoreArticle(article({ bookmarked: 'not-a-date' }), { now })).toBe(0);
+  });
+});
+
+describe('groupByCategory section ranking', () => {
+  const sectionOrder = (m: Map<string, unknown>) => [...m.keys()];
+
+  test('without a score, falls back to alphabetical with More last', () => {
+    const groups = groupByCategory([
+      article({ categories: ['Crypto'] }),
+      article({ categories: ['AI'] }),
+      article({}), // -> More
+    ]);
+    expect(sectionOrder(groups)).toEqual(['AI', 'Crypto', 'More']);
+  });
+
+  test('with a score, the strongest section leads (not alphabetical)', () => {
+    const arts = [
+      article({ title: 'weak ai', categories: ['AI'] }),
+      article({ title: 'huge crypto story', categories: ['Crypto'] }),
+    ];
+    const score = (a: ArticleMeta) => (a.categories?.[0] === 'Crypto' ? 10 : 1);
+    const groups = groupByCategory(arts, { score, seed: 'day' });
+    // Crypto outranks AI despite coming later in the alphabet.
+    expect(sectionOrder(groups)).toEqual(['Crypto', 'AI']);
+  });
+
+  test("the strongest story sorts first within a section (it becomes the hero)", () => {
+    const arts = [
+      article({ title: 'quiet', categories: ['AI'], filename: 'q.md' }),
+      article({ title: 'loud', categories: ['AI'], filename: 'l.md' }),
+    ];
+    const score = (a: ArticleMeta) => (a.title === 'loud' ? 9 : 1);
+    const groups = groupByCategory(arts, { score, seed: 'day' });
+    expect(groups.get('AI')![0].title).toBe('loud');
+  });
+
+  test('More stays last even when it scores highest', () => {
+    const arts = [
+      article({ title: 'strong uncat' }), // More
+      article({ title: 'ai', categories: ['AI'] }),
+    ];
+    const score = (a: ArticleMeta) => (a.categories?.[0] ? 1 : 100);
+    const groups = groupByCategory(arts, { score, seed: 'day' });
+    expect(sectionOrder(groups)[sectionOrder(groups).length - 1]).toBe('More');
+  });
+
+  test('ties reshuffle across days (seed) instead of freezing', () => {
+    // All sections score zero -> pure tie; different daily seeds should be able
+    // to lead with different sections.
+    const arts = [
+      article({ categories: ['AI'] }),
+      article({ categories: ['Business'] }),
+      article({ categories: ['Crypto'] }),
+      article({ categories: ['Design'] }),
+    ];
+    const score = () => 0;
+    const leads = new Set<string>();
+    for (const seed of ['2026-07-18', '2026-07-19', '2026-07-20', '2026-07-21', '2026-07-22']) {
+      leads.add(sectionOrder(groupByCategory(arts, { score, seed }))[0]);
+    }
+    // Not the same section every day.
+    expect(leads.size).toBeGreaterThan(1);
+    // But deterministic for a given seed.
+    const a = sectionOrder(groupByCategory(arts, { score, seed: 'fixed' }));
+    const b = sectionOrder(groupByCategory(arts, { score, seed: 'fixed' }));
+    expect(a).toEqual(b);
+  });
+});
+
 describe('sendTestEmail', () => {
   test('throws when custom provider has no host', async () => {
     await expect(sendTestEmail({
@@ -291,12 +557,14 @@ describe('sendTestEmail', () => {
   });
 
   test('does not throw for gmail provider with empty smtpHost', async () => {
+    // Gmail's host comes from the provider preset, so validation passes and
+    // the call proceeds to the (mocked) transport — no real socket.
     await expect(sendTestEmail({
       ...baseConfig,
       smtpProvider: 'gmail',
       smtpHost: '',
       smtpPort: 99999,
-    })).rejects.not.toThrow('missing SMTP host or recipient');
+    })).rejects.toThrow('mock transport: network disabled in tests');
   });
 });
 
@@ -360,7 +628,8 @@ describe('generateRoundupSummary', () => {
     ];
     const result = await generateRoundupSummary(articles);
 
-    expect(result).toBe('A fresh, article-aware blurb.');
+    // Returns the text plus the model/provider that produced it, for AI disclosure.
+    expect(result).toEqual({ text: 'A fresh, article-aware blurb.', model: 'gpt-5', provider: 'openai' });
     // Must route through promptLLM, which sends the prompt verbatim — NOT summarizeText,
     // which would prepend "Summarize this article…" and yield a near-static blurb.
     expect(mockPromptLLM).toHaveBeenCalledTimes(1);
@@ -370,6 +639,8 @@ describe('generateRoundupSummary', () => {
     expect(prompt).toContain('New transit plan');
     // The roundup instructions are present as instructions.
     expect(prompt).toContain('opening note for a daily reading rundown');
+    // The prompt asks for real paragraph structure.
+    expect(prompt).toContain('SHORT paragraphs');
   });
 
   test('returns null when the model yields empty text', async () => {
@@ -421,7 +692,7 @@ describe('buildRoundup', () => {
 
   const cfg = (): EmailConfig => ({ ...baseConfig });
 
-  test('renders article titles and the editorial note into the HTML', async () => {
+  test('renders article titles and the editorial note into the HTML, and discloses the model', async () => {
     mockLoadLLMConfig.mockReturnValue({ provider: 'openai', apiKey: 'k', model: 'gpt-5' });
     mockPromptLLM.mockResolvedValue({ text: 'A fresh editorial note.', model: 'gpt-5' });
 
@@ -432,10 +703,14 @@ describe('buildRoundup', () => {
     const result = await buildRoundup(cfg(), async () => articles);
 
     expect(result.summary).toBe('A fresh editorial note.');
+    expect(result.summaryCredit).toBe('GPT');
     expect(result.articles).toHaveLength(2);
     expect(result.html).toContain('Quantum chips ship');
     expect(result.html).toContain('New transit plan');
     expect(result.html).toContain('A fresh editorial note.');
+    // The AI-written intro credits which AI produced it (brand only).
+    expect(result.html).toContain('Summary by');
+    expect(result.html).toContain('GPT');
     expect(result.subject).toContain('The Pull Read Rundown');
   });
 
@@ -444,7 +719,35 @@ describe('buildRoundup', () => {
     const result = await buildRoundup(cfg(), async () => articles);
 
     expect(result.summary).toBeNull();
+    expect(result.summaryCredit).toBeNull();
     expect(result.html).toContain('Solo story');
+    expect(result.html).not.toContain('Summary by');
     expect(mockPromptLLM).not.toHaveBeenCalled();
+  });
+});
+
+describe('formatSummaryCredit', () => {
+  test('credits a brand, not a specific model/version', () => {
+    expect(formatSummaryCredit('anthropic', 'claude-haiku-4-5-20251001')).toBe('Claude');
+    expect(formatSummaryCredit('anthropic', 'claude-opus-4-7')).toBe('Claude');
+    expect(formatSummaryCredit('openai', 'gpt-5')).toBe('GPT');
+    expect(formatSummaryCredit('openai', 'gpt-4.1-nano')).toBe('GPT');
+    expect(formatSummaryCredit('gemini', 'gemini-2.5-flash-lite')).toBe('Gemini');
+  });
+
+  test('names Apple Intelligence (no on-device model detail)', () => {
+    expect(formatSummaryCredit('apple', 'on-device')).toBe('Apple Intelligence');
+    expect(formatSummaryCredit('apple', 'apple-on-device')).toBe('Apple Intelligence');
+  });
+
+  test('derives the brand from OpenRouter-routed model ids', () => {
+    expect(formatSummaryCredit('openrouter', 'anthropic/claude-haiku-4.5')).toBe('Claude');
+    expect(formatSummaryCredit('openrouter', 'google/gemini-2.5-flash')).toBe('Gemini');
+    expect(formatSummaryCredit('openrouter', 'meta-llama/llama-3.3-70b-instruct:free')).toBe('Llama');
+  });
+
+  test('falls back to the provider brand when the model id is unrecognized', () => {
+    expect(formatSummaryCredit('anthropic', '')).toBe('Claude');
+    expect(formatSummaryCredit('openai', 'some-unknown-id')).toBe('GPT');
   });
 });
