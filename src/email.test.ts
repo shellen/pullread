@@ -4,6 +4,15 @@
 import { escapeHtml, buildRoundupHtml, sendTestEmail, sendRoundup, resolveSmtpConfig, SMTP_PROVIDERS, curateArticles, generateRoundupSummary, buildRoundup, filterByLookback, formatSummaryCredit, scoreArticle, groupByCategory } from './email';
 import type { EmailConfig, ArticleMeta } from './email';
 
+jest.mock('nodemailer', () => ({
+  // No test should ever open a real socket — a connect attempt in offline
+  // environments hangs until the Jest timeout (issue #106). Send paths that
+  // pass config validation reject with this marker error instead.
+  createTransport: jest.fn(() => ({
+    sendMail: jest.fn(() => Promise.reject(new Error('mock transport: network disabled in tests'))),
+  })),
+}));
+
 jest.mock('./summarizer', () => ({
   // Default: no LLM configured, so generateRoundupSummary short-circuits to null.
   // Individual tests override these mocks as needed.
@@ -548,12 +557,14 @@ describe('sendTestEmail', () => {
   });
 
   test('does not throw for gmail provider with empty smtpHost', async () => {
+    // Gmail's host comes from the provider preset, so validation passes and
+    // the call proceeds to the (mocked) transport — no real socket.
     await expect(sendTestEmail({
       ...baseConfig,
       smtpProvider: 'gmail',
       smtpHost: '',
       smtpPort: 99999,
-    })).rejects.not.toThrow('missing SMTP host or recipient');
+    })).rejects.toThrow('mock transport: network disabled in tests');
   });
 });
 
