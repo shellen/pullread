@@ -120,18 +120,65 @@ function truncateExcerpt(text: string, max = 120): string {
   return text.slice(0, max).replace(/\s+\S*$/, '') + '\u2026';
 }
 
-function groupByCategory(articles: ArticleMeta[]): Map<string, ArticleMeta[]> {
+// Deterministic per-key rotation derived from a daily seed, so sections that
+// tie on strength (e.g. a quiet day where nothing scores) still reshuffle from
+// one issue to the next instead of freezing into a fixed order.
+function rotationKey(key: string, seed: string): number {
+  let h = 2166136261;
+  const s = `${seed}|${key}`;
+  for (let i = 0; i < s.length; i++) {
+    h = Math.imul(h ^ s.charCodeAt(i), 16777619) >>> 0;
+  }
+  return h;
+}
+
+export interface GroupOptions {
+  /** Per-article relevance score; when given, sections and stories are ranked by it. */
+  score?: (a: ArticleMeta) => number;
+  /** Daily seed for the tie-break rotation (keeps quiet days varying). */
+  seed?: string;
+}
+
+/**
+ * Group articles by their primary category. With a `score` function, sections
+ * are ordered by their combined strength (strongest section leads, so the lead
+ * changes with the news) and each section's strongest story sorts first (it
+ * becomes the hero); "More" stays last and ties break on a daily rotation.
+ * Without a score, falls back to the legacy alphabetical order.
+ */
+export function groupByCategory(articles: ArticleMeta[], opts: GroupOptions = {}): Map<string, ArticleMeta[]> {
   const groups = new Map<string, ArticleMeta[]>();
   for (const a of articles) {
     const cat = a.categories?.[0] || 'More';
     if (!groups.has(cat)) groups.set(cat, []);
     groups.get(cat)!.push(a);
   }
-  // Sort: named categories alphabetically, "More" last
+
+  const { score, seed = '' } = opts;
+
+  if (score) {
+    // Strongest story first within each section — it becomes the hero.
+    for (const list of groups.values()) {
+      list.sort((a, b) => score(b) - score(a));
+    }
+  }
+
+  const strength = new Map<string, number>();
+  if (score) {
+    for (const [cat, list] of groups) {
+      strength.set(cat, list.reduce((sum, a) => sum + score(a), 0));
+    }
+  }
+
   const sorted = new Map<string, ArticleMeta[]>();
   const keys = [...groups.keys()].sort((a, b) => {
     if (a === 'More') return 1;
     if (b === 'More') return -1;
+    if (score) {
+      const diff = (strength.get(b) || 0) - (strength.get(a) || 0);
+      if (Math.abs(diff) > 1e-9) return diff;
+      return rotationKey(a, seed) - rotationKey(b, seed);
+    }
     return a.localeCompare(b);
   });
   for (const k of keys) sorted.set(k, groups.get(k)!);
@@ -234,6 +281,7 @@ export function buildRoundupHtml(
   lookbackDays: number,
   summary?: string | null,
   summaryCredit?: string | null,
+  scoreFn?: ((a: ArticleMeta) => number) | null,
 ): string {
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
@@ -285,7 +333,9 @@ ${renderSummaryParagraphs(summary, citationUrls)}${credit}
 <div style="font-size:15px;color:#6b6560;line-height:1.5">Nothing new ${lookbackDays === 1 ? 'today' : 'recently'}. Enjoy the quiet.</div>
 </div>`;
   } else {
-    const groups = groupByCategory(articles);
+    // Rank sections by the day's signal (seed = today's date) so the lead
+    // section changes with the news instead of freezing alphabetically.
+    const groups = groupByCategory(articles, scoreFn ? { score: scoreFn, seed: today } : {});
     for (const [cat, catArticles] of groups) {
       html += categorySection(cat, catArticles);
     }
@@ -359,6 +409,58 @@ async function validateArticleImages(articles: ArticleMeta[]): Promise<void> {
 
 const MAX_ROUNDUP_ARTICLES = 12;
 
+export interface ScoreContext {
+  /** Current time in ms, for recency scoring. */
+  now: number;
+  mentionCounts?: Map<string, number>;
+  watchedEntities?: Set<string>;
+}
+
+/**
+ * Freshness boost: a story bookmarked minutes ago outweighs one from yesterday.
+ * Bounded to [0, 3] and decays to zero over ~24h so it nudges ordering without
+ * swamping the relevance signals.
+ */
+function recencyBoost(bookmarked: string | undefined, now: number): number {
+  if (!bookmarked) return 0;
+  const t = Date.parse(bookmarked);
+  if (Number.isNaN(t)) return 0;
+  const hoursAgo = (now - t) / 3_600_000;
+  if (hoursAgo <= 0) return 3;
+  return Math.max(0, 3 - hoursAgo / 8);
+}
+
+/**
+ * Relevance score for one article, combining freshness, content richness, and
+ * research-graph / watched-entity signals. Used both to curate (which stories
+ * make the cut) and to rank sections (which section leads the issue).
+ */
+export function scoreArticle(a: ArticleMeta, ctx: ScoreContext): number {
+  let score = 0;
+  // Freshness — the strongest lever for making each day's ordering feel different.
+  score += recencyBoost(a.bookmarked, ctx.now);
+  // Richer content (excerpt, image) reads better as a lead.
+  if (a.excerpt) score += 1;
+  if (a.image?.startsWith('http')) score += 1;
+  // Watched/trending entities in the title.
+  if (ctx.mentionCounts && ctx.watchedEntities) {
+    const titleLower = a.title.toLowerCase();
+    for (const entity of ctx.watchedEntities) {
+      if (titleLower.includes(entity.toLowerCase())) score += 3;
+    }
+  }
+  // Research-graph mentions.
+  if (ctx.mentionCounts) {
+    const titleWords = a.title.toLowerCase().split(/\s+/);
+    for (const [entity, count] of ctx.mentionCounts) {
+      if (titleWords.some(w => entity.toLowerCase().includes(w) && w.length > 3)) {
+        score += Math.min(count, 5);
+      }
+    }
+  }
+  return score;
+}
+
 export function curateArticles(
   articles: ArticleMeta[],
   mentionCounts?: Map<string, number>,
@@ -367,31 +469,8 @@ export function curateArticles(
 ): ArticleMeta[] {
   if (articles.length <= limit) return articles;
 
-  // Score each article based on signals
-  const scored = articles.map(a => {
-    let score = 0;
-    // Boost articles with excerpts (richer content)
-    if (a.excerpt) score += 1;
-    // Boost articles with images (visual interest)
-    if (a.image?.startsWith('http')) score += 1;
-    // Boost articles that mention watched/trending entities
-    if (mentionCounts && watchedEntities) {
-      const titleLower = a.title.toLowerCase();
-      for (const entity of watchedEntities) {
-        if (titleLower.includes(entity.toLowerCase())) score += 3;
-      }
-    }
-    // Boost articles with research graph mentions
-    if (mentionCounts) {
-      const titleWords = a.title.toLowerCase().split(/\s+/);
-      for (const [entity, count] of mentionCounts) {
-        if (titleWords.some(w => entity.toLowerCase().includes(w) && w.length > 3)) {
-          score += Math.min(count, 5);
-        }
-      }
-    }
-    return { article: a, score };
-  });
+  const ctx: ScoreContext = { now: Date.now(), mentionCounts, watchedEntities };
+  const scored = articles.map(a => ({ article: a, score: scoreArticle(a, ctx) }));
 
   // Sort by score descending, then ensure category diversity
   scored.sort((a, b) => b.score - a.score);
@@ -547,7 +626,10 @@ export async function buildRoundup(
     ? formatSummaryCredit(summaryResult.provider, summaryResult.model)
     : null;
 
-  const html = buildRoundupHtml(curated, cfg.lookbackDays, summary, summaryCredit);
+  // Rank sections by the day's relevance/freshness so the lead changes daily.
+  const scoreCtx: ScoreContext = { now: Date.now(), mentionCounts, watchedEntities };
+  const scoreFn = (a: ArticleMeta) => scoreArticle(a, scoreCtx);
+  const html = buildRoundupHtml(curated, cfg.lookbackDays, summary, summaryCredit, scoreFn);
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   const subject = `The Pull Read Rundown — ${today}`;
 

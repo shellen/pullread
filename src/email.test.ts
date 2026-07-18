@@ -1,7 +1,7 @@
 // ABOUTME: Tests for the email roundup module
 // ABOUTME: Covers HTML generation, escaping, provider resolution, curation, summary, and send logic
 
-import { escapeHtml, buildRoundupHtml, sendTestEmail, sendRoundup, resolveSmtpConfig, SMTP_PROVIDERS, curateArticles, generateRoundupSummary, buildRoundup, filterByLookback, formatSummaryCredit } from './email';
+import { escapeHtml, buildRoundupHtml, sendTestEmail, sendRoundup, resolveSmtpConfig, SMTP_PROVIDERS, curateArticles, generateRoundupSummary, buildRoundup, filterByLookback, formatSummaryCredit, scoreArticle, groupByCategory } from './email';
 import type { EmailConfig, ArticleMeta } from './email';
 
 jest.mock('./summarizer', () => ({
@@ -327,6 +327,99 @@ describe('curateArticles', () => {
     const result = curateArticles(articles, undefined, undefined, 6);
     const cats = new Set(result.map(a => a.categories?.[0]));
     expect(cats.size).toBeGreaterThan(1);
+  });
+});
+
+describe('scoreArticle', () => {
+  const now = Date.parse('2026-07-18T12:00:00Z');
+
+  test('rewards fresher stories', () => {
+    const fresh = scoreArticle(article({ bookmarked: '2026-07-18T11:00:00Z' }), { now });
+    const old = scoreArticle(article({ bookmarked: '2026-07-17T12:00:00Z' }), { now });
+    expect(fresh).toBeGreaterThan(old);
+  });
+
+  test('rewards richer content and watched entities', () => {
+    const plain = scoreArticle(article({ title: 'Plain' }), { now });
+    const rich = scoreArticle(article({ title: 'Plain', excerpt: 'x', image: 'https://i/x.jpg' }), { now });
+    expect(rich).toBeGreaterThan(plain);
+
+    const watched = scoreArticle(
+      article({ title: 'Apple ships a thing' }),
+      { now, mentionCounts: new Map(), watchedEntities: new Set(['Apple']) },
+    );
+    expect(watched).toBeGreaterThan(plain);
+  });
+
+  test('missing or unparseable bookmark contributes no recency', () => {
+    expect(scoreArticle(article({}), { now })).toBe(0);
+    expect(scoreArticle(article({ bookmarked: 'not-a-date' }), { now })).toBe(0);
+  });
+});
+
+describe('groupByCategory section ranking', () => {
+  const sectionOrder = (m: Map<string, unknown>) => [...m.keys()];
+
+  test('without a score, falls back to alphabetical with More last', () => {
+    const groups = groupByCategory([
+      article({ categories: ['Crypto'] }),
+      article({ categories: ['AI'] }),
+      article({}), // -> More
+    ]);
+    expect(sectionOrder(groups)).toEqual(['AI', 'Crypto', 'More']);
+  });
+
+  test('with a score, the strongest section leads (not alphabetical)', () => {
+    const arts = [
+      article({ title: 'weak ai', categories: ['AI'] }),
+      article({ title: 'huge crypto story', categories: ['Crypto'] }),
+    ];
+    const score = (a: ArticleMeta) => (a.categories?.[0] === 'Crypto' ? 10 : 1);
+    const groups = groupByCategory(arts, { score, seed: 'day' });
+    // Crypto outranks AI despite coming later in the alphabet.
+    expect(sectionOrder(groups)).toEqual(['Crypto', 'AI']);
+  });
+
+  test("the strongest story sorts first within a section (it becomes the hero)", () => {
+    const arts = [
+      article({ title: 'quiet', categories: ['AI'], filename: 'q.md' }),
+      article({ title: 'loud', categories: ['AI'], filename: 'l.md' }),
+    ];
+    const score = (a: ArticleMeta) => (a.title === 'loud' ? 9 : 1);
+    const groups = groupByCategory(arts, { score, seed: 'day' });
+    expect(groups.get('AI')![0].title).toBe('loud');
+  });
+
+  test('More stays last even when it scores highest', () => {
+    const arts = [
+      article({ title: 'strong uncat' }), // More
+      article({ title: 'ai', categories: ['AI'] }),
+    ];
+    const score = (a: ArticleMeta) => (a.categories?.[0] ? 1 : 100);
+    const groups = groupByCategory(arts, { score, seed: 'day' });
+    expect(sectionOrder(groups)[sectionOrder(groups).length - 1]).toBe('More');
+  });
+
+  test('ties reshuffle across days (seed) instead of freezing', () => {
+    // All sections score zero -> pure tie; different daily seeds should be able
+    // to lead with different sections.
+    const arts = [
+      article({ categories: ['AI'] }),
+      article({ categories: ['Business'] }),
+      article({ categories: ['Crypto'] }),
+      article({ categories: ['Design'] }),
+    ];
+    const score = () => 0;
+    const leads = new Set<string>();
+    for (const seed of ['2026-07-18', '2026-07-19', '2026-07-20', '2026-07-21', '2026-07-22']) {
+      leads.add(sectionOrder(groupByCategory(arts, { score, seed }))[0]);
+    }
+    // Not the same section every day.
+    expect(leads.size).toBeGreaterThan(1);
+    // But deterministic for a given seed.
+    const a = sectionOrder(groupByCategory(arts, { score, seed: 'fixed' }));
+    const b = sectionOrder(groupByCategory(arts, { score, seed: 'fixed' }));
+    expect(a).toEqual(b);
   });
 });
 
