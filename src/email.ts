@@ -239,7 +239,7 @@ export function buildRoundupHtml(
   articles: ArticleMeta[],
   lookbackDays: number,
   summary?: string | null,
-  summaryModel?: string | null,
+  summaryCredit?: string | null,
 ): string {
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
@@ -271,10 +271,10 @@ export function buildRoundupHtml(
 `;
 
   if (summary) {
-    const disclosure = summaryModel
+    const disclosure = summaryCredit
       ? `\n<div style="margin-top:20px;padding-top:15px;border-top:1px solid #efe4dc;font-size:12px;color:#a99f95;letter-spacing:0.01em">`
-        + `<span style="color:#b45535">&#10022;</span> This intro was written by `
-        + `<span style="color:#7d746b;font-weight:600">${escapeHtml(summaryModel)}</span></div>`
+        + `<span style="color:#b45535">&#10022;</span> Summary by `
+        + `<span style="color:#7d746b;font-weight:600">${escapeHtml(summaryCredit)}</span></div>`
       : '';
     html += `<div style="background:#faf8f6;border:1px solid #efe7df;border-left:3px solid #b45535;border-radius:10px;padding:26px 28px;margin-bottom:34px">
 ${renderSummaryParagraphs(summary)}${disclosure}
@@ -311,72 +311,36 @@ export function escapeHtml(s: string): string {
 }
 
 /**
- * Turn a raw model id into a reader-friendly name for the AI-disclosure byline
- * (e.g. `claude-haiku-4-5-20251001` → "Claude Haiku 4.5", `gpt-5-mini` → "GPT-5
- * mini"). Falls back to a title-cased cleanup for models we don't special-case.
+ * Brand-level credit for the AI that wrote the intro — e.g. "Claude", "Apple
+ * Intelligence", "Gemini". We deliberately don't expose the exact model/version;
+ * the family name is enough disclosure and reads cleaner in the byline.
  */
-function prettyModelName(model: string): string {
-  const raw = (model || '').trim();
-  if (!raw) return 'an AI model';
-  const lower = raw.toLowerCase();
-
-  // Claude: claude-haiku-4-5-20251001 / claude-opus-4.7 → Claude Haiku 4.5 / Claude Opus 4.7
-  let m = lower.match(/^claude-(haiku|sonnet|opus)-(\d+)[-.](\d+)/);
-  if (m) {
-    const tier = m[1].charAt(0).toUpperCase() + m[1].slice(1);
-    return `Claude ${tier} ${m[2]}.${m[3]}`;
-  }
-  if (lower.startsWith('claude')) return 'Claude';
-
-  // OpenAI GPT: gpt-5 / gpt-5-mini / gpt-4.1-nano → GPT-5 / GPT-5 mini / GPT-4.1 nano
-  m = lower.match(/^gpt-(\d+(?:\.\d+)?)(?:-(nano|mini|turbo))?/);
-  if (m) {
-    return `GPT-${m[1]}${m[2] ? ` ${m[2]}` : ''}`;
-  }
-  // OpenAI o-series: o3-mini → o3-mini
-  m = lower.match(/^o(\d+)(?:-(nano|mini))?/);
-  if (m) {
-    return `o${m[1]}${m[2] ? `-${m[2]}` : ''}`;
-  }
-
-  // Gemini: gemini-2.5-flash-lite → Gemini 2.5 Flash Lite
-  m = lower.match(/^gemini-(\d+(?:\.\d+)?)-(flash-lite|flash|pro)/);
-  if (m) {
-    const tierMap: Record<string, string> = { 'flash-lite': 'Flash Lite', 'flash': 'Flash', 'pro': 'Pro' };
-    return `Gemini ${m[1]} ${tierMap[m[2]]}`;
-  }
-  if (lower.startsWith('gemini')) return 'Gemini';
-
-  // Fallback: strip an OpenRouter ":free" tag, split on separators, title-case words.
-  return raw
-    .replace(/:free$/i, '')
-    .replace(/[-_/]+/g, ' ')
-    .split(/\s+/)
-    .filter(Boolean)
-    .map(w => (/^\d/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)))
-    .join(' ')
-    .trim() || 'an AI model';
-}
-
-/**
- * Human-readable disclosure of which model wrote the editorial intro. Keeps the
- * hosting provider visible when it isn't obvious from the model name (Apple's
- * on-device model, OpenRouter-routed models).
- */
-export function formatModelDisclosure(provider: string, model: string): string {
-  const raw = (model || '').trim();
-  const lower = raw.toLowerCase();
+export function formatSummaryCredit(provider: string, model: string): string {
+  const lower = (model || '').toLowerCase();
 
   if (provider === 'apple' || lower === 'on-device' || lower.includes('apple')) {
-    return 'Apple Intelligence (on-device)';
+    return 'Apple Intelligence';
   }
 
-  if (provider === 'openrouter') {
-    const base = raw.includes('/') ? raw.split('/').pop() || raw : raw;
-    return `${prettyModelName(base)} (via OpenRouter)`;
-  }
+  // Recognize the model family from its id — the reliable signal for
+  // OpenRouter-routed models, which name the underlying vendor in the id.
+  const family =
+    lower.includes('claude') ? 'Claude'
+    : lower.includes('gemini') ? 'Gemini'
+    : lower.includes('gpt') || /(^|[^a-z])o\d/.test(lower) ? 'GPT'
+    : lower.includes('llama') ? 'Llama'
+    : lower.includes('deepseek') ? 'DeepSeek'
+    : lower.includes('mistral') || lower.includes('mixtral') ? 'Mistral'
+    : null;
 
-  return prettyModelName(raw);
+  if (family) return family;
+
+  switch (provider) {
+    case 'anthropic': return 'Claude';
+    case 'openai': return 'GPT';
+    case 'gemini': return 'Gemini';
+    default: return 'AI';
+  }
 }
 
 async function validateArticleImages(articles: ArticleMeta[]): Promise<void> {
@@ -511,8 +475,8 @@ export interface RoundupResult {
   html: string;
   subject: string;
   summary: string | null;
-  /** Reader-friendly name of the model that wrote the intro, if any. */
-  summaryModel: string | null;
+  /** Brand-level credit for the AI that wrote the intro (e.g. "Claude"), if any. */
+  summaryCredit: string | null;
   articles: ArticleMeta[];
 }
 
@@ -575,15 +539,15 @@ export async function buildRoundup(
   // Generate AI editorial summary (non-blocking — roundup renders even if this fails)
   const summaryResult = await generateRoundupSummary(curated);
   const summary = summaryResult?.text ?? null;
-  const summaryModel = summaryResult
-    ? formatModelDisclosure(summaryResult.provider, summaryResult.model)
+  const summaryCredit = summaryResult
+    ? formatSummaryCredit(summaryResult.provider, summaryResult.model)
     : null;
 
-  const html = buildRoundupHtml(curated, cfg.lookbackDays, summary, summaryModel);
+  const html = buildRoundupHtml(curated, cfg.lookbackDays, summary, summaryCredit);
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   const subject = `The Pull Read Rundown — ${today}`;
 
-  return { html, subject, summary, summaryModel, articles: curated };
+  return { html, subject, summary, summaryCredit, articles: curated };
 }
 
 export async function sendRoundup(

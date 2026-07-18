@@ -1,7 +1,7 @@
 // ABOUTME: Tests for the email roundup module
 // ABOUTME: Covers HTML generation, escaping, provider resolution, curation, summary, and send logic
 
-import { escapeHtml, buildRoundupHtml, sendTestEmail, sendRoundup, resolveSmtpConfig, SMTP_PROVIDERS, curateArticles, generateRoundupSummary, buildRoundup, filterByLookback, formatModelDisclosure } from './email';
+import { escapeHtml, buildRoundupHtml, sendTestEmail, sendRoundup, resolveSmtpConfig, SMTP_PROVIDERS, curateArticles, generateRoundupSummary, buildRoundup, filterByLookback, formatSummaryCredit } from './email';
 import type { EmailConfig, ArticleMeta } from './email';
 
 jest.mock('./summarizer', () => ({
@@ -244,15 +244,15 @@ describe('buildRoundupHtml', () => {
     expect(html).toContain('Third para, the payoff.');
   });
 
-  test('discloses the AI model that wrote the intro when provided', () => {
-    const html = buildRoundupHtml([article()], 1, 'A sharp little briefing.', 'Claude Haiku 4.5');
-    expect(html).toContain('This intro was written by');
-    expect(html).toContain('Claude Haiku 4.5');
+  test('credits the AI that wrote the intro when provided', () => {
+    const html = buildRoundupHtml([article()], 1, 'A sharp little briefing.', 'Claude');
+    expect(html).toContain('Summary by');
+    expect(html).toContain('Claude');
   });
 
-  test('omits the AI disclosure when no model is provided', () => {
+  test('omits the AI credit when none is provided', () => {
     const html = buildRoundupHtml([article()], 1, 'A sharp little briefing.');
-    expect(html).not.toContain('This intro was written by');
+    expect(html).not.toContain('Summary by');
   });
 });
 
@@ -463,14 +463,14 @@ describe('buildRoundup', () => {
     const result = await buildRoundup(cfg(), async () => articles);
 
     expect(result.summary).toBe('A fresh editorial note.');
-    expect(result.summaryModel).toBe('GPT-5');
+    expect(result.summaryCredit).toBe('GPT');
     expect(result.articles).toHaveLength(2);
     expect(result.html).toContain('Quantum chips ship');
     expect(result.html).toContain('New transit plan');
     expect(result.html).toContain('A fresh editorial note.');
-    // The AI-written intro discloses which model produced it.
-    expect(result.html).toContain('This intro was written by');
-    expect(result.html).toContain('GPT-5');
+    // The AI-written intro credits which AI produced it (brand only).
+    expect(result.html).toContain('Summary by');
+    expect(result.html).toContain('GPT');
     expect(result.subject).toContain('The Pull Read Rundown');
   });
 
@@ -479,40 +479,35 @@ describe('buildRoundup', () => {
     const result = await buildRoundup(cfg(), async () => articles);
 
     expect(result.summary).toBeNull();
-    expect(result.summaryModel).toBeNull();
+    expect(result.summaryCredit).toBeNull();
     expect(result.html).toContain('Solo story');
-    expect(result.html).not.toContain('This intro was written by');
+    expect(result.html).not.toContain('Summary by');
     expect(mockPromptLLM).not.toHaveBeenCalled();
   });
 });
 
-describe('formatModelDisclosure', () => {
-  test('formats Anthropic Claude model ids', () => {
-    expect(formatModelDisclosure('anthropic', 'claude-haiku-4-5-20251001')).toBe('Claude Haiku 4.5');
-    expect(formatModelDisclosure('anthropic', 'claude-opus-4-7')).toBe('Claude Opus 4.7');
+describe('formatSummaryCredit', () => {
+  test('credits a brand, not a specific model/version', () => {
+    expect(formatSummaryCredit('anthropic', 'claude-haiku-4-5-20251001')).toBe('Claude');
+    expect(formatSummaryCredit('anthropic', 'claude-opus-4-7')).toBe('Claude');
+    expect(formatSummaryCredit('openai', 'gpt-5')).toBe('GPT');
+    expect(formatSummaryCredit('openai', 'gpt-4.1-nano')).toBe('GPT');
+    expect(formatSummaryCredit('gemini', 'gemini-2.5-flash-lite')).toBe('Gemini');
   });
 
-  test('formats OpenAI model ids', () => {
-    expect(formatModelDisclosure('openai', 'gpt-5')).toBe('GPT-5');
-    expect(formatModelDisclosure('openai', 'gpt-5-mini')).toBe('GPT-5 mini');
-    expect(formatModelDisclosure('openai', 'gpt-4.1-nano')).toBe('GPT-4.1 nano');
+  test('names Apple Intelligence (no on-device model detail)', () => {
+    expect(formatSummaryCredit('apple', 'on-device')).toBe('Apple Intelligence');
+    expect(formatSummaryCredit('apple', 'apple-on-device')).toBe('Apple Intelligence');
   });
 
-  test('formats Gemini model ids', () => {
-    expect(formatModelDisclosure('gemini', 'gemini-2.5-flash-lite')).toBe('Gemini 2.5 Flash Lite');
-    expect(formatModelDisclosure('gemini', 'gemini-2.5-pro')).toBe('Gemini 2.5 Pro');
+  test('derives the brand from OpenRouter-routed model ids', () => {
+    expect(formatSummaryCredit('openrouter', 'anthropic/claude-haiku-4.5')).toBe('Claude');
+    expect(formatSummaryCredit('openrouter', 'google/gemini-2.5-flash')).toBe('Gemini');
+    expect(formatSummaryCredit('openrouter', 'meta-llama/llama-3.3-70b-instruct:free')).toBe('Llama');
   });
 
-  test('names Apple Intelligence as on-device', () => {
-    expect(formatModelDisclosure('apple', 'on-device')).toBe('Apple Intelligence (on-device)');
-    expect(formatModelDisclosure('apple', 'apple-on-device')).toBe('Apple Intelligence (on-device)');
-  });
-
-  test('keeps the OpenRouter routing visible', () => {
-    expect(formatModelDisclosure('openrouter', 'anthropic/claude-haiku-4.5')).toBe('Claude Haiku 4.5 (via OpenRouter)');
-  });
-
-  test('falls back to a clean title-case name for unknown models', () => {
-    expect(formatModelDisclosure('openrouter', 'meta-llama/llama-3.3-70b-instruct:free')).toBe('Llama 3.3 70b Instruct (via OpenRouter)');
+  test('falls back to the provider brand when the model id is unrecognized', () => {
+    expect(formatSummaryCredit('anthropic', '')).toBe('Claude');
+    expect(formatSummaryCredit('openai', 'some-unknown-id')).toBe('GPT');
   });
 });
