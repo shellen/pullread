@@ -137,17 +137,17 @@ describe('buildRoundupHtml', () => {
     expect(html).toContain('My RSS Feed');
   });
 
-  test('headline opens in Pull Read (matching the in-app rundown), with the source as a secondary link', () => {
-    const html = buildRoundupHtml([article({ url: 'https://example.com/article?id=1' })], 1);
-    // Primary action: open in the Pull Read reader (deep link), like tapping a headline in-app.
-    expect(html).toContain('pullread.com/link');
+  test('headline links to the source; Open in Pull Read is a desktop-only extra', () => {
+    const url = 'https://example.com/article?id=1';
+    const html = buildRoundupHtml([article({ url })], 1);
+    // The headline links straight to the original source, so it works on any device.
+    expect(html).toContain(`<a href="${url}"`);
+    // Open in Pull Read is still offered, but only on desktop (no Pull Read on mobile yet).
     expect(html).toContain('Open in Pull Read');
-    // The headline itself links to Pull Read, not straight to the publisher.
-    const prLink = `https://pullread.com/link?url=${encodeURIComponent('https://example.com/article?id=1')}`;
-    expect(html).toContain(prLink);
-    // Secondary action: the original source is still one click away.
-    expect(html).toContain('Read the original');
-    expect(html).toContain('https://example.com/article?id=1');
+    expect(html).toContain('pullread.com/link');
+    expect(html).toContain('class="pr-desktop-only"');
+    // The media query that hides it on small screens is present.
+    expect(html).toContain('.pr-desktop-only{display:none');
   });
 
   test('escapes HTML in article titles', () => {
@@ -222,15 +222,39 @@ describe('buildRoundupHtml', () => {
     expect(html).toContain('Pull Read');
   });
 
-  test('renders AI summary when provided', () => {
+  test('renders the AI intro as a plain newsletter lede (no bounding box)', () => {
     const html = buildRoundupHtml([article()], 1, 'AI is reshaping how we read and write.');
     expect(html).toContain('AI is reshaping how we read and write.');
-    expect(html).toContain('border-left:3px solid #b45535');
+    // No boxed callout — the intro sits on the card like a lede.
+    expect(html).not.toContain('border-left:3px solid #b45535');
+    expect(html).not.toContain('background:#faf8f6');
   });
 
   test('renders without summary when null', () => {
     const html = buildRoundupHtml([article()], 1, null);
-    expect(html).not.toContain('border-left:3px solid #b45535');
+    expect(html).not.toContain('Summary by');
+  });
+
+  test('links story references in the intro to the matching article', () => {
+    const arts = [
+      article({ title: 'EU forces Google', url: 'https://a.com/eu' }),
+      article({ title: 'Self-parking EV', url: 'https://b.com/ev' }),
+    ];
+    const summary = 'Regulators moved on {{Google’s search data|1}} while carmakers bet on {{a self-parking EV|2}}.';
+    const html = buildRoundupHtml(arts, 1, summary);
+    expect(html).toContain('<a href="https://a.com/eu"');
+    expect(html).toContain('<a href="https://b.com/ev"');
+    expect(html).toContain('a self-parking EV');
+    // The raw {{...|n}} markers never leak into the output.
+    expect(html).not.toContain('{{');
+    expect(html).not.toContain('|1}}');
+  });
+
+  test('strips citation markers that reference a missing story, keeping the words', () => {
+    const html = buildRoundupHtml([article({ url: 'https://a.com/x' })], 1, 'A claim about {{something big|9}} today.');
+    expect(html).toContain('something big');
+    expect(html).not.toContain('{{');
+    expect(html).not.toContain('|9');
   });
 
   test('splits the intro into paragraphs on blank lines', () => {

@@ -139,19 +139,21 @@ function groupByCategory(articles: ArticleMeta[]): Map<string, ArticleMeta[]> {
 }
 
 /**
- * Deep link that opens an article inside Pull Read's reader — the email
- * equivalent of the in-app rundown, where tapping a headline opens the piece in
- * the reader rather than the raw publisher page. Headlines link here so the
- * email behaves like the app; a secondary link still offers the original source.
+ * Deep link that opens an article inside Pull Read's reader on desktop. It's
+ * offered as a secondary, desktop-only action (hidden on mobile via the media
+ * query in the document head, since there's no Pull Read mobile app yet) —
+ * headlines themselves link straight to the source so every recipient can read.
  */
 function pullReadLink(article: ArticleMeta): string {
   return `https://pullread.com/link?url=${encodeURIComponent(article.url)}&title=${encodeURIComponent(article.title)}`;
 }
 
-function articleLinks(article: ArticleMeta): string {
-  return `<a href="${escapeHtml(pullReadLink(article))}" style="color:#b45535;text-decoration:none;font-size:12px;font-weight:600">Open in Pull Read &rarr;</a>`
-    + `<span style="color:#d8d0c8;margin:0 8px">&middot;</span>`
-    + `<a href="${escapeHtml(article.url)}" style="color:#9a938c;text-decoration:none;font-size:12px">Read the original &#8599;</a>`;
+// "Open in Pull Read" — desktop only. The .pr-desktop-only class is hidden on
+// small screens by the media query in buildRoundupHtml's <head>.
+function openInPullRead(article: ArticleMeta): string {
+  return `<div class="pr-desktop-only" style="margin-top:9px">`
+    + `<a href="${escapeHtml(pullReadLink(article))}" style="color:#b45535;text-decoration:none;font-size:12px;font-weight:600">Open in Pull Read &rarr;</a>`
+    + `</div>`;
 }
 
 function metaLine(article: ArticleMeta): string {
@@ -163,7 +165,7 @@ function metaLine(article: ArticleMeta): string {
 function heroArticleHtml(article: ArticleMeta): string {
   const excerpt = truncateExcerpt(article.excerpt || '');
   const hasImage = article.image && article.image.startsWith('http');
-  const link = escapeHtml(pullReadLink(article));
+  const link = escapeHtml(article.url);
 
   if (hasImage) {
     // Image + text side by side using table layout (email-safe)
@@ -175,7 +177,7 @@ function heroArticleHtml(article: ArticleMeta): string {
 <a href="${link}" style="font-size:17px;color:#1a1a1a;text-decoration:none;font-weight:600;line-height:1.35">${escapeHtml(article.title)}</a>
 ${excerpt ? `<div style="font-size:13.5px;color:#6b6560;margin-top:6px;line-height:1.55">${escapeHtml(excerpt)}</div>` : ''}
 ${metaLine(article)}
-<div style="margin-top:9px">${articleLinks(article)}</div>
+${openInPullRead(article)}
 </td>
 </tr></table>`;
   }
@@ -185,18 +187,18 @@ ${metaLine(article)}
 <a href="${link}" style="font-size:17px;color:#1a1a1a;text-decoration:none;font-weight:600;line-height:1.35">${escapeHtml(article.title)}</a>
 ${excerpt ? `<div style="font-size:13.5px;color:#6b6560;margin-top:6px;line-height:1.55">${escapeHtml(excerpt)}</div>` : ''}
 ${metaLine(article)}
-<div style="margin-top:9px">${articleLinks(article)}</div>
+${openInPullRead(article)}
 </div>`;
 }
 
 function compactArticleHtml(article: ArticleMeta): string {
   const excerpt = truncateExcerpt(article.excerpt || '');
-  const link = escapeHtml(pullReadLink(article));
+  const link = escapeHtml(article.url);
   return `<div style="padding:16px 0;border-top:1px solid #f0ebe6">
 <a href="${link}" style="font-size:15px;color:#1a1a1a;text-decoration:none;font-weight:600;line-height:1.4">${escapeHtml(article.title)}</a>
 ${excerpt ? `<div style="font-size:13px;color:#6b6560;margin-top:5px;line-height:1.5">${escapeHtml(excerpt)}</div>` : ''}
 ${metaLine(article)}
-<div style="margin-top:8px">${articleLinks(article)}</div>
+${openInPullRead(article)}
 </div>`;
 }
 
@@ -217,11 +219,22 @@ function categorySection(name: string, articles: ArticleMeta[]): string {
 }
 
 /**
- * Split the AI editorial note into paragraphs so it reads like a reporter's
- * briefing rather than one dense block. Honors blank-line paragraph breaks,
- * falling back to single newlines, then to the whole note as one paragraph.
+ * Render the AI editorial note. Splits into paragraphs (blank-line breaks, then
+ * single newlines) so it reads like a reporter's briefing, and turns the model's
+ * inline story references — written as `{{linked words|N}}` — into links to the
+ * matching article (by 1-based index into `citationUrls`). Markers that point at
+ * a missing story, or any stray/unbalanced braces, are stripped so nothing leaks.
  */
-function renderSummaryParagraphs(summary: string): string {
+function renderSummaryParagraphs(summary: string, citationUrls: string[] = []): string {
+  const linkify = (escaped: string): string =>
+    escaped
+      .replace(/\{\{([^{}|]+)\|(\d+)\}\}/g, (_m, phrase: string, n: string) => {
+        const url = citationUrls[parseInt(n, 10) - 1];
+        if (!url) return phrase; // out of range — keep the words, drop the marker
+        return `<a href="${escapeHtml(url)}" style="color:#b45535;text-decoration:underline;text-underline-offset:2px">${phrase}</a>`;
+      })
+      .replace(/\{\{|\}\}/g, ''); // drop any leftover markers
+
   const byBlank = summary.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean);
   const paras = byBlank.length > 1
     ? byBlank
@@ -230,7 +243,7 @@ function renderSummaryParagraphs(summary: string): string {
   return finalParas
     .map((p, i) => {
       const mb = i === finalParas.length - 1 ? '0' : '15px';
-      return `<p style="margin:0 0 ${mb};font-size:16px;line-height:1.72;color:#33302d">${escapeHtml(p)}</p>`;
+      return `<p style="margin:0 0 ${mb};font-size:16px;line-height:1.72;color:#33302d">${linkify(escapeHtml(p))}</p>`;
     })
     .join('\n');
 }
@@ -253,7 +266,8 @@ export function buildRoundupHtml(
   let html = `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only">
-<style>:root{color-scheme:light only}body,table,td,div,p,a,span{color-scheme:light only}</style>
+<style>:root{color-scheme:light only}body,table,td,div,p,a,span{color-scheme:light only}
+@media only screen and (max-width:600px){.pr-desktop-only{display:none !important}}</style>
 </head>
 <body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background-color:#f7f5f3;color:#1a1a1a;-webkit-font-smoothing:antialiased">
 <div style="max-width:600px;margin:0 auto;padding:28px 20px 32px;background-color:#f7f5f3">
@@ -271,13 +285,16 @@ export function buildRoundupHtml(
 `;
 
   if (summary) {
-    const disclosure = summaryCredit
-      ? `\n<div style="margin-top:20px;padding-top:15px;border-top:1px solid #efe4dc;font-size:12px;color:#a99f95;letter-spacing:0.01em">`
+    // The note reads as a newsletter lede straight on the card — no bounding box.
+    // Story references written as {{words|N}} link to the Nth article below.
+    const citationUrls = articles.map(a => a.url);
+    const credit = summaryCredit
+      ? `\n<div style="margin-top:16px;font-size:12px;color:#a99f95;letter-spacing:0.01em">`
         + `<span style="color:#b45535">&#10022;</span> Summary by `
         + `<span style="color:#7d746b;font-weight:600">${escapeHtml(summaryCredit)}</span></div>`
       : '';
-    html += `<div style="background:#faf8f6;border:1px solid #efe7df;border-left:3px solid #b45535;border-radius:10px;padding:26px 28px;margin-bottom:34px">
-${renderSummaryParagraphs(summary)}${disclosure}
+    html += `<div style="margin:0 0 6px">
+${renderSummaryParagraphs(summary, citationUrls)}${credit}
 </div>`;
   }
 
@@ -429,9 +446,13 @@ Voice:
 - Opinions welcome, clichés not.
 - Don't name every article or count how many there are.
 
+Linking (important):
+- The stories below are numbered. When you reference a specific one, link the exact words that name it by wrapping them like {{these words|N}}, where N is that story's number — e.g. {{Brussels forcing Google to share search data|3}}.
+- Link 2 to 4 stories across the whole note. Keep each linked phrase short (a noun phrase, not a full sentence), never link the same story twice, and never use a number that isn't in the list.
+
 Never use: "dive in", "buckle up", "without further ado", "let's get started", "here's what caught my eye", "in today's rundown", "welcome to".
 
-Today's articles:
+Today's stories (numbered for linking):
 `;
 
 /** The editorial intro plus the model that wrote it, for AI disclosure. */
@@ -446,11 +467,13 @@ export async function generateRoundupSummary(articles: ArticleMeta[]): Promise<R
   const config = loadLLMConfig();
   if (!config) return null;
 
+  // Number the stories so the model can cite them inline as {{words|N}};
+  // renderSummaryParagraphs maps N back to this same (curated) article order.
   const articleList = articles
     .slice(0, 15)
-    .map(a => {
+    .map((a, i) => {
       const excerpt = a.excerpt ? ` — ${a.excerpt.slice(0, 100)}` : '';
-      return `- ${a.title} (${a.domain || a.feed || ''})${excerpt}`;
+      return `${i + 1}. ${a.title} (${a.domain || a.feed || ''})${excerpt}`;
     })
     .join('\n');
 
