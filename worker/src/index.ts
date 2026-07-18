@@ -147,6 +147,34 @@ async function handleExport(request: Request, env: Env): Promise<Response> {
   });
 }
 
+async function handleStats(request: Request, env: Env): Promise<Response> {
+  const url = new URL(request.url);
+  if (url.searchParams.get('key') !== env.ADMIN_KEY) {
+    return new Response('Forbidden', { status: 403 });
+  }
+
+  const totals = await env.DB.prepare(
+    'SELECT COUNT(*) AS total, SUM(unsubscribed_at IS NULL) AS active FROM subscribers',
+  ).first<{ total: number; active: number | null }>();
+
+  const bySourcePlatform = await env.DB.prepare(
+    "SELECT source, COALESCE(platform, '') AS platform, COUNT(*) AS count FROM subscribers WHERE unsubscribed_at IS NULL GROUP BY source, platform ORDER BY source, platform",
+  ).all();
+
+  const byWeek = await env.DB.prepare(
+    "SELECT strftime('%Y-%W', created_at) AS week, source, COUNT(*) AS count FROM subscribers GROUP BY week, source ORDER BY week",
+  ).all();
+
+  return new Response(
+    JSON.stringify({
+      totals: { total: totals?.total ?? 0, active: totals?.active ?? 0 },
+      active_by_source_platform: bySourcePlatform.results,
+      signups_by_week: byWeek.results,
+    }),
+    { headers: { 'Content-Type': 'application/json' } },
+  );
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -165,6 +193,10 @@ export default {
 
     if (url.pathname === '/api/export') {
       return handleExport(request, env);
+    }
+
+    if (url.pathname === '/api/stats') {
+      return handleStats(request, env);
     }
 
     return new Response('Not found', { status: 404 });
