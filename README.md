@@ -10,12 +10,12 @@ PullRead connects to bookmark services like Instapaper, Pinboard, Raindrop, and 
 
 ## Download
 
-**[Download the latest release](https://github.com/shellen/pullread/releases/latest)**
+**[Download Pull Read from pullread.com](https://pullread.com/#download)**
 
 | Platform | Download | Architecture |
 |----------|----------|-------------|
-| **macOS (Apple Silicon)** | [PullRead_aarch64.dmg](https://github.com/shellen/pullread/releases/latest) | ARM64 (M1/M2/M3/M4) |
-| **macOS (Intel)** | [PullRead_x64.dmg](https://github.com/shellen/pullread/releases/latest) | x86_64 |
+| **macOS (Apple Silicon)** | [pullread.com/#download](https://pullread.com/#download) | ARM64 (M1/M2/M3/M4) |
+| **macOS (Intel)** | [pullread.com/#download](https://pullread.com/#download) | x86_64 |
 | **CLI** | Clone this repo | For development, Linux, or Windows |
 
 > **Quick install:** Download the DMG, open it, drag PullRead to your Applications folder, and launch it. The app is fully self-contained — no Node.js or other dependencies required. Configure your feeds in Settings and start syncing.
@@ -131,7 +131,7 @@ npm run sync -- --help
 
 **Option A: Download Release (Recommended)**
 
-1. Download `PullRead.dmg` from [GitHub Releases](https://github.com/shellen/pullread/releases)
+1. Download `PullRead.dmg` from [pullread.com](https://pullread.com/#download)
 2. Open the DMG and drag PullRead to Applications
 3. Launch PullRead from Applications
 4. The onboarding wizard walks you through setting up feeds and output path

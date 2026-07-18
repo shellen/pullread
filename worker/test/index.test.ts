@@ -247,3 +247,36 @@ describe('GET /api/export', () => {
     expect(csv).toContain('active@example.com');
   });
 });
+
+// ── GET /api/stats ───────────────────────────────────────
+
+describe('GET /api/stats', () => {
+  test('valid key returns aggregate counts without emails', async () => {
+    await env.DB.prepare(
+      "INSERT INTO subscribers (email, source, platform) VALUES ('a@x.com', 'download', 'apple_silicon'), ('b@x.com', 'download', 'intel'), ('c@x.com', 'newsletter', NULL)",
+    ).run();
+    await env.DB.prepare(
+      "INSERT INTO subscribers (email, source, unsubscribed_at) VALUES ('gone@x.com', 'newsletter', datetime('now'))",
+    ).run();
+
+    const res = await SELF.fetch('https://fake.host/api/stats?key=test-admin-key');
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.totals).toEqual({ total: 4, active: 3 });
+    expect(body.active_by_source_platform).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ source: 'download', platform: 'apple_silicon', count: 1 }),
+        expect.objectContaining({ source: 'download', platform: 'intel', count: 1 }),
+        expect.objectContaining({ source: 'newsletter', platform: '', count: 1 }),
+      ]),
+    );
+    expect(body.signups_by_week.length).toBeGreaterThan(0);
+    // Aggregates only — no addresses leave the worker via this route.
+    expect(JSON.stringify(body)).not.toContain('@x.com');
+  });
+
+  test('bad key returns 403', async () => {
+    const res = await SELF.fetch('https://fake.host/api/stats?key=nope');
+    expect(res.status).toBe(403);
+  });
+});

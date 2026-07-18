@@ -1,0 +1,42 @@
+# ABOUTME: Weekly snapshot of download/usage metrics into data/metrics.csv.
+# ABOUTME: Rescues ephemeral GitHub counters (14-day traffic, resetting rolling-DMG counts). See #111.
+
+name: Metrics Snapshot
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'  # Every Monday at 8am UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Collect metrics
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Optional: set PULLREAD_STATS_KEY (the worker ADMIN_KEY) in repo secrets
+          # to include download-gate subscriber counts in the snapshot.
+          STATS_KEY: ${{ secrets.PULLREAD_STATS_KEY }}
+        run: bun scripts/metrics-snapshot.ts
+
+      - name: Commit snapshot
+        run: |
+          if [ -z "$(git status --porcelain data/metrics.csv)" ]; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/metrics.csv
+          git commit -m "chore: metrics snapshot $(date -u +%Y-%m-%d) [skip ci]"
+          git push
