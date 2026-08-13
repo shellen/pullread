@@ -302,8 +302,13 @@ async function init() {
         ttsProvider = cfg.provider || 'browser';
       }).catch(function() {});
 
-      // Show dashboard instead of auto-loading first article
+      // Show dashboard instead of auto-loading first article. The dashboard
+      // IS the Explore view, so keep the nav highlight in sync (#110) — the
+      // static HTML default can be overridden by stale DOM state on reopen.
       renderHub();
+      document.querySelectorAll('.sidebar-nav-item').forEach(function(item) {
+        item.classList.toggle('active', item.dataset.nav === 'explore');
+      });
       showOnboardingIfNeeded();
       // Seed the change tracker so first poll doesn't false-trigger
       fetch('/api/files-changed').then(function(r) { return r.ok ? r.json() : null; }).then(function(d) { if (d) _lastKnownChangeAt = d.changedAt; }).catch(function() {});
