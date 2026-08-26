@@ -95,6 +95,14 @@ function stripTags(s) {
   return s ? s.replace(/<[^>]+>/g, '').trim() : s;
 }
 
+// True when a loaded image is too small to be real artwork — favicons, logos,
+// avatars (#115). Blowing these up as a hero/card image looks blurry; callers
+// should fall back to their no-image treatment instead. 200px covers standard
+// favicon sizes up to apple-touch-icon (180x180).
+function isTinyImage(img) {
+  return img.naturalWidth > 0 && (img.naturalWidth < 200 || img.naturalHeight < 100);
+}
+
 function escapeHtml(s) {
   return String(s)
     .replace(/&/g, '&amp;')

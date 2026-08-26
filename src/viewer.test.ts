@@ -1,7 +1,7 @@
 // ABOUTME: Tests for viewer module helpers
 // ABOUTME: Covers reprocessFile, parseFrontmatter, sync progress, and XSS sanitization
 
-import { reprocessFile, parseFrontmatter } from './viewer';
+import { reprocessFile, parseFrontmatter, listFiles } from './viewer';
 import { setOutputPath, resetWriteGuard } from './writer';
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
@@ -315,6 +315,43 @@ bookmarked: 2025-01-15T00:00:00Z
     const result = await reprocessFile(filePath);
     expect(result.ok).toBe(false);
     expect(result.error).toBe('Network timeout');
+  });
+});
+
+describe('listFiles body-image fallback', () => {
+  let testDir: string;
+
+  beforeEach(() => {
+    testDir = join(tmpdir(), `pullread-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(testDir, { recursive: true });
+  });
+
+  function writeArticle(body: string): void {
+    writeFileSync(join(testDir, 'article.md'), `---
+title: "No Thumbnail"
+url: https://example.com/a
+domain: example.com
+bookmarked: 2026-08-26T00:00:00Z
+---
+
+${body}
+`);
+  }
+
+  test('skips favicon-like URLs and picks the next real image (#115)', () => {
+    writeArticle(
+      '![](https://example.com/favicon.ico)\n\n' +
+      '![](https://example.com/apple-touch-icon-180.png)\n\n' +
+      '![](https://cdn.example.com/photos/story-lead.jpg)'
+    );
+    const files = listFiles(testDir);
+    expect(files[0].image).toBe('https://cdn.example.com/photos/story-lead.jpg');
+  });
+
+  test('leaves image empty when only favicon-like images exist', () => {
+    writeArticle('![](https://example.com/favicon-32x32.png)');
+    const files = listFiles(testDir);
+    expect(files[0].image).toBe('');
   });
 });
 
@@ -848,9 +885,11 @@ describe('For You section rendering', () => {
     const fnMatch = article.match(/function buildSectionRundownHtml\b[\s\S]*?^}/m);
     expect(fnMatch).toBeTruthy();
     const fnBody = fnMatch![0];
-    // The onerror should call dashCardInitialHtml as a function (runtime call pattern)
-    // NOT pre-render it and embed raw HTML with unescaped quotes in the attribute
-    expect(fnBody).toMatch(/onerror="this\.outerHTML=dashCardInitialHtml\(/);
+    // The fallback should call dashCardInitialHtml as a function at runtime
+    // (shared by onload's tiny-image check and onerror — #115), NOT pre-render
+    // it and embed raw HTML with unescaped quotes in the attribute
+    expect(fnBody).toMatch(/compactFallback = 'this\.outerHTML=dashCardInitialHtml\(/);
+    expect(fnBody).toMatch(/onerror="' \+ compactFallback/);
     expect(fnBody).not.toContain("dashCardInitialHtml(a.domain, 80).replace");
   });
 });

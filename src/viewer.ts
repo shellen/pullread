@@ -478,6 +478,8 @@ export function listFiles(outputPath: string, includeSummaries = false): FileMet
             // Skip tracking pixels, badges, tiny icons, and feeds.feedburner
             if (/[?&](w|width|sz)=\d{1,2}(&|$)/.test(src)) continue;
             if (/\/(pixel|beacon|track|spacer|blank|badge|icon)\b/i.test(src)) continue;
+            // Skip favicons/touch icons — too small to be card artwork (#115)
+            if (/favicon|apple-touch-icon|\/favicons\//i.test(src)) continue;
             if (/feeds\.feedburner\.com/i.test(src)) continue;
             if (/\.(gif|svg)(\?|$)/.test(src) && !/\d{3,}/.test(src)) continue;
             image = imgMatch[1];
