@@ -219,7 +219,7 @@ function buildRundownTab(engagement, mc) {
       var feat = arts[0];
       html += '<div class="sections-featured" onclick="dashLoadArticle(\'' + escapeJsStr(feat.filename) + '\')">';
       if (feat.image) {
-        html += '<img src="' + escapeHtml(feat.image) + '" alt="" loading="lazy" onerror="this.remove()">';
+        html += '<img src="' + escapeHtml(feat.image) + '" alt="" loading="lazy" onload="if(isTinyImage(this))this.remove()" onerror="this.remove()">';
       }
       html += '<div class="sections-featured-body">';
       html += '<div class="sections-featured-title">' + escapeHtml(feat.title) + '</div>';
@@ -564,7 +564,8 @@ function buildDailyRundownHtml() {
 
     if (heroImage) {
       var imgLoading = ci === 0 ? 'eager' : 'lazy';
-      html += '<img class="rundown-card-img" src="' + escapeHtml(heroImage) + '" alt="" loading="' + imgLoading + '" onerror="this.parentElement.style.setProperty(\'--reel-color\',\'' + clusterColor + '\');this.outerHTML=\'<div class=rundown-card-noimg></div>\'">';
+      var cardFallback = 'this.parentElement.style.setProperty(\'--reel-color\',\'' + clusterColor + '\');this.outerHTML=\'<div class=rundown-card-noimg></div>\'';
+      html += '<img class="rundown-card-img" src="' + escapeHtml(heroImage) + '" alt="" loading="' + imgLoading + '" onload="if(isTinyImage(this)){' + cardFallback + '}" onerror="' + cardFallback + '">';
     } else {
       html += '<div class="rundown-card-noimg" style="background:' + clusterColor + '"><span class="rundown-card-initial">' + escapeHtml(c.label.charAt(0).toUpperCase()) + '</span></div>';
     }
@@ -629,7 +630,8 @@ function buildSectionRundownHtml() {
       var onclick = 'dashLoadArticle(\'' + escapeJsStr(a.filename) + '\')';
       html += '<div class="dash-card dash-card-compact" onclick="' + onclick + '">';
       if (a.image) {
-        html += '<img class="dash-card-img" src="' + escapeHtml(a.image) + '" alt="" loading="lazy" onerror="this.outerHTML=dashCardInitialHtml(\'' + escapeHtml(a.domain || '').replace(/'/g, "\\'") + '\',80)">';
+        var compactFallback = 'this.outerHTML=dashCardInitialHtml(\'' + escapeHtml(a.domain || '').replace(/'/g, "\\'") + '\',80)';
+        html += '<img class="dash-card-img" src="' + escapeHtml(a.image) + '" alt="" loading="lazy" onload="if(isTinyImage(this)){' + compactFallback + '}" onerror="' + compactFallback + '">';
       } else {
         html += dashCardInitialHtml(a.domain, 80);
       }
@@ -664,7 +666,8 @@ function dashCardHtml(f, progressPct, variant) {
 
   // Image or source-colored initial
   if (f.image) {
-    html += '<img class="dash-card-img" src="' + escapeHtml(f.image) + '" alt="" loading="lazy" onerror="this.outerHTML=dashCardInitialHtml(\'' + escapeHtml(feedName).replace(/'/g, "\\'") + '\',' + imgHeight + ')">';
+    var dashFallback = 'this.outerHTML=dashCardInitialHtml(\'' + escapeHtml(feedName).replace(/'/g, "\\'") + '\',' + imgHeight + ')';
+    html += '<img class="dash-card-img" src="' + escapeHtml(f.image) + '" alt="" loading="lazy" onload="if(isTinyImage(this)){' + dashFallback + '}" onerror="' + dashFallback + '">';
   } else {
     html += dashCardInitialHtml(feedName, imgHeight);
   }
@@ -908,9 +911,11 @@ function renderArticle(text, filename) {
     html += '<div class="article-meta">' + metaLineParts.join('<span class="sep">&middot;</span>') + '</div>';
   }
 
-  // Hero image from frontmatter thumbnail (feed media:content or og:image)
+  // Hero image from frontmatter thumbnail (feed media:content or og:image).
+  // Tiny images (favicons/logos some sites ship as og:image) are hidden
+  // rather than rez'd up full-width (#115).
   if (meta && meta.thumbnail) {
-    html += '<div class="article-hero"><img src="' + escapeHtml(meta.thumbnail) + '" alt="" loading="lazy" onerror="this.parentElement.style.display=\'none\'"></div>';
+    html += '<div class="article-hero"><img src="' + escapeHtml(meta.thumbnail) + '" alt="" loading="lazy" onload="if(isTinyImage(this))this.parentElement.style.display=\'none\'" onerror="this.parentElement.style.display=\'none\'"></div>';
   }
 
   // Detect review/summary articles where Summarize doesn't make sense
