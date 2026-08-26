@@ -1,7 +1,0 @@
-{
-  "mcpServers": {
-    "pongogo-knowledge": {
-      "command": "pongogo-server"
-    }
-  }
-}
