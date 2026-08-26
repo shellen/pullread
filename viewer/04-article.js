@@ -1094,6 +1094,11 @@ function renderArticle(text, filename) {
       try { seen.add(new URL(meta.thumbnail).origin + new URL(meta.thumbnail).pathname); } catch { seen.add(meta.thumbnail); }
     }
     for (const img of imgs) {
+      // Never dedupe the hero itself — its URL is pre-seeded into `seen`, so
+      // without this guard the hero is removed as a duplicate of itself and
+      // the article loses its top image (most visibly after a re-fetch adds
+      // an og:image to the frontmatter).
+      if (img.closest('.article-hero')) continue;
       const src = img.getAttribute('src');
       if (!src) continue;
       // Normalize: strip query params for dedup comparison
