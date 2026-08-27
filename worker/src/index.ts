@@ -147,6 +147,37 @@ async function handleExport(request: Request, env: Env): Promise<Response> {
   });
 }
 
+// ── Updater check-ins (#111 Phase 2) ─────────────────────
+// The app's updater fetches latest.json through this endpoint, giving a
+// daily active-install count without telemetry: one row per (day, salted
+// IP hash), then a redirect to the real manifest on GitHub. No user agent,
+// no version, no raw IP is stored.
+
+const UPDATER_MANIFEST_URL =
+  'https://github.com/shellen/pullread/releases/latest/download/latest.json';
+
+const CHECKINS_SCHEMA =
+  'CREATE TABLE IF NOT EXISTS updater_checkins (' +
+  'day TEXT NOT NULL, ip_hash TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 1, ' +
+  'PRIMARY KEY (day, ip_hash))';
+
+async function handleUpdaterManifest(request: Request, env: Env): Promise<Response> {
+  // Counting must never block updates — redirect even if D1 hiccups.
+  try {
+    await env.DB.exec(CHECKINS_SCHEMA);
+    const day = new Date().toISOString().slice(0, 10);
+    const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+    const ipHash = (await hmacHex(env.HMAC_SECRET, `checkin:${ip}`)).slice(0, 32);
+    await env.DB.prepare(
+      'INSERT INTO updater_checkins (day, ip_hash) VALUES (?, ?) ' +
+      'ON CONFLICT(day, ip_hash) DO UPDATE SET count = count + 1',
+    ).bind(day, ipHash).run();
+  } catch {
+    // swallow — the redirect below is the contract
+  }
+  return Response.redirect(UPDATER_MANIFEST_URL, 302);
+}
+
 async function handleStats(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   if (url.searchParams.get('key') !== env.ADMIN_KEY) {
@@ -165,11 +196,22 @@ async function handleStats(request: Request, env: Env): Promise<Response> {
     "SELECT strftime('%Y-%W', created_at) AS week, source, COUNT(*) AS count FROM subscribers GROUP BY week, source ORDER BY week",
   ).all();
 
+  // Updater check-ins: uniques = distinct installs seen that day (#111)
+  let checkins: unknown[] = [];
+  try {
+    await env.DB.exec(CHECKINS_SCHEMA);
+    const rows = await env.DB.prepare(
+      'SELECT day, COUNT(*) AS uniques, SUM(count) AS total FROM updater_checkins GROUP BY day ORDER BY day DESC LIMIT 30',
+    ).all();
+    checkins = rows.results;
+  } catch { /* table empty/unavailable — report nothing rather than fail stats */ }
+
   return new Response(
     JSON.stringify({
       totals: { total: totals?.total ?? 0, active: totals?.active ?? 0 },
       active_by_source_platform: bySourcePlatform.results,
       signups_by_week: byWeek.results,
+      updater_checkins_by_day: checkins,
     }),
     { headers: { 'Content-Type': 'application/json' } },
   );
@@ -197,6 +239,10 @@ export default {
 
     if (url.pathname === '/api/stats') {
       return handleStats(request, env);
+    }
+
+    if (url.pathname === '/api/updater/latest.json') {
+      return handleUpdaterManifest(request, env);
     }
 
     return new Response('Not found', { status: 404 });
