@@ -44,6 +44,50 @@ test('hero image survives dedup; body duplicate is removed', async ({ page }) =>
   await expect(otherImg).toHaveCount(1);
 });
 
+// #115: tiny images (favicons/logos shipped as og:image) must not be
+// rez'd up as the hero — the hero hides itself once dimensions are known.
+test('tiny hero image is hidden instead of scaled up (#115)', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForFunction(() => typeof (window as any).renderArticle === 'function');
+
+  const render = (dataUrl: string) => `---
+title: "Tiny Hero"
+url: https://example.com/tiny
+bookmarked: 2026-08-26T10:00:00.000Z
+domain: example.com
+image: ${dataUrl}
+source: extracted
+---
+
+Body text.
+`;
+
+  // 32x32 (favicon-sized) → hero hidden
+  await page.evaluate((fm) => {
+    const c = document.createElement('canvas');
+    c.width = 32; c.height = 32;
+    (window as any).renderArticle(fm.replace('__URL__', c.toDataURL()), 'tiny.md');
+  }, render('__URL__'));
+  await page.waitForFunction(() => {
+    const hero = document.querySelector('.article-hero') as HTMLElement | null;
+    return hero !== null && hero.style.display === 'none';
+  });
+
+  // 400x250 (real artwork) → hero stays visible
+  await page.evaluate((fm) => {
+    const c = document.createElement('canvas');
+    c.width = 400; c.height = 250;
+    (window as any).renderArticle(fm.replace('__URL__', c.toDataURL()), 'big.md');
+  }, render('__URL__'));
+  await page.waitForFunction(() => {
+    const img = document.querySelector('.article-hero img') as HTMLImageElement | null;
+    return img !== null && img.complete && img.naturalWidth === 400;
+  });
+  const heroVisible = await page.evaluate(() =>
+    (document.querySelector('.article-hero') as HTMLElement).style.display !== 'none');
+  expect(heroVisible).toBe(true);
+});
+
 test('launch highlights Explore in the sidebar nav (#110)', async ({ page }) => {
   await page.goto('/');
   await page.waitForSelector('.sidebar-nav-item');
