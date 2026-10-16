@@ -318,6 +318,21 @@ bookmarked: 2025-01-15T00:00:00Z
   });
 });
 
+describe('local API hardening', () => {
+  const viewerSource = readFileSync(join(__dirname, 'viewer.ts'), 'utf-8');
+
+  test('never sends CORS allow-origin headers — the API must stay same-origin only', () => {
+    // Access-Control-Allow-Origin on 127.0.0.1:7777 lets ANY website read the
+    // user's library, notes, and stored SMTP/LLM credentials from the browser.
+    expect(viewerSource).not.toContain("setHeader('Access-Control-Allow-Origin'");
+  });
+
+  test('settings writes are owner-only (0600) — settings.json holds credentials', () => {
+    expect(viewerSource).toMatch(/writeFileSync\(path, JSON\.stringify\(data, null, 2\), \{ mode: 0o600 \}\)/);
+    expect(viewerSource).toMatch(/chmodSync\(path, 0o600\)/);
+  });
+});
+
 describe('sync progress', () => {
   const rootDir = join(__dirname, '..');
 

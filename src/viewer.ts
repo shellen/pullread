@@ -2,7 +2,7 @@
 // ABOUTME: Serves viewer UI and provides API for listing/reading articles
 
 import { createServer, IncomingMessage, ServerResponse } from 'http';
-import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, mkdirSync, watch, unlinkSync, copyFileSync } from 'fs';
+import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, mkdirSync, watch, unlinkSync, copyFileSync, chmodSync } from 'fs';
 import { join, extname, dirname } from 'path';
 import { exec, execFile, execFileSync } from 'child_process';
 import { homedir } from 'os';
@@ -644,7 +644,9 @@ function saveJsonFile(path: string, data: unknown): void {
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
-  writeFileSync(path, JSON.stringify(data, null, 2));
+  // Owner-only: settings.json holds SMTP passwords and LLM API keys
+  writeFileSync(path, JSON.stringify(data, null, 2), { mode: 0o600 });
+  try { chmodSync(path, 0o600); } catch {} // mode is ignored when the file already exists
 }
 
 /** Copy bundled classic books into the output directory and tag them */
@@ -845,11 +847,11 @@ export function startViewer(initialOutputPath: string, port = 7777, openBrowser 
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url || '/', `http://localhost:${port}`);
 
-    // CORS for local dev
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
+    // No CORS headers — every legitimate client (the Tauri webview and the
+    // browser UI) is served from this same origin, so cross-origin access is
+    // only ever another website's JavaScript probing localhost. Answering
+    // with Access-Control-Allow-Origin would hand any web page the user's
+    // library, notes, and stored SMTP/LLM credentials.
     if (req.method === 'OPTIONS') {
       res.writeHead(204);
       res.end();
