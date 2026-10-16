@@ -857,7 +857,18 @@ export function startViewer(initialOutputPath: string, port = 7777, openBrowser 
     }
 
     if (url.pathname === '/' || url.pathname === '/index.html') {
-      res.writeHead(200, { 'Content-Type': 'text/html' });
+      // Second layer behind DOMPurify (#117): article content is untrusted
+      // remote HTML. Scripts/styles are fully inlined by embed-viewer.ts, so
+      // script-src needs no remote hosts; images/media/connect stay open for
+      // arbitrary article assets and HLS; frames are YouTube-embed only.
+      res.writeHead(200, {
+        'Content-Type': 'text/html',
+        'Content-Security-Policy':
+          "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+          + "img-src * data: blob:; media-src * data: blob:; font-src 'self' data:; connect-src *; "
+          + "frame-src https://www.youtube.com https://www.youtube-nocookie.com; "
+          + "worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'",
+      });
       res.end(VIEWER_HTML);
       return;
     }

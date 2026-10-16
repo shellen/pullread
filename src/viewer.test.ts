@@ -318,6 +318,26 @@ bookmarked: 2025-01-15T00:00:00Z
   });
 });
 
+describe('content security policy (#117)', () => {
+  const viewerSource = readFileSync(join(__dirname, 'viewer.ts'), 'utf-8');
+
+  test('viewer HTML ships a Content-Security-Policy', () => {
+    expect(viewerSource).toContain("'Content-Security-Policy':");
+    // The load-bearing directives: no remote scripts, no plugins, no foreign frames beyond YouTube.
+    expect(viewerSource).toContain("script-src 'self' 'unsafe-inline'");
+    expect(viewerSource).toContain("object-src 'none'");
+    expect(viewerSource).toContain('frame-src https://www.youtube.com');
+    // Article assets must stay unrestricted or every remote image/podcast breaks.
+    expect(viewerSource).toContain('img-src * data: blob:');
+    expect(viewerSource).toContain('media-src * data: blob:');
+  });
+
+  test('tauri.conf.json no longer ships csp: null', () => {
+    const conf = JSON.parse(readFileSync(join(__dirname, '..', 'src-tauri', 'tauri.conf.json'), 'utf-8'));
+    expect(conf.app.security.csp).toBeTruthy();
+  });
+});
+
 describe('sync progress', () => {
   const rootDir = join(__dirname, '..');
 
