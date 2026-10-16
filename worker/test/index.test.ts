@@ -280,3 +280,47 @@ describe('GET /api/stats', () => {
     expect(res.status).toBe(403);
   });
 });
+
+// ── GET /api/updater/latest.json ─────────────────────────
+
+describe('GET /api/updater/latest.json', () => {
+  test('redirects to the GitHub manifest and records a check-in', async () => {
+    const res = await SELF.fetch('https://fake.host/api/updater/latest.json', {
+      headers: { 'cf-connecting-ip': '203.0.113.7' },
+      redirect: 'manual',
+    });
+    expect(res.status).toBe(302);
+    expect(res.headers.get('Location')).toBe(
+      'https://github.com/shellen/pullread/releases/latest/download/latest.json',
+    );
+
+    const rows = await env.DB.prepare('SELECT day, ip_hash, count FROM updater_checkins').all();
+    expect(rows.results.length).toBe(1);
+    expect(rows.results[0].count).toBe(1);
+    // Raw IP never stored — only a salted hash
+    expect(String(rows.results[0].ip_hash)).not.toContain('203.0.113.7');
+  });
+
+  test('same IP same day increments count, not uniques; new IP adds a row', async () => {
+    const opts = (ip: string) => ({ headers: { 'cf-connecting-ip': ip }, redirect: 'manual' as const });
+    await SELF.fetch('https://fake.host/api/updater/latest.json', opts('203.0.113.7'));
+    await SELF.fetch('https://fake.host/api/updater/latest.json', opts('203.0.113.7'));
+    await SELF.fetch('https://fake.host/api/updater/latest.json', opts('198.51.100.9'));
+
+    const rows = await env.DB.prepare(
+      'SELECT COUNT(*) AS uniques, SUM(count) AS total FROM updater_checkins',
+    ).first();
+    expect(rows.uniques).toBe(2);
+    expect(rows.total).toBe(3);
+  });
+
+  test('stats endpoint reports check-ins by day', async () => {
+    await SELF.fetch('https://fake.host/api/updater/latest.json', {
+      headers: { 'cf-connecting-ip': '203.0.113.7' }, redirect: 'manual',
+    });
+    const res = await SELF.fetch('https://fake.host/api/stats?key=test-admin-key');
+    const body = await res.json();
+    expect(body.updater_checkins_by_day.length).toBe(1);
+    expect(body.updater_checkins_by_day[0].uniques).toBe(1);
+  });
+});

@@ -84,6 +84,12 @@ if (process.env.STATS_KEY) {
       for (const g of stats.active_by_source_platform || []) {
         addRow('subscribers_active', `${g.source}/${g.platform || 'none'}`, g.count);
       }
+      // Daily active installs via updater check-ins (#111 Phase 2). Only the
+      // last 7 days — weekly runs overlap, dedupe on (date, metric, label).
+      for (const d of (stats.updater_checkins_by_day || []).slice(0, 7)) {
+        addRow('updater_uniques', d.day, d.uniques);
+        addRow('updater_checkins', d.day, d.total);
+      }
     } else {
       console.warn(`[metrics] stats endpoint -> ${res.status} (skipping subscriber counts)`);
     }
