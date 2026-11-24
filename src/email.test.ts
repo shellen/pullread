@@ -1,7 +1,7 @@
 // ABOUTME: Tests for the email roundup module
 // ABOUTME: Covers HTML generation, escaping, provider resolution, curation, summary, and send logic
 
-import { escapeHtml, buildRoundupHtml, sendTestEmail, sendRoundup, resolveSmtpConfig, SMTP_PROVIDERS, curateArticles, generateRoundupSummary, buildRoundup, filterByLookback, formatSummaryCredit, scoreArticle, groupByCategory } from './email';
+import { escapeHtml, buildRoundupHtml, sendTestEmail, sendRoundup, resolveSmtpConfig, SMTP_PROVIDERS, curateArticles, dedupeArticles, generateRoundupSummary, buildRoundup, filterByLookback, formatSummaryCredit, scoreArticle, groupByCategory, issueDateLine } from './email';
 import type { EmailConfig, ArticleMeta } from './email';
 
 jest.mock('nodemailer', () => ({
@@ -44,7 +44,7 @@ function article(overrides: Partial<ArticleMeta> = {}): ArticleMeta {
   return {
     filename: 'test.md',
     title: 'Test Article',
-    url: 'https://example.com/test',
+    url: `https://example.com/${(overrides.title || 'test').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
     domain: 'example.com',
     ...overrides,
   };
@@ -447,6 +447,92 @@ describe('curateArticles', () => {
   });
 });
 
+describe('dedupeArticles', () => {
+  test('drops the same story listed under two links with the same title (Nov 21 Roundup)', () => {
+    const title = 'Judge Approves $7 Billion Settlement Over Claims That Roundup Caused Cancer';
+    const result = dedupeArticles([
+      article({ title, url: 'https://www.nytimes.com/2026/11/20/business/judge-approves-7-billion-settlement-over-claims-that-roundup-caused-cancer.html', categories: ['Suits and Litigation (Civil)'] }),
+      article({ title, url: 'https://www.nytimes.com/2026/11/20/business/bayer-settlement-roundup-cancer.html', categories: ['Bayer AG'] }),
+      article({ title: 'BMW Recalls 286 i5 And i7 EVs' }),
+    ]);
+    expect(result).toHaveLength(2);
+  });
+
+  test('drops the same news from two outlets (Nov 17 Julien Baker)', () => {
+    const result = dedupeArticles([
+      article({ title: 'Julien Baker Lines Up New Album This World or the Next', url: 'https://pitchfork.com/story/julien-baker' }),
+      article({ title: 'Julien Baker Announces New Album This World Or The Next: Hear \u201cHound\u201d', url: 'https://stereogum.com/2518378/julien-baker' }),
+    ]);
+    expect(result).toHaveLength(1);
+  });
+
+  test('treats URLs differing only by query, hash, www or trailing slash as one', () => {
+    const result = dedupeArticles([
+      article({ title: 'First headline', url: 'https://www.example.com/story/' }),
+      article({ title: 'Different headline', url: 'https://example.com/story?utm_source=rss#top' }),
+    ]);
+    expect(result).toHaveLength(1);
+  });
+
+  test('keeps the copy with an image when the first has none', () => {
+    const result = dedupeArticles([
+      article({ title: 'Same Story Here About Things', url: 'https://a.com/1' }),
+      article({ title: 'Same Story Here About Things', url: 'https://b.com/2', image: 'https://img.com/x.jpg' }),
+    ]);
+    expect(result).toHaveLength(1);
+    expect(result[0].url).toBe('https://b.com/2');
+  });
+
+  test('keeps different stories that share a name', () => {
+    const result = dedupeArticles([
+      article({ title: 'Trump orders federal contractors to check with White House before responding to Congress' }),
+      article({ title: 'Trump lands in China with key meetings with Xi and Putin on the agenda' }),
+      article({ title: 'Jeff Bezos says he was heavily involved in picking the new James Bond' }),
+      article({ title: 'Bezos shrugs off blue wave, warns politicians not to make tech a villain' }),
+    ]);
+    expect(result).toHaveLength(4);
+  });
+
+  test('curateArticles removes duplicates even when under the limit', () => {
+    const title = 'Judge Approves $7 Billion Settlement Over Claims That Roundup Caused Cancer';
+    const result = curateArticles([
+      article({ title, url: 'https://nytimes.com/a' }),
+      article({ title, url: 'https://nytimes.com/b' }),
+    ], undefined, undefined, 12);
+    expect(result).toHaveLength(1);
+  });
+});
+
+describe('byline guard', () => {
+  test('hides a stringified-object byline saved by older builds', () => {
+    const html = buildRoundupHtml([article({ title: 'Nico Therin photographs', author: '[object Object]' })], 1, null);
+    expect(html).not.toContain('[object Object]');
+    expect(html).toContain('Nico Therin photographs');
+  });
+
+  test('still shows a real byline', () => {
+    const html = buildRoundupHtml([article({ title: 'A story', author: 'Jazz Monroe' })], 1, null);
+    expect(html).toContain('Jazz Monroe');
+  });
+});
+
+describe('mobile layout', () => {
+  test('uses narrow side padding by default and widens it only on desktop', () => {
+    const html = buildRoundupHtml([article({ title: 'A story' })], 1, null);
+    expect(html).toContain('class="rundown-card" style="background:#ffffff;padding:28px 22px');
+    expect(html).toContain('.rundown-card{padding:22px 16px !important');
+    expect(html).toContain('@media only screen and (min-width:601px){.rundown-card{padding:40px !important}}');
+    expect(html).not.toContain('padding:40px;border:1px solid');
+  });
+});
+
+describe('issueDateLine', () => {
+  test('names the weekday, date and time of day', () => {
+    expect(issueDateLine(new Date(2026, 10, 17, 17, 0))).toBe('Tuesday, November 17, 2026 (evening)');
+    expect(issueDateLine(new Date(2026, 10, 18, 8, 0))).toBe('Wednesday, November 18, 2026 (morning)');
+  });
+});
+
 describe('scoreArticle', () => {
   const now = Date.parse('2026-07-18T12:00:00Z');
 
@@ -641,6 +727,8 @@ describe('generateRoundupSummary', () => {
     expect(prompt).toContain('opening note for a daily reading rundown');
     // The prompt asks for real paragraph structure.
     expect(prompt).toContain('SHORT paragraphs');
+    // The model is told the issue date so it doesn't take a date from a story as today's.
+    expect(prompt).toContain(`This note goes out on ${issueDateLine()}`);
   });
 
   test('returns null when the model yields empty text', async () => {

@@ -191,8 +191,7 @@ function parseJsonFeed(text: string): FeedEntry[] {
     }
 
     // JSON Feed author: item.author.name (v1.0) or item.authors[0].name (v1.1)
-    const jsonAuthor = item.authors?.[0]?.name || item.author?.name || '';
-    const jsonAuthorStr = typeof jsonAuthor === 'string' ? jsonAuthor.trim() : '';
+    const jsonAuthorStr = textOf(item.authors?.[0]?.name) || textOf(item.author?.name);
 
     const categories = Array.isArray(item.tags) && item.tags.length > 0
       ? item.tags.filter((t: any) => typeof t === 'string' && t.trim()).map((t: string) => t.trim())
@@ -225,15 +224,30 @@ function parseJsonFeedTitle(text: string): string | null {
   }
 }
 
-function extractAtomAuthorName(author: any): string | undefined {
-  if (!author) return undefined;
-  if (typeof author === 'string') return author.trim() || undefined;
-  // Atom author: { name: "...", uri: "...", email: "..." } — we only want name
-  if (author.name) {
-    const name = typeof author.name === 'string' ? author.name : String(author.name);
-    return name.trim() || undefined;
+/**
+ * Plain text from a parsed XML/JSON value. fast-xml-parser gives a bare string
+ * for simple elements, but an object for CDATA ({ __cdata }), elements with
+ * attributes ({ '#text' }), nested names ({ name }), and arrays for repeated
+ * elements. Never stringify an object directly: that prints "[object Object]".
+ */
+export function textOf(value: any): string {
+  if (value == null) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number') return String(value);
+  if (Array.isArray(value)) return value.map(textOf).filter(Boolean).join(', ');
+  if (typeof value === 'object') {
+    return textOf(value.__cdata ?? value['#text'] ?? value.name ?? '');
   }
-  return undefined;
+  return '';
+}
+
+function extractAtomAuthorName(author: any): string | undefined {
+  // Atom author: { name: "...", uri: "...", email: "..." } — we only want name.
+  // The name can arrive as CDATA, and an entry can carry several authors.
+  if (!author) return undefined;
+  const authors = Array.isArray(author) ? author : [author];
+  const names = authors.map(a => (typeof a === 'string' ? a.trim() : textOf(a?.name))).filter(Boolean);
+  return names.join(', ') || undefined;
 }
 
 function resolveAtomLink(link: any): string {
@@ -368,9 +382,7 @@ function parseRssFeed(rss: any): FeedEntry[] {
     }
 
     // RSS author: <dc:creator> or <author> (often an email address, sometimes CDATA)
-    const rawAuthor = item['dc:creator'] || item.author || '';
-    const authorStr = typeof rawAuthor === 'string' ? rawAuthor.trim()
-      : rawAuthor?.__cdata?.trim() || rawAuthor?.['#text']?.trim() || '';
+    const authorStr = textOf(item['dc:creator']) || textOf(item.author);
     // Strip email format like "email (Name)" → "Name"
     const authorName = authorStr.includes('@')
       ? (authorStr.match(/\(([^)]+)\)/)?.[1] || '').trim()
@@ -440,8 +452,7 @@ function parseRdfFeed(rdf: any): FeedEntry[] {
     let updatedAt = dateStr;
     try { updatedAt = new Date(dateStr).toISOString(); } catch {}
 
-    const rdfAuthor = item['dc:creator'] || '';
-    const rdfAuthorStr = typeof rdfAuthor === 'string' ? rdfAuthor.trim() : '';
+    const rdfAuthorStr = textOf(item['dc:creator']);
     const categories = extractCategories(item['dc:subject'] || item.category);
 
     return {
