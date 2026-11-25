@@ -47,6 +47,8 @@ const baseConfig: EmailConfig = {
   // Tests never reach the network: the wider-news panel is exercised in stories.test.ts.
   widerNews: false,
   regionalFeeds: [],
+  oneRead: false,
+  obsidianPath: '',
 };
 
 function article(overrides: Partial<ArticleMeta> = {}): ArticleMeta {
@@ -402,6 +404,24 @@ describe('buildRoundupHtml', () => {
     const html = buildRoundupHtml([article()], 1, 'A sharp little briefing.', 'Claude');
     expect(html).toContain('Summary by');
     expect(html).toContain('Claude');
+  });
+
+  test("renders Today's one read above the intro, with its why line", () => {
+    const pick = article({ title: 'Al Gore buys hometown Tennessee newspaper', url: 'https://foxnews.com/gore' });
+    const html = buildRoundupHtml([article({ title: 'Other story' })], 1, 'An intro about {{Other story|1}}.', 'Claude', null, {
+      oneRead: { article: pick, why: 'Because of your highlights on newspaper and gore' },
+    });
+    const oneReadAt = html.indexOf('Today\u2019s one read');
+    expect(oneReadAt).toBeGreaterThan(-1);
+    expect(oneReadAt).toBeLessThan(html.indexOf('An intro about'));
+    expect(html).toContain('Al Gore buys hometown Tennessee newspaper');
+    expect(html).toContain('Because of your highlights on newspaper and gore');
+    // The intro's story numbers still point at the main list, not the one read.
+    expect(html).toMatch(/href="[^"]*"[^>]*>Other story<\/a>/);
+  });
+
+  test("no one read, no block", () => {
+    expect(buildRoundupHtml([article()], 1, null)).not.toContain('one read');
   });
 
   test('labels an on-device Apple Intelligence intro as possibly containing errors', () => {

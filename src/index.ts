@@ -595,13 +595,22 @@ if (command === 'sync') {
       library = { total: all.length, newest: all.map(a => a.bookmarked || '').filter(Boolean).sort().pop() || '', inWindow: inWindow.length };
       return inWindow;
     };
-    const result = await buildRoundup(cfg, fetchArticles);
+    const result = await buildRoundup(cfg, fetchArticles, undefined, { outputPath: config.outputPath });
 
     writeFileSync(outPath, result.html);
     console.log(`Library: ${config.outputPath} — ${library.total} article${library.total === 1 ? '' : 's'}${library.newest ? `, newest saved ${library.newest.slice(0, 10)}` : ''}`);
     console.log(`Articles in last ${cfg.lookbackDays} day${cfg.lookbackDays === 1 ? '' : 's'}: ${library.inWindow} (${result.articles.length} in the email)`);
     console.log(`Editorial note: ${result.summary ?? (result.articles.length === 0 ? '(none — no articles in the window)' : '(none — no LLM configured, or the intro failed its checks; see [email] lines above)')}`);
     if (result.summaryCredit) console.log(`Summary by: ${result.summaryCredit}`);
+    const o = result.oneRead;
+    if (o) {
+      const sig = Object.entries(o.signals).map(([k, n]) => `${n} ${k}${n === 1 ? '' : 's'}`).join(', ');
+      console.log(`Today's one read: ${o.pick ? `"${o.pick.article.title}" (${o.pick.article.domain}) — ${o.pick.why} [score ${o.pick.score.toFixed(1)}]` : '(none — no article matched your interests)'}`);
+      console.log(`  Interest profile: ${sig || 'no signals found'}${o.topInterests.length ? `; strongest: ${o.topInterests.join(', ')}` : ''}`);
+      for (const r of o.runnersUp) console.log(`  runner-up [${r.score.toFixed(1)}]: ${r.title.slice(0, 80)} (${r.terms.join(', ')})`);
+    } else if (!cfg.oneRead) {
+      console.log("Today's one read: off");
+    }
     const r = result.report;
     if (r) {
       console.log(`Wider news: ${r.panelFeeds ? `${r.panelFeedsReached.length} of ${r.panelFeeds} outlets reached (${r.panelHeadlines} headlines); ${r.widelyCovered} widely covered, ${r.beyondFeeds} added beyond your feeds` : 'off'}`);

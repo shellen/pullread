@@ -33,6 +33,10 @@ export interface EmailConfig {
   widerNews: boolean;
   /** Local outlets for the "Near you" check, e.g. [{ name: 'KQED', feedUrl: '…' }]. Two or more must agree. */
   regionalFeeds: Array<{ name: string; feedUrl: string }>;
+  /** Lead with Today's one read: the day's best match for your highlights, notes, favorites and watches. */
+  oneRead: boolean;
+  /** Optional folder of markdown notes (e.g. an Obsidian vault) to include in the interest profile. */
+  obsidianPath: string;
 }
 
 const DEFAULT_CONFIG: EmailConfig = {
@@ -51,6 +55,8 @@ const DEFAULT_CONFIG: EmailConfig = {
   lookbackDays: 1,
   widerNews: true,
   regionalFeeds: [],
+  oneRead: true,
+  obsidianPath: '',
 };
 
 function settingsPath(): string {
@@ -519,6 +525,7 @@ export function buildRoundupHtml(
   summary?: string | null,
   summaryCredit?: string | null,
   scoreFn?: ((a: ArticleMeta) => number) | null,
+  extras: { oneRead?: { article: ArticleMeta; why: string } | null } = {},
 ): string {
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
@@ -551,6 +558,17 @@ export function buildRoundupHtml(
 <div style="font-size:13px;color:#9a938c;letter-spacing:0.01em">${escapeHtml(today)} &middot; ${count} article${count === 1 ? '' : 's'} from ${period}</div>
 </div>
 `;
+
+  if (extras.oneRead) {
+    // Today's one read: the reader's own pick, above the day's news. The "why"
+    // names the signals it matched, so the choice is never a mystery.
+    html += `<div style="margin:0 0 30px;padding:0 0 26px;border-bottom:1px solid #ece7e2">
+<div style="font-size:11px;font-weight:700;color:#b45535;letter-spacing:0.12em;text-transform:uppercase;padding-bottom:12px">Today\u2019s one read</div>
+${heroArticleHtml(extras.oneRead.article).replace(/margin-bottom:22px/, 'margin-bottom:10px')}
+<div style="font-size:12.5px;color:#7d746b;font-style:italic;line-height:1.5">${escapeHtml(extras.oneRead.why)}</div>
+</div>
+`;
+  }
 
   if (summary) {
     // The note reads as a newsletter lede straight on the card — no bounding box.
@@ -958,6 +976,13 @@ export interface RoundupResult {
   articles: ArticleMeta[];
   /** What story curation did: panel feeds reached, model grouping, merges. */
   report?: StoryReport;
+  /** Today's one read, its runners-up and the profile it came from (for preview-rundown). */
+  oneRead?: {
+    pick: { article: ArticleMeta; why: string; score: number; terms: string[] } | null;
+    runnersUp: Array<{ title: string; score: number; terms: string[] }>;
+    signals: Partial<Record<string, number>>;
+    topInterests: string[];
+  };
 }
 
 /** Keep only articles bookmarked within the lookback window. */
@@ -1140,6 +1165,7 @@ export async function buildRoundup(
   cfg: EmailConfig,
   fetchArticles?: () => Promise<ArticleMeta[]>,
   port = 7777,
+  opts: { outputPath?: string } = {},
 ): Promise<RoundupResult> {
   let articles: ArticleMeta[] = [];
   if (fetchArticles) {
@@ -1176,6 +1202,37 @@ export async function buildRoundup(
 
   const scoreCtx: ScoreContext = { now: Date.now(), mentionCounts, watchedEntities };
   const scoreFn = (a: ArticleMeta) => scoreArticle(a, scoreCtx);
+  // Today's one read: the best match for the reader's own signals, picked from
+  // the whole window before curation, then kept out of the rest of the email
+  // (with any other copies of the same story).
+  let oneRead: RoundupResult['oneRead'];
+  if (cfg.oneRead && articles.length) {
+    try {
+      const { gatherInterestSignals, buildInterestProfile, pickOneRead } = await import('./interests');
+      const { signals, engaged } = await gatherInterestSignals({
+        outputPath: opts.outputPath || '',
+        watches: [...(watchedEntities || [])],
+        obsidianPath: cfg.obsidianPath,
+      });
+      const profile = buildInterestProfile(signals);
+      const { pick, ranked } = pickOneRead(articles, profile, engaged);
+      oneRead = {
+        pick,
+        runnersUp: ranked.slice(1, 6).map(c => ({ title: c.article.title, score: c.score, terms: c.terms.slice(0, 4) })),
+        signals: profile.counts,
+        topInterests: [...profile.weights].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([t]) => t),
+      };
+      if (pick) {
+        const sameStory = groupStories(articles).find(g => g.members.includes(pick.article));
+        const remove = new Set((sameStory?.members ?? [pick.article]).map(a => a.filename));
+        articles = articles.filter(a => !remove.has(a.filename));
+        await validateArticleImages([pick.article]);
+      }
+    } catch (err) {
+      console.warn("[email] Today's one read skipped:", err instanceof Error ? err.message : err);
+    }
+  }
+
   let report: StoryReport | undefined;
   const curated = await curateWithStories(articles, cfg, scoreFn, mentionCounts, watchedEntities, {
     modelGrouper: await appleGrouperIfEnabled(),
@@ -1193,11 +1250,13 @@ export async function buildRoundup(
     : null;
 
   // Rank sections by the day's relevance/freshness so the lead changes daily.
-  const html = buildRoundupHtml(curated, cfg.lookbackDays, summary, summaryCredit, scoreFn);
+  const html = buildRoundupHtml(curated, cfg.lookbackDays, summary, summaryCredit, scoreFn, {
+    oneRead: oneRead?.pick ? { article: oneRead.pick.article, why: oneRead.pick.why } : null,
+  });
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   const subject = `The Pull Read Rundown — ${today}`;
 
-  return { html, subject, summary, summaryCredit, articles: curated, report };
+  return { html, subject, summary, summaryCredit, articles: curated, report, oneRead };
 }
 
 export async function sendRoundup(

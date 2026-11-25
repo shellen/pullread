@@ -66,6 +66,32 @@ These were proven on macOS 26.6 over four live runs and moved from `scripts/demo
 
 Caveat: the helper runs synchronously (`execFileSync`), like the existing Apple summarizer, so the sidecar blocks while it runs. That's acceptable for a scheduled email, but it should go async in Phase 2.
 
+## Today's one read (v1, Nov 25)
+
+Inspired by a friend's personal newspaper, which picks one story a day from about 8,000 feeds using months of hand-tuned instructions built from Obsidian and meeting notes. Pull Read builds the interest profile automatically, and keeps it on the Mac (`src/interests.ts`).
+
+- **Signals** (all local; `gatherInterestSignals`), with these weights:
+
+  | Signal | Weight | Notes |
+  |---|---|---|
+  | Research watches | 4 | Never fade |
+  | Highlights and inline notes | 3 | |
+  | Notebook notes | 3 | |
+  | Favorites | 2 | The article's title |
+  | Your own tags | 1.5 | |
+  | Optional Obsidian folder | 1 | Notes edited in the last 30 days; `emailRoundup.obsidianPath` |
+
+  Dated signals halve every 21 days.
+- **Scoring** (`rankForInterests`): words from the title count double. Words common across the day's articles are discounted, and an article needs at least two different matching words. It's deterministic, so the "why" is explainable.
+- **Pick** (`pickOneRead`): the best match. Articles already highlighted or noted are skipped, since read state lives only in the viewer's localStorage and the sidecar can't see it. The pick and any other copies of its story are removed from the rest of the email.
+- **Email:** a "Today's one read" block above the intro, with a "why" line ("Because of your highlights and Notebook on …"). `oneRead` defaults to on.
+- **Preview:** `preview-rundown` prints the pick, its score and why, the profile's signal counts and strongest interests, and the five runners-up.
+
+Next:
+- **Sync read state to the sidecar,** so it can skip what you've read and learn from what you open and finish. Without that feedback the pick can't improve on its own.
+- **Let a model choose among the top 5** with a one-line reason.
+- **Show the profile in Settings,** where you can edit it.
+
 ## Phases
 
 ### Phase 1: Story grouping + wider-news panel (prototyped)
