@@ -1,7 +1,7 @@
 // ABOUTME: Tests for the Rundown structured-output helpers (intro citations, model grouping, intro checks)
 // ABOUTME: Model responses here are recorded samples, not live model output
 
-import { parseFlatIntro, structuredIntroToMarkers, applyModelGroups, groupingPrompt, checkIntro, buildPerStoryIntro, mentionsToIntro, fallbackPhrase, parseIntroResponse, candidatePairs, pairsPrompt, groupingLinesFromPairs, batches, onDeviceGrouping } from './rundown-ai';
+import { parseFlatIntro, structuredIntroToMarkers, applyModelGroups, groupingPrompt, checkIntro, buildPerStoryIntro, mentionsToIntro, fallbackPhrase, parseIntroResponse, candidatePairs, pairsPrompt, groupingLinesFromPairs, batches, onDeviceGrouping, commonWords } from './rundown-ai';
 import { groupStories } from './stories';
 import type { ArticleMeta } from './email';
 
@@ -76,6 +76,14 @@ describe('buildPerStoryIntro', () => {
     const r = buildPerStoryIntro(stories, p => (p.includes('Story 2') ? (() => { throw new Error('refused'); })() : { sentence: `About ${p.split('\n')[0].slice(10)}.`, phrase: 'About' }));
     expect(r!.mentions.map(p => p.map(m => m.story))).toEqual([[1, 3], [4, 5, 6]]);
     expect(r!.skipped).toBe(1);
+  });
+
+  test('keeps only the first sentence of each story', () => {
+    const r = buildPerStoryIntro(stories.slice(0, 3), () => ({
+      sentence: 'The BMW-powered Ineos Grenadier will be built in America. This development is significant as it marks a major step.',
+      phrase: 'Ineos Grenadier',
+    }));
+    expect(r!.mentions[0][0].sentence).toBe('The BMW-powered Ineos Grenadier will be built in America.');
   });
 
   test('returns null when fewer than three stories come back', () => {
@@ -156,6 +164,28 @@ describe('macOS 26 tie-breaker grouping', () => {
   test('merges three when every pair is confirmed', () => {
     const pairs: Array<[number, number]> = [[0, 1], [1, 2], [0, 2]];
     expect(groupingLinesFromPairs(3, pairs, ['P1', 'P2', 'P3'], ['1|Courts|3'])).toEqual(['1,2,3|Courts|3']);
+  });
+
+  test('common words are measured over the whole day, not the shortlist (real Black Friday merge)', () => {
+    const shortlist = groupStories([
+      article('Adobe Black Friday 2026 Cuts Creative Cloud Pro to $29.99 a Month Until November 27', 'https://a.com/adobe'),
+      article('Black Friday 2026 Deals On The Camera And Travel Gear We Use', 'https://b.com/gear'),
+      article('Black Friday 2026 \u2013 The best style deals for men', 'https://c.com/style'),
+    ]);
+    // Within the shortlist alone, "black", "friday" and "deal" look uncommon, so the deal posts pair up…
+    expect(candidatePairs(shortlist).length).toBeGreaterThan(0);
+    // …but the day had plenty of other Black Friday posts, so across the day those words are common.
+    const day = [...shortlist, ...groupStories(['Laptops', 'TVs', 'Headphones', 'Mattresses', 'Kitchen', 'Toys'].map((x, i) =>
+      article(`Black Friday 2026: The best ${x} deals`, `https://d.com/${i}`)))];
+    expect(candidatePairs(shortlist, 40, commonWords(day))).toEqual([]);
+  });
+
+  test('a year is never evidence of the same event', () => {
+    const g = groupStories([
+      article('Alpha Corp 2026 outlook raised', 'https://a.com/1'),
+      article('Beta Inc 2026 outlook cut', 'https://b.com/2'),
+    ]);
+    expect(candidatePairs(g)).toEqual([]); // shares "2026" and "outlook" only — the year doesn't count
   });
 
   test('real BMW BLOG day: stories that only share the brand are never asked about', () => {

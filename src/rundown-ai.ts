@@ -111,7 +111,8 @@ No greetings, no sign-offs, no "here are the top stories", never "dive in" or "b
  */
 export function appleSentenceInstructions(dateLine: string, retry = false): string {
   return `You write one sentence for a daily reading email about the story below.
-Say what happened and why it matters, IN YOUR OWN WORDS, with one concrete detail (a number, a name, a place). Do not copy the headline or the excerpt.
+Say what happened IN YOUR OWN WORDS, with one concrete detail (a number, a name, a place). Do not copy the headline or the excerpt.
+Use ONLY facts stated in the headline and excerpt. Do not add background, guess who people are, or explain why it matters. If unsure, say less.
 Also give 2 to 5 words from your sentence that name the story, never the whole sentence.
 This email goes out on ${dateLine}. Don't name today's weekday or date, and don't call past events upcoming. No greetings, no hype.`
     + (retry ? '\nImportant: never reuse more than three words in a row from the headline or excerpt.' : '');
@@ -137,7 +138,9 @@ export function buildPerStoryIntro(
     let r: { sentence?: string; phrase?: string } | null = null;
     try { r = ask(`Headline: ${a.title}\nSource: ${a.domain || ''}${gist ? `\nExcerpt: ${gist}` : ''}`); } catch { r = null; }
     if (!r?.sentence?.trim()) { skipped++; continue; }
-    got.push({ story: i + 1, sentence: r.sentence.trim(), phrase: r.phrase });
+    // One sentence per story: the model often adds "This is significant because…".
+    const first = r.sentence.trim().match(/^.+?[.!?](?=\s+[A-Z"\u201c]|\s*$)/)?.[0] ?? r.sentence.trim();
+    got.push({ story: i + 1, sentence: first, phrase: r.phrase });
   }
   if (got.length < 3) return null;
   return { mentions: [got.slice(0, 2), got.slice(2)], skipped };
@@ -291,6 +294,21 @@ function groupTokens(g: StoryGroup): Set<string> {
   return t;
 }
 
+const YEAR = /^(19|20)\d\d$/;
+
+/**
+ * Words too common in the day's stories to be evidence of the same event:
+ * in more than max(3, 2%) of them. Compute this over the WHOLE day, not a
+ * shortlist — within a 40-story shortlist "BMW" and "Black Friday" looked
+ * rare, and the model merged unrelated BMW and Black Friday stories.
+ */
+export function commonWords(groups: StoryGroup[]): Set<string> {
+  const df = new Map<string, number>();
+  for (const g of groups) for (const w of groupTokens(g)) df.set(w, (df.get(w) || 0) + 1);
+  const above = Math.max(3, Math.ceil(groups.length * 0.02));
+  return new Set([...df].filter(([, n]) => n > above).map(([w]) => w));
+}
+
 /**
  * Pairs of group indexes (0-based) worth asking about, most shared words
  * first. A pair needs at least two shared uncommon words — words that appear
@@ -298,16 +316,13 @@ function groupTokens(g: StoryGroup): Set<string> {
  * ("BMW" for a reader of BMW BLOG) is not evidence of the same event: on a
  * real day the model merged three unrelated BMW stories that shared it.
  */
-export function candidatePairs(groups: StoryGroup[], max = 40): Array<[number, number]> {
+export function candidatePairs(groups: StoryGroup[], max = 40, common: Set<string> = commonWords(groups)): Array<[number, number]> {
   const tokens = groups.map(groupTokens);
-  const df = new Map<string, number>();
-  for (const t of tokens) for (const w of t) df.set(w, (df.get(w) || 0) + 1);
-  const commonAbove = Math.max(3, Math.ceil(groups.length * 0.02));
   const pairs: Array<{ pair: [number, number]; shared: number }> = [];
   for (let i = 0; i < groups.length; i++) {
     for (let j = i + 1; j < groups.length; j++) {
       let shared = 0;
-      for (const w of tokens[i]) if (tokens[j].has(w) && (df.get(w) || 0) <= commonAbove) shared++;
+      for (const w of tokens[i]) if (tokens[j].has(w) && !common.has(w) && !YEAR.test(w)) shared++;
       if (shared >= 2) pairs.push({ pair: [i, j], shared });
     }
   }
@@ -408,11 +423,11 @@ export type StructuredRunner = (mode: 'pairs' | 'labels', instructions: string, 
 export function onDeviceGrouping(
   groups: StoryGroup[],
   run: StructuredRunner,
-  opts: { budgetMs?: number; clock?: () => number } = {},
+  opts: { budgetMs?: number; clock?: () => number; common?: Set<string> } = {},
 ): string[] | null {
-  const { budgetMs = 45_000, clock = Date.now } = opts;
+  const { budgetMs = 45_000, clock = Date.now, common } = opts;
   const start = clock();
-  const pairs = candidatePairs(groups);
+  const pairs = candidatePairs(groups, 40, common);
   const same: string[] = [];
   const pairBatches = batches(pairs, 12);
   // A batch the model refuses (sensitive headlines) or fails is skipped, not fatal.
@@ -471,6 +486,7 @@ export const STOCK_FILLER: RegExp[] = [
   /\bstay informed and engaged\b/i, /\bin the (world|realm) of\b/i, /\bon one hand\b/i,
   /\bit'?s no surprise\b/i, /\bsent ripples through\b/i, /\bshape our communities\b/i,
   /\bin today'?s fast-paced\b/i, /\bonly time will tell\b/i, /^lastly,/im,
+  /\bthis (development )?is significant\b/i, /\bhighlights the intersection\b/i, /\bmarks a major step\b/i,
 ];
 
 /** The blocking failures in a set of checks, as "rule — detail" strings. */

@@ -978,7 +978,7 @@ export interface StoryCurationOptions {
    * onDeviceGrouping). Returns "ids|label|importance" lines, or null to skip.
    * Errors are caught and the stories stay grouped by word matching alone.
    */
-  modelGrouper?: (groups: StoryGroup[]) => string[] | null | Promise<string[] | null>;
+  modelGrouper?: (groups: StoryGroup[], context: { allGroups: StoryGroup[] }) => string[] | null | Promise<string[] | null>;
   /** Receives a summary of what curation did (for preview-rundown and logs). */
   onReport?: (report: StoryReport) => void;
 }
@@ -1054,7 +1054,7 @@ export async function curateWithStories(
         .map((g, i) => ({ i, w: scoreFn(g.lead) + 2.5 * (g.sources.length - 1) }))
         .sort((a, b) => b.w - a.w)
         .slice(0, MODEL_GROUPING_MAX);
-      const subLines = await opts.modelGrouper(ranked.map(r => groups[r.i]));
+      const subLines = await opts.modelGrouper(ranked.map(r => groups[r.i]), { allGroups: groups });
       // Map the model's ids (positions in the shortlist) back to positions in `groups`.
       modelLines = subLines?.map(line => {
         const [ids, ...rest] = line.split('|');
@@ -1114,8 +1114,10 @@ async function appleGrouperIfEnabled(): Promise<StoryCurationOptions['modelGroup
     const { loadLLMConfig, isAppleAvailable } = await import('./summarizer');
     if (loadLLMConfig()?.provider !== 'apple' || !isAppleAvailable()) return undefined;
     const { runAppleStructured } = await import('./apple-structured');
-    const { onDeviceGrouping } = await import('./rundown-ai');
-    return groups => onDeviceGrouping(groups, (mode, instructions, prompt) => runAppleStructured(mode, instructions, prompt, 30_000));
+    const { onDeviceGrouping, commonWords } = await import('./rundown-ai');
+    return (groups, { allGroups }) => onDeviceGrouping(groups, (mode, instructions, prompt) => runAppleStructured(mode, instructions, prompt, 30_000), {
+      common: commonWords(allGroups), // measured over the whole day, not the shortlist
+    });
   } catch {
     return undefined;
   }

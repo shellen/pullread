@@ -66,7 +66,7 @@ struct StoryLabel {
 
 @Generable
 struct StorySentence {
-    @Guide(description: "One sentence in your own words saying what happened and why it matters, with one concrete detail. Do not copy the headline.")
+    @Guide(description: "One sentence in your own words saying what happened, using only facts from the headline and excerpt, with one concrete detail. Do not copy the headline.")
     var sentence: String
     @Guide(description: "2 to 5 words from your sentence that name the story.")
     var phrase: String

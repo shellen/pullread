@@ -55,6 +55,12 @@ These were proven on macOS 26.6 over four live runs and moved from `scripts/demo
   - Permissive guardrails did **not** stop the refusal of the six-story intro. The text fallback then failed the checks twice, so the gate correctly sent no intro.
   - **The Apple intro is now one story per request** (`sentence` mode, `buildPerStoryIntro`). A refused story is skipped, and the intro is written from up to 5 others. It needs at least 3 sentences.
   - Grouping ran, but merged three unrelated BMW BLOG stories that shared only "BMW", and the merges chained. Now a pair is only asked about if it shares at least **two uncommon words** (words in more than `max(3, 2%)` of the day's stories don't count). Clusters merge only when the model confirmed **every** cross pair.
+- **Third real-article run (Nov 25).**
+  - Per-story intro worked: 2 stories declined, intro built from 5.
+  - Santa Cruz mayor race merge was correct.
+  - **Over-merges:** three Black Friday deal posts, which then became the top story on coverage, and two BMW BLOG posts. Cause: common words were measured on the 40-story shortlist, not the whole day. Fixed with `commonWords(allGroups)`, and years are ignored.
+  - **The intro had factual errors no check can catch:** Molly Meldrum as "her", John Berger "featured in GTA", and an unsupported "first time the brand has built a vehicle in the US". It also added "This is significant…" sentences. Now: first sentence only, "use only facts from the headline and excerpt", more filler patterns.
+  - **Decision pending:** on-device intro accuracy. In 2 of 3 real runs, the intro that passed or nearly passed the checks misstated facts.
 - **`preview-rundown` report and `--days N`.** It prints panel outlets reached, widely covered stories, story count and the model grouping outcome (`StoryReport`), so a live run shows whether each part worked.
 - **On-device grouping for Apple users** (`buildRoundup` → `appleGrouperIfEnabled` → `onDeviceGrouping`). "Same event?" for candidate pairs, plus fixed-list labels, with importance ignored. It runs under a 45-second budget. Each call has a 30-second timeout, and on any error the Rundown keeps word matching only.
 
