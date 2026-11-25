@@ -175,23 +175,37 @@ export function buildInterestProfile(signals: InterestSignal[], now = Date.now()
   const weights = new Map<string, number>();
   const sources = new Map<string, Map<SignalKind, number>>();
   const counts: Partial<Record<SignalKind, number>> = {};
-  for (const sig of signals) {
-    counts[sig.kind] = (counts[sig.kind] || 0) + 1;
-    let w = KIND_WEIGHT[sig.kind];
+  for (const sig of signals) counts[sig.kind] = (counts[sig.kind] || 0) + 1;
+
+  const tokenSets = signals.map(sig => interestTokens(sig.text));
+  // How many signals use each word. A word in most of them is a writing habit
+  // ("because", "right", "before" topped the second live profile), not an interest.
+  const df = new Map<string, number>();
+  for (const t of tokenSets) for (const w of t) df.set(w, (df.get(w) || 0) + 1);
+  const n = Math.max(1, signals.length);
+  // ln((n+1)/df) / ln(n+1): 1 for a word in one signal, near 0 for a word in
+  // nearly all of a large set, but still ~0.2 for a word shared by 3 of 3.
+  const idf = (w: string) => Math.log((n + 1) / (df.get(w) || 1)) / Math.log(n + 1);
+
+  signals.forEach((sig, i) => {
+    // No kind can drown out the others by volume: a kind's signals share its
+    // weight by the square root of how many there are (1,029 notes vs 3 highlights).
+    let w = KIND_WEIGHT[sig.kind] / Math.sqrt(counts[sig.kind] || 1);
     if (sig.at && sig.kind !== 'watch') {
       const days = (now - Date.parse(sig.at)) / 86_400_000;
       if (Number.isFinite(days) && days > 0) w *= Math.pow(0.5, days / HALF_LIFE_DAYS);
     }
-    const tokens = interestTokens(sig.text);
+    const tokens = tokenSets[i];
     // A long note shouldn't outweigh a sharp highlight: spread its weight a little.
     const per = w / Math.max(1, Math.sqrt(tokens.size / 8));
     for (const t of tokens) {
-      weights.set(t, (weights.get(t) || 0) + per);
+      const add = per * idf(t);
+      weights.set(t, (weights.get(t) || 0) + add);
       if (!sources.has(t)) sources.set(t, new Map());
       const m = sources.get(t)!;
-      m.set(sig.kind, (m.get(sig.kind) || 0) + per);
+      m.set(sig.kind, (m.get(sig.kind) || 0) + add);
     }
-  }
+  });
   return { weights, sources, counts };
 }
 

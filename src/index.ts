@@ -608,6 +608,10 @@ if (command === 'sync') {
       console.log(`Today's one read: ${o.pick ? `"${o.pick.article.title}" (${o.pick.article.domain}) — ${o.pick.why} [score ${o.pick.score.toFixed(1)}]` : '(none — no article matched your interests)'}`);
       console.log(`  Interest profile: ${sig || 'no signals found'}${o.topInterests.length ? `; strongest: ${o.topInterests.join(', ')}` : ''}`);
       for (const r of o.runnersUp) console.log(`  runner-up [${r.score.toFixed(1)}]: ${r.title.slice(0, 80)} (${r.terms.join(', ')})`);
+      if (o.sampleNotes.length) {
+        console.log('  Sample notes (longest, middle, shortest):');
+        for (const n of o.sampleNotes) console.log(`    ${n}`);
+      }
     } else if (!cfg.oneRead) {
       console.log("Today's one read: off");
     }

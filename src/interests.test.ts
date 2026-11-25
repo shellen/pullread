@@ -25,6 +25,23 @@ describe('buildInterestProfile', () => {
     expect(p.counts).toEqual({ highlight: 2, watch: 1 });
   });
 
+  test('a word in most notes is a habit, and a flood of notes cannot drown three highlights', () => {
+    // Second live profile: ~1,000 prose notes made "because" and "right" the top interests.
+    const notes: InterestSignal[] = Array.from({ length: 200 }, (_, i) => ({
+      text: `because right now the topic${i} is talking about including such things`, kind: 'note' as const, at: daysAgo(2),
+    }));
+    const p = buildInterestProfile([
+      ...notes,
+      { text: 'Semafor reports on Nvidia board politics', kind: 'highlight', at: daysAgo(2) },
+      { text: 'Nvidia export controls and chip policy', kind: 'highlight', at: daysAgo(2) },
+      { text: 'local newspaper ownership', kind: 'highlight', at: daysAgo(2) },
+    ], now);
+    const top = [...p.weights].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([w]) => w);
+    expect(top[0]).toBe('nvidia');
+    expect(top).not.toContain('because');
+    expect(top).not.toContain('talking');
+  });
+
   test('filler words and numbers carry no interest', () => {
     const p = buildInterestProfile([{ text: 'I really think people want 2026 things', kind: 'note', at: daysAgo(0) }], now);
     expect([...p.weights.keys()]).toEqual([]);

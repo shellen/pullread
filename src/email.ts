@@ -979,6 +979,8 @@ export interface RoundupResult {
     runnersUp: Array<{ title: string; score: number; terms: string[] }>;
     signals: Partial<Record<string, number>>;
     topInterests: string[];
+    /** A few of the notes, to spot imported text masquerading as notes. */
+    sampleNotes: string[];
   };
 }
 
@@ -1217,6 +1219,9 @@ export async function buildRoundup(
         runnersUp: ranked.slice(1, 6).map(c => ({ title: c.article.title, score: c.score, terms: c.terms.slice(0, 4) })),
         signals: profile.counts,
         topInterests: [...profile.weights].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([t]) => t),
+        sampleNotes: signals.filter(x => x.kind === 'note').sort((a, b) => b.text.length - a.text.length)
+          .filter((_, i, arr) => i === 0 || i === Math.floor(arr.length / 2) || i === arr.length - 1)
+          .map(x => `${x.text.length} chars: ${x.text.replace(/\s+/g, ' ').slice(0, 110)}`),
       };
       if (pick) {
         const sameStory = groupStories(articles).find(g => g.members.includes(pick.article));
