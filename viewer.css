@@ -911,6 +911,10 @@
     opacity: 1;
     max-height: 24px;
   }
+  .sync-status.stale {
+    color: var(--accent);
+    max-height: 40px;
+  }
   .new-notebook-btn {
     display: block;
     width: 100%;

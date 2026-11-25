@@ -17,7 +17,27 @@ async function loadSyncStatus() {
     }
     if (data.articleCount) parts.push(data.articleCount + ' articles');
     if (btn && parts.length) btn.title = parts.join('\n');
+    showStaleSyncNotice(data);
   } catch {}
+}
+
+// When the last good sync is over a day old, say so in the sidebar instead of
+// letting the library quietly go stale (scheduled sync once stopped for a month
+// and nothing showed it).
+function showStaleSyncNotice(data) {
+  var statusEl = document.getElementById('sync-status');
+  if (!statusEl || _wasSyncing) return;
+  var days = data && typeof data.lastSyncDays === 'number' ? data.lastSyncDays : null;
+  if (days !== null && days >= 1) {
+    var label = days === 1 ? '1 day ago' : days + ' days ago';
+    statusEl.textContent = 'Last synced ' + label + ' \u2014 use Sync Now in the menu bar';
+    statusEl.title = data.lastSyncError ? 'Last error: ' + data.lastSyncError : '';
+    statusEl.classList.add('visible', 'stale');
+  } else if (statusEl.classList.contains('stale')) {
+    statusEl.textContent = '';
+    statusEl.title = '';
+    statusEl.classList.remove('visible', 'stale');
+  }
 }
 
 // ---- One-Time Migration: frontmatter annotations to JSON ----
@@ -163,8 +183,12 @@ let _autoRefreshTimer = null;
 let _lastKnownChangeAt = 0;
 let _syncSpinTimeout = null;
 let _wasSyncing = false;
+let _syncStatusTimer = null;
 function startAutoRefresh() {
   if (_autoRefreshTimer) return;
+  // Re-check sync freshness now and then so a window left open for days still
+  // shows "Last synced N days ago" when syncing stops.
+  if (!_syncStatusTimer) _syncStatusTimer = setInterval(loadSyncStatus, 10 * 60 * 1000);
   _autoRefreshTimer = setInterval(async () => {
     try {
       // Poll sync progress
@@ -181,6 +205,7 @@ function startAutoRefresh() {
           }
           if (statusEl) {
             statusEl.textContent = 'Syncing ' + progress.feed + ' (' + progress.feedIndex + '/' + progress.totalFeeds + ')';
+            statusEl.classList.remove('stale');
             statusEl.classList.add('visible');
           }
         } else if (_wasSyncing) {

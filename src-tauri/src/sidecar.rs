@@ -2,6 +2,7 @@
 // ABOUTME: Handles spawning sync, view, review, and autotag commands
 
 use std::path::PathBuf;
+use std::sync::atomic::AtomicBool;
 use std::sync::Mutex;
 
 use serde_json::Value;
@@ -9,10 +10,15 @@ use tauri::{AppHandle, Manager};
 use tauri_plugin_shell::process::CommandChild;
 use tauri_plugin_shell::ShellExt;
 
+use crate::sync_schedule::{append_sync_log, RunGuard, MAX_SYNC_LOG_BYTES};
+
 pub struct SidecarState {
     viewer_child: Mutex<Option<CommandChild>>,
     viewer_port: Mutex<u16>,
     config_dir: PathBuf,
+    /// Set while any sync (scheduled, startup, tray, deep link) is running.
+    /// In memory only, so a crash or restart can never leave it stuck.
+    sync_running: AtomicBool,
 }
 
 impl SidecarState {
@@ -26,6 +32,7 @@ impl SidecarState {
             viewer_child: Mutex::new(None),
             viewer_port: Mutex::new(0),
             config_dir,
+            sync_running: AtomicBool::new(false),
         }
     }
 
@@ -35,6 +42,26 @@ impl SidecarState {
 
     pub fn db_path(&self) -> PathBuf {
         self.config_dir.join("pullread.db")
+    }
+
+    /// One line per sync run (start, outcome, duration). Kept in ~/.config so
+    /// it survives reboots, unlike /tmp/pullread.log.
+    pub fn sync_log_path(&self) -> PathBuf {
+        self.config_dir.join("sync.log")
+    }
+
+    /// Written by the CLI when a sync finishes (see src/sync-state.ts).
+    pub fn sync_state_path(&self) -> PathBuf {
+        self.config_dir.join("sync-state.json")
+    }
+
+    /// When the last sync finished successfully, from sync-state.json.
+    pub fn last_sync_success(&self) -> Option<std::time::SystemTime> {
+        let content = std::fs::read_to_string(self.sync_state_path()).ok()?;
+        let v: Value = serde_json::from_str(&content).ok()?;
+        let ts = v.get("lastSuccessAt")?.as_str()?;
+        let parsed = chrono::DateTime::parse_from_rfc3339(ts).ok()?;
+        Some(std::time::SystemTime::from(parsed))
     }
 
     pub fn is_first_run(&self) -> bool {
@@ -234,6 +261,47 @@ fn append_log(message: &str) {
     }
 }
 
+/// Kill a sync that prints nothing for this long.
+const SYNC_IDLE_TIMEOUT_SECS: u64 = 5 * 60;
+/// Kill a sync that runs longer than this in total.
+const SYNC_TOTAL_TIMEOUT_SECS: u64 = 60 * 60;
+
+/// Run a sync and record it in the sync run log. Every caller (scheduler,
+/// startup, tray, deep link) goes through here so runs never overlap and every
+/// run, including failures, leaves a line in ~/.config/pullread/sync.log.
+pub async fn run_sync_logged(
+    app: &AppHandle,
+    retry_failed: bool,
+    trigger: &str,
+) -> Result<String, String> {
+    let state = app.state::<SidecarState>();
+    let log_path = state.sync_log_path();
+    let stamp = || chrono::Local::now().format("%Y-%m-%dT%H:%M:%S%z").to_string();
+
+    let _guard = match RunGuard::try_acquire(&state.sync_running) {
+        Some(g) => g,
+        None => {
+            append_sync_log(
+                &log_path,
+                &format!("{} {} skipped: a sync is already running", stamp(), trigger),
+                MAX_SYNC_LOG_BYTES,
+            );
+            return Err("A sync is already running".to_string());
+        }
+    };
+
+    append_sync_log(&log_path, &format!("{} {} start", stamp(), trigger), MAX_SYNC_LOG_BYTES);
+    let started = std::time::Instant::now();
+    let result = run_sync(app, retry_failed).await;
+    let secs = started.elapsed().as_secs();
+    let line = match &result {
+        Ok(summary) => format!("{} {} ok {}s {}", stamp(), trigger, secs, summary),
+        Err(e) => format!("{} {} FAILED {}s {}", stamp(), trigger, secs, e),
+    };
+    append_sync_log(&log_path, &line, MAX_SYNC_LOG_BYTES);
+    result
+}
+
 /// Run a sync operation using spawn + kill pattern.
 /// Bun compiled binaries don't exit when stdout is a pipe, so we watch
 /// for the "Done:" summary line and then kill the process.
@@ -269,15 +337,27 @@ pub async fn run_sync(app: &AppHandle, retry_failed: bool) -> Result<String, Str
         .spawn()
         .map_err(|e| format!("Failed to spawn sync: {}", e))?;
 
-    let timeout = std::time::Duration::from_secs(5 * 60);
+    // A big library (or one on a cloud drive) can take well over 5 minutes to
+    // sync, so give up only when the CLI goes quiet, with a generous hard cap.
+    let idle_timeout = std::time::Duration::from_secs(SYNC_IDLE_TIMEOUT_SECS);
+    let total_timeout = std::time::Duration::from_secs(SYNC_TOTAL_TIMEOUT_SECS);
     let mut stdout_lines = Vec::new();
     let mut stderr_lines = Vec::new();
     let mut summary: Option<String> = None;
+    let mut idle_expired = false;
 
     use tauri_plugin_shell::process::CommandEvent;
 
-    let result = tokio::time::timeout(timeout, async {
-        while let Some(event) = rx.recv().await {
+    let result = tokio::time::timeout(total_timeout, async {
+        loop {
+            let event = match tokio::time::timeout(idle_timeout, rx.recv()).await {
+                Ok(Some(event)) => event,
+                Ok(None) => break,
+                Err(_) => {
+                    idle_expired = true;
+                    break;
+                }
+            };
             match event {
                 CommandEvent::Stdout(line) => {
                     let text = String::from_utf8_lossy(&line).trim().to_string();
@@ -315,8 +395,15 @@ pub async fn run_sync(app: &AppHandle, retry_failed: bool) -> Result<String, Str
     let _ = child.kill();
 
     if result.is_err() {
-        append_log("[sync] timed out after 5 minutes");
-        return Err("Sync timed out after 5 minutes".to_string());
+        append_log("[sync] hit the overall time limit");
+        return Err(format!("Sync timed out after {} minutes", SYNC_TOTAL_TIMEOUT_SECS / 60));
+    }
+    if idle_expired && summary.is_none() {
+        append_log("[sync] no output for too long, stopped");
+        return Err(format!(
+            "Sync stopped after {} minutes with no progress",
+            SYNC_IDLE_TIMEOUT_SECS / 60
+        ));
     }
 
     if let Some(done_line) = summary {
@@ -332,12 +419,20 @@ pub async fn run_sync(app: &AppHandle, retry_failed: bool) -> Result<String, Str
 pub async fn ensure_viewer_running(app: &AppHandle) -> Result<u16, String> {
     let state = app.state::<SidecarState>();
 
+    // Health checks get a timeout: without one, a viewer that accepts the
+    // connection but never answers would block the caller (e.g. the email
+    // timer) forever.
+    let health = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .unwrap_or_default();
+
     // If viewer is already running, verify it's actually responsive
     if state.is_viewer_running() {
         let port = state.get_viewer_port();
         if port > 0 {
             let url = format!("http://127.0.0.1:{}", port);
-            if let Ok(resp) = reqwest::get(&url).await {
+            if let Ok(resp) = health.get(&url).send().await {
                 if resp.status().is_success() {
                     return Ok(port);
                 }
@@ -406,7 +501,7 @@ pub async fn ensure_viewer_running(app: &AppHandle) -> Result<u16, String> {
     let timeout = std::time::Duration::from_secs(10);
 
     while start.elapsed() < timeout {
-        if let Ok(resp) = reqwest::get(&url).await {
+        if let Ok(resp) = health.get(&url).send().await {
             if resp.status().is_success() {
                 log::info!("Viewer server ready on port {}", port);
                 return Ok(port);

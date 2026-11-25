@@ -1,57 +1,172 @@
 // ABOUTME: Scheduled sync, review, and email roundup timers
 // ABOUTME: Reads intervals from config and runs periodic operations
 
-use crate::{notifications, sidecar, tray};
+use crate::{notifications, sidecar, sync_schedule, tray};
 use chrono::Datelike;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{Duration, SystemTime};
 use tauri::{AppHandle, Manager};
 
-/// Start sync, review, and email roundup timers based on user configuration
+/// Set once the timers are running, so repeat calls (e.g. pullread://sync
+/// after onboarding) don't start duplicate sync loops or send duplicate email.
+static TIMERS_STARTED: AtomicBool = AtomicBool::new(false);
+
+/// Start sync, review, and email roundup timers based on user configuration.
+/// Safe to call more than once; only the first call starts anything.
 pub fn start_timers(app: &AppHandle) {
-    start_sync_timer(app);
+    if TIMERS_STARTED.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    start_sync_supervisor(app);
     start_review_timer(app);
     start_email_timer(app);
 }
 
-/// Start the periodic sync timer
-fn start_sync_timer(app: &AppHandle) {
-    let state = app.state::<sidecar::SidecarState>();
-    let interval_str = state.get_sync_interval();
-
-    let duration = match parse_interval(&interval_str) {
-        Some(d) => d,
-        None => return, // "manual" or unparseable — no automatic sync
-    };
-
-    log::info!("Starting sync timer: every {}", interval_str);
-    tray::update_next_sync(app, &interval_str);
-
+/// Background sync supervisor.
+///
+/// The old timer was a single `tokio::time::interval(1h)`. That clock is
+/// monotonic and stops while the Mac sleeps, the interval was read once at
+/// launch, and if the task ever died (panic) or never started (config not
+/// valid at launch) nothing noticed or restarted it. This loop instead wakes
+/// every minute, compares wall-clock time with the last attempt, re-reads the
+/// interval and config each time, runs each sync in its own task so a panic or
+/// hang can't kill the loop, logs every run to ~/.config/pullread/sync.log,
+/// and flags a stale library in the tray.
+fn start_sync_supervisor(app: &AppHandle) {
+    log::info!("Starting sync supervisor");
     let handle = app.clone();
     tauri::async_runtime::spawn(async move {
-        let mut interval = tokio::time::interval(duration);
-        interval.tick().await; // Skip first immediate tick
+        let mut last_attempt: Option<SystemTime> = None;
+        let mut prev_tick = SystemTime::now();
+        let mut stale_notified_day: Option<u64> = None;
+        let mut first = true;
 
         loop {
-            interval.tick().await;
+            if first {
+                // Let startup settle before the first sync
+                tokio::time::sleep(Duration::from_secs(2)).await;
+                first = false;
+            } else {
+                tokio::time::sleep(sync_schedule::SUPERVISOR_TICK).await;
+            }
 
-            log::info!("Scheduled sync triggered");
-            match sidecar::run_sync(&handle, false).await {
-                Ok(summary) => {
-                    tray::update_last_sync(&handle);
-                    notifications::notify_sync_complete(&handle, &summary);
+            let now = SystemTime::now();
+            let state = handle.state::<sidecar::SidecarState>();
+            let log_path = state.sync_log_path();
 
-                    // Run autotag if enabled
-                    let state = handle.state::<sidecar::SidecarState>();
-                    if state.is_autotag_enabled() {
-                        let _ = sidecar::run_autotag(&handle).await;
+            let woke = sync_schedule::detect_wake(prev_tick, now, sync_schedule::SUPERVISOR_TICK);
+            prev_tick = now;
+            if let Some(gap) = woke {
+                log_line(&log_path, &format!("woke after {} min asleep", gap.as_secs() / 60));
+            }
+
+            check_stale(&handle, now, &mut stale_notified_day);
+
+            if !state.is_config_valid() {
+                continue; // first run / onboarding not finished yet
+            }
+            let interval_str = state.get_sync_interval();
+            let interval = match sync_schedule::parse_interval(&interval_str) {
+                Some(d) => d,
+                None => {
+                    // Manual sync: still do the one startup sync, as before
+                    if last_attempt.is_some() {
+                        tray::update_next_sync(&handle, "manual");
+                        continue;
                     }
+                    Duration::MAX
                 }
-                Err(e) => {
-                    log::error!("Scheduled sync failed: {}", e);
-                    notifications::notify(&handle, "Sync Failed", &e);
+            };
+            if !sync_schedule::is_due(now, last_attempt, interval) {
+                continue;
+            }
+
+            let trigger = if last_attempt.is_none() {
+                "startup"
+            } else if woke.is_some() {
+                "scheduled-after-wake"
+            } else {
+                "scheduled"
+            };
+            last_attempt = Some(now);
+            if interval != Duration::MAX {
+                tray::update_next_sync(&handle, &format!("every {}", interval_str));
+            }
+
+            // Run in a separate task: if anything in it panics, the JoinError
+            // lands here and the supervisor keeps going.
+            let h = handle.clone();
+            let trig = trigger.to_string();
+            // The outer timeout is a backstop (run_sync has its own limits): if
+            // it ever fires, the supervisor moves on and later runs log
+            // "skipped: a sync is already running" until the stuck one ends.
+            let job = tauri::async_runtime::spawn(async move { scheduled_sync(&h, &trig).await });
+            match tokio::time::timeout(Duration::from_secs(90 * 60), job).await {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => {
+                    log_line(&log_path, &format!("{} sync task crashed: {}", trigger, e));
+                    log::error!("Scheduled sync task crashed: {}", e);
+                }
+                Err(_) => {
+                    log_line(&log_path, &format!("{} sync still running after 90 min; moving on", trigger));
                 }
             }
         }
     });
+}
+
+async fn scheduled_sync(handle: &AppHandle, trigger: &str) {
+    log::info!("Sync triggered ({})", trigger);
+    match sidecar::run_sync_logged(handle, false, trigger).await {
+        Ok(summary) => {
+            tray::update_last_sync(handle);
+            notifications::notify_sync_complete(handle, &summary);
+
+            let state = handle.state::<sidecar::SidecarState>();
+            if state.is_autotag_enabled() {
+                let _ = sidecar::run_autotag(handle).await;
+            }
+        }
+        Err(e) => {
+            log::error!("Scheduled sync failed: {}", e);
+            notifications::notify(handle, "Sync Failed", &e);
+        }
+    }
+}
+
+/// If the last successful sync is over a day old, say so in the tray, and
+/// send one notification per day of staleness.
+fn check_stale(handle: &AppHandle, now: SystemTime, notified_day: &mut Option<u64>) {
+    let state = handle.state::<sidecar::SidecarState>();
+    let last = match state.last_sync_success() {
+        Some(t) => t,
+        None => return, // never synced with this version yet; nothing to compare
+    };
+    let age = now.duration_since(last).unwrap_or_default();
+    if age < sync_schedule::STALE_AFTER {
+        *notified_day = None;
+        return;
+    }
+    let label = match sync_schedule::days_ago_label(age) {
+        Some(l) => l,
+        None => return,
+    };
+    tray::show_stale_sync(handle, &label);
+    let days = sync_schedule::whole_days(age).unwrap_or(1);
+    if *notified_day != Some(days) {
+        *notified_day = Some(days);
+        log_line(&state.sync_log_path(), &format!("stale: last successful sync {}", label));
+        notifications::notify(
+            handle,
+            "Pull Read hasn't synced",
+            &format!("Last successful sync was {}. Use Sync Now, or check {}.", label, state.sync_log_path().display()),
+        );
+    }
+}
+
+fn log_line(path: &std::path::Path, msg: &str) {
+    let stamp = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S%z");
+    sync_schedule::append_sync_log(path, &format!("{} {}", stamp, msg), sync_schedule::MAX_SYNC_LOG_BYTES);
 }
 
 /// Start the periodic review timer
@@ -69,11 +184,16 @@ fn start_review_timer(app: &AppHandle) {
 
     let handle = app.clone();
     tauri::async_runtime::spawn(async move {
-        let mut interval = tokio::time::interval(duration);
-        interval.tick().await; // Skip first immediate tick
+        // Judge "a day/week has passed" by the wall clock, checked every
+        // minute: a single long tokio interval stops counting while the Mac sleeps.
+        let mut last_run = SystemTime::now();
 
         loop {
-            interval.tick().await;
+            tokio::time::sleep(sync_schedule::SUPERVISOR_TICK).await;
+            if !sync_schedule::is_due(SystemTime::now(), Some(last_run), duration) {
+                continue;
+            }
+            last_run = SystemTime::now();
 
             log::info!("Scheduled review triggered");
             match sidecar::run_review(&handle, 7).await {
@@ -169,7 +289,18 @@ fn start_email_timer(app: &AppHandle) {
                 wait.as_secs() / 60
             );
 
-            tokio::time::sleep(wait).await;
+            // Sleep in short steps and re-check the wall clock: tokio's clock
+            // stops while the Mac sleeps, so one long sleep could fire hours
+            // or days late. If the Mac slept through the send time, this sends
+            // soon after it wakes.
+            let target = SystemTime::now() + wait;
+            loop {
+                let remaining = match target.duration_since(SystemTime::now()) {
+                    Ok(r) if !r.is_zero() => r,
+                    _ => break,
+                };
+                tokio::time::sleep(remaining.min(sync_schedule::SUPERVISOR_TICK)).await;
+            }
 
             // Weekly: only send on the configured day (default Monday)
             if frequency == "weekly" {
@@ -194,7 +325,12 @@ async fn send_email_roundup(handle: &AppHandle, settings_path: &std::path::Path)
     match sidecar::ensure_viewer_running(handle).await {
         Ok(port) => {
             let url = format!("http://127.0.0.1:{}/api/email/send-roundup", port);
-            match reqwest::Client::new().post(&url).send().await {
+            // Bounded so a hung viewer can't block the email loop forever
+            let client = reqwest::Client::builder()
+                .timeout(Duration::from_secs(10 * 60))
+                .build()
+                .unwrap_or_default();
+            match client.post(&url).send().await {
                 Ok(resp) => {
                     let body = resp.text().await.unwrap_or_default();
                     log::info!("Email roundup sent: {}", body);
@@ -271,20 +407,4 @@ fn duration_until_time(time_str: &str) -> std::time::Duration {
     let diff = target - now.naive_local();
     diff.to_std()
         .unwrap_or(std::time::Duration::from_secs(3600))
-}
-
-/// Parse interval strings like "30m", "1h", "4h", "90m" into a Duration.
-/// Returns None for "manual" or unparseable values.
-fn parse_interval(s: &str) -> Option<std::time::Duration> {
-    let s = s.trim();
-    if s == "manual" || s.is_empty() {
-        return None;
-    }
-    if let Some(mins) = s.strip_suffix('m') {
-        mins.parse::<u64>().ok().filter(|&n| n > 0).map(|n| std::time::Duration::from_secs(n * 60))
-    } else if let Some(hrs) = s.strip_suffix('h') {
-        hrs.parse::<u64>().ok().filter(|&n| n > 0).map(|n| std::time::Duration::from_secs(n * 3600))
-    } else {
-        None
-    }
 }

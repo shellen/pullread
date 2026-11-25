@@ -12,6 +12,7 @@ import { startViewer, reprocessFile, parseFrontmatter, listFiles } from './viewe
 import { summarizeText, loadLLMConfig } from './summarizer';
 import { autotagBatch } from './autotagger';
 import { parseBookmarksHtml, bookmarksToEntries } from './bookmarks';
+import { recordSyncSuccess, recordSyncFailure } from './sync-state';
 
 // Default paths for standalone binary
 const DEFAULT_CONFIG_DIR = join(homedir(), '.config', 'pullread');
@@ -505,7 +506,11 @@ async function sync(feedFilter?: string, retryFailed = false): Promise<void> {
     }
     if (repaired > 0) console.log(`  Repaired ${repaired} short articles`);
 
-    console.log(`\nDone: ${totalSuccess} saved, ${totalFailed} failed`);
+    const doneLine = `Done: ${totalSuccess} saved, ${totalFailed} failed`;
+    // Record before printing: the app kills the CLI as soon as it sees "Done:".
+    recordSyncSuccess(doneLine);
+    clearSyncProgress();
+    console.log(`\n${doneLine}`);
 
     // Auto-tag newly synced articles if enabled in settings
     if (totalSuccess > 0) {
@@ -560,6 +565,7 @@ if (command === 'sync') {
   const feedFilter = feedIndex !== -1 ? args[feedIndex + 1] : undefined;
 
   sync(feedFilter, retryFailed).catch(err => {
+    recordSyncFailure(err instanceof Error ? err.message : String(err));
     console.error('Fatal error:', err.message);
     process.exit(1);
   });
@@ -584,13 +590,17 @@ if (command === 'sync') {
   (async () => {
     const { buildRoundup, filterByLookback, loadEmailConfig } = await import('./email');
     const cfg = loadEmailConfig();
-    const fetchArticles = async () => filterByLookback(listFiles(config.outputPath, true), cfg.lookbackDays);
-    const result = await buildRoundup(cfg, fetchArticles);
+    const { newestTimestamp } = await import('./sync-state');
+    const all = listFiles(config.outputPath, true);
+    const newestArticleAt = newestTimestamp(all.map(a => a.bookmarked));
+    const fetchArticles = async () => filterByLookback(all, cfg.lookbackDays);
+    const result = await buildRoundup(cfg, fetchArticles, undefined, { newestArticleAt });
 
     writeFileSync(outPath, result.html);
     console.log(`Articles in last ${cfg.lookbackDays} day${cfg.lookbackDays === 1 ? '' : 's'}: ${result.articles.length}`);
     console.log(`Editorial note: ${result.summary ?? '(none — no LLM configured, or generation failed)'}`);
     if (result.summaryCredit) console.log(`Summary by: ${result.summaryCredit}`);
+    if (result.staleNotice) console.log(`Stale library: ${result.staleNotice}`);
     console.log(`Wrote preview to ${outPath}`);
     if (result.articles.length === 0) {
       console.log('Note: no bookmarked articles in the window, so the summary will be empty. Bookmark a few recent articles and re-run.');

@@ -1086,6 +1086,10 @@ rm ~/.config/pullread/pullread.db
 # Then run a new sync from the app or CLI
 ```
 
+**New articles stopped arriving**
+
+The app syncs on its own while it's running (menu bar icon visible). Check `~/.config/pullread/sync.log` for recent `scheduled ... ok` lines. If the last successful sync is over a day old, the menu bar shows "Last sync: N days ago" and the viewer sidebar says so too; the Rundown email adds a warning when the newest article is over 2 days old. Use **Sync Now** to run one immediately.
+
 **Tauri app won't start**
 ```bash
 # Check logs
@@ -1107,8 +1111,14 @@ bash scripts/prepare-sidecar.sh
 ```bash
 # CLI output is printed to terminal
 
-# Desktop app logs
+# Desktop app logs (full sync output; cleared on reboot)
 tail -f /tmp/pullread.log
+
+# One line per sync run: trigger, outcome, duration, wake-from-sleep, stale warnings
+tail -n 50 ~/.config/pullread/sync.log
+
+# When the last sync finished successfully (written by the CLI)
+cat ~/.config/pullread/sync-state.json
 
 # View in Console.app (macOS)
 # Filter by "PullRead"

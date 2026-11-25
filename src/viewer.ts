@@ -16,6 +16,7 @@ import { generateMarkdown, writeArticle, ArticleData, downloadFavicon, resolveFi
 import { loadTTSConfig, saveTTSConfig, generateSpeech, getAudioContentType, getCachedAudioPath, createTtsSession, generateSessionChunk, TTS_VOICES, TTS_MODELS } from './tts';
 import { deleteFromKeychain } from './keychain';
 import { listSiteLogins, removeSiteLogin, saveSiteLoginCookies } from './cookies';
+import { readSyncState, daysSince } from './sync-state';
 
 interface FileMeta {
   filename: string;
@@ -1664,10 +1665,20 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
         } catch {}
       }
 
+      const lastActivity = latestMtime > 0 ? new Date(latestMtime).toISOString() : null;
+      // Prefer the recorded finish time of the last good sync; fall back to the
+      // newest file for libraries synced before sync-state.json existed.
+      const syncState = readSyncState();
+      const lastSyncAt = syncState.lastSuccessAt || lastActivity;
       sendJson(res, {
         syncInterval,
         intervalMinutes: minutes,
-        lastActivity: latestMtime > 0 ? new Date(latestMtime).toISOString() : null,
+        lastActivity,
+        lastSyncAt,
+        lastSyncDays: daysSince(lastSyncAt),
+        lastSyncError: syncState.lastErrorAt && (!syncState.lastSuccessAt || syncState.lastErrorAt > syncState.lastSuccessAt)
+          ? syncState.lastError || null
+          : null,
         articleCount: outputFiles.length,
       });
       return;

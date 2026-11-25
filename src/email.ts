@@ -5,6 +5,7 @@ import { createTransport } from 'nodemailer';
 import { join } from 'path';
 import { homedir } from 'os';
 import { readFileSync, existsSync } from 'fs';
+import { readSyncState, newestTimestamp, libraryStaleNotice } from './sync-state';
 
 const HEADER_IMAGE_PATH = join(__dirname, '..', 'email-header.png');
 
@@ -468,6 +469,7 @@ export function buildRoundupHtml(
   summary?: string | null,
   summaryCredit?: string | null,
   scoreFn?: ((a: ArticleMeta) => number) | null,
+  staleNotice?: string | null,
 ): string {
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
@@ -499,6 +501,14 @@ export function buildRoundupHtml(
 </div>
 `;
 
+  if (staleNotice) {
+    // Syncing looks stalled: say so up top rather than send a quiet issue silently.
+    html += `<div style="margin:0 0 24px;padding:14px 16px;background:#fdf3ec;border:1px solid #f0d5c3;border-radius:10px;font-size:14px;line-height:1.5;color:#7a3b1d">
+${escapeHtml(staleNotice)}
+</div>
+`;
+  }
+
   if (summary) {
     // The note reads as a newsletter lede straight on the card — no bounding box.
     // Story references written as {{words|N}} link to the Nth article below.
@@ -516,7 +526,7 @@ ${renderSummaryParagraphs(summary, citations)}${credit}
   if (articles.length === 0) {
     html += `<div style="text-align:center;padding:40px 0">
 <div style="font-size:26px;margin-bottom:14px;color:#c9c1b9">&mdash;</div>
-<div style="font-size:15px;color:#6b6560;line-height:1.5">Nothing new ${lookbackDays === 1 ? 'today' : 'recently'}. Enjoy the quiet.</div>
+<div style="font-size:15px;color:#6b6560;line-height:1.5">${staleNotice ? 'Nothing new to show. See the note above.' : `Nothing new ${lookbackDays === 1 ? 'today' : 'recently'}. Enjoy the quiet.`}</div>
 </div>`;
   } else {
     // Rank sections by the day's signal (seed = today's date) so the lead
@@ -810,6 +820,16 @@ export interface RoundupResult {
   /** Brand-level credit for the AI that wrote the intro (e.g. "Claude"), if any. */
   summaryCredit: string | null;
   articles: ArticleMeta[];
+  /** Set when the library's newest article is over 2 days old (sync looks stalled). */
+  staleNotice: string | null;
+}
+
+export interface RoundupOptions {
+  /** Newest article date in the whole library (not just the lookback window). */
+  newestArticleAt?: string | null;
+  /** When the last sync finished; defaults to ~/.config/pullread/sync-state.json. */
+  lastSyncAt?: string | null;
+  now?: number;
 }
 
 /** Keep only articles bookmarked within the lookback window. */
@@ -831,8 +851,10 @@ export async function buildRoundup(
   cfg: EmailConfig,
   fetchArticles?: () => Promise<ArticleMeta[]>,
   port = 7777,
+  opts: RoundupOptions = {},
 ): Promise<RoundupResult> {
   let articles: ArticleMeta[] = [];
+  let newestArticleAt = opts.newestArticleAt;
   if (fetchArticles) {
     articles = await fetchArticles();
   } else {
@@ -841,6 +863,7 @@ export async function buildRoundup(
       // intro prompt needs real content, not just titles, to stay specific.
       const resp = await fetch(`http://127.0.0.1:${port}/api/files?summaries=1`);
       const allArticles = (await resp.json()) as ArticleMeta[];
+      if (newestArticleAt === undefined) newestArticleAt = newestTimestamp(allArticles.map(a => a.bookmarked));
       articles = filterByLookback(allArticles, cfg.lookbackDays);
     } catch (err) {
       throw new Error(`Failed to fetch articles: ${err instanceof Error ? err.message : err}`);
@@ -867,6 +890,11 @@ export async function buildRoundup(
 
   const curated = curateArticles(articles, mentionCounts, watchedEntities);
 
+  if (newestArticleAt === undefined) newestArticleAt = newestTimestamp(articles.map(a => a.bookmarked));
+  const lastSyncAt = opts.lastSyncAt !== undefined ? opts.lastSyncAt : readSyncState().lastSuccessAt ?? null;
+  const staleNotice = libraryStaleNotice(newestArticleAt, lastSyncAt, opts.now ?? Date.now());
+  if (staleNotice) console.log(`[email] ${staleNotice}`);
+
   // Validate article images — strip broken URLs to avoid broken image icons
   await validateArticleImages(curated);
 
@@ -880,11 +908,11 @@ export async function buildRoundup(
   // Rank sections by the day's relevance/freshness so the lead changes daily.
   const scoreCtx: ScoreContext = { now: Date.now(), mentionCounts, watchedEntities };
   const scoreFn = (a: ArticleMeta) => scoreArticle(a, scoreCtx);
-  const html = buildRoundupHtml(curated, cfg.lookbackDays, summary, summaryCredit, scoreFn);
+  const html = buildRoundupHtml(curated, cfg.lookbackDays, summary, summaryCredit, scoreFn, staleNotice);
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   const subject = `The Pull Read Rundown — ${today}`;
 
-  return { html, subject, summary, summaryCredit, articles: curated };
+  return { html, subject, summary, summaryCredit, articles: curated, staleNotice };
 }
 
 export async function sendRoundup(

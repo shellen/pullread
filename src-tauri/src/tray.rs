@@ -101,7 +101,7 @@ pub fn create_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 async fn handle_sync(app: &AppHandle, retry_failed: bool) {
     set_sync_active(app, true);
 
-    match sidecar::run_sync(app, retry_failed).await {
+    match sidecar::run_sync_logged(app, retry_failed, "tray").await {
         Ok(summary) => {
             set_sync_active(app, false);
             update_last_sync(app);
@@ -243,6 +243,18 @@ pub async fn check_updates_silently(app: &AppHandle) {
         Err(e) => {
             log::warn!("Updater not configured: {}", e);
         }
+    }
+}
+
+/// Show that the last successful sync is old ("Last sync: 34 days ago").
+pub fn show_stale_sync(app: &AppHandle, age_label: &str) {
+    if let Some(tray) = app.tray_by_id("main") {
+        let _ = tray.set_tooltip(Some(&format!("Pull Read — Last synced {}", age_label)));
+    }
+    let items = app.state::<TrayItems>();
+    let lock = items.last_sync.lock();
+    if let Ok(item) = lock {
+        let _ = item.set_text(format!("\u{26A0} Last sync: {}", age_label));
     }
 }
 

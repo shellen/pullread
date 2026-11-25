@@ -6,6 +6,7 @@ mod commands;
 mod notifications;
 mod platform;
 mod sidecar;
+mod sync_schedule;
 mod timers;
 mod tray;
 
@@ -39,7 +40,11 @@ pub fn run() {
             // Build system tray
             tray::create_tray(app)?;
 
-            // Check for first run or start initial sync
+            // Always start the sync supervisor. It runs the startup sync itself
+            // and waits for a valid config, so a first-run user who finishes
+            // onboarding gets scheduled syncs without restarting the app.
+            timers::start_timers(app.handle());
+
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 let state = handle.state::<SidecarState>();
@@ -47,15 +52,6 @@ pub fn run() {
                     // Open viewer for onboarding
                     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
                     let _ = commands::open_viewer_inner(&handle).await;
-                } else if state.is_config_valid() {
-                    // Wait 2 seconds then run initial sync
-                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                    if sidecar::run_sync(&handle, false).await.is_ok() {
-                        tray::update_last_sync(&handle);
-                    }
-
-                    // Start scheduled timers
-                    timers::start_timers(&handle);
                 }
             });
 

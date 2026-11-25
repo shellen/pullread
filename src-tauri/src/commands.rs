@@ -81,7 +81,7 @@ pub async fn open_viewer(app: AppHandle) -> Result<(), String> {
 /// Tauri command: trigger a sync
 #[tauri::command]
 pub async fn trigger_sync(app: AppHandle, retry_failed: bool) -> Result<String, String> {
-    let result = sidecar::run_sync(&app, retry_failed).await;
+    let result = sidecar::run_sync_logged(&app, retry_failed, "manual").await;
     match &result {
         Ok(summary) => {
             tray::update_last_sync(&app);
@@ -195,7 +195,7 @@ pub async fn handle_deep_link(app: &AppHandle, url: &str) {
         }
         "sync" => {
             // pullread://sync — trigger a sync
-            match sidecar::run_sync(app, false).await {
+            match sidecar::run_sync_logged(app, false, "deeplink").await {
                 Ok(summary) => {
                     tray::update_last_sync(app);
                     notifications::notify_sync_complete(app, &summary);

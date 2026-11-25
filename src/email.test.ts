@@ -724,6 +724,34 @@ describe('buildRoundup', () => {
     expect(result.html).not.toContain('Summary by');
     expect(mockPromptLLM).not.toHaveBeenCalled();
   });
+
+  test('warns instead of sending a quiet issue when the library has gone stale', async () => {
+    const now = Date.now();
+    const newest = new Date(now - 5 * 86_400_000).toISOString();
+    const result = await buildRoundup(cfg(), async () => [], undefined, {
+      newestArticleAt: newest, lastSyncAt: newest, now,
+    });
+
+    expect(result.articles).toHaveLength(0);
+    expect(result.staleNotice).toContain('5 days ago');
+    expect(result.html).toContain('may have stopped syncing');
+    expect(result.html).toContain('last successful sync was 5 days ago');
+    expect(result.html).not.toContain('Enjoy the quiet');
+  });
+
+  test('judges staleness from the articles when no library date is given', async () => {
+    const old = new Date(Date.now() - 3 * 86_400_000).toISOString();
+    const result = await buildRoundup(cfg(), async () => [article({ title: 'Old news', bookmarked: old })], undefined, { lastSyncAt: null });
+    expect(result.staleNotice).toContain('3 days ago');
+    expect(result.html).toContain('Old news');
+  });
+
+  test('no stale warning when the library is fresh', async () => {
+    const articles = [article({ title: 'Fresh story', bookmarked: new Date().toISOString() })];
+    const result = await buildRoundup(cfg(), async () => articles, undefined, { lastSyncAt: null });
+    expect(result.staleNotice).toBeNull();
+    expect(result.html).not.toContain('stopped syncing');
+  });
 });
 
 describe('formatSummaryCredit', () => {
