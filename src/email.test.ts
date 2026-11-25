@@ -48,7 +48,6 @@ const baseConfig: EmailConfig = {
   widerNews: false,
   regionalFeeds: [],
   oneRead: false,
-  obsidianPath: '',
 };
 
 function article(overrides: Partial<ArticleMeta> = {}): ArticleMeta {

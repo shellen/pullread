@@ -1,7 +1,7 @@
 // ABOUTME: Builds an on-device interest profile from the reader's own signals (highlights, notes,
-// ABOUTME: favorites, tags, Research watches, the Notebook, an optional Obsidian folder) and picks Today's one read
+// ABOUTME: favorites, tags, Research watches, the Notebook) and picks Today's one read
 
-import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
+import { existsSync, readFileSync, statSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { storyTokens } from './stories';
@@ -13,7 +13,7 @@ import type { ArticleMeta } from './email';
  * explainable; a model can choose among the top candidates later.
  */
 
-export type SignalKind = 'highlight' | 'note' | 'favorite' | 'tag' | 'watch' | 'notebook' | 'obsidian';
+export type SignalKind = 'highlight' | 'note' | 'favorite' | 'tag' | 'watch' | 'notebook';
 
 export interface InterestSignal {
   text: string;
@@ -22,9 +22,9 @@ export interface InterestSignal {
   at?: string;
 }
 
-/** How much one signal of each kind counts. Explicit watches count most; Obsidian is broad, so least. */
+/** How much one signal of each kind counts. Explicit watches count most. */
 export const KIND_WEIGHT: Record<SignalKind, number> = {
-  watch: 4, highlight: 3, note: 3, notebook: 3, favorite: 2, tag: 1.5, obsidian: 1,
+  watch: 4, highlight: 3, note: 3, notebook: 3, favorite: 2, tag: 1.5,
 };
 
 /** Recent interest matters more: a signal's weight halves every 21 days. Watches don't fade. */
@@ -33,7 +33,7 @@ const HALF_LIFE_DAYS = 21;
 /** Readable labels for the "why" line. */
 const KIND_LABEL: Record<SignalKind, string> = {
   highlight: 'highlights', note: 'notes', favorite: 'favorites', tag: 'tags',
-  watch: 'Research watches', notebook: 'Notebook', obsidian: 'Obsidian notes',
+  watch: 'Research watches', notebook: 'Notebook',
 };
 
 // Words that carry no interest on their own, on top of storyTokens' stopwords.
@@ -44,6 +44,13 @@ const PROFILE_STOPWORDS = new Set([
   'could', 'would', 'should', 'might', 'there', 'their', 'they', 'them', 'these', 'those', 'into',
   'only', 'some', 'most', 'more', 'than', 'then', 'when', 'where', 'which', 'while', 'your', 'you',
   'our', 'can', 'get', 'got', 'see', 'use', 'used', 'using', 'here', 'all', 'any', 'each', 'own',
+  // From the first live profile (Nov 25), where they topped the "interests":
+  'now', 'been', 'back', 'had', 'did', 'does', 'done', 'around', 'through', 'next', 'look', 'looks',
+  'another', 'over', 'under', 'again', 'ever', 'never', 'always', 'already', 'yet', 'soon', 'since',
+  'being', 'having', 'doing', 'went', 'come', 'came', 'goes', 'gets', 'put', 'set', 'say', 'told',
+  'know', 'knew', 'new', 'old', 'big', 'small', 'high', 'low', 'long', 'day', 'days', 'month',
+  'months', 'today', 'tonight', 'tomorrow', 'yesterday', 'monday', 'tuesday', 'wednesday',
+  'thursday', 'friday', 'saturday', 'sunday', 'work', 'world', 'state', 'part', 'show', 'shows',
 ]);
 
 function interestTokens(text: string): Set<string> {
@@ -69,9 +76,6 @@ export interface GatherOptions {
   configDir?: string;
   /** Watched entities/queries from the Research tab (already loaded by buildRoundup). */
   watches?: string[];
-  /** Optional Obsidian vault (or any folder of markdown notes). Notes edited in the last 30 days count. */
-  obsidianPath?: string;
-  now?: number;
 }
 
 /**
@@ -80,7 +84,7 @@ export interface GatherOptions {
  * fewer signals.
  */
 export async function gatherInterestSignals(opts: GatherOptions): Promise<{ signals: InterestSignal[]; engaged: Set<string> }> {
-  const { outputPath, configDir = join(homedir(), '.config', 'pullread'), watches = [], obsidianPath, now = Date.now() } = opts;
+  const { outputPath, configDir = join(homedir(), '.config', 'pullread'), watches = [] } = opts;
   const signals: InterestSignal[] = [];
   /** Articles the reader already highlighted or noted: treated as already read. */
   const engaged = new Set<string>();
@@ -88,20 +92,23 @@ export async function gatherInterestSignals(opts: GatherOptions): Promise<{ sign
   // Highlights, inline notes, article notes, favorites, tags (.annot.json sidecars).
   try {
     const ann = await import('./annotations');
-    if (!ann.annotationsInitialized()) ann.initAnnotations(outputPath, configDir);
+    if (outputPath ? !ann.annotationsInitialized(outputPath) : !ann.annotationsInitialized()) ann.initAnnotations(outputPath, configDir);
     for (const [filename, data] of Object.entries(ann.allNotes())) {
       const full = ann.loadAnnotation(filename);
       const title = titleFromFilename(filename);
       let mtime: string | undefined;
       try { mtime = statSync(ann.annotationPath(outputPath, filename)).mtime.toISOString(); } catch {}
-      if (full.highlights.length || data.annotations.length || data.articleNote?.trim()) engaged.add(filename);
+      // Older builds copied each feed item's description into articleNote
+      // (viewer/13-init.js migration). Those aren't the reader's notes.
+      const realNote = !!data.articleNote?.trim() && !isImportedDescription(data.articleNote, ann.annotationPath(outputPath, filename));
+      if (full.highlights.length || data.annotations.length || realNote) engaged.add(filename);
       for (const h of full.highlights as Array<{ text?: string; note?: string; createdAt?: string }>) {
         if (h.text) signals.push({ text: `${h.text} ${h.note || ''}`, kind: 'highlight', at: h.createdAt });
       }
       for (const a of data.annotations as Array<{ note?: string; anchorText?: string; createdAt?: string }>) {
         if (a.note || a.anchorText) signals.push({ text: `${a.note || ''} ${a.anchorText || ''}`, kind: 'note', at: a.createdAt });
       }
-      if (data.articleNote?.trim()) signals.push({ text: `${data.articleNote} ${title}`, kind: 'note', at: mtime });
+      if (realNote) signals.push({ text: `${data.articleNote} ${title}`, kind: 'note', at: mtime });
       if (data.isFavorite) signals.push({ text: title, kind: 'favorite', at: mtime });
       for (const t of data.tags || []) {
         if (t && !/^(classicbooks|gutenberg)$/i.test(t)) signals.push({ text: t.replace(/[-_]/g, ' '), kind: 'tag', at: mtime });
@@ -126,39 +133,30 @@ export async function gatherInterestSignals(opts: GatherOptions): Promise<{ sign
     }
   } catch {}
 
-  // Optional Obsidian vault: notes edited in the last 30 days.
-  if (obsidianPath) signals.push(...readRecentNotes(obsidianPath.replace(/^~/, homedir()), now));
-
   return { signals, engaged };
 }
 
-/** Markdown notes edited in the last `days`, newest first, capped so a big vault stays fast. */
-function readRecentNotes(dir: string, now: number, days = 30, maxFiles = 200): InterestSignal[] {
-  const cutoff = now - days * 86_400_000;
-  const found: Array<{ path: string; mtime: number }> = [];
-  const walk = (d: string, depth: number) => {
-    if (depth > 6) return;
-    let entries: string[];
-    try { entries = readdirSync(d); } catch { return; }
-    for (const name of entries) {
-      if (name.startsWith('.')) continue; // .obsidian, .trash, .git
-      const full = join(d, name);
-      try {
-        const st = statSync(full);
-        if (st.isDirectory()) walk(full, depth + 1);
-        else if (name.endsWith('.md') && st.mtimeMs >= cutoff) found.push({ path: full, mtime: st.mtimeMs });
-      } catch {}
-    }
-  };
-  walk(dir, 0);
-  return found.sort((a, b) => b.mtime - a.mtime).slice(0, maxFiles).map(f => {
-    let body = '';
-    try { body = readFileSync(f.path, 'utf-8').slice(0, 20_000); } catch {}
-    const name = f.path.replace(/^.*\//, '').replace(/\.md$/, '');
-    // The note's title and headings say what it's about; weight them by repeating.
-    const headings = (body.match(/^#{1,3}\s+.+$/gm) || []).join(' ');
-    return { text: `${name} ${name} ${headings} ${headings} ${body.replace(/^---[\s\S]*?---/, '')}`, kind: 'obsidian' as const, at: new Date(f.mtime).toISOString() };
-  });
+const normalize = (t: string) => t.toLowerCase().replace(/<[^>]+>/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
+
+/**
+ * Is this "article note" really the feed's description, copied in by an old
+ * migration? Compares it with the article's frontmatter `annotation:` field.
+ * (First live profile: 19,794 "notes", nearly all feed blurbs.)
+ */
+export function isImportedDescription(note: string, annotPath: string): boolean {
+  try {
+    const md = annotPath.replace(/\.annot\.json$/, '.md');
+    const head = readFileSync(md, 'utf-8').slice(0, 8000);
+    const fm = head.match(/^---\n([\s\S]*?)\n---/)?.[1] || '';
+    const raw = fm.match(/^annotation:\s*"?([\s\S]*?)"?\s*$/m)?.[1] || '';
+    const a = normalize(raw.replace(/\\"/g, '"'));
+    const n = normalize(note);
+    if (!a || !n) return false;
+    const k = Math.min(60, a.length, n.length);
+    return a.slice(0, k) === n.slice(0, k);
+  } catch {
+    return false;
+  }
 }
 
 // ---------------------------------------------------------------------------

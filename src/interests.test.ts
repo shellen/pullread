@@ -1,10 +1,10 @@
 // ABOUTME: Tests for the on-device interest profile and Today's one read
 // ABOUTME: Covers signal gathering from local files, fading, scoring rules, the "why" line, and skipping
 
-import { mkdtempSync, mkdirSync, writeFileSync, utimesSync } from 'fs';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { buildInterestProfile, rankForInterests, explainPick, pickOneRead, gatherInterestSignals, titleFromFilename } from './interests';
+import { buildInterestProfile, rankForInterests, explainPick, pickOneRead, gatherInterestSignals, titleFromFilename, isImportedDescription } from './interests';
 import type { InterestSignal } from './interests';
 import type { ArticleMeta } from './email';
 
@@ -81,12 +81,11 @@ describe('rankForInterests and the pick', () => {
 });
 
 describe('gatherInterestSignals (local files)', () => {
-  test('reads sidecars, the Notebook, watches and recent Obsidian notes', async () => {
+  test('reads sidecars, the Notebook and watches', async () => {
     const root = mkdtempSync(join(tmpdir(), 'pr-interests-'));
     const out = join(root, 'library');
     const config = join(root, 'config');
-    const vault = join(root, 'vault');
-    mkdirSync(out); mkdirSync(config); mkdirSync(join(vault, '.obsidian'), { recursive: true });
+    mkdirSync(out); mkdirSync(config);
 
     writeFileSync(join(out, '2026-11-20-why-local-news-matters.md'), '---\ntitle: Why local news matters\n---\n');
     writeFileSync(join(out, '2026-11-20-why-local-news-matters.annot.json'), JSON.stringify({
@@ -95,18 +94,29 @@ describe('gatherInterestSignals (local files)', () => {
       articleNote: '', tags: ['media', 'classicbooks'], machineTags: ['news'], isFavorite: true,
     }));
     writeFileSync(join(config, 'notebooks.json'), JSON.stringify({ 'nb-1': { notes: [{ content: 'Idea: a co-op model for small papers', createdAt: daysAgo(4) }] } }));
-    writeFileSync(join(vault, 'Local news.md'), '# Local news\nOwnership and civic health.');
-    writeFileSync(join(vault, 'Old idea.md'), 'Ancient note');
-    utimesSync(join(vault, 'Old idea.md'), new Date(now - 90 * 86_400_000), new Date(now - 90 * 86_400_000));
-    writeFileSync(join(vault, '.obsidian', 'workspace.md'), 'should be ignored');
 
-    const { signals, engaged } = await gatherInterestSignals({ outputPath: out, configDir: config, watches: ['Al Gore'], obsidianPath: vault, now });
+    const { signals, engaged } = await gatherInterestSignals({ outputPath: out, configDir: config, watches: ['Al Gore'] });
     const kinds = signals.map((x: InterestSignal) => x.kind).sort();
-    expect(kinds).toEqual(['favorite', 'highlight', 'note', 'notebook', 'obsidian', 'tag', 'watch']); // classicbooks tag skipped
-    expect(signals.find(x => x.kind === 'obsidian')!.text).toContain('Local news');
-    expect(signals.some(x => x.text.includes('should be ignored') || x.text.includes('Ancient'))).toBe(false);
+    expect(kinds).toEqual(['favorite', 'highlight', 'note', 'notebook', 'tag', 'watch']); // classicbooks tag skipped
     expect(signals.find(x => x.kind === 'favorite')!.text).toBe('why local news matters');
     expect([...engaged]).toEqual(['2026-11-20-why-local-news-matters.md']);
+  });
+
+  test("an article note that is just the feed's description is not the reader's note", async () => {
+    const root = mkdtempSync(join(tmpdir(), 'pr-interests-'));
+    const out = join(root, 'library');
+    const config = join(root, 'config');
+    mkdirSync(out); mkdirSync(config);
+    const blurb = 'U2 announced a 2027 North American stadium tour on Tuesday, their first since 2018.';
+    writeFileSync(join(out, '2026-11-24-u2-tour.md'), `---\ntitle: U2 tour\nannotation: "${blurb}"\n---\nBody`);
+    writeFileSync(join(out, '2026-11-24-u2-tour.annot.json'), JSON.stringify({ highlights: [], annotations: [], articleNote: blurb, tags: [], machineTags: [], isFavorite: false }));
+    writeFileSync(join(out, '2026-11-24-mine.md'), `---\ntitle: Mine\nannotation: "${blurb}"\n---\nBody`);
+    writeFileSync(join(out, '2026-11-24-mine.annot.json'), JSON.stringify({ highlights: [], annotations: [], articleNote: 'My own take: stadium tours are a bad deal for fans.', tags: [], machineTags: [], isFavorite: false }));
+
+    const { signals, engaged } = await gatherInterestSignals({ outputPath: out, configDir: config });
+    expect(signals.filter(x => x.kind === 'note').map(x => x.text)).toEqual([expect.stringContaining('My own take')]);
+    expect([...engaged]).toEqual(['2026-11-24-mine.md']);
+    expect(isImportedDescription(blurb, join(out, '2026-11-24-u2-tour.annot.json'))).toBe(true);
   });
 
   test('titleFromFilename turns a dated slug back into words', () => {

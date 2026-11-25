@@ -68,7 +68,7 @@ Caveat: the helper runs synchronously (`execFileSync`), like the existing Apple 
 
 ## Today's one read (v1, Nov 25)
 
-Inspired by a friend's personal newspaper, which picks one story a day from about 8,000 feeds using months of hand-tuned instructions built from Obsidian and meeting notes. Pull Read builds the interest profile automatically, and keeps it on the Mac (`src/interests.ts`).
+Inspired by a friend's personal newspaper, which picks one story a day from about 8,000 feeds using months of hand-tuned instructions built from Obsidian and meeting notes. Pull Read builds the interest profile automatically from what you do in Pull Read, and keeps it on the Mac (`src/interests.ts`).
 
 - **Signals** (all local; `gatherInterestSignals`), with these weights:
 
@@ -79,18 +79,19 @@ Inspired by a friend's personal newspaper, which picks one story a day from abou
   | Notebook notes | 3 | |
   | Favorites | 2 | The article's title |
   | Your own tags | 1.5 | |
-  | Optional Obsidian folder | 1 | Notes edited in the last 30 days; `emailRoundup.obsidianPath` |
 
   Dated signals halve every 21 days.
-- **Scoring** (`rankForInterests`): words from the title count double. Words common across the day's articles are discounted, and an article needs at least two different matching words. It's deterministic, so the "why" is explainable.
-- **Pick** (`pickOneRead`): the best match. Articles already highlighted or noted are skipped, since read state lives only in the viewer's localStorage and the sidecar can't see it. The pick and any other copies of its story are removed from the rest of the email.
-- **Email:** a "Today's one read" block above the intro, with a "why" line ("Because of your highlights and Notebook on …"). `oneRead` defaults to on.
+- **No Obsidian (decided Nov 25):** the library is already saved as markdown, so a vault would mostly feed your own reads back in.
+- **Imported feed descriptions are not notes.** An old viewer migration (`viewer/13-init.js`) copied each RSS item's `annotation:` (the feed's description) into `articleNote`. The first live profile counted 19,794 "notes" this way, and their filler words ("now", "been", "back") topped the profile. `isImportedDescription()` now compares each note with the frontmatter and skips copies. The stoplist also grew.
+- **Scoring** (`rankForInterests`): words from the title count double. Words common across the day's articles are discounted, and an article needs at least two different matching words.
+- **Pick** (`pickOneRead`): the best match. Articles you've highlighted or really noted are skipped, since read state lives only in the viewer's localStorage. The pick and any other copies of its story are removed from the rest of the email.
+- **Email:** a "Today's one read" block above the intro, with a "why" line. `oneRead` defaults to on.
 - **Preview:** `preview-rundown` prints the pick, its score and why, the profile's signal counts and strongest interests, and the five runners-up.
 
 Next:
-- **Sync read state to the sidecar,** so it can skip what you've read and learn from what you open and finish. Without that feedback the pick can't improve on its own.
+- **Sync read state to the sidecar,** so it can skip what you've read and learn from what you open and finish.
 - **Let a model choose among the top 5** with a one-line reason.
-- **Show the profile in Settings,** where you can edit it.
+- **Show the profile in Settings.**
 
 ## Phases
 

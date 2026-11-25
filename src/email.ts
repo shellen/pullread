@@ -35,8 +35,6 @@ export interface EmailConfig {
   regionalFeeds: Array<{ name: string; feedUrl: string }>;
   /** Lead with Today's one read: the day's best match for your highlights, notes, favorites and watches. */
   oneRead: boolean;
-  /** Optional folder of markdown notes (e.g. an Obsidian vault) to include in the interest profile. */
-  obsidianPath: string;
 }
 
 const DEFAULT_CONFIG: EmailConfig = {
@@ -56,7 +54,6 @@ const DEFAULT_CONFIG: EmailConfig = {
   widerNews: true,
   regionalFeeds: [],
   oneRead: true,
-  obsidianPath: '',
 };
 
 function settingsPath(): string {
@@ -1212,7 +1209,6 @@ export async function buildRoundup(
       const { signals, engaged } = await gatherInterestSignals({
         outputPath: opts.outputPath || '',
         watches: [...(watchedEntities || [])],
-        obsidianPath: cfg.obsidianPath,
       });
       const profile = buildInterestProfile(signals);
       const { pick, ranked } = pickOneRead(articles, profile, engaged);
