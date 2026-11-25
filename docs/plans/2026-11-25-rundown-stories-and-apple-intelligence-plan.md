@@ -60,7 +60,7 @@ These were proven on macOS 26.6 over four live runs and moved from `scripts/demo
   - Santa Cruz mayor race merge was correct.
   - **Over-merges:** three Black Friday deal posts, which then became the top story on coverage, and two BMW BLOG posts. Cause: common words were measured on the 40-story shortlist, not the whole day. Fixed with `commonWords(allGroups)`, and years are ignored.
   - **The intro had factual errors no check can catch:** Molly Meldrum as "her", John Berger "featured in GTA", and an unsupported "first time the brand has built a vehicle in the US". It also added "This is significant…" sentences. Now: first sentence only, "use only facts from the headline and excerpt", more filler patterns.
-  - **Decision pending:** on-device intro accuracy. In 2 of 3 real runs, the intro that passed or nearly passed the checks misstated facts.
+  - **Decision (Nov 25):** the on-device intro stays on by default, with a clearer label. The credit reads "Written on-device by Apple Intelligence · may contain errors, so check the stories below". Cloud providers keep "Summary by …". Revisit with PCC on macOS 27.
 - **`preview-rundown` report and `--days N`.** It prints panel outlets reached, widely covered stories, story count and the model grouping outcome (`StoryReport`), so a live run shows whether each part worked.
 - **On-device grouping for Apple users** (`buildRoundup` → `appleGrouperIfEnabled` → `onDeviceGrouping`). "Same event?" for candidate pairs, plus fixed-list labels, with importance ignored. It runs under a 45-second budget. Each call has a 30-second timeout, and on any error the Rundown keeps word matching only.
 

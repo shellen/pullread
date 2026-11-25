@@ -556,10 +556,16 @@ export function buildRoundupHtml(
     // The note reads as a newsletter lede straight on the card — no bounding box.
     // Story references written as {{words|N}} link to the Nth article below.
     const citations = articles.map(a => ({ title: a.title, url: a.url }));
+    // The on-device model can misstate facts in ways the intro checks can't
+    // catch (live runs: a losing candidate "declaring victory", a man called
+    // "her"), so its credit says so plainly. Cloud models keep the plain credit.
+    const onDevice = summaryCredit === 'Apple Intelligence';
     const credit = summaryCredit
       ? `\n<div style="margin-top:16px;font-size:12px;color:#a99f95;letter-spacing:0.01em">`
-        + `<span style="color:#b45535">&#10022;</span> Summary by `
-        + `<span style="color:#7d746b;font-weight:600">${escapeHtml(summaryCredit)}</span></div>`
+        + `<span style="color:#b45535">&#10022;</span> ${onDevice ? 'Written on-device by ' : 'Summary by '}`
+        + `<span style="color:#7d746b;font-weight:600">${escapeHtml(summaryCredit)}</span>`
+        + (onDevice ? ' &middot; may contain errors, so check the stories below' : '')
+        + `</div>`
       : '';
     html += `<div style="margin:0 0 6px">
 ${renderSummaryParagraphs(summary, citations)}${credit}

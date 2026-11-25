@@ -404,6 +404,18 @@ describe('buildRoundupHtml', () => {
     expect(html).toContain('Claude');
   });
 
+  test('labels an on-device Apple Intelligence intro as possibly containing errors', () => {
+    const html = buildRoundupHtml([article()], 1, 'A sharp little briefing.', 'Apple Intelligence');
+    expect(html).toContain('Written on-device by');
+    expect(html).toContain('may contain errors, so check the stories below');
+    expect(html).not.toContain('Summary by');
+  });
+
+  test('cloud models keep the plain credit, without the caveat', () => {
+    const html = buildRoundupHtml([article()], 1, 'A sharp little briefing.', 'Claude');
+    expect(html).not.toContain('may contain errors');
+  });
+
   test('omits the AI credit when none is provided', () => {
     const html = buildRoundupHtml([article()], 1, 'A sharp little briefing.');
     expect(html).not.toContain('Summary by');
