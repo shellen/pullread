@@ -157,6 +157,104 @@ export function applyModelGroups(groups: StoryGroup[], lines: string[]): ModelGr
 }
 
 // ---------------------------------------------------------------------------
+// Demo 2, macOS 26 path — the on-device model as a tie-breaker
+// ---------------------------------------------------------------------------
+//
+// The on-device model's context is too small for a whole day of headlines, so
+// on macOS 26 it only answers narrow questions in small batches:
+//   1. "Same event?" for candidate pairs — groups that share at least one
+//      distinctive word but that word matching didn't merge. Groups sharing no
+//      word are never asked about (this is also the merge guard).
+//   2. A section label and 1–5 importance for ~20 groups at a time.
+// groupingLinesFromPairs() turns the answers into "ids|label|importance" lines
+// for applyModelGroups(), the same input the macOS 27 (PCC) full-list path makes.
+
+function groupTokens(g: StoryGroup): Set<string> {
+  const t = new Set<string>();
+  for (const m of g.members) for (const w of storyTokens(m.title)) t.add(w);
+  return t;
+}
+
+/** Pairs of group indexes (0-based) worth asking about, most shared words first. */
+export function candidatePairs(groups: StoryGroup[], max = 40): Array<[number, number]> {
+  const tokens = groups.map(groupTokens);
+  const pairs: Array<{ pair: [number, number]; shared: number }> = [];
+  for (let i = 0; i < groups.length; i++) {
+    for (let j = i + 1; j < groups.length; j++) {
+      let shared = 0;
+      for (const w of tokens[i]) if (tokens[j].has(w)) shared++;
+      if (shared > 0) pairs.push({ pair: [i, j], shared });
+    }
+  }
+  return pairs.sort((a, b) => b.shared - a.shared).slice(0, max).map(p => p.pair);
+}
+
+export const PAIR_INSTRUCTIONS = `You compare pairs of news headlines.
+For each pair, decide whether both headlines report the SAME news event. Sharing a topic, company, person or place is not enough; it must be the same event.
+Return "same": the ids (like P3) of the pairs that are the same event. Return an empty list if none are.`;
+
+/** One line per pair, numbered from P{offset+1} so ids stay unique across batches. */
+export function pairsPrompt(groups: StoryGroup[], pairs: Array<[number, number]>, offset = 0): string {
+  return pairs.map(([a, b], i) =>
+    `P${offset + i + 1}: "${groups[a].lead.title}" (${groups[a].sources.join(', ')}) || "${groups[b].lead.title}" (${groups[b].sources.join(', ')})`).join('\n');
+}
+
+export const LABEL_INSTRUCTIONS = `You label a day's news headlines for a newsletter.
+Each line is "[id] headline (outlets)". Return one entry per headline as "id|label|importance":
+- label: a 1-3 word section name a newspaper would use (e.g. "Courts", "Music", "Climate", "Bay Area").
+- importance: 1-5, how much this matters to a general reader today (5 = major news anywhere, 1 = niche).`;
+
+/** "[id] headline (outlets)" lines for the given 0-based group indexes, ids 1-based. */
+export function labelPrompt(groups: StoryGroup[], indexes: number[]): string {
+  return indexes.map(i => `[${i + 1}] ${groups[i].lead.title} (${groups[i].sources.join(', ')})`).join('\n');
+}
+
+export function batches<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+/**
+ * Combine the tie-breaker answers into "ids|label|importance" lines. Confirmed
+ * pairs are joined transitively; a merged story takes the first label among
+ * its parts and the highest importance.
+ */
+export function groupingLinesFromPairs(
+  groupCount: number,
+  pairs: Array<[number, number]>,
+  sameIds: string[],
+  labelLines: string[],
+): string[] {
+  const parent = Array.from({ length: groupCount }, (_, i) => i);
+  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  for (const id of sameIds) {
+    const n = parseInt(String(id).replace(/^\s*P/i, ''), 10) - 1;
+    const pair = pairs[n];
+    if (pair) parent[find(pair[1])] = find(pair[0]);
+  }
+
+  const info = new Map<number, { label: string; imp: number }>();
+  for (const line of labelLines) {
+    const [idPart, label = '', imp = ''] = line.split('|').map(x => x.trim());
+    const i = parseInt((idPart || '').replace(/[^\d]/g, ''), 10) - 1;
+    if (i >= 0 && i < groupCount && !info.has(i)) info.set(i, { label, imp: parseInt(imp, 10) || 0 });
+  }
+
+  const clusters = new Map<number, number[]>();
+  for (let i = 0; i < groupCount; i++) {
+    const r = find(i);
+    if (!clusters.has(r)) clusters.set(r, []);
+    clusters.get(r)!.push(i);
+  }
+  return [...clusters.values()].map(ids => {
+    const label = ids.map(i => info.get(i)?.label).find(Boolean) || '';
+    const imp = Math.max(0, ...ids.map(i => info.get(i)?.imp || 0));
+    return `${ids.map(i => i + 1).join(',')}|${label}|${imp || ''}`;
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Demo 3 — intro rule checks (Evaluations-style)
 // ---------------------------------------------------------------------------
 

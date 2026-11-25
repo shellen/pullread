@@ -1,7 +1,7 @@
 // ABOUTME: Tests for the Rundown structured-output helpers (intro citations, model grouping, intro checks)
 // ABOUTME: Model responses here are recorded samples, not live model output
 
-import { parseFlatIntro, structuredIntroToMarkers, applyModelGroups, groupingPrompt, checkIntro } from './rundown-ai';
+import { parseFlatIntro, structuredIntroToMarkers, applyModelGroups, groupingPrompt, checkIntro, candidatePairs, pairsPrompt, groupingLinesFromPairs, batches } from './rundown-ai';
 import { groupStories } from './stories';
 import type { ArticleMeta } from './email';
 
@@ -80,6 +80,34 @@ describe('model grouping', () => {
     const r = applyModelGroups(pair, ['1|Music|3', '1,9|Dup|5', 'junk']);
     expect(r.groups).toHaveLength(4);
     expect(r.groups[0].members).toHaveLength(2); // Baker pair stays together
+  });
+});
+
+describe('macOS 26 tie-breaker grouping', () => {
+  const groups = groupStories([
+    article('Judge Approves $7 Billion Settlement Over Claims That Roundup Caused Cancer', 'https://www.nytimes.com/roundup'),
+    article('Weedkiller maker cleared to pay out billions to cancer claimants', 'https://www.theguardian.com/weedkiller'),
+    article('Why every app suddenly wants to be your daily newspaper', 'https://www.theverge.com/digest'),
+    article('Bezos shrugs off blue wave, warns politicians not to make tech a villain', 'https://www.cnbc.com/bezos'),
+  ]);
+
+  test('only asks about groups that share a distinctive word', () => {
+    expect(candidatePairs(groups)).toEqual([[0, 1]]); // "cancer"; digest apps vs Bezos is never asked
+  });
+
+  test('numbers pairs across batches so ids stay unique', () => {
+    expect(pairsPrompt(groups, [[0, 1]], 12)).toMatch(/^P13: "Judge Approves/);
+    expect(batches([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
+  });
+
+  test('turns pair answers and labels into grouping lines, transitively', () => {
+    const pairs: Array<[number, number]> = [[0, 1], [1, 2]];
+    const lines = groupingLinesFromPairs(4, pairs, ['P1', 'p2'], ['1|Courts|3', '2|Law|5', '[4] | Tech | 2', 'garbage']);
+    expect(lines).toEqual(['1,2,3|Courts|5', '4|Tech|2']);
+  });
+
+  test('a "no" from the model leaves groups separate', () => {
+    expect(groupingLinesFromPairs(2, [[0, 1]], [], [])).toEqual(['1||', '2||']);
   });
 });
 

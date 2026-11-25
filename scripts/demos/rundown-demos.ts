@@ -7,7 +7,9 @@
  *   Demo 1  Structured intro: the model returns paragraphs + cited story numbers
  *           (guided generation), so links are exact instead of title-matched.
  *   Demo 2  Model-assisted grouping: the model merges stories word overlap
- *           missed, labels sections, and rates importance (PCC, 32K context).
+ *           missed, labels sections, and rates importance. On macOS 26 the
+ *           on-device model is a tie-breaker: "same event?" for candidate
+ *           pairs, then labels in batches. On macOS 27 PCC gets the full list.
  *   Demo 3  Intro checks: rule checks on generated intros (Evaluations-style).
  *
  * Without --live, the model responses are recorded samples from sample-day.ts.
@@ -23,8 +25,8 @@ import { tmpdir } from 'os';
 import { buildRoundupHtml, curateWithStories, scoreArticle, escapeHtml, issueDateLine } from '../../src/email';
 import type { ArticleMeta } from '../../src/email';
 import { groupStories } from '../../src/stories';
-import { parseFlatIntro, structuredIntroToMarkers, groupingPrompt, GROUPING_INSTRUCTIONS, checkIntro } from '../../src/rundown-ai';
-import { articles, panel, panelHeadlines, regionalFeeds, sampleIntro, sampleGrouping, sampleIntrosToCheck } from './sample-day';
+import { parseFlatIntro, structuredIntroToMarkers, groupingPrompt, GROUPING_INSTRUCTIONS, checkIntro, applyModelGroups, candidatePairs, pairsPrompt, PAIR_INSTRUCTIONS, labelPrompt, LABEL_INSTRUCTIONS, batches, groupingLinesFromPairs } from '../../src/rundown-ai';
+import { articles, panel, panelHeadlines, regionalFeeds, sampleIntro, sampleGrouping, sampleSamePairs, sampleLabels, sampleIntrosToCheck } from './sample-day';
 
 const args = process.argv.slice(2);
 const live = args.includes('--live');
@@ -120,17 +122,35 @@ console.log(dropped.length ? `Dropped links: ${dropped.join('; ')}` : 'All links
 // --- Demo 2 ------------------------------------------------------------------
 
 const groups = groupStories(articles);
-const groupingRaw: string[] = live
-  ? structured('groups', groupingPrompt(groups), GROUPING_INSTRUCTIONS, ['stories']).stories
-  : sampleGrouping;
+console.log(`\n=== Demo 2: model-assisted grouping (${source}) ===`);
+let groupingRaw: string[];
+if (usePcc) {
+  // macOS 27 + PCC: the whole day fits in 32K, so send the full list once.
+  console.log('Sent to the model (full list):\n' + groupingPrompt(groups));
+  groupingRaw = structured('groups', groupingPrompt(groups), GROUPING_INSTRUCTIONS, ['stories']).stories;
+} else {
+  // macOS 26 / on-device: narrow questions in small batches.
+  const pairs = candidatePairs(groups);
+  const same: string[] = [];
+  const pairBatches = batches(pairs, 12);
+  pairBatches.forEach((b, bi) => {
+    const prompt = pairsPrompt(groups, b, bi * 12);
+    console.log(`Asked "same event?" (batch ${bi + 1}/${pairBatches.length}):\n${prompt}`);
+    same.push(...(live ? structured('pairs', prompt, PAIR_INSTRUCTIONS, ['same']).same : sampleSamePairs));
+  });
+  console.log(`Model said same event: ${same.join(', ') || 'none'}`);
+  const labelLines: string[] = [];
+  for (const ids of batches(groups.map((_, i) => i), 20)) {
+    labelLines.push(...(live ? structured('groups', labelPrompt(groups, ids), LABEL_INSTRUCTIONS, ['stories']).stories : sampleLabels));
+  }
+  console.log('Labels:\n' + labelLines.join('\n'));
+  groupingRaw = groupingLinesFromPairs(groups.length, pairs, same, labelLines);
+}
 const before = await curateWithStories(articles, cfg, score, undefined, undefined, { panelHeadlines, panel });
 const after = await curateWithStories(articles, cfg, score, undefined, undefined, { panelHeadlines, panel, modelGroups: groupingRaw });
 writeFileSync(join(outDir, 'demo2-before.html'), buildRoundupHtml(before, 1, null, null, score));
 writeFileSync(join(outDir, 'demo2-after.html'), buildRoundupHtml(after, 1, null, null, score));
-console.log(`\n=== Demo 2: model-assisted grouping (${source}) ===`);
-console.log('Sent to the model:\n' + groupingPrompt(groups));
-console.log('\nModel returned:\n' + groupingRaw.join('\n'));
-const { applyModelGroups } = await import('../../src/rundown-ai');
+console.log('\nCombined:\n' + groupingRaw.join('\n'));
 const check = applyModelGroups(groups, groupingRaw);
 console.log('\nMerged: ' + (check.merges.join('; ') || 'none'));
 console.log('Refused (no shared words): ' + (check.rejected.join('; ') || 'none'));

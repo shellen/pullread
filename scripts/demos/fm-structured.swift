@@ -1,5 +1,5 @@
 // ABOUTME: macOS 26 stand-in for `fm respond --schema` in the Rundown demos (on-device model only)
-// ABOUTME: Usage: fm-structured <intro|groups> <instructions-file> <prompt-file>  → JSON on stdout
+// ABOUTME: Usage: fm-structured <intro|pairs|groups> <instructions-file> <prompt-file>  → JSON on stdout
 
 import Foundation
 import FoundationModels
@@ -13,8 +13,14 @@ struct IntroResult {
 }
 
 @Generable
+struct SamePairs {
+    @Guide(description: "Ids (like P3) of the pairs that report the same news event. Empty if none.")
+    var same: [String]
+}
+
+@Generable
 struct StoryGroups {
-    @Guide(description: "One entry per story, formatted ids|label|importance.")
+    @Guide(description: "One entry per story, formatted ids|label|importance (or id|label|importance when labeling).")
     var stories: [String]
 }
 
@@ -27,7 +33,7 @@ func emit(_ object: [String: Any]) throws {
     static func main() async throws {
         let args = CommandLine.arguments
         guard args.count == 4 else {
-            FileHandle.standardError.write(Data("usage: fm-structured <intro|groups> <instructions-file> <prompt-file>\n".utf8))
+            FileHandle.standardError.write(Data("usage: fm-structured <intro|pairs|groups> <instructions-file> <prompt-file>\n".utf8))
             exit(2)
         }
         switch SystemLanguageModel.default.availability {
@@ -45,6 +51,9 @@ func emit(_ object: [String: Any]) throws {
         if args[1] == "intro" {
             let r = try await session.respond(to: prompt, generating: IntroResult.self)
             try emit(["paragraphs": r.content.paragraphs, "links": r.content.links])
+        } else if args[1] == "pairs" {
+            let r = try await session.respond(to: prompt, generating: SamePairs.self)
+            try emit(["same": r.content.same])
         } else {
             let r = try await session.respond(to: prompt, generating: StoryGroups.self)
             try emit(["stories": r.content.stories])

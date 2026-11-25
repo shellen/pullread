@@ -92,7 +92,7 @@ export const sampleIntro = {
  * 1 Roundup (NYT+CNBC) · 2 Weedkiller (Guardian) · 3 BMW · 4 Julien Baker ·
  * 5 Therin · 6 Type foundry · 7 Bay Bridge · 8 Digest apps · 9 Bezos
  */
-export const sampleGrouping = [
+export const sampleGrouping = [ // macOS 27 / PCC full-list path
   '1,2|Courts|4',
   '3|Autos|2',
   '4|Music|2',
@@ -100,6 +100,24 @@ export const sampleGrouping = [
   '6|Design|1',
   '7|Bay Area|3',
   '8,9|Tech|2', // a model mistake: same topic, different events — the guard refuses this merge
+];
+
+/**
+ * Demo 2, macOS 26 path: answers to the "same event?" pair batch (pair ids
+ * follow candidatePairs(groupStories(articles)); P1 is Roundup vs. Weedkiller,
+ * which share "cancer") and to the label batch ("id|label|importance").
+ */
+export const sampleSamePairs = ['P1'];
+export const sampleLabels = [
+  '1|Courts|4',
+  '2|Courts|4',
+  '3|Autos|2',
+  '4|Music|2',
+  '5|Photography|1',
+  '6|Design|1',
+  '7|Bay Area|3',
+  '8|Tech|2',
+  '9|Tech|2',
 ];
 
 /** Demo 3: intros to check — one clean, three with the kinds of mistakes we've seen. */

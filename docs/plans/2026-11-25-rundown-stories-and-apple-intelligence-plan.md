@@ -3,6 +3,7 @@
 **Date**: 2026-11-25
 **Status**: Plan. Phase 1 is prototyped on `claude/lucid-shannon-jkllpp`.
 **Ships after**: PR #121 (Rundown fixes) in 0.5.2. This work targets 0.6.0 and later.
+**Target OS**: macOS 26 (Tahoe), which is what we develop and test on (26.6). Everything in Phases 1–5 runs on macOS 26. The macOS 27 features are a separate later section and nothing earlier depends on them.
 
 ## Problem
 
@@ -19,12 +20,12 @@ From Apple's sessions [241](https://developer.apple.com/videos/play/wwdc2026/241
 
 | API | Notes | Use in Pull Read |
 |---|---|---|
+| Guided generation (`@Generable`, **macOS 26**) | Not new, but unused. | Structured intro output with exact citations, and model-assisted grouping. |
+| `SystemLanguageModel().contextSize`, `tokenCount(for:)` (**macOS 26.4+**) | Apple's sample shows 8192 on newer devices. | Real token budgets, for RLM chunks and grouping batches. |
 | `PrivateCloudComputeLanguageModel` (macOS 27) | 32K-token context and adjustable reasoning (`reasoningLevel`). No API keys, and no cost to developers under 2M first-time downloads. Users get daily limits, higher with iCloud+. **Requires an entitlement.** | Story grouping and importance across the whole day's headlines in one call. |
-| `SystemLanguageModel().contextSize`, `tokenCount(for:)` (iOS 26.4 / macOS 26.4) | Apple's sample shows 8192 on newer devices. | Replace fixed word chunking with real token budgets. |
 | `fm` CLI (pre-installed on macOS 27) | `fm respond --schema schema.json` returns JSON, and `--model pcc` uses the big model. Output can be captured from a script. | A no-compile path on macOS 27, and the basis for the demos. |
 | Image input (`Attachment(...)`) | Any image size, though larger images cost more tokens. | Tell real artwork from logos and placeholders (draft #116). |
 | Evaluations framework (Xcode 27) | Tests for prompts. | Regression tests for the Rundown intro rules. |
-| Guided generation (`@Generable`, macOS 26) | Not new, but unused. | Structured intro output with exact citations. |
 
 Not added: embeddings, clustering and ranking APIs. On-device semantic matching still uses the Natural Language framework (`NLEmbedding`, `NLTagger`).
 
@@ -56,7 +57,7 @@ This is the foundation for everything after it, and it works on macOS 26.
 - Compile the Swift helpers (`SUMMARIZE_SWIFT`, `RLM_SWIFT` and the autotagger batch helper) in `build-tauri.yml`, then sign them with the app. This removes the Xcode command-line tools requirement.
 - Replace the `sw_vers ≥ 26` check with `SystemLanguageModel.default.availability`, which reports when the device isn't eligible, Apple Intelligence is off, or the model isn't downloaded.
 - Size the RLM chunks with `contextSize` and `tokenCount(for:)` on 26.4+, and keep the word-count fallback below that.
-- Required for Phase 4: the PCC entitlement can only live on the signed app, not on binaries compiled on the user's Mac.
+- Later, for macOS 27: the PCC entitlement can only live on the signed app, not on binaries compiled on the user's Mac. Building the helpers in CI now is what makes that possible.
 
 ### Phase 3: Guided generation for the Rundown intro (macOS 26+)
 
@@ -65,14 +66,21 @@ This is the foundation for everything after it, and it works on macOS 26.
 - Other providers keep the current marker path. Claude and OpenAI could also use their own structured-output modes later.
 - **Demo 1** shows the renderer.
 
-### Phase 4: Model-assisted story grouping and importance (macOS 27, PCC)
+### Phase 4: Model-assisted story grouping and importance (macOS 26, on-device)
 
-- Send the day's feed and panel headlines (about 150–300 short lines fit in 32K) to PCC with a schema: groups of headline IDs, plus a short label and a 1–5 importance rating per group.
-- Merge the result into `groupStories()`. The word-overlap matching stays as the fallback and the check: the model can only merge groups, never split ones the deterministic pass is sure of.
-- Guard against grouping by topic: a merge is refused unless the headlines share at least one distinctive word. In the demo this kept Roundup + Weedkiller ("cancer") and refused a Verge digest-apps + Bezos merge. Panel headlines go into the same prompt, so panel-only stories (the quake) get an importance rating too. The demo doesn't do that yet, which is why Roundup outranks the quake there.
-- Use the model's labels as sections, replacing the feeds' category strings.
-- Use `reasoningLevel(.light)`, and fall back to Phase 1 alone when PCC isn't available or the daily limit is reached.
-- **Demo 2** shows the merge.
+The on-device model's context is too small for a whole day of headlines, so on macOS 26 it acts as a tie-breaker that answers narrow questions in small batches (`src/rundown-ai.ts`):
+
+1. **"Same event?" for candidate pairs.** `candidatePairs()` lists groups that share at least one distinctive word but that word matching didn't merge, most shared words first, capped at 40 pairs. The model answers in batches of 12 (`PAIR_INSTRUCTIONS`, returning `same: ["P3", …]`). Groups that share no word are never asked about, so the model can't group by topic alone. In the demo, only Roundup vs. Weedkiller ("cancer") is asked, and Verge digest apps vs. Bezos never is.
+2. **Labels and importance.** One section label and a 1–5 rating per group, in batches of 20 (`LABEL_INSTRUCTIONS`).
+3. `groupingLinesFromPairs()` joins confirmed pairs transitively and produces "ids|label|importance" lines. `applyModelGroups()` merges and relabels the groups, and `curateWithStories({ modelGroups })` adjusts weight by ±1.5 per importance step. The model can only merge groups, never split ones the word matching joined. Merges with no shared word are still refused, as a backstop.
+
+Still to do:
+- [ ] Include the panel headlines in the label batches, so panel-only stories (the quake) get an importance rating too. The demo doesn't do this yet, which is why Roundup outranks the quake there.
+- [ ] Size batches with `tokenCount(for:)` instead of fixed counts.
+- [ ] Time the full pass on a real day (about 100 stories means roughly 4 pair batches and 5 label batches) and set a time budget, falling back to Phase 1 alone if it runs over.
+- [ ] Production helper: move `scripts/demos/fm-structured.swift`'s `@Generable` types into the CI-built helpers from Phase 2.
+
+**Demo 2** shows this path.
 
 ### Phase 5: Rundown prompt checks (Evaluations)
 
@@ -80,18 +88,29 @@ This is the foundation for everything after it, and it works on macOS 26.
 - Run these checks on recorded outputs in jest now. Move to Apple's Evaluations framework when we adopt Xcode 27.
 - **Demo 3** shows the checks.
 
-### Later
+### Later: macOS 27
 
+None of this is needed for the phases above. Pick it up once we test on macOS 27.
+
+- **Private Cloud Compute for grouping.** Send the whole day's feed and panel headlines (about 150–300 lines fit in 32K) in one call with `reasoningLevel(.light)`, replacing the pair and label batches. `groupingPrompt()` and `GROUPING_INSTRUCTIONS` already exist, and the demos use them when `fm` is present. Needs the PCC entitlement (session 319) and the CI-signed helpers from Phase 2. Fall back to the macOS 26 path when PCC is unavailable or over its daily limit.
+- **`fm` CLI** as a no-compile path for scripts and previews.
+- **Evaluations framework** (Xcode 27) to replace the jest-based intro checks.
 - **Image input:** hide logos and placeholder images used as hero art. This supersedes the size rules in draft #116.
-- **On-device embeddings** (`NLEmbedding`) for semantic matching where PCC isn't available.
+
+### Later: any OS
+
+- **On-device embeddings** (`NLEmbedding`, macOS 26) to find candidate pairs by meaning, not just shared words. This would catch pairs like "Bayer" vs. "Roundup maker" that share no word.
 
 ## Demos
 
-Each demo has a part that runs anywhere (jest, or the sample render in `scripts/demos/`) and a part that runs only on a Mac with macOS 27 through `fm`. Apple shows only flat `fm schema` examples, so the demos use flat schemas: arrays of strings with the structure encoded inside them. Check `fm schema --help` for nested objects before Phase 3/4 production code.
+Each demo has a part that runs anywhere (jest, or the sample render in `scripts/demos/`) and a part that runs on a Mac with Apple Intelligence.
+
+- **macOS 26:** `--live` compiles `scripts/demos/fm-structured.swift` once with `swiftc`, then asks the on-device model with `@Generable` types. Demo 2 uses the pair and label batches.
+- **macOS 27:** `--live` uses `fm respond --schema` (PCC by default), and demo 2 sends the full list. Apple shows only flat `fm schema` examples, so the demos use flat string-array schemas.
 
 ```bash
 bun scripts/demos/rundown-demos.ts            # sample data, renders HTML to ./demo-out
-bun scripts/demos/rundown-demos.ts --live     # macOS 27: fm (PCC; --on-device for local). macOS 26: Swift helper, on-device only
+bun scripts/demos/rundown-demos.ts --live     # macOS 26: Swift helper, on-device · macOS 27: fm (PCC; --on-device for local)
 ```
 
 ## Release sequencing
@@ -99,4 +118,5 @@ bun scripts/demos/rundown-demos.ts --live     # macOS 27: fm (PCC; --on-device f
 1. #121 merges and 0.5.2 ships through the normal release process (`RELEASING.md`).
 2. Phase 1 gets its own PR, once the remaining items above are done. It's stacked on #121.
 3. Phases 2 and 3 go in one PR, so CI-built helpers and structured output land together.
-4. Phases 4 and 5 come after we have the PCC entitlement.
+4. Phases 4 and 5 follow in their own PR, on-device on macOS 26.
+5. The macOS 27 items come later, once we're testing on 27 and have the PCC entitlement.
