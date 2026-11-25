@@ -38,6 +38,9 @@ const baseConfig: EmailConfig = {
   sendTime: '08:00',
   sendTime2: '17:00',
   lookbackDays: 1,
+  // Tests never reach the network: the wider-news panel is exercised in stories.test.ts.
+  widerNews: false,
+  regionalFeeds: [],
 };
 
 function article(overrides: Partial<ArticleMeta> = {}): ArticleMeta {

@@ -5,6 +5,8 @@ import { createTransport } from 'nodemailer';
 import { join } from 'path';
 import { homedir } from 'os';
 import { readFileSync, existsSync } from 'fs';
+import { groupStories, alsoInFor, weighStories, findConsensus, pickTopStories, fetchPanelHeadlines, DEFAULT_PANEL } from './stories';
+import type { PanelSource, Scope } from './stories';
 
 const HEADER_IMAGE_PATH = join(__dirname, '..', 'email-header.png');
 
@@ -22,6 +24,10 @@ export interface EmailConfig {
   sendTime: string;
   sendTime2: string;
   lookbackDays: number;
+  /** Read a balanced panel of broad news outlets so major stories surface even outside your feeds. */
+  widerNews: boolean;
+  /** Local outlets for the "Near you" check, e.g. [{ name: 'KQED', feedUrl: '…' }]. Two or more must agree. */
+  regionalFeeds: Array<{ name: string; feedUrl: string }>;
 }
 
 const DEFAULT_CONFIG: EmailConfig = {
@@ -38,6 +44,8 @@ const DEFAULT_CONFIG: EmailConfig = {
   sendTime: '08:00',
   sendTime2: '17:00',
   lookbackDays: 1,
+  widerNews: true,
+  regionalFeeds: [],
 };
 
 function settingsPath(): string {
@@ -114,6 +122,16 @@ export interface ArticleMeta {
   summary?: string;
   image?: string;
   categories?: string[];
+  /** Set on stories in the Top stories block: who else ran it, and whether the wider news did. */
+  story?: StoryCoverage;
+}
+
+export interface StoryCoverage {
+  /** In the Top stories block (vs. a multi-source story shown in its section). */
+  top: boolean;
+  alsoIn: Array<{ source: string; url: string }>;
+  wider?: { sources: string[]; scope: Scope };
+  beyondFeeds: boolean;
 }
 
 function truncateExcerpt(text: string, max = 120): string {
@@ -194,6 +212,32 @@ function metaLine(article: ArticleMeta): string {
   return `<div style="font-size:12px;color:#9a938c;margin-top:5px">${source}${author}</div>`;
 }
 
+/**
+ * "Also in pitchfork.com, stereogum.com" / "Widely covered · BBC News, Fox News, NPR +3"
+ * under a top story, so the reader can see why it's at the top.
+ */
+function coverageLine(article: ArticleMeta): string {
+  const s = article.story;
+  if (!s) return '';
+  const parts: string[] = [];
+  if (s.beyondFeeds) {
+    const label = s.wider?.scope === 'regional' ? 'Near you' : 'Beyond your feeds';
+    parts.push(`<span style="color:#b45535;font-weight:600">${label}</span>`);
+  }
+  if (s.alsoIn.length) {
+    const links = s.alsoIn.slice(0, 3).map(o =>
+      `<a href="${escapeHtml(o.url)}" style="color:#7d746b;text-decoration:underline;text-underline-offset:2px">${escapeHtml(o.source)}</a>`);
+    const more = s.alsoIn.length > 3 ? ` +${s.alsoIn.length - 3}` : '';
+    parts.push(`Also in ${links.join(', ')}${more}`);
+  }
+  if (s.wider) {
+    const names = s.wider.sources.slice(0, 3).map(escapeHtml).join(', ');
+    const more = s.wider.sources.length > 3 ? ` +${s.wider.sources.length - 3}` : '';
+    parts.push(s.beyondFeeds ? `Covered by ${names}${more}` : `Widely covered: ${names}${more}`);
+  }
+  return `<div style="font-size:12px;color:#9a938c;margin-top:4px;line-height:1.5">${parts.join(' &middot; ')}</div>`;
+}
+
 // The whole headline is the link, straight to the source — no per-item CTA. On
 // mobile the image stacks above the text (.hero-cell / .hero-img in the head).
 function heroArticleHtml(article: ArticleMeta): string {
@@ -210,7 +254,7 @@ function heroArticleHtml(article: ArticleMeta): string {
 <td class="hero-cell" valign="top">
 <a href="${link}" style="font-size:17px;color:#1a1a1a;text-decoration:none;font-weight:600;line-height:1.35">${escapeHtml(article.title)}</a>
 ${excerpt ? `<div style="font-size:13.5px;color:#6b6560;margin-top:6px;line-height:1.55">${escapeHtml(excerpt)}</div>` : ''}
-${metaLine(article)}
+${metaLine(article)}${coverageLine(article)}
 </td>
 </tr></table>`;
   }
@@ -219,7 +263,7 @@ ${metaLine(article)}
   return `<div style="margin-bottom:22px">
 <a href="${link}" style="font-size:17px;color:#1a1a1a;text-decoration:none;font-weight:600;line-height:1.35">${escapeHtml(article.title)}</a>
 ${excerpt ? `<div style="font-size:13.5px;color:#6b6560;margin-top:6px;line-height:1.55">${escapeHtml(excerpt)}</div>` : ''}
-${metaLine(article)}
+${metaLine(article)}${coverageLine(article)}
 </div>`;
 }
 
@@ -229,7 +273,7 @@ function compactArticleHtml(article: ArticleMeta): string {
   return `<div style="padding:16px 0;border-top:1px solid #f0ebe6">
 <a href="${link}" style="font-size:15px;color:#1a1a1a;text-decoration:none;font-weight:600;line-height:1.4">${escapeHtml(article.title)}</a>
 ${excerpt ? `<div style="font-size:13px;color:#6b6560;margin-top:5px;line-height:1.5">${escapeHtml(excerpt)}</div>` : ''}
-${metaLine(article)}
+${metaLine(article)}${coverageLine(article)}
 </div>`;
 }
 
@@ -525,7 +569,16 @@ ${renderSummaryParagraphs(summary, citations)}${credit}
   } else {
     // Rank sections by the day's signal (seed = today's date) so the lead
     // section changes with the news instead of freezing alphabetically.
-    const groups = groupByCategory(articles, scoreFn ? { score: scoreFn, seed: today } : {});
+    // Top stories (marked with .story by buildRoundup) lead, in weight order;
+    // every one gets the hero treatment so they read as the day's headlines.
+    const top = articles.filter(a => a.story?.top);
+    if (top.length) {
+      html += `<div style="margin:38px 0 20px">
+<div style="font-size:11px;font-weight:700;color:#b45535;letter-spacing:0.12em;text-transform:uppercase;padding-bottom:10px;border-bottom:1px solid #ece7e2">Top stories</div>
+</div>`;
+      for (const a of top) html += heroArticleHtml(a);
+    }
+    const groups = groupByCategory(articles.filter(a => !a.story?.top), scoreFn ? { score: scoreFn, seed: today } : {});
     for (const [cat, catArticles] of groups) {
       html += categorySection(cat, catArticles);
     }
@@ -651,64 +704,14 @@ export function scoreArticle(a: ArticleMeta, ctx: ScoreContext): number {
   return score;
 }
 
-/** Lowercased host (no www) + path (no trailing slash); query and hash dropped. */
-function canonicalUrl(url: string): string {
-  try {
-    const u = new URL(url);
-    return u.hostname.replace(/^www\./, '').toLowerCase() + u.pathname.replace(/\/+$/, '');
-  } catch {
-    return url.trim().toLowerCase();
-  }
-}
-
-const DEDUPE_STOPWORDS = new Set(['the', 'a', 'an', 'of', 'to', 'in', 'on', 'at', 'and', 'or', 'for', 'with', 'by', 'is', 'are', 'was', 'up', 'its', 'it', 'as', 'from', 'over', 'that']);
-
-function titleTokens(title: string): Set<string> {
-  const words = normalizeForTitleMatch(titleCore(title))
-    .replace(/['"]/g, '')
-    .split(/[^a-z0-9$]+/)
-    .filter(w => w && !DEDUPE_STOPWORDS.has(w));
-  return new Set(words);
-}
-
-/**
- * Two titles name the same story when their distinctive words overlap heavily:
- * at least 4 shared words and a Jaccard overlap of 0.5 or more. Catches the same
- * news from two outlets ("Julien Baker Lines Up New Album…" / "Julien Baker
- * Announces New Album…") without merging unrelated stories that share a name.
- */
-function sameStory(a: Set<string>, b: Set<string>): boolean {
-  let shared = 0;
-  for (const w of a) if (b.has(w)) shared++;
-  if (shared < 4) return false;
-  const union = a.size + b.size - shared;
-  return shared / union >= 0.5;
-}
-
-function richness(a: ArticleMeta): number {
-  return (a.image?.startsWith('http') ? 1 : 0) + (a.summary || a.excerpt ? 1 : 0);
-}
-
 /**
  * Drop duplicate stories: the same URL (ignoring query, hash, www and trailing
  * slash), the same title, or near-identical titles from different outlets.
  * Keeps the first occurrence unless a later copy has a real image or excerpt the
- * first lacks.
+ * first lacks. (groupStories keeps the extra copies; this keeps only the leads.)
  */
 export function dedupeArticles(articles: ArticleMeta[]): ArticleMeta[] {
-  const kept: Array<{ article: ArticleMeta; url: string; tokens: Set<string> }> = [];
-  for (const article of articles) {
-    const url = canonicalUrl(article.url);
-    const tokens = titleTokens(article.title);
-    const dup = kept.find(k => k.url === url || sameStory(k.tokens, tokens)
-      || normalizeForTitleMatch(k.article.title) === normalizeForTitleMatch(article.title));
-    if (!dup) {
-      kept.push({ article, url, tokens });
-    } else if (richness(article) > richness(dup.article)) {
-      dup.article = article;
-    }
-  }
-  return kept.map(k => k.article);
+  return groupStories(articles).map(g => g.lead);
 }
 
 export function curateArticles(
@@ -897,6 +900,60 @@ export function filterByLookback(articles: ArticleMeta[], lookbackDays: number):
   return articles.filter(a => a.bookmarked && a.bookmarked >= cutoffStr);
 }
 
+export interface StoryCurationOptions {
+  /** Supply panel headlines directly (tests, previews); otherwise they're fetched when widerNews is on. */
+  panelHeadlines?: import('./stories').PanelHeadline[];
+  panel?: PanelSource[];
+  limit?: number;
+}
+
+/**
+ * Group the day's articles into stories, weigh them (your sources' coverage +
+ * the wider-news panel), pull out the Top stories, and curate the rest. Top
+ * stories come first in the returned list, marked with `.story`.
+ */
+export async function curateWithStories(
+  articles: ArticleMeta[],
+  cfg: Pick<EmailConfig, 'widerNews' | 'regionalFeeds'>,
+  scoreFn: (a: ArticleMeta) => number,
+  mentionCounts?: Map<string, number>,
+  watchedEntities?: Set<string>,
+  opts: StoryCurationOptions = {},
+): Promise<ArticleMeta[]> {
+  const limit = opts.limit ?? MAX_ROUNDUP_ARTICLES;
+  const panel = opts.panel ?? [
+    ...DEFAULT_PANEL,
+    ...(cfg.regionalFeeds || []).map(f => ({ ...f, lean: 'center' as const, scope: 'regional' as const })),
+  ];
+
+  let headlines = opts.panelHeadlines ?? [];
+  if (!opts.panelHeadlines && cfg.widerNews) {
+    try {
+      const { fetchFeed } = await import('./feed');
+      headlines = await fetchPanelHeadlines(panel, fetchFeed);
+    } catch {
+      headlines = []; // offline or every feed failed — rank on your feeds alone
+    }
+  }
+  const consensus = headlines.length ? findConsensus(headlines, panel) : [];
+
+  const groups = groupStories(articles);
+  const weighed = weighStories(groups, consensus, scoreFn);
+  const { top, rest } = pickTopStories(weighed, consensus, { baseScore: scoreFn });
+
+  const topArticles = top.map(t => ({
+    ...t.article,
+    story: { top: true, alsoIn: t.alsoIn, wider: t.wider, beyondFeeds: t.beyondFeeds },
+  }));
+  // Stories outside the top block still show who else ran them.
+  const leads = rest.map(g => {
+    const alsoIn = alsoInFor(g);
+    return alsoIn.length ? { ...g.lead, story: { top: false, alsoIn, beyondFeeds: false } } : g.lead;
+  });
+  const others = curateArticles(leads, mentionCounts, watchedEntities, Math.max(0, limit - topArticles.length));
+  return [...topArticles, ...others];
+}
+
 /**
  * Gather, curate, summarize, and render the roundup HTML — everything except the
  * actual email send. Shared by sendRoundup (which mails it) and the preview-rundown
@@ -942,7 +999,9 @@ export async function buildRoundup(
     // Research module not available — curate without it
   }
 
-  const curated = curateArticles(articles, mentionCounts, watchedEntities);
+  const scoreCtx: ScoreContext = { now: Date.now(), mentionCounts, watchedEntities };
+  const scoreFn = (a: ArticleMeta) => scoreArticle(a, scoreCtx);
+  const curated = await curateWithStories(articles, cfg, scoreFn, mentionCounts, watchedEntities);
 
   // Validate article images — strip broken URLs to avoid broken image icons
   await validateArticleImages(curated);
@@ -955,8 +1014,6 @@ export async function buildRoundup(
     : null;
 
   // Rank sections by the day's relevance/freshness so the lead changes daily.
-  const scoreCtx: ScoreContext = { now: Date.now(), mentionCounts, watchedEntities };
-  const scoreFn = (a: ArticleMeta) => scoreArticle(a, scoreCtx);
   const html = buildRoundupHtml(curated, cfg.lookbackDays, summary, summaryCredit, scoreFn);
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   const subject = `The Pull Read Rundown — ${today}`;
