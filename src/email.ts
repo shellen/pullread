@@ -907,17 +907,17 @@ export async function generateRoundupSummary(articles: ArticleMeta[], opts: { no
     const { runAppleStructured } = await import('./apple-structured');
     // One story per request: a refusal (Apple's guardrails, on sensitive news)
     // drops that story instead of the whole intro, and each request is tiny.
-    const instructions = appleSentenceInstructions(issueDateLine(now), retry);
     let refused = 0;
-    const built = buildPerStoryIntro(articles, prompt => {
+    const built = buildPerStoryIntro(articles, (prompt, retryStory) => {
       try {
-        return runAppleStructured('sentence', instructions, prompt, 30_000);
+        return runAppleStructured('sentence', appleSentenceInstructions(issueDateLine(now), retry || retryStory), prompt, 30_000);
       } catch (err) {
         if ((err as { kind?: string }).kind === 'refusal') refused++;
         throw err;
       }
     });
     if (refused) console.warn(`[email] Apple Intelligence declined ${refused} stor${refused === 1 ? 'y' : 'ies'}; writing the intro from the rest`);
+    if (built?.copied) console.warn(`[email] Skipped ${built.copied} stor${built.copied === 1 ? 'y' : 'ies'} whose sentence kept copying the headline`);
     if (!built) return null;
     const { text } = structuredIntroToMarkers(mentionsToIntro(built.mentions, articles.map(a => a.title)), articles.length);
     return text.trim() ? { text, model: 'on-device', provider: 'apple' } : null;

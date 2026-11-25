@@ -109,9 +109,8 @@ let introRaw: any = sampleIntro;
 if (live && hasFm) {
   introRaw = structured('intro', `Stories:\n${storyList(curated)}`, INTRO_INSTRUCTIONS, ['paragraphs', 'links']);
 } else if (live) {
-  const instructions = appleSentenceInstructions(issueDateLine());
-  const built = buildPerStoryIntro(curated, prompt => {
-    try { return runAppleStructured('sentence', instructions, prompt, 30_000); } catch (err) {
+  const built = buildPerStoryIntro(curated, (prompt, retry) => {
+    try { return runAppleStructured('sentence', appleSentenceInstructions(issueDateLine(), retry), prompt, 30_000); } catch (err) {
       console.log(`  (story skipped: ${err instanceof Error ? err.message : err})`);
       return null;
     }

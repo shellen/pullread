@@ -86,6 +86,22 @@ describe('buildPerStoryIntro', () => {
     expect(r!.mentions[0][0].sentence).toBe('The BMW-powered Ineos Grenadier will be built in America.');
   });
 
+  test('a sentence that copies its headline is retried once, then the story is skipped', () => {
+    const real = [
+      { title: "Trump Made Up to $15M on Nvidia Stock After Huang's Return", domain: 'x.com' },
+      { title: 'Story B', domain: 'x.com' }, { title: 'Story C', domain: 'x.com' }, { title: 'Story D', domain: 'x.com' },
+    ];
+    const calls: Array<[string, boolean]> = [];
+    const r = buildPerStoryIntro(real, (p, retry) => {
+      calls.push([p.split('\n')[0], retry]);
+      if (p.includes('Nvidia')) return { sentence: "Trump made up to $15M on Nvidia stock after Huang's return.", phrase: 'Nvidia stock' };
+      return { sentence: `Something specific happened in ${p.split('\n')[0].slice(10)} today.`, phrase: 'Something specific' };
+    });
+    expect(calls.filter(c => c[0].includes('Nvidia'))).toEqual([[expect.any(String), false], [expect.any(String), true]]);
+    expect(r!.copied).toBe(1);
+    expect(r!.mentions.flat().map(m => m.story)).toEqual([2, 3, 4]);
+  });
+
   test('returns null when fewer than three stories come back', () => {
     expect(buildPerStoryIntro(stories, p => (p.includes('Story 1') ? { sentence: 'One.', phrase: 'One' } : null))).toBeNull();
   });

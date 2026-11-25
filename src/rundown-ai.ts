@@ -104,6 +104,18 @@ This note goes out on ${dateLine}. Stories may mention other days; those are not
 No greetings, no sign-offs, no "here are the top stories", never "dive in" or "buckle up".`;
 }
 
+const wordsOf = (t: string) => t.toLowerCase().replace(/[\u2018\u2019]/g, "'").match(/[a-z0-9$.']+/g) || [];
+
+/** Does this sentence (8+ words) take at least 85% of its words from one of the sources? */
+export function copiesSource(sentence: string, sources: string[]): boolean {
+  const w = wordsOf(sentence);
+  if (w.length < 8) return false;
+  return sources.filter(Boolean).some(src => {
+    const set = new Set(wordsOf(src));
+    return w.filter(x => set.has(x)).length / w.length >= 0.85;
+  });
+}
+
 /**
  * Instructions for one story's sentence (on-device, one story per request). A
  * refusal then costs one story, not the whole intro: on a real day, Apple's
@@ -126,24 +138,34 @@ This email goes out on ${dateLine}. Don't name today's weekday or date, and don'
  */
 export function buildPerStoryIntro(
   stories: Array<{ title: string; domain?: string; summary?: string; excerpt?: string }>,
-  ask: (prompt: string) => { sentence?: string; phrase?: string } | null,
+  ask: (prompt: string, retry: boolean) => { sentence?: string; phrase?: string } | null,
   opts: { want?: number; maxTries?: number; gistCap?: number } = {},
-): { mentions: Mention[][]; skipped: number } | null {
+): { mentions: Mention[][]; skipped: number; copied: number } | null {
   const { want = 5, maxTries = 8, gistCap = 200 } = opts;
   const got: Mention[] = [];
   let skipped = 0;
+  let copied = 0;
+  const firstSentence = (t: string) => t.trim().match(/^.+?[.!?](?=\s+[A-Z"\u201c]|\s*$)/)?.[0] ?? t.trim();
   for (let i = 0; i < Math.min(stories.length, maxTries) && got.length < want; i++) {
     const a = stories[i];
     const gist = (a.summary || a.excerpt || '').slice(0, gistCap);
-    let r: { sentence?: string; phrase?: string } | null = null;
-    try { r = ask(`Headline: ${a.title}\nSource: ${a.domain || ''}${gist ? `\nExcerpt: ${gist}` : ''}`); } catch { r = null; }
-    if (!r?.sentence?.trim()) { skipped++; continue; }
+    const prompt = `Headline: ${a.title}\nSource: ${a.domain || ''}${gist ? `\nExcerpt: ${gist}` : ''}`;
+    const askOnce = (retry: boolean) => { try { return ask(prompt, retry); } catch { return null; } };
     // One sentence per story: the model often adds "This is significant because…".
-    const first = r.sentence.trim().match(/^.+?[.!?](?=\s+[A-Z"\u201c]|\s*$)/)?.[0] ?? r.sentence.trim();
-    got.push({ story: i + 1, sentence: first, phrase: r.phrase });
+    let r = askOnce(false);
+    let sentence = r?.sentence?.trim() ? firstSentence(r.sentence) : '';
+    // A sentence that copies its own headline or excerpt gets one more try, then
+    // the story is skipped — instead of one copied sentence sinking the intro.
+    if (sentence && copiesSource(sentence, [a.title, gist])) {
+      r = askOnce(true);
+      sentence = r?.sentence?.trim() ? firstSentence(r.sentence) : '';
+      if (sentence && copiesSource(sentence, [a.title, gist])) { copied++; sentence = ''; }
+    }
+    if (!sentence) { skipped++; continue; }
+    got.push({ story: i + 1, sentence, phrase: r?.phrase });
   }
   if (got.length < 3) return null;
-  return { mentions: [got.slice(0, 2), got.slice(2)], skipped };
+  return { mentions: [got.slice(0, 2), got.slice(2)], skipped, copied };
 }
 
 /** The numbered story list for the on-device intro: top stories only, short gists (4K window). */
@@ -552,12 +574,7 @@ export function checkIntro(text: string, opts: { now: Date; storyCount: number; 
   if (opts.sources?.length) {
     // Quoted titles are allowed (the strict-titles prompt asks for them); measure the rest.
     const plain = text.replace(/\{\{([^{}|]+)\|\d+\}\}/g, '$1').replace(/["\u201c][^"\u201d]{12,}["\u201d]/g, ' ');
-    const wordsOf = (t: string) => t.toLowerCase().replace(/[\u2018\u2019]/g, "'").match(/[a-z0-9$.']+/g) || [];
-    const sourceSets = opts.sources.map(src => new Set(wordsOf(src)));
-    const copied = plain.split(/(?<=[.!?])\s+/).filter(sentence => {
-      const w = wordsOf(sentence);
-      return w.length >= 8 && sourceSets.some(set => w.filter(x => set.has(x)).length / w.length >= 0.85);
-    });
+    const copied = plain.split(/(?<=[.!?])\s+/).filter(sentence => copiesSource(sentence, opts.sources!));
     checks.push({ rule: 'Written in its own words', passed: copied.length === 0,
       detail: copied.length ? `${copied.length} sentence(s) copied from the stories, e.g. "${copied[0].slice(0, 60)}…"` : undefined });
   }
