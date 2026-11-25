@@ -82,6 +82,20 @@ describe('generateMarkdown', () => {
     expect(md).toContain('annotation: "My note about this"');
   });
 
+  test('writes feed description as description:, not annotation:', () => {
+    const md = generateMarkdown({
+      title: 'Test',
+      url: 'https://example.com',
+      bookmarkedAt: '2024-01-29T12:00:00Z',
+      domain: 'example.com',
+      content: 'Content',
+      description: 'The feed says "hi"'
+    });
+
+    expect(md).toContain('description: "The feed says \\"hi\\""');
+    expect(md).not.toContain('annotation:');
+  });
+
   test('escapes quotes in title', () => {
     const md = generateMarkdown({
       title: 'Article with "quotes"',

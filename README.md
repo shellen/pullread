@@ -366,6 +366,8 @@ The extracted content preserves:
 - Lists and tables
 ```
 
+`annotation:` is only written for bookmark services (Instapaper, Pinboard, Raindrop, Drafty, bookmarks.html imports), where it is your own note. For ordinary RSS/Atom/JSON feeds, the item's summary is written as `description:` instead, so it is never mistaken for a note.
+
 ### Podcast Episode Example
 
 ```markdown

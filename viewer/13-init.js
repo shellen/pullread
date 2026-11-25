@@ -20,89 +20,11 @@ async function loadSyncStatus() {
   } catch {}
 }
 
-// ---- One-Time Migration: frontmatter annotations to JSON ----
-async function migrateAnnotationsIfNeeded() {
-  if (!serverMode) return;
-  if (localStorage.getItem('pr-migration-v2-done')) return;
-
-  // Check each article's frontmatter for old-style annotation field
-  let migrated = 0;
-  for (const file of allFiles) {
-    try {
-      const res = await fetch('/api/file?name=' + encodeURIComponent(file.filename));
-      if (!res.ok) continue;
-      const text = await res.text();
-      const match = text.match(/^---\n([\s\S]*?)\n---/);
-      if (!match) continue;
-
-      const frontmatter = match[1];
-      const annotationMatch = frontmatter.match(/^annotation:\s*"?(.*?)"?\s*$/m);
-      if (!annotationMatch || !annotationMatch[1]) continue;
-
-      // Skip podcast/YouTube articles — their annotation field is the feed description
-      const hasEnclosure = frontmatter.match(/^enclosure_url:/m);
-      const domain = (frontmatter.match(/^domain:\s*(.*)$/m) || [])[1] || '';
-      const isMediaArticle = hasEnclosure || domain.includes('youtube') || domain.includes('youtu.be');
-      if (isMediaArticle) continue;
-
-      // Found old-style annotation - migrate to JSON notes
-      const existingNotes = allNotesIndex[file.filename] || {};
-      if (existingNotes.articleNote) continue; // Already has notes, skip
-
-      await fetch('/api/notes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: file.filename,
-          articleNote: annotationMatch[1],
-          annotations: existingNotes.annotations || [],
-          tags: existingNotes.tags || [],
-          isFavorite: existingNotes.isFavorite || false
-        })
-      });
-      migrated++;
-    } catch { continue; }
-  }
-
-  // Cleanup pass: clear articleNote that duplicates the article body (already-migrated media articles)
-  let cleaned = 0;
-  for (const file of allFiles) {
-    try {
-      const notes = allNotesIndex[file.filename];
-      if (!notes || !notes.articleNote) continue;
-      const res = await fetch('/api/file?name=' + encodeURIComponent(file.filename));
-      if (!res.ok) continue;
-      const text = await res.text();
-      const bodyStart = text.indexOf('---', text.indexOf('---') + 3);
-      if (bodyStart < 0) continue;
-      const body = text.slice(bodyStart + 3).trim();
-      const bodyPrefix = body.slice(0, 200).trim();
-      const notePrefix = notes.articleNote.slice(0, 200).trim();
-      if (notePrefix && bodyPrefix.startsWith(notePrefix)) {
-        await fetch('/api/notes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: file.filename,
-            articleNote: '',
-            annotations: notes.annotations || [],
-            tags: notes.tags || [],
-            isFavorite: notes.isFavorite || false
-          })
-        });
-        cleaned++;
-      }
-    } catch { continue; }
-  }
-
-  localStorage.setItem('pr-migration-v2-done', '1');
-  if (migrated > 0 || cleaned > 0) {
-    console.log('Migration: ' + migrated + ' migrated, ' + cleaned + ' duplicates cleaned');
-    await loadAnnotationsIndex(); // Refresh
-    renderFileList();
-    scheduleNavCounts();
-  }
-}
+// The old one-time migration that copied frontmatter `annotation:` into article
+// notes was retired: for ordinary feeds that field held the feed's description,
+// not a note the reader wrote. The server now clears those copies once at
+// startup (src/imported-notes.ts), and new articles store feed text as
+// `description:`.
 
 // Refresh article list from server
 let _refreshInFlight = false;
@@ -292,8 +214,7 @@ async function init() {
         }
       }).catch(function() {});
 
-      // Run one-time migration and load sync status in background
-      migrateAnnotationsIfNeeded();
+      // Load sync status in background
       loadSyncStatus();
 
       // Load TTS provider setting

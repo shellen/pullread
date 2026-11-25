@@ -1,5 +1,5 @@
 // ABOUTME: Parses RSS, Atom, and JSON feeds
-// ABOUTME: Extracts entries with metadata, annotations, and enclosures
+// ABOUTME: Extracts entries with metadata, descriptions, bookmark annotations, and enclosures
 
 import { XMLParser } from 'fast-xml-parser';
 
@@ -17,6 +17,13 @@ export interface FeedEntry {
   url: string;
   updatedAt: string;
   domain: string;
+  /** The feed's own summary/description of the item. Not written by the reader. */
+  description?: string;
+  /**
+   * The reader's own note from a bookmark service (Pinboard, Instapaper, Raindrop,
+   * Drafty, a bookmarks.html import). Only set for bookmark sources — see
+   * isBookmarkFeedUrl() and markBookmarkAnnotations().
+   */
   annotation?: string;
   contentHtml?: string;
   enclosure?: Enclosure;
@@ -155,15 +162,15 @@ function parseJsonFeed(text: string): FeedEntry[] {
     let domain = '';
     try { domain = new URL(url).hostname.replace(/^www\./, ''); } catch {}
 
-    let annotation: string | undefined;
+    let description: string | undefined;
     let contentHtml: string | undefined;
     if (item.content_text?.trim()) {
-      annotation = item.content_text.trim();
+      description = item.content_text.trim();
     } else if (item.content_html?.trim()) {
-      annotation = item.content_html.replace(/<[^>]+>/g, '').trim() || undefined;
+      description = item.content_html.replace(/<[^>]+>/g, '').trim() || undefined;
       if (item.content_html.trim().length > 50) contentHtml = item.content_html.trim();
     } else if (item.summary?.trim()) {
-      annotation = item.summary.trim();
+      description = item.summary.trim();
     }
 
     let enclosure: Enclosure | undefined;
@@ -205,7 +212,7 @@ function parseJsonFeed(text: string): FeedEntry[] {
       url,
       updatedAt: item.date_published || item.date_modified || '',
       domain,
-      annotation: annotation || undefined,
+      description: description || undefined,
       contentHtml: contentHtml || undefined,
       enclosure,
       videoEnclosure,
@@ -262,7 +269,7 @@ function parseAtomFeed(feed: any): FeedEntry[] {
     const url = resolveAtomLink(entry.link);
     const domain = new URL(url).hostname.replace(/^www\./, '');
 
-    let annotation: string | undefined;
+    let description: string | undefined;
     let contentHtml: string | undefined;
     let rawHtml = typeof entry.content === 'string' ? entry.content.trim()
       : entry.content?.['__cdata']?.trim() || entry.content?.['#text']?.trim() || undefined;
@@ -271,7 +278,7 @@ function parseAtomFeed(feed: any): FeedEntry[] {
         : entry.summary?.['__cdata']?.trim() || entry.summary?.['#text']?.trim() || undefined;
     }
     if (rawHtml) {
-      annotation = extractTextFromHtml(rawHtml);
+      description = extractTextFromHtml(rawHtml);
       if (rawHtml.length > 50) contentHtml = rawHtml;
     }
 
@@ -302,7 +309,7 @@ function parseAtomFeed(feed: any): FeedEntry[] {
       url,
       updatedAt: entry.updated,
       domain,
-      annotation: annotation || undefined,
+      description: description || undefined,
       contentHtml: contentHtml || undefined,
       author: author || undefined,
       categories,
@@ -402,7 +409,7 @@ function parseRssFeed(rss: any): FeedEntry[] {
       url,
       updatedAt: parseRssDate(item.pubDate),
       domain,
-      annotation: description || undefined,
+      description: description || undefined,
       contentHtml: contentHtml || undefined,
       enclosure,
       videoEnclosure,
@@ -449,7 +456,7 @@ function parseRdfFeed(rdf: any): FeedEntry[] {
       url,
       updatedAt,
       domain,
-      annotation: description || undefined,
+      description: description || undefined,
       contentHtml: contentHtml || undefined,
       author: rdfAuthorStr || undefined,
       categories
@@ -724,5 +731,34 @@ export async function fetchFeed(url: string): Promise<FeedEntry[]> {
     throw new Error(`Failed to fetch feed: ${response.status}`);
   }
   const xml = await response.text();
-  return parseFeed(xml);
+  return markBookmarkAnnotations(parseFeed(xml), url);
+}
+
+/**
+ * Is this the feed of a bookmark service, where each item's description is the
+ * reader's own note rather than the publisher's blurb? Mirrors
+ * isBookmarkServiceUrl() in viewer/02-utils.js — keep the two in step.
+ */
+export function isBookmarkFeedUrl(feedUrl: string | undefined | null): boolean {
+  if (!feedUrl) return false;
+  const lower = feedUrl.toLowerCase();
+  if (lower.includes('instapaper.com/rss/') || lower.includes('instapaper.com/archive/rss/')) return true;
+  if (lower.includes('feeds.pinboard.in')) return true;
+  if (lower.includes('raindrop.io') && !lower.includes('blog.raindrop.io')) return true;
+  if (/drafty\.com\/@[^/]+\/links/i.test(feedUrl)) return true;
+  return false;
+}
+
+/**
+ * For bookmark feeds, the item description is the reader's annotation: copy it
+ * to `annotation` (and drop `description`, so it isn't written twice). Other
+ * feeds keep it as `description` only.
+ */
+export function markBookmarkAnnotations(entries: FeedEntry[], feedUrl: string): FeedEntry[] {
+  if (!isBookmarkFeedUrl(feedUrl)) return entries;
+  return entries.map(e => {
+    if (!e.description) return e;
+    const { description, ...rest } = e;
+    return { ...rest, annotation: description };
+  });
 }

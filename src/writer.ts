@@ -40,6 +40,9 @@ export interface ArticleData {
   domain: string;
   content: string;
   feed?: string;
+  /** The feed's own summary of the item (not a user note). */
+  description?: string;
+  /** The reader's note from a bookmark service. */
   annotation?: string;
   enclosure?: Enclosure;
   videoEnclosure?: Enclosure;
@@ -111,6 +114,10 @@ domain: ${data.domain}`;
 
   if (data.favicon) {
     frontmatter += `\nfavicon: ${data.favicon}`;
+  }
+
+  if (data.description) {
+    frontmatter += `\ndescription: "${escapeQuotes(data.description)}"`;
   }
 
   if (data.annotation) {

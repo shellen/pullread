@@ -1,7 +1,7 @@
 // ABOUTME: Tests for RSS, Atom, and JSON feed parsing
 // ABOUTME: Verifies extraction of entries from various feed formats
 
-import { parseFeed, parseFeedTitle, discoverFeedUrl, transformPlatformUrl } from './feed';
+import { parseFeed, parseFeedTitle, discoverFeedUrl, transformPlatformUrl, isBookmarkFeedUrl, markBookmarkAnnotations } from './feed';
 
 const ATOM_FEED = `<?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
@@ -71,15 +71,15 @@ describe('parseFeed - Atom', () => {
     expect(first.title).toBe('Test Article Title');
     expect(first.url).toBe('https://example.com/article');
     expect(first.updatedAt).toBe('2024-01-29T19:05:18.441Z');
-    expect(first.annotation).toBe('Some annotation text');
+    expect(first.description).toBe('Some annotation text');
   });
 
-  test('handles entries without annotation', () => {
+  test('handles entries without description', () => {
     const entries = parseFeed(ATOM_FEED);
     const second = entries[1];
 
     expect(second.title).toBe('[Private] Another Article');
-    expect(second.annotation).toBeUndefined();
+    expect(second.description).toBeUndefined();
   });
 
   test('extracts domain from URL', () => {
@@ -103,13 +103,13 @@ describe('parseFeed - Atom', () => {
     const entries = parseFeed(feed);
     expect(entries[0].contentHtml).toBeDefined();
     expect(entries[0].contentHtml!.length).toBeGreaterThan(200);
-    expect(entries[0].annotation).toBeDefined();
+    expect(entries[0].description).toBeDefined();
   });
 
   test('does not set contentHtml for short Atom content', () => {
     const entries = parseFeed(ATOM_FEED);
     expect(entries[0].contentHtml).toBeUndefined();
-    expect(entries[0].annotation).toBe('Some annotation text');
+    expect(entries[0].description).toBe('Some annotation text');
   });
 
   test('preserves contentHtml for medium-length Atom content (50-200 chars)', () => {
@@ -154,7 +154,7 @@ describe('parseFeed - Atom', () => {
     expect(entries[0].contentHtml).toBeDefined();
     expect(entries[0].contentHtml).toContain('Scott Rogowsky');
     expect(entries[0].contentHtml).toContain('<blockquote>');
-    expect(entries[0].annotation).toContain('Scott Rogowsky');
+    expect(entries[0].description).toContain('Scott Rogowsky');
   });
 
   test('falls back to summary when content is absent', () => {
@@ -208,7 +208,7 @@ describe('parseFeed - RSS', () => {
     expect(first.title).toBe('RSS Article');
     expect(first.url).toBe('https://example.com/rss-article');
     expect(first.updatedAt).toBe('2024-01-29T19:05:18.000Z');
-    expect(first.annotation).toBe('This is the article description.');
+    expect(first.description).toBe('This is the article description.');
     expect(first.domain).toBe('example.com');
   });
 
@@ -216,7 +216,7 @@ describe('parseFeed - RSS', () => {
     const entries = parseFeed(RSS_FEED);
     const second = entries[1];
 
-    expect(second.annotation).toBeUndefined();
+    expect(second.description).toBeUndefined();
   });
 
   test('decodes HTML entities in titles', () => {
@@ -314,7 +314,7 @@ describe('parseFeed - Podcast', () => {
     const episode = entries[0];
     expect(episode.title).toBe('Episode 1: The Beginning');
     expect(episode.url).toBe('https://podcast.com/ep1');
-    expect(episode.annotation).toBe('Episode description here');
+    expect(episode.description).toBe('Episode description here');
   });
 
   test('parses enclosure metadata', () => {
@@ -333,8 +333,8 @@ describe('parseFeed - Podcast', () => {
     const episode = entries[0];
 
     expect(episode.title).toBe('Episode 1: The Beginning');
-    expect(episode.annotation).not.toContain('CDATA');
-    expect(episode.annotation).not.toContain('<p>');
+    expect(episode.description).not.toContain('CDATA');
+    expect(episode.description).not.toContain('<p>');
   });
 
   test('falls back to enclosure URL when item has no link', () => {
@@ -480,7 +480,7 @@ describe('parseFeed - RDF/RSS 1.0 (Pinboard)', () => {
     expect(first.title).toBe('Pinboard Article One');
     expect(first.url).toBe('https://example.com/article1');
     expect(first.updatedAt).toBe('2025-01-15T10:30:00.000Z');
-    expect(first.annotation).toBe('A great article about testing');
+    expect(first.description).toBe('A great article about testing');
     expect(first.domain).toBe('example.com');
   });
 
@@ -489,7 +489,7 @@ describe('parseFeed - RDF/RSS 1.0 (Pinboard)', () => {
     const second = entries[1];
 
     expect(second.title).toBe('Another Pinboard Bookmark');
-    expect(second.annotation).toBeUndefined();
+    expect(second.description).toBeUndefined();
   });
 
   test('preserves contentHtml for medium-length RDF content (50-200 chars)', () => {
@@ -538,7 +538,7 @@ describe('parseFeed - RDF/RSS 1.0 (Pinboard)', () => {
     const entries = parseFeed(feed);
     expect(entries[0].contentHtml).toBeDefined();
     expect(entries[0].contentHtml!.length).toBeGreaterThan(200);
-    expect(entries[0].annotation).toBe('Short summary');
+    expect(entries[0].description).toBe('Short summary');
   });
 
   test('does not set contentHtml for RDF items without content:encoded', () => {
@@ -773,7 +773,7 @@ describe('parseFeed - JSON Feed', () => {
     expect(first.title).toBe('JSON Feed Article');
     expect(first.url).toBe('https://example.com/json-article');
     expect(first.updatedAt).toBe('2024-01-29T19:05:18Z');
-    expect(first.annotation).toBe('This is the article content.');
+    expect(first.description).toBe('This is the article content.');
     expect(first.domain).toBe('example.com');
   });
 
@@ -781,7 +781,7 @@ describe('parseFeed - JSON Feed', () => {
     const entries = parseFeed(JSON_FEED);
     const second = entries[1];
 
-    expect(second.annotation).toBe('HTML content');
+    expect(second.description).toBe('HTML content');
   });
 
   test('preserves contentHtml for medium-length JSON Feed HTML (50-200 chars)', () => {
@@ -807,7 +807,7 @@ describe('parseFeed - JSON Feed', () => {
     const third = entries[2];
 
     expect(third.title).toBe('Untitled');
-    expect(third.annotation).toBeUndefined();
+    expect(third.description).toBeUndefined();
   });
 
   test('extracts domain from URL', () => {
@@ -1315,7 +1315,7 @@ describe('parseFeed - RSS description as contentHtml fallback', () => {
     const entries = parseFeed(feed);
     expect(entries[0].contentHtml).toBeDefined();
     expect(entries[0].contentHtml).toContain('<p>');
-    expect(entries[0].annotation).toBeDefined();
+    expect(entries[0].description).toBeDefined();
   });
 
   test('does not use short plain-text description as contentHtml', () => {
@@ -1333,7 +1333,7 @@ describe('parseFeed - RSS description as contentHtml fallback', () => {
 </rss>`;
     const entries = parseFeed(feed);
     expect(entries[0].contentHtml).toBeUndefined();
-    expect(entries[0].annotation).toBe('Just a brief summary.');
+    expect(entries[0].description).toBe('Just a brief summary.');
   });
 
   test('prefers content:encoded over HTML description for contentHtml', () => {
@@ -1372,7 +1372,7 @@ describe('parseFeed - RSS description as contentHtml fallback', () => {
     const entries = parseFeed(feed);
     expect(entries[0].contentHtml).toBeDefined();
     expect(entries[0].contentHtml).toContain('long plain text description');
-    expect(entries[0].annotation).toBeDefined();
+    expect(entries[0].description).toBeDefined();
   });
 });
 
@@ -1399,7 +1399,7 @@ describe('parseFeed - Substack RSS feeds', () => {
     expect(entries[0].title).toBe('How To Build Great Products');
     expect(entries[0].contentHtml).toBeDefined();
     expect(entries[0].contentHtml).toContain('full article body from Substack');
-    expect(entries[0].annotation).toBe('Community Wisdom 175');
+    expect(entries[0].description).toBe('Community Wisdom 175');
     expect(entries[0].author).toBe('Test Author');
   });
 
@@ -1827,5 +1827,45 @@ describe('parseFeed - comment extraction', () => {
     const entries = parseFeed(RSS_FEED);
     expect(entries[0].commentsUrl).toBeUndefined();
     expect(entries[0].commentCount).toBeUndefined();
+  });
+});
+
+describe('feed descriptions vs bookmark annotations', () => {
+  const RSS = `<?xml version="1.0"?>
+<rss version="2.0"><channel><title>T</title>
+  <item><title>One</title><link>https://example.com/1</link><description>Publisher blurb</description></item>
+  <item><title>Two</title><link>https://example.com/2</link></item>
+</channel></rss>`;
+
+  test('parseFeed puts item text in description and never in annotation', () => {
+    const entries = parseFeed(RSS);
+    expect(entries[0].description).toBe('Publisher blurb');
+    expect(entries[0].annotation).toBeUndefined();
+    expect(entries[1].description).toBeUndefined();
+  });
+
+  test('isBookmarkFeedUrl recognizes bookmark services only', () => {
+    expect(isBookmarkFeedUrl('https://feeds.pinboard.in/rss/u:someone/')).toBe(true);
+    expect(isBookmarkFeedUrl('https://www.instapaper.com/rss/123/abc')).toBe(true);
+    expect(isBookmarkFeedUrl('https://www.instapaper.com/archive/rss/123/abc')).toBe(true);
+    expect(isBookmarkFeedUrl('https://bookmarks.raindrop.io/collection/1/feed')).toBe(true);
+    expect(isBookmarkFeedUrl('https://drafty.com/@someone/links/feed')).toBe(true);
+    expect(isBookmarkFeedUrl('https://blog.raindrop.io/rss')).toBe(false);
+    expect(isBookmarkFeedUrl('https://www.instapaper.com/blog/feed')).toBe(false);
+    expect(isBookmarkFeedUrl('https://feeds.arstechnica.com/arstechnica/index')).toBe(false);
+    expect(isBookmarkFeedUrl('')).toBe(false);
+  });
+
+  test('markBookmarkAnnotations moves description to annotation for bookmark feeds', () => {
+    const entries = markBookmarkAnnotations(parseFeed(RSS), 'https://feeds.pinboard.in/rss/u:someone/');
+    expect(entries[0].annotation).toBe('Publisher blurb');
+    expect(entries[0].description).toBeUndefined();
+    expect(entries[1].annotation).toBeUndefined();
+  });
+
+  test('markBookmarkAnnotations leaves ordinary feeds as description only', () => {
+    const entries = markBookmarkAnnotations(parseFeed(RSS), 'https://example.com/feed.xml');
+    expect(entries[0].description).toBe('Publisher blurb');
+    expect(entries[0].annotation).toBeUndefined();
   });
 });

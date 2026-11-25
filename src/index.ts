@@ -262,7 +262,7 @@ async function syncFeed(
           content = htmlToMarkdown(entry.contentHtml, entry.url);
           source = 'feed';
         } else {
-          content = entry.annotation || 'No description available.';
+          content = entry.description || entry.annotation || 'No description available.';
         }
       } else if (entry.contentHtml) {
         // Feed has content — use it directly, skip extraction
@@ -318,6 +318,7 @@ async function syncFeed(
         domain: entry.domain,
         content,
         feed: feedName,
+        description: entry.description,
         annotation: entry.annotation,
         enclosure: entry.enclosure,
         videoEnclosure: entry.videoEnclosure,

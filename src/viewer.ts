@@ -10,6 +10,7 @@ import { VIEWER_HTML } from './viewer-html';
 import { summarizeText, promptLLM, loadLLMConfig, saveLLMConfig, loadLLMSettings, saveLLMSettings, getDefaultModel, isAppleAvailable, KNOWN_MODELS, LLMConfig, LLMSettings } from './summarizer';
 import { autotagText, autotagBatch, saveMachineTags, hasMachineTags, migrateDashedTags } from './autotagger';
 import { initAnnotations, loadAnnotation, saveAnnotation, allHighlights, allNotes, migrateMonolithicFiles } from './annotations';
+import { cleanupImportedDescriptionNotes, loadBookmarkFeedNames } from './imported-notes';
 import { APP_ICON } from './app-icon';
 import { fetchAndExtract } from './extractor';
 import { generateMarkdown, writeArticle, ArticleData, downloadFavicon, resolveFilePath, listMarkdownFiles, listEpubFiles, migrateToDateFolders, markShortExtractedArticles, exportNotebook, removeExportedNotebook, assertWritablePath, setOutputPath } from './writer';
@@ -824,6 +825,17 @@ export function startViewer(initialOutputPath: string, port = 7777, openBrowser 
 
   // Load annotation sidecars into memory
   initAnnotations(outputPath, CONFIG_DIR);
+
+  // One-time: clear article notes that are just the feed's description
+  // (copied in by an old viewer migration). Keeps bookmark-service notes.
+  try {
+    const cleanup = cleanupImportedDescriptionNotes(outputPath, CONFIG_DIR, loadBookmarkFeedNames(CONFIG_DIR));
+    if (cleanup.cleared > 0) {
+      console.log(`[Storage] Cleared ${cleanup.cleared} imported feed descriptions from article notes`);
+    }
+  } catch (err) {
+    console.error('[Storage] Imported-notes cleanup failed:', err instanceof Error ? err.message : err);
+  }
 
   // Normalize any legacy dashed machine tags
   migrateDashedTags();
