@@ -2,6 +2,7 @@
 // ABOUTME: story grouping, and rule checks on generated intros (plan: docs/plans/2026-11-25-…)
 
 import { domainOf, storyTokens } from './stories';
+import { PROFILE_STOPWORDS } from './interests';
 import type { StoryGroup } from './stories';
 
 // ---------------------------------------------------------------------------
@@ -376,7 +377,10 @@ export function candidatePairs(groups: StoryGroup[], max = 40, common: Set<strin
   for (let i = 0; i < groups.length; i++) {
     for (let j = i + 1; j < groups.length; j++) {
       let shared = 0;
-      for (const w of tokens[i]) if (tokens[j].has(w) && !common.has(w) && !YEAR.test(w)) shared++;
+      // Everyday words ("time", "latest", "review") aren't evidence either, however rare
+      // they are that day: "That Time John Berger Was in 'Grand Theft Auto'" merged with
+      // "Life Time Announces … Grand Prix Series" over "time" and "grand" (Nov 25).
+      for (const w of tokens[i]) if (tokens[j].has(w) && !common.has(w) && !YEAR.test(w) && !PROFILE_STOPWORDS.has(w)) shared++;
       if (shared >= 2) pairs.push({ pair: [i, j], shared });
     }
   }

@@ -102,6 +102,8 @@ describe('rankForInterests and the pick', () => {
       art("What's going on with the Riemann hypothesis?", { excerpt: 'A century-old problem about primes.' }),
     ], p);
     expect(pick?.article.title).toBe("What's going on with the Riemann hypothesis?");
+    expect(pick?.why).toContain('Riemann');
+    expect(pick?.why).toMatch(/\bhypothesis\b/); // the article's word, not the stem "hypothesi"
     for (const junk of ['11pm', 'weve', 'november', 'headline', 'what', 'solved', 'problem', 'based']) expect(p.weights.has(junk)).toBe(false);
   });
 

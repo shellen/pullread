@@ -203,18 +203,25 @@ describe('macOS 26 tie-breaker grouping', () => {
     expect(groupingLinesFromPairs(3, pairs, ['P1', 'P2', 'P3'], ['1|Courts|3'])).toEqual(['1,2,3|Courts|3']);
   });
 
-  test('common words are measured over the whole day, not the shortlist (real Black Friday merge)', () => {
+  test('common words are measured over the whole day, not the shortlist (from the real Black Friday/BMW merges)', () => {
     const shortlist = groupStories([
-      article('Adobe Black Friday 2026 Cuts Creative Cloud Pro to $29.99 a Month Until November 27', 'https://a.com/adobe'),
-      article('Black Friday 2026 Deals On The Camera And Travel Gear We Use', 'https://b.com/gear'),
-      article('Black Friday 2026 \u2013 The best style deals for men', 'https://c.com/style'),
+      article('Acme Widget recall expands across Europe', 'https://a.com/1'),
+      article('Acme Widget pricing leaks ahead of launch', 'https://b.com/2'),
     ]);
-    // Within the shortlist alone, "black", "friday" and "deal" look uncommon, so the deal posts pair up…
-    expect(candidatePairs(shortlist).length).toBeGreaterThan(0);
-    // …but the day had plenty of other Black Friday posts, so across the day those words are common.
-    const day = [...shortlist, ...groupStories(['Laptops', 'TVs', 'Headphones', 'Mattresses', 'Kitchen', 'Toys'].map((x, i) =>
-      article(`Black Friday 2026: The best ${x} deals`, `https://d.com/${i}`)))];
+    // Within the shortlist alone, "acme" and "widget" look uncommon, so these pair up…
+    expect(candidatePairs(shortlist).length).toBe(1);
+    // …but if the whole day is full of Acme Widget posts (like BMW BLOG's BMW posts), they're common.
+    const day = [...shortlist, ...groupStories(['colors', 'battery', 'teardown', 'accessories', 'firmware'].map((x, i) =>
+      article(`Acme Widget ${x} roundup`, `https://d.com/${i}`)))];
     expect(candidatePairs(shortlist, 40, commonWords(day))).toEqual([]);
+  });
+
+  test('everyday words are not evidence (real Nov 25 merge: Berger/GTA + Life Time Grand Prix)', () => {
+    const g = groupStories([
+      article("That Time John Berger Was in \u2018Grand Theft Auto\u2019", 'https://a.com/berger'),
+      article('Life Time Announces a Record $800,000 Prize Purse for Its 2027 Grand Prix Series', 'https://b.com/lifetime'),
+    ]);
+    expect(candidatePairs(g)).toEqual([]); // "time" is everyday; "grand" alone is one word
   });
 
   test('a year is never evidence of the same event', () => {

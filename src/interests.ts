@@ -39,7 +39,7 @@ const KIND_LABEL: Record<SignalKind, string> = {
 };
 
 // Words that carry no interest on their own, on top of storyTokens' stopwords.
-const PROFILE_STOPWORDS = new Set([
+export const PROFILE_STOPWORDS = new Set([
   'just', 'like', 'really', 'think', 'thing', 'things', 'something', 'also', 'still', 'much', 'many',
   'very', 'even', 'well', 'make', 'made', 'take', 'going', 'want', 'need', 'good', 'great', 'people',
   'time', 'year', 'years', 'today', 'week', 'way', 'one', 'two', 'first', 'last', 'other', 'every',
@@ -281,13 +281,24 @@ export function rankForInterests(candidates: ArticleMeta[], profile: InterestPro
 }
 
 /** "Because of your highlights and Research watches on nvidia and chip exports" */
-export function explainPick(terms: string[], profile: InterestProfile): string {
+export function explainPick(terms: string[], profile: InterestProfile, article?: ArticleMeta): string {
   const top = terms.slice(0, 3);
+  // Show words as the article spells them ("hypothesis"), not as stems ("hypothesi").
+  const shown = article ? top.map(t => surfaceForm(t, `${article.title} ${article.summary || ''} ${article.excerpt || ''}`)) : top;
   const kinds = new Map<SignalKind, number>();
   for (const t of top) for (const [k, v] of profile.sources.get(t) || []) kinds.set(k, (kinds.get(k) || 0) + v);
   const labels = [...kinds].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k]) => KIND_LABEL[k]);
   const list = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
-  return `Because of your ${list(labels)} on ${list(top)}`;
+  return `Because of your ${list(labels)} on ${list(shown)}`;
+}
+
+/** The first word in `text` that tokenizes to `term`, without punctuation; else the term. */
+export function surfaceForm(term: string, text: string): string {
+  for (const raw of text.split(/\s+/)) {
+    const word = raw.replace(/^[^\p{L}\p{N}$]+|[^\p{L}\p{N}]+$/gu, '').replace(/['\u2019]s$/i, '');
+    if (word && interestTokens(word).has(term)) return word;
+  }
+  return term;
 }
 
 /**
@@ -298,5 +309,5 @@ export function explainPick(terms: string[], profile: InterestProfile): string {
 export function pickOneRead(candidates: ArticleMeta[], profile: InterestProfile, skip: Set<string> = new Set()): { pick: OneRead | null; ranked: OneReadCandidate[] } {
   const ranked = rankForInterests(candidates.filter(a => !skip.has(a.filename)), profile);
   const best = ranked[0];
-  return { pick: best ? { ...best, why: explainPick(best.terms, profile) } : null, ranked };
+  return { pick: best ? { ...best, why: explainPick(best.terms, profile, best.article) } : null, ranked };
 }
