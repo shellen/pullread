@@ -54,7 +54,9 @@ function run(cmd: string[], stdoutFile?: string): string {
   const p = Bun.spawnSync(cmd, { stdout: 'pipe', stderr: 'pipe' });
   if (p.exitCode !== 0) {
     throw new Error(`${cmd.slice(0, 3).join(' ')} failed (${p.exitCode}): ${p.stderr.toString().trim()}\n`
-      + (cmd[0] === 'swiftc' ? 'swiftc needs the Xcode command line tools: xcode-select --install'
+      + (/CONTEXT_WINDOW|exceededContextWindowSize/.test(p.stderr.toString()) ? 'The on-device model has a 4K-token context window; this request (prompt + answer) went over it.'
+        : /GENERATION:/.test(p.stderr.toString()) ? 'The model returned an error; see above.'
+        : cmd[0] === 'swiftc' ? 'swiftc needs the Xcode command line tools: xcode-select --install'
         : cmd[0] === 'fm' ? 'Check `fm respond --help` and `fm schema object --help` for the flags on this macOS.'
         : 'Is Apple Intelligence turned on in System Settings?'));
   }
@@ -99,7 +101,7 @@ function structured(mode: 'intro' | 'groups', prompt: string, instructions: stri
   return parseJson(run([swiftHelper(), mode, instFile, promptFile]));
 }
 
-const storyList = (list: ArticleMeta[]) => list.map((a, i) => `${i + 1}. ${a.title} (${a.domain})${a.excerpt ? ` — ${a.excerpt}` : ''}`).join('\n');
+const storyList = (list: ArticleMeta[], excerptMax = 240) => list.map((a, i) => `${i + 1}. ${a.title} (${a.domain})${a.excerpt ? ` — ${a.excerpt.slice(0, excerptMax)}` : ''}`).join('\n');
 
 // macOS 26 / on-device: per-story sentences in two paragraphs (see fm-structured.swift).
 const INTRO_INSTRUCTIONS_ONDEVICE = `You write the opening note for a daily reading email.
@@ -118,7 +120,7 @@ const curated = await curateWithStories(articles, cfg, score, undefined, undefin
 // The on-device model sees only the top 6 stories (numbering still matches the email).
 const introStories = hasFm ? curated : curated.slice(0, 6);
 const introRaw = live
-  ? structured('intro', `Stories:\n${storyList(introStories)}`, hasFm ? INTRO_INSTRUCTIONS : INTRO_INSTRUCTIONS_ONDEVICE, ['paragraphs', 'links'])
+  ? structured('intro', `Stories:\n${storyList(introStories, hasFm ? 240 : 140)}`, hasFm ? INTRO_INSTRUCTIONS : INTRO_INSTRUCTIONS_ONDEVICE, ['paragraphs', 'links'])
   : sampleIntro;
 const parsedIntro = parseIntroResponse(introRaw, curated.map(a => a.title));
 const linkCount = parsedIntro.paragraphs.reduce((n, p) => n + p.links.length, 0);

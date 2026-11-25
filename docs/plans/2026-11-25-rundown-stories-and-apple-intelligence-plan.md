@@ -29,7 +29,9 @@ From Apple's sessions [241](https://developer.apple.com/videos/play/wwdc2026/241
 
 Not added: embeddings, clustering and ranking APIs. On-device semantic matching still uses the Natural Language framework (`NLEmbedding`, `NLTagger`).
 
-Not yet confirmed: the PCC entitlement name and its daily limits (in session 319), and the on-device context size on macOS 26 vs. 27.
+**Measured on macOS 26.6 (M4 Pro, Nov 25):** the on-device context window is **4,096 tokens**, covering prompt, schema and answer together. Apple's 8,192 figure is for macOS 27. In guided generation, an unbounded `[T]` field let the model run until the window was full (`exceededContextWindowSize` at 4,091 tokens). Every array field needs a `.count`/`.maximumCount` guide, and every call needs `GenerationOptions(maximumResponseTokens:)`.
+
+Not yet confirmed: the PCC entitlement name and its daily limits (in session 319).
 
 ## Phases
 

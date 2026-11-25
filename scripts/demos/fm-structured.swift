@@ -16,21 +16,21 @@ struct Mention {
 
 @Generable
 struct IntroResult {
-    @Guide(description: "First paragraph: one sentence each for the 1 or 2 most important stories.")
+    @Guide(description: "First paragraph: one sentence each for the 1 or 2 most important stories.", .count(1...2))
     var lead: [Mention]
-    @Guide(description: "Second paragraph: one sentence each for 2 or 3 other stories worth reading.")
+    @Guide(description: "Second paragraph: one sentence each for 2 or 3 other stories worth reading.", .count(2...3))
     var more: [Mention]
 }
 
 @Generable
 struct SamePairs {
-    @Guide(description: "Ids (like P3) of the pairs that report the same news event. Empty if none.")
+    @Guide(description: "Ids (like P3) of the pairs that report the same news event. Empty if none.", .maximumCount(12))
     var same: [String]
 }
 
 @Generable
 struct StoryGroups {
-    @Guide(description: "One entry per story, formatted ids|label|importance (or id|label|importance when labeling).")
+    @Guide(description: "One entry per story, formatted ids|label|importance (or id|label|importance when labeling).", .maximumCount(25))
     var stories: [String]
 }
 
@@ -57,17 +57,29 @@ func emit(_ object: [String: Any]) throws {
         let instructions = try String(contentsOfFile: args[2], encoding: .utf8)
         let prompt = try String(contentsOfFile: args[3], encoding: .utf8)
         let session = LanguageModelSession(instructions: instructions)
+        // Cap the answer so a runaway response fails fast instead of filling the 4K window.
+        let options = GenerationOptions(maximumResponseTokens: args[1] == "intro" ? 600 : 500)
 
-        if args[1] == "intro" {
-            let r = try await session.respond(to: prompt, generating: IntroResult.self)
-            let para = { (ms: [Mention]) in ms.map { ["story": $0.story, "sentence": $0.sentence, "phrase": $0.phrase] as [String: Any] } }
-            try emit(["mentions": [para(r.content.lead), para(r.content.more)]])
-        } else if args[1] == "pairs" {
-            let r = try await session.respond(to: prompt, generating: SamePairs.self)
-            try emit(["same": r.content.same])
-        } else {
-            let r = try await session.respond(to: prompt, generating: StoryGroups.self)
-            try emit(["stories": r.content.stories])
+        do {
+            if args[1] == "intro" {
+                let r = try await session.respond(to: prompt, generating: IntroResult.self, options: options)
+                let para = { (ms: [Mention]) in ms.map { ["story": $0.story, "sentence": $0.sentence, "phrase": $0.phrase] as [String: Any] } }
+                try emit(["mentions": [para(r.content.lead), para(r.content.more)]])
+            } else if args[1] == "pairs" {
+                let r = try await session.respond(to: prompt, generating: SamePairs.self, options: options)
+                try emit(["same": r.content.same])
+            } else {
+                let r = try await session.respond(to: prompt, generating: StoryGroups.self, options: options)
+                try emit(["stories": r.content.stories])
+            }
+        } catch let error as LanguageModelSession.GenerationError {
+            switch error {
+            case .exceededContextWindowSize:
+                FileHandle.standardError.write(Data("CONTEXT_WINDOW: prompt + answer exceeded the on-device model's context window (\(error))\n".utf8))
+            default:
+                FileHandle.standardError.write(Data("GENERATION: \(error)\n".utf8))
+            }
+            exit(4)
         }
     }
 }
