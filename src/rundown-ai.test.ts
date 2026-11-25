@@ -52,6 +52,13 @@ describe('per-story intro (macOS 26 shape)', () => {
     expect(intro.paragraphs[1].links).toEqual([{ story: 2, phrase: '$7 billion' }, { story: 3, phrase: 'Julien Baker' }]);
   });
 
+  test('a whole-sentence link is replaced by a short title-word link', () => {
+    const sentence = 'Dozens dead after 7.8 magnitude quake strikes near Santiago';
+    const intro = mentionsToIntro([[{ story: 1, sentence, phrase: sentence }]], titles);
+    expect(intro.paragraphs[0].links[0].phrase.split(' ').length).toBeLessThanOrEqual(6);
+    expect(intro.paragraphs[0].links[0].phrase).toBe('7.8 magnitude quake strikes near Santiago');
+  });
+
   test('fallbackPhrase uses the first words when nothing matches the title', () => {
     expect(fallbackPhrase('Trains stopped across the system tonight.', 'Unrelated headline')).toBe('Trains stopped across the');
   });
@@ -144,6 +151,25 @@ describe('checkIntro', () => {
   test('flags the real macOS 26 on-device intro from Nov 25 (filler opener, 11 paragraphs, no links)', () => {
     const failed = checkIntro("Here are the top stories for today.\n\nA major earthquake struck Chile, causing significant damage and loss of life.\n\nA significant settlement was reached in a cancer lawsuit involving a weedkiller.\n\nPublic transportation was disrupted due to a power failure.\n\nA new album by Julien Baker is set to release.\n\nLanguage models are being used to create digest emails.\n\nPhotographer Nico Therin captured the quiet edges of Marseille.\n\nBMW is recalling EVs due to a battery fire risk.\n\nMajor road closures are planned for the Bay Bridge.\n\nJeff Bezos dismisses concerns about tech and politics.", { now, storyCount: 11 }).filter(c => !c.passed).map(c => c.rule);
     expect(failed).toEqual(['No filler opener', 'At most 3 paragraphs', 'Links at least one story']);
+  });
+
+  test('flags the second real on-device intro: copied excerpts linked as whole sentences', () => {
+    const sources = [
+      'Chile earthquake: Dozens dead after 7.8 magnitude quake strikes near Santiago',
+      'The deal resolves tens of thousands of claims that the weedkiller caused non-Hodgkin lymphoma, and sets aside money for future cases.',
+      'Trains are stopped across the system during the evening commute; AC Transit is adding buses.',
+      'Digest emails are back, and this time the editor is a language model.',
+      'A series shot over three winters, mostly before sunrise, of a city between shifts.',
+    ];
+    const failed = checkIntro("{{Dozens dead after 7.8 magnitude quake strikes near Santiago|1}}. {{Trains are stopped across the system during the evening commute|3}}.\n\n{{The deal resolves tens of thousands of claims that the weedkiller caused non-Hodgkin lymphoma|2}}. {{Digest emails are back, and this time the editor is a language model|5}}. {{A series shot over three winters, mostly before sunrise, of a city between shifts|6}}.", { now, storyCount: 8, sources }).filter(c => !c.passed).map(c => c.rule);
+    expect(failed).toEqual(['Links are short (≤8 words)', 'Written in its own words']);
+  });
+
+  test('own-words check passes sentences that only borrow a few words', () => {
+    const c = checkIntro("Bayer will pay out billions to end the {Roundup lawsuits|1}, though the science stays unsettled.", {
+      now, storyCount: 3, sources: ['Judge Approves $7 Billion Settlement Over Claims That Roundup Caused Cancer'],
+    });
+    expect(c.find(x => x.rule === 'Written in its own words')!.passed).toBe(true);
   });
 
   test('a clean intro passes every rule', () => {

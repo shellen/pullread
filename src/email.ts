@@ -914,8 +914,12 @@ export interface StoryCurationOptions {
   modelGroups?: string[];
 }
 
-/** Weight per importance step away from the middle (3): a 5 adds 3, a 1 takes 3 off. */
-const IMPORTANCE_POINTS = 1.5;
+/**
+ * Weight per importance step away from the middle (3): a 5 adds 1.5, a 1 takes
+ * 1.5 off. Kept small: on macOS 26 the on-device model's ratings were flat or
+ * inflated across runs (Nov 25), so they nudge rather than reorder.
+ */
+const IMPORTANCE_POINTS = 0.75;
 
 /**
  * Group the day's articles into stories, weigh them (your sources' coverage +

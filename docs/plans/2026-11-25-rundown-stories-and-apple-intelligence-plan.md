@@ -66,6 +66,9 @@ This is the foundation for everything after it, and it works on macOS 26.
 - Replace free text plus `{{phrase|N}}` markers with a `@Generable` result: `paragraphs: [{ text, stories: [Int] }]`.
 - Render the links from the cited story numbers instead of matching titles in the text. This retires `strictTitles` and most of the title-matching fallback.
 - Other providers keep the current marker path. Claude and OpenAI could also use their own structured-output modes later.
+- **On-device schema (from live runs on macOS 26.6).** Free paragraphs plus a separate links list failed: the model wrote a filler opener and ten one-line paragraphs, with no links. Per-story fields work better: `lead` (1–2) and `more` (2–3) mentions of `{ story, sentence, phrase }`, all bounded. The next run respected the structure and linked every story correctly, but copied titles and excerpts verbatim and linked whole sentences. Now: prompt for own words, ≤5-word links, and code replaces long links with title words.
+- **Gate the intro on the checks (Phase 5).** In production, run `checkIntro()` on the result. Retry once on failure, then leave the intro out. No intro is better than a copied or broken one.
+- **Section labels from a fixed list.** On-device labels were inconsistent ("Tech" vs. "Technology", Roundup as "Health"), so the label schema uses `.anyOf(SECTION_NAMES)` and `.range(1...5)`. Importance ratings were flat or inflated across runs, so they're worth ±0.75 per step, not ±1.5.
 - **Demo 1** shows the renderer.
 
 ### Phase 4: Model-assisted story grouping and importance (macOS 26, on-device)

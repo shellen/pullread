@@ -1,5 +1,5 @@
 // ABOUTME: macOS 26 stand-in for `fm respond --schema` in the Rundown demos (on-device model only)
-// ABOUTME: Usage: fm-structured <intro|pairs|groups> <instructions-file> <prompt-file>  → JSON on stdout
+// ABOUTME: Usage: fm-structured <intro|pairs|labels|groups> <instructions-file> <prompt-file>  → JSON on stdout
 
 import Foundation
 import FoundationModels
@@ -34,6 +34,26 @@ struct StoryGroups {
     var stories: [String]
 }
 
+// Keep in sync with SECTION_NAMES in src/rundown-ai.ts.
+let SECTIONS = ["World", "U.S.", "Politics", "Business", "Courts", "Tech", "Science", "Health",
+                "Climate", "Culture", "Music", "Design", "Sports", "Autos", "Local"]
+
+@Generable
+struct StoryLabel {
+    @Guide(description: "The headline's id number.")
+    var id: Int
+    @Guide(description: "The newspaper section this headline belongs in.", .anyOf(SECTIONS))
+    var section: String
+    @Guide(description: "Importance for a general reader today: 5 = major news anywhere, 3 = solid story, 1 = niche.", .range(1...5))
+    var importance: Int
+}
+
+@Generable
+struct StoryLabels {
+    @Guide(description: "One entry per headline.", .maximumCount(25))
+    var labels: [StoryLabel]
+}
+
 func emit(_ object: [String: Any]) throws {
     let data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted])
     print(String(decoding: data, as: UTF8.self))
@@ -43,7 +63,7 @@ func emit(_ object: [String: Any]) throws {
     static func main() async throws {
         let args = CommandLine.arguments
         guard args.count == 4 else {
-            FileHandle.standardError.write(Data("usage: fm-structured <intro|pairs|groups> <instructions-file> <prompt-file>\n".utf8))
+            FileHandle.standardError.write(Data("usage: fm-structured <intro|pairs|labels|groups> <instructions-file> <prompt-file>\n".utf8))
             exit(2)
         }
         switch SystemLanguageModel.default.availability {
@@ -68,6 +88,9 @@ func emit(_ object: [String: Any]) throws {
             } else if args[1] == "pairs" {
                 let r = try await session.respond(to: prompt, generating: SamePairs.self, options: options)
                 try emit(["same": r.content.same])
+            } else if args[1] == "labels" {
+                let r = try await session.respond(to: prompt, generating: StoryLabels.self, options: options)
+                try emit(["stories": r.content.labels.map { "\($0.id)|\($0.section)|\($0.importance)" }])
             } else {
                 let r = try await session.respond(to: prompt, generating: StoryGroups.self, options: options)
                 try emit(["stories": r.content.stories])

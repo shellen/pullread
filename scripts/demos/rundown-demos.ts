@@ -89,9 +89,9 @@ function swiftHelper(): string {
 }
 
 /** Structured output from Apple's model: `fm` on macOS 27, the Swift helper on macOS 26. */
-function structured(mode: 'intro' | 'groups', prompt: string, instructions: string, arrays: string[]): any {
+function structured(mode: 'intro' | 'pairs' | 'labels' | 'groups', prompt: string, instructions: string, arrays: string[]): any {
   if (hasFm) {
-    const schema = fmSchema(mode === 'intro' ? 'RundownIntro' : 'StoryGroups', arrays);
+    const schema = fmSchema(mode === 'intro' ? 'RundownIntro' : mode === 'pairs' ? 'SamePairs' : 'StoryGroups', arrays);
     return parseJson(run(['fm', 'respond', ...(usePcc ? ['--model', 'pcc'] : []), '--instructions', instructions, '--schema', schema, prompt]));
   }
   const instFile = join(tmpdir(), 'pullread-demo-instructions.txt');
@@ -105,7 +105,8 @@ const storyList = (list: ArticleMeta[], excerptMax = 240) => list.map((a, i) => 
 
 // macOS 26 / on-device: per-story sentences in two paragraphs (see fm-structured.swift).
 const INTRO_INSTRUCTIONS_ONDEVICE = `You write the opening note for a daily reading email.
-Pick the 1-2 most important stories for the first paragraph and 2-3 others for the second. For each, write ONE specific sentence using a concrete detail from the story (a number, a name, a place), and give the exact words from that sentence to link.
+Pick the 1-2 most important stories for the first paragraph and 2-3 others for the second. For each, write ONE sentence IN YOUR OWN WORDS saying what happened and why it matters, with one concrete detail (a number, a name, a place). Do not copy the headline or the excerpt.
+For each sentence also give the link: 2 to 5 words from your sentence that name the story (for example "Bayer's Roundup deal"), never the whole sentence.
 This note goes out on ${issueDateLine()}. Stories may mention other days; those are not today. Don't name today's weekday or date.
 No greetings, no sign-offs, no "here are the top stories", never "dive in" or "buckle up".`;
 
@@ -153,7 +154,7 @@ if (usePcc) {
   console.log(`Model said same event: ${same.join(', ') || 'none'}`);
   const labelLines: string[] = [];
   for (const ids of batches(groups.map((_, i) => i), 20)) {
-    labelLines.push(...(live ? structured('groups', labelPrompt(groups, ids), LABEL_INSTRUCTIONS, ['stories']).stories : sampleLabels));
+    labelLines.push(...(live ? structured(hasFm ? 'groups' : 'labels', labelPrompt(groups, ids), LABEL_INSTRUCTIONS, ['stories']).stories : sampleLabels));
   }
   console.log('Labels:\n' + labelLines.join('\n'));
   groupingRaw = groupingLinesFromPairs(groups.length, pairs, same, labelLines);
@@ -175,7 +176,8 @@ console.log('\nAfter:\n' + after.map(line).join('\n'));
 const toCheck = [...sampleIntrosToCheck];
 if (live) toCheck.unshift({ label: 'Live intro from demo 1', text: introText });
 const now = new Date();
-const results = toCheck.map(s => ({ ...s, checks: checkIntro(s.text, { now, storyCount: curated.length }) }));
+const sources = curated.flatMap(a => [a.title, a.excerpt || '']).filter(Boolean);
+const results = toCheck.map(s => ({ ...s, checks: checkIntro(s.text, { now, storyCount: curated.length, sources }) }));
 console.log('\n=== Demo 3: intro checks ===');
 for (const r of results) {
   const failed = r.checks.filter(c => !c.passed);

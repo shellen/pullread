@@ -61,7 +61,7 @@ export function fallbackPhrase(sentence: string, title: string): string {
     }
   }
   const run = best[1] > best[0] ? words.slice(best[0], best[1]) : words.slice(0, Math.min(4, words.length));
-  return run.join(' ').replace(/^[^\w$]+|[^\w$]+$/g, '');
+  return run.slice(0, 6).join(' ').replace(/^[^\w$]+|[^\w$]+$/g, '');
 }
 
 /**
@@ -75,8 +75,12 @@ export function mentionsToIntro(paragraphs: Mention[][], titles: string[]): Stru
       text: mentions.map(m => m.sentence.trim()).join(' '),
       links: mentions.map(m => {
         const title = titles[m.story - 1] || '';
-        const has = m.phrase && m.sentence.toLowerCase().includes(m.phrase.toLowerCase());
-        return { story: m.story, phrase: has ? m.phrase! : fallbackPhrase(m.sentence, title) };
+        const phrase = (m.phrase || '').trim();
+        const words = phrase.split(/\s+/).filter(Boolean).length;
+        // Small models often "link" the whole sentence; keep links to a few words.
+        const usable = phrase && words <= 6 && phrase.length < m.sentence.trim().length * 0.8
+          && m.sentence.toLowerCase().includes(phrase.toLowerCase());
+        return { story: m.story, phrase: usable ? phrase : fallbackPhrase(m.sentence, title) };
       }),
     })),
   };
@@ -251,10 +255,18 @@ export function pairsPrompt(groups: StoryGroup[], pairs: Array<[number, number]>
     `P${offset + i + 1}: "${groups[a].lead.title}" (${groups[a].sources.join(', ')}) || "${groups[b].lead.title}" (${groups[b].sources.join(', ')})`).join('\n');
 }
 
-export const LABEL_INSTRUCTIONS = `You label a day's news headlines for a newsletter.
-Each line is "[id] headline (outlets)". Return one entry per headline as "id|label|importance":
-- label: a 1-3 word section name a newspaper would use (e.g. "Courts", "Music", "Climate", "Bay Area").
-- importance: 1-5, how much this matters to a general reader today (5 = major news anywhere, 1 = niche).`;
+/**
+ * Fixed section names. The on-device model labels far more consistently picking
+ * from a list than inventing names ("Tech" vs "Technology", Roundup as "Health").
+ * Keep in sync with SECTIONS in scripts/demos/fm-structured.swift.
+ */
+export const SECTION_NAMES = [
+  'World', 'U.S.', 'Politics', 'Business', 'Courts', 'Tech', 'Science', 'Health',
+  'Climate', 'Culture', 'Music', 'Design', 'Sports', 'Autos', 'Local',
+];
+
+export const LABEL_INSTRUCTIONS = `You sort a day's news headlines into newspaper sections.
+Each line is "[id] headline (outlets)". For each headline give its id, the best section from this list: ${SECTION_NAMES.join(', ')}; and its importance from 1 to 5 for a general reader today (5 = major news anywhere, 3 = solid story, 1 = niche). Use 5 rarely.`;
 
 /** "[id] headline (outlets)" lines for the given 0-based group indexes, ids 1-based. */
 export function labelPrompt(groups: StoryGroup[], indexes: number[]): string {
@@ -326,7 +338,7 @@ export interface IntroCheck {
  * Check a generated intro against the rules its prompt states. Runs on the raw
  * model text (before rendering), so marker problems are visible.
  */
-export function checkIntro(text: string, opts: { now: Date; storyCount: number }): IntroCheck[] {
+export function checkIntro(text: string, opts: { now: Date; storyCount: number; sources?: string[] }): IntroCheck[] {
   const lower = text.toLowerCase().replace(/[\u2018\u2019]/g, "'");
   const weekday = opts.now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
   const monthDay = opts.now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }).toLowerCase();
@@ -357,6 +369,23 @@ export function checkIntro(text: string, opts: { now: Date; storyCount: number }
 
   const paraCount = text.split(/\n\s*\n/).filter(p => p.trim()).length;
   checks.push({ rule: 'At most 3 paragraphs', passed: paraCount <= 3, detail: paraCount > 3 ? `${paraCount} paragraphs` : undefined });
+
+  const longLinks = markers.filter(m => m[1].trim().split(/\s+/).length > 8);
+  checks.push({ rule: 'Links are short (≤8 words)', passed: longLinks.length === 0,
+    detail: longLinks.length ? `${longLinks.length} long link(s), e.g. "${longLinks[0][1].slice(0, 50)}…"` : undefined });
+
+  // Copying: a sentence whose words (8+) nearly all come from one story's title or excerpt.
+  if (opts.sources?.length) {
+    const plain = text.replace(/\{\{([^{}|]+)\|\d+\}\}/g, '$1');
+    const wordsOf = (t: string) => t.toLowerCase().replace(/[\u2018\u2019]/g, "'").match(/[a-z0-9$.']+/g) || [];
+    const sourceSets = opts.sources.map(src => new Set(wordsOf(src)));
+    const copied = plain.split(/(?<=[.!?])\s+/).filter(sentence => {
+      const w = wordsOf(sentence);
+      return w.length >= 8 && sourceSets.some(set => w.filter(x => set.has(x)).length / w.length >= 0.85);
+    });
+    checks.push({ rule: 'Written in its own words', passed: copied.length === 0,
+      detail: copied.length ? `${copied.length} sentence(s) copied from the stories, e.g. "${copied[0].slice(0, 60)}…"` : undefined });
+  }
 
   checks.push({ rule: 'Links at least one story', passed: markers.length > 0,
     detail: markers.length ? undefined : 'no story links' });
