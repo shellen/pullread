@@ -188,7 +188,9 @@ export function groupByCategory(articles: ArticleMeta[], opts: GroupOptions = {}
 
 function metaLine(article: ArticleMeta): string {
   const source = escapeHtml(article.domain || article.feed || '');
-  const author = article.author ? ` <span style="color:#c9c1b9">&middot;</span> ${escapeHtml(article.author)}` : '';
+  // Articles saved before the feed parser fix can carry a stringified object.
+  const authorText = article.author && !/\[object \w+\]/.test(article.author) ? article.author : '';
+  const author = authorText ? ` <span style="color:#c9c1b9">&middot;</span> ${escapeHtml(authorText)}` : '';
   return `<div style="font-size:12px;color:#9a938c;margin-top:5px">${source}${author}</div>`;
 }
 
@@ -482,16 +484,18 @@ export function buildRoundupHtml(
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only">
 <style>:root{color-scheme:light only}body,table,td,div,p,a,span{color-scheme:light only}
-@media only screen and (max-width:600px){.hero-cell{display:block !important;width:100% !important;padding-right:0 !important}.hero-img{padding-bottom:14px !important}.hero-img img{width:100% !important;height:180px !important;max-width:100% !important}}</style>
+@media only screen and (max-width:600px){.rundown-wrap{padding:12px 8px 20px !important}.rundown-card{padding:22px 16px !important;border-radius:10px !important}.hero-cell{display:block !important;width:100% !important;padding-right:0 !important}.hero-img{padding-bottom:14px !important}.hero-img img{width:100% !important;height:180px !important;max-width:100% !important}}
+@media only screen and (min-width:601px){.rundown-card{padding:40px !important}}</style>
 </head>
 <body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background-color:#f7f5f3;color:#1a1a1a;-webkit-font-smoothing:antialiased">
-<div style="max-width:600px;margin:0 auto;padding:28px 20px 32px;background-color:#f7f5f3">
+<div class="rundown-wrap" style="max-width:600px;margin:0 auto;padding:20px 10px 28px;background-color:#f7f5f3">
 
 <div style="text-align:center;padding:8px 0 22px">
 <a href="https://pullread.com" style="text-decoration:none"><img src="cid:header" width="300" height="55" alt="Pull Read — The Rundown" style="display:inline-block" /></a>
 </div>
 
-<div style="background:#ffffff;padding:40px;border:1px solid #ebe5df;border-radius:14px">
+<!-- Narrow side padding by default (mobile-first): on a phone the old 20px wrap + 40px card padding left a third of the screen empty. Clients that honor the media queries get 40px back on desktop. -->
+<div class="rundown-card" style="background:#ffffff;padding:28px 22px;border:1px solid #ebe5df;border-radius:14px">
 
 <div style="text-align:center;padding-bottom:24px;margin-bottom:30px;border-bottom:1px solid #ece7e2">
 <div style="font-size:27px;font-weight:600;color:#1a1a1a;font-family:Georgia,'Times New Roman',serif;letter-spacing:-0.01em;margin-bottom:6px">The Rundown</div>
@@ -647,12 +651,73 @@ export function scoreArticle(a: ArticleMeta, ctx: ScoreContext): number {
   return score;
 }
 
+/** Lowercased host (no www) + path (no trailing slash); query and hash dropped. */
+function canonicalUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    return u.hostname.replace(/^www\./, '').toLowerCase() + u.pathname.replace(/\/+$/, '');
+  } catch {
+    return url.trim().toLowerCase();
+  }
+}
+
+const DEDUPE_STOPWORDS = new Set(['the', 'a', 'an', 'of', 'to', 'in', 'on', 'at', 'and', 'or', 'for', 'with', 'by', 'is', 'are', 'was', 'up', 'its', 'it', 'as', 'from', 'over', 'that']);
+
+function titleTokens(title: string): Set<string> {
+  const words = normalizeForTitleMatch(titleCore(title))
+    .replace(/['"]/g, '')
+    .split(/[^a-z0-9$]+/)
+    .filter(w => w && !DEDUPE_STOPWORDS.has(w));
+  return new Set(words);
+}
+
+/**
+ * Two titles name the same story when their distinctive words overlap heavily:
+ * at least 4 shared words and a Jaccard overlap of 0.5 or more. Catches the same
+ * news from two outlets ("Julien Baker Lines Up New Album…" / "Julien Baker
+ * Announces New Album…") without merging unrelated stories that share a name.
+ */
+function sameStory(a: Set<string>, b: Set<string>): boolean {
+  let shared = 0;
+  for (const w of a) if (b.has(w)) shared++;
+  if (shared < 4) return false;
+  const union = a.size + b.size - shared;
+  return shared / union >= 0.5;
+}
+
+function richness(a: ArticleMeta): number {
+  return (a.image?.startsWith('http') ? 1 : 0) + (a.summary || a.excerpt ? 1 : 0);
+}
+
+/**
+ * Drop duplicate stories: the same URL (ignoring query, hash, www and trailing
+ * slash), the same title, or near-identical titles from different outlets.
+ * Keeps the first occurrence unless a later copy has a real image or excerpt the
+ * first lacks.
+ */
+export function dedupeArticles(articles: ArticleMeta[]): ArticleMeta[] {
+  const kept: Array<{ article: ArticleMeta; url: string; tokens: Set<string> }> = [];
+  for (const article of articles) {
+    const url = canonicalUrl(article.url);
+    const tokens = titleTokens(article.title);
+    const dup = kept.find(k => k.url === url || sameStory(k.tokens, tokens)
+      || normalizeForTitleMatch(k.article.title) === normalizeForTitleMatch(article.title));
+    if (!dup) {
+      kept.push({ article, url, tokens });
+    } else if (richness(article) > richness(dup.article)) {
+      dup.article = article;
+    }
+  }
+  return kept.map(k => k.article);
+}
+
 export function curateArticles(
   articles: ArticleMeta[],
   mentionCounts?: Map<string, number>,
   watchedEntities?: Set<string>,
   limit = MAX_ROUNDUP_ARTICLES,
 ): ArticleMeta[] {
+  articles = dedupeArticles(articles);
   if (articles.length <= limit) return articles;
 
   const ctx: ScoreContext = { now: Date.now(), mentionCounts, watchedEntities };
@@ -686,7 +751,15 @@ export function curateArticles(
  * the renderer's title-matching fallback then turns into links (the same
  * approach the in-app briefing uses).
  */
-function roundupSummaryPrompt(strictTitles: boolean): string {
+/** "Monday, November 23, 2026 (evening)" — the issue's date and time of day, for the prompt. */
+export function issueDateLine(now: Date = new Date()): string {
+  const date = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const h = now.getHours();
+  const part = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
+  return `${date} (${part})`;
+}
+
+function roundupSummaryPrompt(strictTitles: boolean, dateLine: string = issueDateLine()): string {
   const linking = strictTitles
     ? `Linking (important):
 - LINKING RULE — THIS IS CRITICAL: every story you reference MUST be named by its exact title, copied word-for-word from the list below, wrapped in double quotes. Do not shorten, reword, or retitle it.
@@ -711,6 +784,10 @@ Voice:
 - Write only about the stories listed below. Do not invent stories, and do not reuse any wording from these instructions.
 - Opinions welcome, clichés not.
 - Don't name every article or count how many there are.
+
+Timing:
+- This note goes out on ${dateLine}. Stories may mention other days ("Friday the 13th weekend", "Monday morning traffic"); those are not today.
+- Don't name today's weekday or date, and don't describe anything as coming up unless the story itself is about a future date.
 
 ${linking}
 

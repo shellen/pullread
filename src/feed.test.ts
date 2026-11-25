@@ -844,6 +844,55 @@ describe('discoverFeedUrl - JSON Feed', () => {
 });
 
 describe('parseFeed - author extraction', () => {
+  test('extracts a CDATA-wrapped Atom author name instead of "[object Object]"', () => {
+    const feed = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Its Nice That</title>
+  <entry>
+    <title>Test Post</title>
+    <link rel="alternate" href="https://example.com/article"/>
+    <id>urn:uuid:1</id>
+    <updated>2024-01-29T12:00:00Z</updated>
+    <author><name><![CDATA[Ayla Angelos]]></name></author>
+  </entry>
+</feed>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].author).toBe('Ayla Angelos');
+  });
+
+  test('joins several Atom authors', () => {
+    const feed = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>T</title>
+  <entry>
+    <title>Test Post</title>
+    <link rel="alternate" href="https://example.com/article"/>
+    <id>urn:uuid:1</id>
+    <updated>2024-01-29T12:00:00Z</updated>
+    <author><name>One Person</name></author>
+    <author><name>Two Person</name></author>
+  </entry>
+</feed>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].author).toBe('One Person, Two Person');
+  });
+
+  test('reads an RSS dc:creator that has attributes', () => {
+    const feed = `<?xml version="1.0"?>
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>T</title>
+    <item>
+      <title>Post</title>
+      <link>https://example.com/p</link>
+      <dc:creator role="writer">Rhea Nayyar</dc:creator>
+    </item>
+  </channel>
+</rss>`;
+    const entries = parseFeed(feed);
+    expect(entries[0].author).toBe('Rhea Nayyar');
+  });
+
   test('extracts author name from Atom entry', () => {
     const feed = `<?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
