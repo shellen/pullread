@@ -823,6 +823,9 @@ export async function generateRoundupSummary(articles: ArticleMeta[]): Promise<R
   const { promptLLM, loadLLMConfig } = await import('./summarizer');
   const config = loadLLMConfig();
   if (!config) return null;
+  // No stories, no intro: given an empty list, the model invents a day of news
+  // that isn't in the reader's library, and the email would still go out.
+  if (!articles.length) return null;
 
   // Number the stories so the model can cite them inline as {{words|N}};
   // renderSummaryParagraphs maps N back to this same (curated) article order.

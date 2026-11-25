@@ -697,6 +697,12 @@ describe('generateRoundupSummary', () => {
     mockLoadLLMConfig.mockReturnValue(null);
   });
 
+  test('returns null without asking the model when there are no articles', async () => {
+    mockLoadLLMConfig.mockReturnValue({ provider: 'apple', apiKey: '' });
+    expect(await generateRoundupSummary([])).toBeNull();
+    expect(mockPromptLLM).not.toHaveBeenCalled();
+  });
+
   test('returns null when no LLM is configured', async () => {
     mockLoadLLMConfig.mockReturnValue(null);
     const result = await generateRoundupSummary([article({ title: 'A' })]);
