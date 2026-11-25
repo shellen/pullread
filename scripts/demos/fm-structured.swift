@@ -5,11 +5,21 @@ import Foundation
 import FoundationModels
 
 @Generable
+struct Mention {
+    @Guide(description: "The story number from the list.")
+    var story: Int
+    @Guide(description: "One specific sentence about this story, using a concrete detail from it. Plain and direct, no hype.")
+    var sentence: String
+    @Guide(description: "The exact words from your sentence to turn into a link, 2 to 6 words.")
+    var phrase: String
+}
+
+@Generable
 struct IntroResult {
-    @Guide(description: "The opening note, one string per short paragraph (2-3 paragraphs).")
-    var paragraphs: [String]
-    @Guide(description: "One entry per story mentioned, formatted paragraph|story|phrase, where phrase is the exact words in that paragraph to link.")
-    var links: [String]
+    @Guide(description: "First paragraph: one sentence each for the 1 or 2 most important stories.")
+    var lead: [Mention]
+    @Guide(description: "Second paragraph: one sentence each for 2 or 3 other stories worth reading.")
+    var more: [Mention]
 }
 
 @Generable
@@ -50,7 +60,8 @@ func emit(_ object: [String: Any]) throws {
 
         if args[1] == "intro" {
             let r = try await session.respond(to: prompt, generating: IntroResult.self)
-            try emit(["paragraphs": r.content.paragraphs, "links": r.content.links])
+            let para = { (ms: [Mention]) in ms.map { ["story": $0.story, "sentence": $0.sentence, "phrase": $0.phrase] as [String: Any] } }
+            try emit(["mentions": [para(r.content.lead), para(r.content.more)]])
         } else if args[1] == "pairs" {
             let r = try await session.respond(to: prompt, generating: SamePairs.self)
             try emit(["same": r.content.same])

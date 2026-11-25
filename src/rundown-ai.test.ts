@@ -1,7 +1,7 @@
 // ABOUTME: Tests for the Rundown structured-output helpers (intro citations, model grouping, intro checks)
 // ABOUTME: Model responses here are recorded samples, not live model output
 
-import { parseFlatIntro, structuredIntroToMarkers, applyModelGroups, groupingPrompt, checkIntro, candidatePairs, pairsPrompt, groupingLinesFromPairs, batches } from './rundown-ai';
+import { parseFlatIntro, structuredIntroToMarkers, applyModelGroups, groupingPrompt, checkIntro, mentionsToIntro, fallbackPhrase, parseIntroResponse, candidatePairs, pairsPrompt, groupingLinesFromPairs, batches } from './rundown-ai';
 import { groupStories } from './stories';
 import type { ArticleMeta } from './email';
 
@@ -33,6 +33,32 @@ describe('structured intro', () => {
       paragraphs: ['Odd {{text}} here.'], links: ['nonsense', '1|x|here'],
     }), 3);
     expect(text).toBe('Odd text here.');
+  });
+});
+
+describe('per-story intro (macOS 26 shape)', () => {
+  const titles = ['Chile earthquake: Dozens dead after 7.8 magnitude quake strikes near Santiago', 'Judge Approves $7 Billion Settlement Over Claims That Roundup Caused Cancer', 'Julien Baker Lines Up New Album This World or the Next'];
+
+  test('every mentioned story gets a link, falling back to title words when the phrase is paraphrased', () => {
+    const intro = mentionsToIntro([
+      [{ story: 1, sentence: 'A 7.8 quake near Santiago has killed dozens.', phrase: '7.8 quake near Santiago' }],
+      [{ story: 2, sentence: 'Bayer will pay $7 billion over Roundup.', phrase: 'Roundup cancer deal' },
+       { story: 3, sentence: 'A new album by Julien Baker arrives in February.', phrase: '' }],
+    ], titles);
+    expect(intro.paragraphs.map(p => p.text)).toEqual([
+      'A 7.8 quake near Santiago has killed dozens.',
+      'Bayer will pay $7 billion over Roundup. A new album by Julien Baker arrives in February.',
+    ]);
+    expect(intro.paragraphs[1].links).toEqual([{ story: 2, phrase: '$7 billion' }, { story: 3, phrase: 'Julien Baker' }]);
+  });
+
+  test('fallbackPhrase uses the first words when nothing matches the title', () => {
+    expect(fallbackPhrase('Trains stopped across the system tonight.', 'Unrelated headline')).toBe('Trains stopped across the');
+  });
+
+  test('parseIntroResponse accepts both shapes', () => {
+    expect(parseIntroResponse({ mentions: [[{ story: 1, sentence: 'Quake.', phrase: 'Quake' }]] }, titles).paragraphs).toHaveLength(1);
+    expect(parseIntroResponse({ paragraphs: ['One.'], links: [] }, titles).paragraphs[0].text).toBe('One.');
   });
 });
 
@@ -114,6 +140,11 @@ describe('macOS 26 tie-breaker grouping', () => {
 describe('checkIntro', () => {
   const now = new Date(2026, 10, 23, 18, 0); // Monday evening
   const good = 'A judge signed off on the {{Roundup settlement|1}}, closing a long fight.\n\nElsewhere, {{Julien Baker|3}} has a record coming in February.';
+
+  test('flags the real macOS 26 on-device intro from Nov 25 (filler opener, 11 paragraphs, no links)', () => {
+    const failed = checkIntro("Here are the top stories for today.\n\nA major earthquake struck Chile, causing significant damage and loss of life.\n\nA significant settlement was reached in a cancer lawsuit involving a weedkiller.\n\nPublic transportation was disrupted due to a power failure.\n\nA new album by Julien Baker is set to release.\n\nLanguage models are being used to create digest emails.\n\nPhotographer Nico Therin captured the quiet edges of Marseille.\n\nBMW is recalling EVs due to a battery fire risk.\n\nMajor road closures are planned for the Bay Bridge.\n\nJeff Bezos dismisses concerns about tech and politics.", { now, storyCount: 11 }).filter(c => !c.passed).map(c => c.rule);
+    expect(failed).toEqual(['No filler opener', 'At most 3 paragraphs', 'Links at least one story']);
+  });
 
   test('a clean intro passes every rule', () => {
     expect(checkIntro(good, { now, storyCount: 8 }).every(c => c.passed)).toBe(true);

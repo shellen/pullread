@@ -25,7 +25,7 @@ import { tmpdir } from 'os';
 import { buildRoundupHtml, curateWithStories, scoreArticle, escapeHtml, issueDateLine } from '../../src/email';
 import type { ArticleMeta } from '../../src/email';
 import { groupStories } from '../../src/stories';
-import { parseFlatIntro, structuredIntroToMarkers, groupingPrompt, GROUPING_INSTRUCTIONS, checkIntro, applyModelGroups, candidatePairs, pairsPrompt, PAIR_INSTRUCTIONS, labelPrompt, LABEL_INSTRUCTIONS, batches, groupingLinesFromPairs } from '../../src/rundown-ai';
+import { parseFlatIntro, parseIntroResponse, structuredIntroToMarkers, groupingPrompt, GROUPING_INSTRUCTIONS, checkIntro, applyModelGroups, candidatePairs, pairsPrompt, PAIR_INSTRUCTIONS, labelPrompt, LABEL_INSTRUCTIONS, batches, groupingLinesFromPairs } from '../../src/rundown-ai';
 import { articles, panel, panelHeadlines, regionalFeeds, sampleIntro, sampleGrouping, sampleSamePairs, sampleLabels, sampleIntrosToCheck } from './sample-day';
 
 const args = process.argv.slice(2);
@@ -101,6 +101,12 @@ function structured(mode: 'intro' | 'groups', prompt: string, instructions: stri
 
 const storyList = (list: ArticleMeta[]) => list.map((a, i) => `${i + 1}. ${a.title} (${a.domain})${a.excerpt ? ` — ${a.excerpt}` : ''}`).join('\n');
 
+// macOS 26 / on-device: per-story sentences in two paragraphs (see fm-structured.swift).
+const INTRO_INSTRUCTIONS_ONDEVICE = `You write the opening note for a daily reading email.
+Pick the 1-2 most important stories for the first paragraph and 2-3 others for the second. For each, write ONE specific sentence using a concrete detail from the story (a number, a name, a place), and give the exact words from that sentence to link.
+This note goes out on ${issueDateLine()}. Stories may mention other days; those are not today. Don't name today's weekday or date.
+No greetings, no sign-offs, no "here are the top stories", never "dive in" or "buckle up".`;
+
 const INTRO_INSTRUCTIONS = `You write the opening note for a daily reading rundown email: 2-3 SHORT paragraphs, plain and specific, opinions welcome, no clichés.
 This note goes out on ${issueDateLine()}. Stories may mention other days; those are not today. Don't name today's weekday or date.
 No greetings, no sign-offs, never "dive in", "buckle up", "welcome to", "in today's rundown".
@@ -109,15 +115,19 @@ Return "paragraphs" (one string per paragraph) and "links": for each story you m
 // --- Demo 1 ------------------------------------------------------------------
 
 const curated = await curateWithStories(articles, cfg, score, undefined, undefined, { panelHeadlines, panel });
+// The on-device model sees only the top 6 stories (numbering still matches the email).
+const introStories = hasFm ? curated : curated.slice(0, 6);
 const introRaw = live
-  ? structured('intro', `Stories:\n${storyList(curated)}`, INTRO_INSTRUCTIONS, ['paragraphs', 'links'])
+  ? structured('intro', `Stories:\n${storyList(introStories)}`, hasFm ? INTRO_INSTRUCTIONS : INTRO_INSTRUCTIONS_ONDEVICE, ['paragraphs', 'links'])
   : sampleIntro;
-const { text: introText, dropped } = structuredIntroToMarkers(parseFlatIntro(introRaw), curated.length);
+const parsedIntro = parseIntroResponse(introRaw, curated.map(a => a.title));
+const linkCount = parsedIntro.paragraphs.reduce((n, p) => n + p.links.length, 0);
+const { text: introText, dropped } = structuredIntroToMarkers(parsedIntro, curated.length);
 writeFileSync(join(outDir, 'demo1-intro.html'), buildRoundupHtml(curated, 1, introText, live ? 'Apple Intelligence' : 'Sample', score));
 if (live) writeFileSync(join(outDir, 'demo1-raw.json'), JSON.stringify(introRaw, null, 2));
 console.log(`\n=== Demo 1: structured intro (${source}) ===`);
 console.log(introText);
-console.log(dropped.length ? `Dropped links: ${dropped.join('; ')}` : 'All links kept.');
+console.log(`${linkCount} link(s) returned, ${linkCount - dropped.length} kept.${dropped.length ? ` Dropped: ${dropped.join('; ')}` : ''}`);
 
 // --- Demo 2 ------------------------------------------------------------------
 

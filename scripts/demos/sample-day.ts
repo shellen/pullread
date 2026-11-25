@@ -70,19 +70,21 @@ export const panelHeadlines: PanelHeadline[] = [
 // Recorded sample model responses (hand-written; --live replaces them with fm)
 // ---------------------------------------------------------------------------
 
-/** Demo 1: what the intro schema returns — paragraphs plus "paragraph|story|phrase" links. */
+/**
+ * Demo 1: what the macOS 26 intro schema returns — two paragraphs of per-story
+ * sentences, each with its story number and the words to link.
+ */
 export const sampleIntro = {
-  paragraphs: [
-    'A 7.8 earthquake in central Chile is the story nearly every outlet is leading with tonight: dozens are dead and rescuers are still working through collapsed buildings near Santiago.',
-    'In court, Bayer’s $7 billion Roundup settlement got a judge’s sign-off, ending one of the longest product-liability fights in the country without settling the science. Closer to home, BART went dark systemwide during the evening commute.',
-    'For the weekend queue: Julien Baker has a new album coming in February, and Nico Therin’s photographs catch Marseille before sunrise.',
-  ],
-  links: [
-    '1|1|7.8 earthquake in central Chile',
-    '2|2|Roundup settlement',
-    '2|3|BART went dark systemwide',
-    '3|4|Julien Baker has a new album',
-    '3|99|Nico Therin’s photographs', // deliberately wrong story number: shows a bad citation being dropped
+  mentions: [
+    [
+      { story: 1, sentence: 'A 7.8 earthquake in central Chile has killed dozens, and rescuers are still working through collapsed buildings near Santiago.', phrase: '7.8 earthquake in central Chile' },
+      { story: 2, sentence: 'A judge signed off on Bayer\u2019s $7 billion Roundup settlement, ending a long fight without settling the science.', phrase: 'Roundup settlement' },
+    ],
+    [
+      { story: 3, sentence: 'Closer to home, BART went dark systemwide during the evening commute.', phrase: 'BART went dark systemwide' },
+      { story: 4, sentence: 'Julien Baker has a new album coming in February.', phrase: 'a new record' }, // paraphrased: falls back to title words
+      { story: 99, sentence: 'Nico Therin\u2019s photographs catch Marseille before sunrise.', phrase: 'Nico Therin\u2019s photographs' }, // wrong story number: dropped
+    ],
   ],
 };
 
@@ -122,6 +124,8 @@ export const sampleLabels = [
 
 /** Demo 3: intros to check — one clean, three with the kinds of mistakes we've seen. */
 export const sampleIntrosToCheck: Array<{ label: string; text: string }> = [
+  // Real output: the macOS 26 on-device model with the first (flat) intro schema, Nov 25, 2026.
+  { label: 'Real on-device output, flat schema (macOS 26.6)', text: "Here are the top stories for today.\n\nA major earthquake struck Chile, causing significant damage and loss of life.\n\nA significant settlement was reached in a cancer lawsuit involving a weedkiller.\n\nPublic transportation was disrupted due to a power failure.\n\nA new album by Julien Baker is set to release.\n\nLanguage models are being used to create digest emails.\n\nPhotographer Nico Therin captured the quiet edges of Marseille.\n\nBMW is recalling EVs due to a battery fire risk.\n\nMajor road closures are planned for the Bay Bridge.\n\nJeff Bezos dismisses concerns about tech and politics." },
   { label: 'Clean', text: 'A judge signed off on Bayer’s {{Roundup settlement|2}}, closing a long fight without settling the science.\n\nElsewhere, {{Julien Baker|4}} has a record coming in February.' },
   { label: 'Wrong day (the Nov 17 bug)', text: 'It’s Friday the 13th, and the {{Roundup settlement|2}} is finally done. Monday morning road closures are coming up on the {{Bay Bridge|7}}.' },
   { label: 'Filler and a greeting', text: 'Good evening! Let’s dive in. A judge approved the {{Roundup settlement|2}} today.\n\nThat’s the rundown — happy reading!' },

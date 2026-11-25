@@ -35,6 +35,58 @@ export function parseFlatIntro(raw: { paragraphs?: string[]; links?: string[] })
   return { paragraphs };
 }
 
+export interface Mention {
+  story: number;
+  sentence: string;
+  phrase?: string;
+}
+
+/**
+ * Words in `sentence` to link for a story when the model's phrase isn't there:
+ * the longest run of consecutive words that appear in the story's title, else
+ * the first few words. Small on-device models often paraphrase the phrase.
+ */
+export function fallbackPhrase(sentence: string, title: string): string {
+  const titleWords = storyTokens(title);
+  const words = sentence.split(/\s+/);
+  let best: [number, number] = [0, 0];
+  let start = -1;
+  for (let i = 0; i <= words.length; i++) {
+    const w = i < words.length ? [...storyTokens(words[i])][0] : undefined;
+    const hit = w !== undefined && titleWords.has(w);
+    if (hit && start === -1) start = i;
+    if (!hit && start !== -1) {
+      if (i - start > best[1] - best[0]) best = [start, i];
+      start = -1;
+    }
+  }
+  const run = best[1] > best[0] ? words.slice(best[0], best[1]) : words.slice(0, Math.min(4, words.length));
+  return run.join(' ').replace(/^[^\w$]+|[^\w$]+$/g, '');
+}
+
+/**
+ * Parse the per-story shape the macOS 26 helper returns — paragraphs of
+ * { story, sentence, phrase } — into a StructuredIntro. Each sentence carries
+ * its own story number, so every mentioned story gets a link.
+ */
+export function mentionsToIntro(paragraphs: Mention[][], titles: string[]): StructuredIntro {
+  return {
+    paragraphs: paragraphs.filter(p => p.length).map(mentions => ({
+      text: mentions.map(m => m.sentence.trim()).join(' '),
+      links: mentions.map(m => {
+        const title = titles[m.story - 1] || '';
+        const has = m.phrase && m.sentence.toLowerCase().includes(m.phrase.toLowerCase());
+        return { story: m.story, phrase: has ? m.phrase! : fallbackPhrase(m.sentence, title) };
+      }),
+    })),
+  };
+}
+
+/** Accept either response shape: macOS 26 mentions, or the flat fm (macOS 27) arrays. */
+export function parseIntroResponse(raw: any, titles: string[]): StructuredIntro {
+  return Array.isArray(raw?.mentions) ? mentionsToIntro(raw.mentions, titles) : parseFlatIntro(raw);
+}
+
 /**
  * Turn a structured intro into the `{{phrase|N}}` marker text the existing
  * renderer already links, so links come from the model's citations instead of
@@ -299,6 +351,12 @@ export function checkIntro(text: string, opts: { now: Date; storyCount: number }
   const bad = markers.filter(m => { const n = parseInt(m[2], 10); return n < 1 || n > opts.storyCount; });
   checks.push({ rule: 'Every cited story exists', passed: bad.length === 0,
     detail: bad.length ? bad.map(m => `"${m[1]}" → story ${m[2]}`).join(', ') : undefined });
+
+  const preamble = text.trim().split(/\n/)[0].match(/^(here (are|is)|here's|below (are|is)|these are|today's (top )?stories|in this (issue|edition))\b[^.!?\n]*[.!?:]?/i);
+  checks.push({ rule: 'No filler opener', passed: !preamble, detail: preamble ? `"${preamble[0]}"` : undefined });
+
+  const paraCount = text.split(/\n\s*\n/).filter(p => p.trim()).length;
+  checks.push({ rule: 'At most 3 paragraphs', passed: paraCount <= 3, detail: paraCount > 3 ? `${paraCount} paragraphs` : undefined });
 
   checks.push({ rule: 'Links at least one story', passed: markers.length > 0,
     detail: markers.length ? undefined : 'no story links' });
