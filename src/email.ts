@@ -56,6 +56,44 @@ const DEFAULT_CONFIG: EmailConfig = {
   oneRead: true,
 };
 
+/** Rundown content settings the Settings page edits (the rest of EmailConfig is delivery). */
+export interface RundownContentSettings {
+  oneRead?: boolean;
+  widerNews?: boolean;
+  regionalFeeds?: Array<{ name: string; feedUrl: string }>;
+}
+
+const MAX_REGIONAL_FEEDS = 10;
+
+/**
+ * Validate the content settings from a Settings-page POST. Only fields that
+ * are present and valid are returned, so a partial update never clobbers the
+ * rest. Regional feeds must be http(s) URLs; a missing name becomes the host.
+ */
+export function sanitizeRundownContentSettings(body: unknown): RundownContentSettings {
+  const b = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
+  const out: RundownContentSettings = {};
+  if (typeof b.oneRead === 'boolean') out.oneRead = b.oneRead;
+  if (typeof b.widerNews === 'boolean') out.widerNews = b.widerNews;
+  if (Array.isArray(b.regionalFeeds)) {
+    const seen = new Set<string>();
+    out.regionalFeeds = [];
+    for (const f of b.regionalFeeds) {
+      const raw = f && typeof f === 'object' ? (f as Record<string, unknown>) : {};
+      const feedUrl = typeof raw.feedUrl === 'string' ? raw.feedUrl.trim() : '';
+      let parsed: URL;
+      try { parsed = new URL(feedUrl); } catch { continue; }
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') continue;
+      if (seen.has(parsed.href)) continue;
+      seen.add(parsed.href);
+      const name = (typeof raw.name === 'string' ? raw.name.trim() : '').slice(0, 60) || parsed.hostname.replace(/^www\./, '');
+      out.regionalFeeds.push({ name, feedUrl: parsed.href });
+      if (out.regionalFeeds.length >= MAX_REGIONAL_FEEDS) break;
+    }
+  }
+  return out;
+}
+
 function settingsPath(): string {
   return join(homedir(), '.config', 'pullread', 'settings.json');
 }

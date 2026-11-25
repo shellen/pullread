@@ -1562,17 +1562,26 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
     if (url.pathname === '/api/email-settings') {
       if (req.method === 'GET') {
         const appSettings = loadJsonFile(APP_SETTINGS_PATH);
-        sendJson(res, (appSettings.emailRoundup as Record<string, unknown>) || {
-          enabled: false,
-          smtpHost: '',
-          smtpPort: 587,
-          smtpUser: '',
-          smtpPass: '',
-          useTls: true,
-          fromAddress: '',
-          toAddress: '',
-          sendTime: '08:00',
-          lookbackDays: 1
+        const { DEFAULT_PANEL } = await import('./stories');
+        sendJson(res, {
+          // Content defaults (on unless turned off), so the Settings page shows the real state.
+          oneRead: true,
+          widerNews: true,
+          regionalFeeds: [],
+          ...((appSettings.emailRoundup as Record<string, unknown>) || {
+            enabled: false,
+            smtpHost: '',
+            smtpPort: 587,
+            smtpUser: '',
+            smtpPass: '',
+            useTls: true,
+            fromAddress: '',
+            toAddress: '',
+            sendTime: '08:00',
+            lookbackDays: 1
+          }),
+          // Read-only: the wider-news outlets, for the Settings page's "Which outlets?" list.
+          panelOutlets: DEFAULT_PANEL.map(p => ({ name: p.name, lean: p.lean })),
         });
         return;
       }
@@ -1587,6 +1596,9 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
           for (const f of fields) {
             if (body[f] !== undefined) updated[f] = body[f];
           }
+          // Rundown content settings (Today's one read, wider news, Near you feeds), validated.
+          const { sanitizeRundownContentSettings } = await import('./email');
+          Object.assign(updated, sanitizeRundownContentSettings(body));
           appSettings.emailRoundup = updated;
           saveJsonFile(APP_SETTINGS_PATH, appSettings);
           sendJson(res, { ok: true });

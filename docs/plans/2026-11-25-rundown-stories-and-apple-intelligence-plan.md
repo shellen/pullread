@@ -117,7 +117,7 @@ Next:
 
 Remaining before merge:
 - [ ] Fetch the nine panel feeds live on a Mac. None have been checked yet.
-- [ ] Settings UI for `widerNews` and `regionalFeeds`.
+- [x] Settings UI: The Rundown card → "What goes in" has toggles for Today's one read and Wider news (with a "Which outlets?" list from `DEFAULT_PANEL`), and a Near you feed editor. It saves through `/api/email-settings`, validated by `sanitizeRundownContentSettings`.
 - [ ] Decide the panel lineup, the 40%/60% thresholds, and whether the panel is on by default.
 - [ ] Cache panel headlines (about 1h) so twice-daily sends and previews don't refetch.
 
