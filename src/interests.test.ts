@@ -134,6 +134,24 @@ describe('gatherInterestSignals (local files)', () => {
     expect(isImportedDescription(blurb, join(out, '2026-11-24-u2-tour.annot.json'))).toBe(true);
   });
 
+  test('reading history: everything opened is returned to skip; recently finished articles become signals', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'pr-interests-'));
+    const out = join(root, 'library');
+    const config = join(root, 'config');
+    mkdirSync(out); mkdirSync(config);
+    const recent = new Date(Date.now() - 2 * 86_400_000).toISOString();
+    const old = new Date(Date.now() - 90 * 86_400_000).toISOString();
+    writeFileSync(join(config, 'reading.json'), JSON.stringify({ picks: [], articles: {
+      '2026-11-23-semafor-trump-nvidia-board.md': { opened: recent, progress: 0.95, finished: recent, lastSeen: recent },
+      '2026-08-01-old-finished-piece.md': { opened: old, progress: 1, finished: old, lastSeen: old },
+      '2026-11-24-skimmed.md': { opened: recent, progress: 0.2, lastSeen: recent },
+      '2019-01-01-backfilled.md': {},
+    } }));
+    const { signals, read } = await gatherInterestSignals({ outputPath: out, configDir: config });
+    expect(signals.filter(x => x.kind === 'read').map(x => x.text)).toEqual(['semafor trump nvidia board']);
+    expect(read.size).toBe(4);
+  });
+
   test('titleFromFilename turns a dated slug back into words', () => {
     expect(titleFromFilename('2026/11/2026-11-20-why-local-news-matters.md')).toBe('why local news matters');
   });

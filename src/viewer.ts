@@ -1125,6 +1125,27 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
     }
 
     // Notes API
+    // Reading history from the viewer (opens, progress, finishes) for Today's one read.
+    if (url.pathname === '/api/reading') {
+      const { loadReading, saveReading, applyReadingEvents } = await import('./reading');
+      if (req.method === 'GET') {
+        sendJson(res, loadReading(CONFIG_DIR));
+        return;
+      }
+      if (req.method === 'POST') {
+        try {
+          const body = JSON.parse(await readBody(req));
+          const events = Array.isArray(body?.events) ? body.events : [];
+          saveReading(applyReadingEvents(loadReading(CONFIG_DIR), events), CONFIG_DIR);
+          sendJson(res, { ok: true, received: events.length });
+        } catch (err) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : 'bad request' }));
+        }
+        return;
+      }
+    }
+
     if (url.pathname === '/api/notes') {
       if (req.method === 'GET') {
         const name = url.searchParams.get('name');

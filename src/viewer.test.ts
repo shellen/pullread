@@ -594,6 +594,13 @@ describe('race condition guards', () => {
     expect(sidebar).toContain('AbortError');
   });
 
+  test('reading activity is reported to the sidecar (viewer/20-reading.js)', () => {
+    const sidebar = readFileSync(join(rootDir, 'viewer', '05-sidebar.js'), 'utf-8');
+    const article = readFileSync(join(rootDir, 'viewer', '04-article.js'), 'utf-8');
+    expect(sidebar).toMatch(/function markAsRead[\s\S]{0,300}queueReadingEvent\(\{ filename: filename, type: 'open'/);
+    expect(article).toMatch(/function saveScrollPosition[\s\S]{0,600}queueReadingEvent\(\{ filename: activeFile, type: 'progress'/);
+  });
+
   test('markAsRead uses delayed timer, not instant', () => {
     const sidebar = readFileSync(join(rootDir, 'viewer', '05-sidebar.js'), 'utf-8');
     expect(sidebar).toContain('_markAsReadDelayTimer');

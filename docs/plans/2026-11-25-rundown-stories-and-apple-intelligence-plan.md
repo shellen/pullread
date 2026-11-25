@@ -90,8 +90,15 @@ Inspired by a friend's personal newspaper, which picks one story a day from abou
 - **Email:** a "Today's one read" block above the intro, with a "why" line. `oneRead` defaults to on.
 - **Preview:** `preview-rundown` prints the pick, its score and why, the profile's signal counts and strongest interests, and the five runners-up.
 
+- **Read-state sync (built Nov 25).**
+  - `viewer/20-reading.js` reports opens (from `markAsRead`) and scroll progress (from `saveScrollPosition`, in 10-point steps, with 90% counting as finished). Events are batched every 3s and flushed with `sendBeacon` on page hide.
+  - It also backfills the existing `pr-read-articles` list and saved scroll positions once.
+  - The sidecar stores everything in `~/.config/pullread/reading.json` (`src/reading.ts`, atomic writes, capped at 20,000 articles) via `POST /api/reading`.
+  - The profile uses articles finished in the last 60 days as a mild `read` signal (weight 1, fading).
+  - The pick skips everything opened.
+  - Sent Rundowns record their pick (`recordPick`), and the preview shows recent picks as opened, finished or not yet. That's the feedback loop.
+
 Next:
-- **Sync read state to the sidecar,** so it can skip what you've read and learn from what you open and finish.
 - **Let a model choose among the top 5** with a one-line reason.
 - **Show the profile in Settings.**
 

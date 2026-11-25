@@ -608,6 +608,12 @@ if (command === 'sync') {
       console.log(`Today's one read: ${o.pick ? `"${o.pick.article.title}" (${o.pick.article.domain}) — ${o.pick.why} [score ${o.pick.score.toFixed(1)}]` : '(none — no article matched your interests)'}`);
       console.log(`  Interest profile: ${sig || 'no signals found'}${o.topInterests.length ? `; strongest: ${o.topInterests.join(', ')}` : ''}`);
       for (const r of o.runnersUp) console.log(`  runner-up [${r.score.toFixed(1)}]: ${r.title.slice(0, 80)} (${r.terms.join(', ')})`);
+      console.log(`  Reading history: ${o.readCount} article${o.readCount === 1 ? '' : 's'} opened (skipped)${o.readCount === 0 ? ' — open Pull Read once so it can send your history' : ''}`);
+      if (o.history.length) {
+        const opened = o.history.filter(h => h.opened).length;
+        console.log(`  Recent picks: ${opened} of ${o.history.length} opened`);
+        for (const h of o.history) console.log(`    ${h.date} ${h.finished ? 'finished' : h.opened ? 'opened  ' : 'not yet '} ${h.title.slice(0, 80)}`);
+      }
       if (o.sampleNotes.length) {
         console.log('  Sample notes (longest, middle, shortest):');
         for (const n of o.sampleNotes) console.log(`    ${n}`);

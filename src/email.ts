@@ -982,6 +982,10 @@ export interface RoundupResult {
     topInterests: string[];
     /** A few of the notes, to spot imported text masquerading as notes. */
     sampleNotes: string[];
+    /** Recent picks and whether the reader opened or finished them. */
+    history: Array<{ date: string; title: string; opened: boolean; finished: boolean }>;
+    /** Articles in the reading history (all skipped). */
+    readCount: number;
   };
 }
 
@@ -1165,7 +1169,7 @@ export async function buildRoundup(
   cfg: EmailConfig,
   fetchArticles?: () => Promise<ArticleMeta[]>,
   port = 7777,
-  opts: { outputPath?: string } = {},
+  opts: { outputPath?: string; recordPick?: boolean } = {},
 ): Promise<RoundupResult> {
   let articles: ArticleMeta[] = [];
   if (fetchArticles) {
@@ -1209,17 +1213,26 @@ export async function buildRoundup(
   if (cfg.oneRead && articles.length) {
     try {
       const { gatherInterestSignals, buildInterestProfile, pickOneRead } = await import('./interests');
-      const { signals, engaged } = await gatherInterestSignals({
+      const { signals, engaged, read } = await gatherInterestSignals({
         outputPath: opts.outputPath || '',
         watches: [...(watchedEntities || [])],
       });
       const profile = buildInterestProfile(signals);
-      const { pick, ranked } = pickOneRead(articles, profile, engaged);
+      // Skip what the reader already opened (reading history) or highlighted/noted.
+      const { pick, ranked } = pickOneRead(articles, profile, new Set([...engaged, ...read]));
+      const { loadReading, saveReading, recordPick, pickOutcomes } = await import('./reading');
+      if (pick && opts.recordPick) {
+        const date = new Date().toISOString().slice(0, 10);
+        saveReading(recordPick(loadReading(), { date, filename: pick.article.filename, title: pick.article.title }));
+      }
+      const history = pickOutcomes(loadReading());
       oneRead = {
         pick,
         runnersUp: ranked.slice(1, 6).map(c => ({ title: c.article.title, score: c.score, terms: c.terms.slice(0, 4) })),
         signals: profile.counts,
         topInterests: [...profile.weights].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([t]) => t),
+        history: history.map(h => ({ date: h.date, title: h.title, opened: h.opened, finished: h.finished })),
+        readCount: read.size,
         sampleNotes: signals.filter(x => x.kind === 'note').sort((a, b) => b.text.length - a.text.length)
           .filter((_, i, arr) => i === 0 || i === Math.floor(arr.length / 2) || i === arr.length - 1)
           .map(x => `${x.text.length} chars: ${x.text.replace(/\s+/g, ' ').slice(0, 110)}`),
@@ -1272,7 +1285,7 @@ export async function sendRoundup(
     throw new Error('Email not configured: missing SMTP host or recipient');
   }
 
-  const { html, subject, articles } = await buildRoundup(cfg, fetchArticles, port);
+  const { html, subject, articles } = await buildRoundup(cfg, fetchArticles, port, { recordPick: true });
 
   const transport = createSmtpTransport(cfg);
   const mailOptions: Record<string, unknown> = {

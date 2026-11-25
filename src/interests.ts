@@ -13,7 +13,7 @@ import type { ArticleMeta } from './email';
  * explainable; a model can choose among the top candidates later.
  */
 
-export type SignalKind = 'highlight' | 'note' | 'favorite' | 'tag' | 'watch' | 'notebook';
+export type SignalKind = 'highlight' | 'note' | 'favorite' | 'tag' | 'watch' | 'notebook' | 'read';
 
 export interface InterestSignal {
   text: string;
@@ -25,6 +25,8 @@ export interface InterestSignal {
 /** How much one signal of each kind counts. Explicit watches count most. */
 export const KIND_WEIGHT: Record<SignalKind, number> = {
   watch: 4, highlight: 3, note: 3, notebook: 3, favorite: 2, tag: 1.5,
+  // Finishing an article is a mild signal: you might finish things you disliked.
+  read: 1,
 };
 
 /** Recent interest matters more: a signal's weight halves every 21 days. Watches don't fade. */
@@ -33,7 +35,7 @@ const HALF_LIFE_DAYS = 21;
 /** Readable labels for the "why" line. */
 const KIND_LABEL: Record<SignalKind, string> = {
   highlight: 'highlights', note: 'notes', favorite: 'favorites', tag: 'tags',
-  watch: 'Research watches', notebook: 'Notebook',
+  watch: 'Research watches', notebook: 'Notebook', read: 'reading',
 };
 
 // Words that carry no interest on their own, on top of storyTokens' stopwords.
@@ -83,7 +85,7 @@ export interface GatherOptions {
  * optional and failures are ignored: a missing Notebook or vault just means
  * fewer signals.
  */
-export async function gatherInterestSignals(opts: GatherOptions): Promise<{ signals: InterestSignal[]; engaged: Set<string> }> {
+export async function gatherInterestSignals(opts: GatherOptions): Promise<{ signals: InterestSignal[]; engaged: Set<string>; read: Set<string> }> {
   const { outputPath, configDir = join(homedir(), '.config', 'pullread'), watches = [] } = opts;
   const signals: InterestSignal[] = [];
   /** Articles the reader already highlighted or noted: treated as already read. */
@@ -118,6 +120,18 @@ export async function gatherInterestSignals(opts: GatherOptions): Promise<{ sign
     // Annotations unavailable — carry on with the other sources.
   }
 
+  // Reading history from the viewer (src/reading.ts): everything opened is
+  // skipped; articles finished in the last 60 days are a mild interest signal.
+  const read = new Set<string>();
+  try {
+    const { loadReading } = await import('./reading');
+    const cutoff = new Date(Date.now() - 60 * 86_400_000).toISOString();
+    for (const [filename, rec] of Object.entries(loadReading(configDir).articles)) {
+      read.add(filename);
+      if (rec.finished && rec.finished >= cutoff) signals.push({ text: titleFromFilename(filename), kind: 'read', at: rec.finished });
+    }
+  } catch {}
+
   // Research watches: explicit, so they don't fade.
   for (const w of watches) if (w?.trim()) signals.push({ text: w, kind: 'watch' });
 
@@ -133,7 +147,7 @@ export async function gatherInterestSignals(opts: GatherOptions): Promise<{ sign
     }
   } catch {}
 
-  return { signals, engaged };
+  return { signals, engaged, read };
 }
 
 const normalize = (t: string) => t.toLowerCase().replace(/<[^>]+>/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
