@@ -11,11 +11,13 @@
  *   Demo 3  Intro checks: rule checks on generated intros (Evaluations-style).
  *
  * Without --live, the model responses are recorded samples from sample-day.ts.
- * With --live (macOS 27), they come from `fm respond`; demo 2 uses --model pcc
- * unless --on-device is passed.
+ * With --live they come from Apple's model: on macOS 27 through `fm respond`
+ * (demo 2 uses --model pcc unless --on-device is passed); on macOS 26, where
+ * there's no `fm`, through fm-structured.swift (compiled once with swiftc,
+ * on-device model only — Private Cloud Compute needs macOS 27).
  */
 
-import { mkdirSync, writeFileSync } from 'fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs';
 import { join, resolve } from 'path';
 import { tmpdir } from 'os';
 import { buildRoundupHtml, curateWithStories, scoreArticle, escapeHtml, issueDateLine } from '../../src/email';
@@ -32,7 +34,17 @@ mkdirSync(outDir, { recursive: true });
 
 const cfg = { widerNews: true, regionalFeeds };
 const score = (a: ArticleMeta) => scoreArticle(a, { now: Date.now() });
-const source = live ? `live fm (${onDevice ? 'on-device' : 'PCC'})` : 'recorded sample';
+const hasFm = !!Bun.which('fm');
+const macVersion = process.platform === 'darwin'
+  ? Bun.spawnSync(['sw_vers', '-productVersion']).stdout.toString().trim() : '';
+if (live && !hasFm) {
+  if (process.platform !== 'darwin') throw new Error('--live needs a Mac with Apple Intelligence.');
+  console.log(`No \`fm\` command (it ships with macOS 27; this Mac is on macOS ${macVersion}).`
+    + ' Using the on-device model through a compiled Swift helper instead.');
+}
+const usePcc = live && hasFm && !onDevice;
+const source = !live ? 'recorded sample'
+  : hasFm ? `live fm (${usePcc ? 'PCC' : 'on-device'})` : `live, on-device via Swift helper (macOS ${macVersion})`;
 
 // --- fm helpers (macOS 27) -------------------------------------------------
 
@@ -40,7 +52,9 @@ function run(cmd: string[], stdoutFile?: string): string {
   const p = Bun.spawnSync(cmd, { stdout: 'pipe', stderr: 'pipe' });
   if (p.exitCode !== 0) {
     throw new Error(`${cmd.slice(0, 3).join(' ')} failed (${p.exitCode}): ${p.stderr.toString().trim()}\n`
-      + 'Is this macOS 27 with Apple Intelligence on? Check `fm respond --help` and `fm schema object --help`.');
+      + (cmd[0] === 'swiftc' ? 'swiftc needs the Xcode command line tools: xcode-select --install'
+        : cmd[0] === 'fm' ? 'Check `fm respond --help` and `fm schema object --help` for the flags on this macOS.'
+        : 'Is Apple Intelligence turned on in System Settings?'));
   }
   const out = p.stdout.toString();
   if (stdoutFile) writeFileSync(stdoutFile, out);
@@ -54,9 +68,33 @@ function fmSchema(name: string, arrays: string[]): string {
   return path;
 }
 
-function fmJson(prompt: string, instructions: string, schema: string, pcc: boolean): any {
-  const out = run(['fm', 'respond', ...(pcc ? ['--model', 'pcc'] : []), '--instructions', instructions, '--schema', schema, prompt]);
+function parseJson(out: string): any {
   return JSON.parse(out.slice(out.indexOf('{'), out.lastIndexOf('}') + 1));
+}
+
+/** Compile fm-structured.swift once (cached by source contents) and return the binary path. */
+function swiftHelper(): string {
+  const src = join(import.meta.dir, 'fm-structured.swift');
+  const code = readFileSync(src, 'utf8');
+  const bin = join(tmpdir(), `pullread-fm-structured-${Bun.hash(code).toString(16)}`);
+  if (!existsSync(bin)) {
+    console.log('Compiling the Swift helper (first run only)…');
+    run(['swiftc', '-parse-as-library', '-O', src, '-o', bin]);
+  }
+  return bin;
+}
+
+/** Structured output from Apple's model: `fm` on macOS 27, the Swift helper on macOS 26. */
+function structured(mode: 'intro' | 'groups', prompt: string, instructions: string, arrays: string[]): any {
+  if (hasFm) {
+    const schema = fmSchema(mode === 'intro' ? 'RundownIntro' : 'StoryGroups', arrays);
+    return parseJson(run(['fm', 'respond', ...(usePcc ? ['--model', 'pcc'] : []), '--instructions', instructions, '--schema', schema, prompt]));
+  }
+  const instFile = join(tmpdir(), 'pullread-demo-instructions.txt');
+  const promptFile = join(tmpdir(), 'pullread-demo-prompt.txt');
+  writeFileSync(instFile, instructions);
+  writeFileSync(promptFile, prompt);
+  return parseJson(run([swiftHelper(), mode, instFile, promptFile]));
 }
 
 const storyList = (list: ArticleMeta[]) => list.map((a, i) => `${i + 1}. ${a.title} (${a.domain})${a.excerpt ? ` — ${a.excerpt}` : ''}`).join('\n');
@@ -70,10 +108,11 @@ Return "paragraphs" (one string per paragraph) and "links": for each story you m
 
 const curated = await curateWithStories(articles, cfg, score, undefined, undefined, { panelHeadlines, panel });
 const introRaw = live
-  ? fmJson(`Stories:\n${storyList(curated)}`, INTRO_INSTRUCTIONS, fmSchema('RundownIntro', ['paragraphs', 'links']), !onDevice)
+  ? structured('intro', `Stories:\n${storyList(curated)}`, INTRO_INSTRUCTIONS, ['paragraphs', 'links'])
   : sampleIntro;
 const { text: introText, dropped } = structuredIntroToMarkers(parseFlatIntro(introRaw), curated.length);
 writeFileSync(join(outDir, 'demo1-intro.html'), buildRoundupHtml(curated, 1, introText, live ? 'Apple Intelligence' : 'Sample', score));
+if (live) writeFileSync(join(outDir, 'demo1-raw.json'), JSON.stringify(introRaw, null, 2));
 console.log(`\n=== Demo 1: structured intro (${source}) ===`);
 console.log(introText);
 console.log(dropped.length ? `Dropped links: ${dropped.join('; ')}` : 'All links kept.');
@@ -82,7 +121,7 @@ console.log(dropped.length ? `Dropped links: ${dropped.join('; ')}` : 'All links
 
 const groups = groupStories(articles);
 const groupingRaw: string[] = live
-  ? fmJson(groupingPrompt(groups), GROUPING_INSTRUCTIONS, fmSchema('StoryGroups', ['stories']), !onDevice).stories
+  ? structured('groups', groupingPrompt(groups), GROUPING_INSTRUCTIONS, ['stories']).stories
   : sampleGrouping;
 const before = await curateWithStories(articles, cfg, score, undefined, undefined, { panelHeadlines, panel });
 const after = await curateWithStories(articles, cfg, score, undefined, undefined, { panelHeadlines, panel, modelGroups: groupingRaw });

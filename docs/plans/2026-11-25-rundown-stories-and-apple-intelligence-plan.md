@@ -91,7 +91,7 @@ Each demo has a part that runs anywhere (jest, or the sample render in `scripts/
 
 ```bash
 bun scripts/demos/rundown-demos.ts            # sample data, renders HTML to ./demo-out
-bun scripts/demos/rundown-demos.ts --live     # macOS 27: also asks fm (on-device / --pcc)
+bun scripts/demos/rundown-demos.ts --live     # macOS 27: fm (PCC; --on-device for local). macOS 26: Swift helper, on-device only
 ```
 
 ## Release sequencing
