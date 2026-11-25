@@ -853,6 +853,7 @@ export async function generateRoundupSummary(articles: ArticleMeta[], opts: { no
   const config = loadLLMConfig();
   if (!config) return null;
   // No stories, no intro: given an empty list, the model invents a day of news
+  // that isn't in the reader's library, and the email would still go out
   // (seen live on macOS 26.6: Biden, the Supreme Court, Chang'e-6 — none of it saved).
   if (!articles.length) return null;
   const now = opts.now ?? new Date();
