@@ -7,6 +7,7 @@ import { homedir } from 'os';
 import { readFileSync, existsSync } from 'fs';
 import { groupStories, alsoInFor, weighStories, findConsensus, pickTopStories, fetchPanelHeadlines, DEFAULT_PANEL } from './stories';
 import type { PanelSource, Scope } from './stories';
+import { applyModelGroups } from './rundown-ai';
 
 const HEADER_IMAGE_PATH = join(__dirname, '..', 'email-header.png');
 
@@ -905,7 +906,16 @@ export interface StoryCurationOptions {
   panelHeadlines?: import('./stories').PanelHeadline[];
   panel?: PanelSource[];
   limit?: number;
+  /**
+   * Model grouping as "ids|label|importance" lines (Phase 4 / demo 2), ids being
+   * 1-based positions in groupingPrompt(groups). Merges groups, relabels their
+   * sections, and nudges weight by importance.
+   */
+  modelGroups?: string[];
 }
+
+/** Weight per importance step away from the middle (3): a 5 adds 3, a 1 takes 3 off. */
+const IMPORTANCE_POINTS = 1.5;
 
 /**
  * Group the day's articles into stories, weigh them (your sources' coverage +
@@ -937,9 +947,19 @@ export async function curateWithStories(
   }
   const consensus = headlines.length ? findConsensus(headlines, panel) : [];
 
-  const groups = groupStories(articles);
-  const weighed = weighStories(groups, consensus, scoreFn);
-  const { top, rest } = pickTopStories(weighed, consensus, { baseScore: scoreFn });
+  let groups = groupStories(articles);
+  let weighFn = scoreFn;
+  if (opts.modelGroups?.length) {
+    const model = applyModelGroups(groups, opts.modelGroups);
+    groups = model.groups.map(g => {
+      const label = model.labels.get(g);
+      return label ? { ...g, lead: { ...g.lead, categories: [label] } } : g;
+    });
+    const importanceByUrl = new Map(model.groups.map((g, i) => [groups[i].lead.url, model.importance.get(g)]));
+    weighFn = (a: ArticleMeta) => scoreFn(a) + IMPORTANCE_POINTS * ((importanceByUrl.get(a.url) ?? 3) - 3);
+  }
+  const weighed = weighStories(groups, consensus, weighFn);
+  const { top, rest } = pickTopStories(weighed, consensus, { baseScore: weighFn });
 
   const topArticles = top.map(t => ({
     ...t.article,

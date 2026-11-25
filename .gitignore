@@ -3,33 +3,25 @@
 
 # Dependencies
 node_modules/
-
 # Build output
 dist/
 src/viewer-html.ts
 src-tauri/resources/
-
 # Local rundown email preview (written by `preview-rundown`)
 rundown-preview.html
-
+demo-out/
 # Environment
 .env
 .dev.vars
-
 # Wrangler local state
 .wrangler/
-
 # Feed configuration
 feeds.json
-
 # SQLite database
 data/*.db
-
 # Downloaded fonts for image generation
 scripts/fonts/
-
 # Pongogo logs
 .pongogo/logs/
-
 # OS files
 .DS_Store

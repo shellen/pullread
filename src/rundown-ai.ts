@@ -1,0 +1,214 @@
+// ABOUTME: Structured-output helpers for the Rundown: intro with exact citations, model-assisted
+// ABOUTME: story grouping, and rule checks on generated intros (plan: docs/plans/2026-11-25-…)
+
+import { domainOf, storyTokens } from './stories';
+import type { StoryGroup } from './stories';
+
+// ---------------------------------------------------------------------------
+// Demo 1 — structured intro (guided generation)
+// ---------------------------------------------------------------------------
+
+export interface IntroLink {
+  /** Words in the paragraph to turn into a link. Must appear verbatim. */
+  phrase: string;
+  /** 1-based story number from the list the model was given. */
+  story: number;
+}
+
+export interface StructuredIntro {
+  paragraphs: Array<{ text: string; links: IntroLink[] }>;
+}
+
+/**
+ * Parse the flat shape the `fm` CLI returns for the intro schema: one array of
+ * paragraph strings and one array of "paragraph|story|phrase" link strings.
+ * (Apple's `fm schema` examples are flat; nested objects may make this moot.)
+ */
+export function parseFlatIntro(raw: { paragraphs?: string[]; links?: string[] }): StructuredIntro {
+  const paragraphs = (raw.paragraphs || []).map(text => ({ text: text.trim(), links: [] as IntroLink[] }));
+  for (const line of raw.links || []) {
+    const m = line.match(/^\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(.+?)\s*$/);
+    if (!m) continue;
+    const p = paragraphs[parseInt(m[1], 10) - 1];
+    if (p) p.links.push({ story: parseInt(m[2], 10), phrase: m[3] });
+  }
+  return { paragraphs };
+}
+
+/**
+ * Turn a structured intro into the `{{phrase|N}}` marker text the existing
+ * renderer already links, so links come from the model's citations instead of
+ * title matching. A link whose phrase isn't in its paragraph, or whose story
+ * number is out of range, is dropped (the words stay) and reported.
+ */
+export function structuredIntroToMarkers(intro: StructuredIntro, storyCount: number): { text: string; dropped: string[] } {
+  const dropped: string[] = [];
+  const paras = intro.paragraphs.map((p, pi) => {
+    let text = p.text.replace(/\{\{|\}\}/g, '');
+    for (const link of p.links) {
+      if (link.story < 1 || link.story > storyCount) {
+        dropped.push(`paragraph ${pi + 1}: story ${link.story} doesn't exist`);
+        continue;
+      }
+      const idx = text.toLowerCase().indexOf(link.phrase.toLowerCase());
+      // Skip phrases already inside a marker from an earlier link.
+      if (idx === -1 || /\{\{[^}]*$/.test(text.slice(0, idx))) {
+        dropped.push(`paragraph ${pi + 1}: "${link.phrase}" isn't in the text`);
+        continue;
+      }
+      const words = text.slice(idx, idx + link.phrase.length);
+      text = `${text.slice(0, idx)}{{${words}|${link.story}}}${text.slice(idx + link.phrase.length)}`;
+    }
+    return text;
+  });
+  return { text: paras.join('\n\n'), dropped };
+}
+
+// ---------------------------------------------------------------------------
+// Demo 2 — model-assisted story grouping (PCC)
+// ---------------------------------------------------------------------------
+
+export interface ModelGrouping {
+  groups: StoryGroup[];
+  /** Section label the model gave each resulting group's lead. */
+  labels: Map<StoryGroup, string>;
+  /** Model's 1–5 importance rating per resulting group. */
+  importance: Map<StoryGroup, number>;
+  merges: string[];
+  /** Merges refused because the headlines share no distinctive word (model over-merging by topic). */
+  rejected: string[];
+}
+
+/** Do the parts share at least one distinctive word across their headlines? */
+function shareAWord(parts: StoryGroup[]): boolean {
+  const sets = parts.map(p => {
+    const t = new Set<string>();
+    for (const m of p.members) for (const w of storyTokens(m.title)) t.add(w);
+    return t;
+  });
+  return sets.slice(1).every(set => [...set].some(w => sets[0].has(w)));
+}
+
+/** The numbered list sent to the model: one line per story group. */
+export function groupingPrompt(groups: StoryGroup[]): string {
+  return groups.map((g, i) => {
+    const others = g.members.filter(m => m !== g.lead).map(m => m.title).slice(0, 2);
+    return `[${i + 1}] ${g.lead.title} (${g.sources.join(', ')})${others.length ? ` — also: ${others.join(' / ')}` : ''}`;
+  }).join('\n');
+}
+
+export const GROUPING_INSTRUCTIONS = `You group a day's news headlines into stories and label them.
+Each line is "[id] headline (outlets)". Return one entry per story as "ids|label|importance":
+- ids: comma-separated ids of headlines that report the SAME news event (most entries have one id). Only merge when they are clearly the same event, not just the same topic.
+- label: a 1-3 word section name a newspaper would use (e.g. "Courts", "Music", "Climate", "Bay Area").
+- importance: 1-5, how much this matters to a general reader today (5 = major news anywhere, 1 = niche).
+Every id must appear exactly once.`;
+
+/**
+ * Apply the model's "ids|label|importance" lines to the deterministic groups.
+ * The model can merge groups the word-overlap pass missed ("Bayer wins…" /
+ * "Weedkiller maker cleared…") but can never split one — the deterministic
+ * matches stand. A merge whose headlines share no distinctive word at all is
+ * refused (the model grouping by topic, not event) and the parts are kept
+ * separate with the model's label. Unknown ids and repeats are ignored; groups
+ * the model skipped are kept as they were.
+ */
+export function applyModelGroups(groups: StoryGroup[], lines: string[]): ModelGrouping {
+  const used = new Set<number>();
+  const out: StoryGroup[] = [];
+  const labels = new Map<StoryGroup, string>();
+  const importance = new Map<StoryGroup, number>();
+  const merges: string[] = [];
+  const rejected: string[] = [];
+
+  const keep = (g: StoryGroup, label: string, imp: string) => {
+    out.push(g);
+    if (label) labels.set(g, label.slice(0, 30));
+    const n = parseInt(imp, 10);
+    if (n >= 1 && n <= 5) importance.set(g, n);
+  };
+
+  for (const line of lines) {
+    const [idsPart, label = '', imp = ''] = line.split('|').map(s => s.trim());
+    const ids = (idsPart || '').split(/[,\s]+/).map(n => parseInt(n, 10) - 1)
+      .filter(i => i >= 0 && i < groups.length && !used.has(i));
+    if (!ids.length) continue;
+    ids.forEach(i => used.add(i));
+    const parts = ids.map(i => groups[i]);
+    if (parts.length > 1 && !shareAWord(parts)) {
+      rejected.push(parts.map(p => `"${p.lead.title}"`).join(' + '));
+      parts.forEach(p => keep(p, label, imp));
+      continue;
+    }
+    const members = parts.flatMap(p => p.members);
+    // Lead: the richest of the parts' leads (image, then excerpt), first on ties.
+    const lead = parts.map(p => p.lead).reduce((best, a) =>
+      ((a.image?.startsWith('http') ? 2 : 0) + (a.excerpt ? 1 : 0)) > ((best.image?.startsWith('http') ? 2 : 0) + (best.excerpt ? 1 : 0)) ? a : best);
+    const merged: StoryGroup = {
+      lead,
+      members,
+      sources: [...new Set(members.map(m => m.domain || domainOf(m.url)).filter(Boolean))],
+    };
+    if (parts.length > 1) merges.push(parts.map(p => `"${p.lead.title}"`).join(' + '));
+    keep(merged, label, imp);
+  }
+  groups.forEach((g, i) => { if (!used.has(i)) out.push(g); });
+  return { groups: out, labels, importance, merges, rejected };
+}
+
+// ---------------------------------------------------------------------------
+// Demo 3 — intro rule checks (Evaluations-style)
+// ---------------------------------------------------------------------------
+
+/** Phrases the intro prompt forbids (kept in sync with roundupSummaryPrompt in email.ts). */
+export const BANNED_PHRASES = [
+  'dive in', 'buckle up', 'without further ado', "let's get started", "here's what caught my eye",
+  "in today's rundown", 'welcome to', "that's the rundown",
+];
+
+export interface IntroCheck {
+  rule: string;
+  passed: boolean;
+  detail?: string;
+}
+
+/**
+ * Check a generated intro against the rules its prompt states. Runs on the raw
+ * model text (before rendering), so marker problems are visible.
+ */
+export function checkIntro(text: string, opts: { now: Date; storyCount: number }): IntroCheck[] {
+  const lower = text.toLowerCase().replace(/[\u2018\u2019]/g, "'");
+  const weekday = opts.now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+  const monthDay = opts.now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }).toLowerCase();
+  const checks: IntroCheck[] = [];
+
+  // Today's weekday or date anywhere, or any day presented as today ("It's Friday the 13th").
+  const days = 'monday|tuesday|wednesday|thursday|friday|saturday|sunday';
+  const asToday = lower.match(new RegExp(`\\b(?:it's|it is|today is|this|happy)\\s+(?:${days})\\b[^.,;:!?]*`));
+  const namesToday = new RegExp(`\\b${weekday}\\b`).test(lower) || lower.includes(monthDay) || !!asToday;
+  checks.push({ rule: "Doesn't name a day or date as today", passed: !namesToday,
+    detail: namesToday ? `"${asToday ? asToday[0].trim() : lower.includes(monthDay) ? monthDay : weekday}"` : undefined });
+
+  const banned = BANNED_PHRASES.filter(p => lower.includes(p));
+  checks.push({ rule: 'No banned phrases', passed: banned.length === 0, detail: banned.length ? banned.join(', ') : undefined });
+
+  const greeting = /^(hi|hello|hey|good (morning|afternoon|evening)|happy \w+)\b/i.test(text.trim());
+  const signoff = /(see you tomorrow|until next time|happy reading|enjoy your (day|evening|reading))[.!]?\s*$/i.test(text.trim());
+  checks.push({ rule: 'No greeting or sign-off', passed: !greeting && !signoff,
+    detail: greeting ? 'opens with a greeting' : signoff ? 'ends with a sign-off' : undefined });
+
+  const markers = [...text.matchAll(/\{\{([^{}|]+)\|(\d+)\}\}/g)];
+  const bad = markers.filter(m => { const n = parseInt(m[2], 10); return n < 1 || n > opts.storyCount; });
+  checks.push({ rule: 'Every cited story exists', passed: bad.length === 0,
+    detail: bad.length ? bad.map(m => `"${m[1]}" → story ${m[2]}`).join(', ') : undefined });
+
+  checks.push({ rule: 'Links at least one story', passed: markers.length > 0,
+    detail: markers.length ? undefined : 'no story links' });
+
+  const paras = text.split(/\n\s*\n/).filter(p => p.trim());
+  const long = paras.filter(p => p.split(/\s+/).length > 70);
+  checks.push({ rule: 'Short paragraphs (≤70 words)', passed: long.length === 0,
+    detail: long.length ? `${long.length} long paragraph(s)` : undefined });
+
+  return checks;
+}

@@ -1,0 +1,116 @@
+// ABOUTME: Tests for the Rundown structured-output helpers (intro citations, model grouping, intro checks)
+// ABOUTME: Model responses here are recorded samples, not live model output
+
+import { parseFlatIntro, structuredIntroToMarkers, applyModelGroups, groupingPrompt, checkIntro } from './rundown-ai';
+import { groupStories } from './stories';
+import type { ArticleMeta } from './email';
+
+function article(title: string, url: string, extra: Partial<ArticleMeta> = {}): ArticleMeta {
+  return { filename: `${title}.md`, title, url, domain: new URL(url).hostname.replace(/^www\./, ''), ...extra };
+}
+
+describe('structured intro', () => {
+  test('turns cited phrases into markers for the existing renderer', () => {
+    const intro = parseFlatIntro({
+      paragraphs: ['A judge signed off on the Roundup settlement.', 'Julien Baker has a new record coming.'],
+      links: ['1|2|Roundup settlement', '2|5|Julien Baker has a new record'],
+    });
+    const { text, dropped } = structuredIntroToMarkers(intro, 8);
+    expect(text).toBe('A judge signed off on the {{Roundup settlement|2}}.\n\n{{Julien Baker has a new record|5}} coming.');
+    expect(dropped).toEqual([]);
+  });
+
+  test('drops links to stories that do not exist or phrases not in the text, keeping the words', () => {
+    const { text, dropped } = structuredIntroToMarkers({
+      paragraphs: [{ text: 'BART went dark tonight.', links: [{ phrase: 'BART', story: 12 }, { phrase: 'Muni', story: 1 }] }],
+    }, 8);
+    expect(text).toBe('BART went dark tonight.');
+    expect(dropped).toHaveLength(2);
+  });
+
+  test('ignores malformed link lines and stray braces from the model', () => {
+    const { text } = structuredIntroToMarkers(parseFlatIntro({
+      paragraphs: ['Odd {{text}} here.'], links: ['nonsense', '1|x|here'],
+    }), 3);
+    expect(text).toBe('Odd text here.');
+  });
+});
+
+describe('model grouping', () => {
+  const articles = [
+    article('Judge Approves $7 Billion Settlement Over Claims That Roundup Caused Cancer', 'https://www.nytimes.com/roundup', { image: 'https://img/r', excerpt: 'x' }),
+    article('Weedkiller maker cleared to pay out billions to cancer claimants', 'https://www.theguardian.com/weedkiller'),
+    article('BMW Recalls 286 i5 And i7 EVs Over Battery Fire Risk', 'https://electrek.co/bmw'),
+  ];
+
+  test('word overlap alone misses the reworded story', () => {
+    expect(groupStories(articles)).toHaveLength(3);
+  });
+
+  test('the model merges it, labels sections and rates importance', () => {
+    const groups = groupStories(articles);
+    expect(groupingPrompt(groups).split('\n')[1]).toBe('[2] Weedkiller maker cleared to pay out billions to cancer claimants (theguardian.com)');
+    const r = applyModelGroups(groups, ['1,2|Courts|4', '3|Autos|2']);
+    expect(r.groups).toHaveLength(2);
+    expect(r.groups[0].sources).toEqual(['nytimes.com', 'theguardian.com']);
+    expect(r.groups[0].lead.domain).toBe('nytimes.com'); // the copy with an image leads
+    expect(r.labels.get(r.groups[0])).toBe('Courts');
+    expect(r.importance.get(r.groups[1])).toBe(2);
+    expect(r.merges).toHaveLength(1);
+  });
+
+  test('refuses a merge of different events that only share a topic', () => {
+    const groups = groupStories([
+      article('Why every app suddenly wants to be your daily newspaper', 'https://www.theverge.com/digest'),
+      article('Bezos shrugs off blue wave, warns politicians not to make tech a villain', 'https://www.cnbc.com/bezos'),
+    ]);
+    const r = applyModelGroups(groups, ['1,2|Tech|2']);
+    expect(r.groups).toHaveLength(2);
+    expect(r.rejected).toHaveLength(1);
+    expect(r.labels.get(r.groups[1])).toBe('Tech');
+  });
+
+  test('cannot split groups, ignores bad ids, and keeps groups the model skipped', () => {
+    const pair = groupStories([
+      article('Julien Baker Lines Up New Album This World or the Next', 'https://pitchfork.com/baker'),
+      article('Julien Baker Announces New Album This World Or The Next', 'https://stereogum.com/baker'),
+      ...articles,
+    ]);
+    expect(pair).toHaveLength(4);
+    const r = applyModelGroups(pair, ['1|Music|3', '1,9|Dup|5', 'junk']);
+    expect(r.groups).toHaveLength(4);
+    expect(r.groups[0].members).toHaveLength(2); // Baker pair stays together
+  });
+});
+
+describe('checkIntro', () => {
+  const now = new Date(2026, 10, 23, 18, 0); // Monday evening
+  const good = 'A judge signed off on the {{Roundup settlement|1}}, closing a long fight.\n\nElsewhere, {{Julien Baker|3}} has a record coming in February.';
+
+  test('a clean intro passes every rule', () => {
+    expect(checkIntro(good, { now, storyCount: 8 }).every(c => c.passed)).toBe(true);
+  });
+
+  test("catches naming today's weekday — the bug PR #121 fixed in the prompt", () => {
+    const c = checkIntro("It's Monday, and the {{Roundup settlement|1}} is done.", { now, storyCount: 8 });
+    expect(c.find(x => x.rule.startsWith("Doesn't name"))!.passed).toBe(false);
+  });
+
+  test('catches another day presented as today (the Nov 17 "Friday the 13th" intro)', () => {
+    const c = checkIntro('It\u2019s Friday the 13th, and the {{Roundup settlement|1}} is done.', { now, storyCount: 8 });
+    const rule = c.find(x => x.rule.startsWith("Doesn't name"))!;
+    expect(rule.passed).toBe(false);
+    expect(rule.detail).toBe('"it\'s friday the 13th"');
+  });
+
+  test('a story detail like "Monday morning closures" is not flagged', () => {
+    const c = checkIntro('Caltrans plans {{Monday morning closures|7}} on the bridge.', { now: new Date(2026, 10, 25, 18), storyCount: 8 });
+    expect(c.find(x => x.rule.startsWith("Doesn't name"))!.passed).toBe(true);
+  });
+
+  test('catches banned phrases, greetings and citations to missing stories', () => {
+    const c = checkIntro('Good evening! Let’s dive in: the {{Roundup settlement|11}}.', { now, storyCount: 8 });
+    const failed = c.filter(x => !x.passed).map(x => x.rule);
+    expect(failed).toEqual(expect.arrayContaining(['No banned phrases', 'No greeting or sign-off', 'Every cited story exists']));
+  });
+});
