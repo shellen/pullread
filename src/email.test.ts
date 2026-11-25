@@ -724,6 +724,24 @@ describe('roundup intro gate and Apple structured intro', () => {
     warn.mockRestore();
   });
 
+  test('no stories means no intro — the model is never asked to invent one', async () => {
+    mockLoadLLMConfig.mockReturnValue({ provider: 'apple', apiKey: '' });
+    expect(await generateRoundupSummary([], { now })).toBeNull();
+    expect(mockRunAppleStructured).not.toHaveBeenCalled();
+    expect(mockPromptLLM).not.toHaveBeenCalled();
+  });
+
+  test('Apple retry tells the model not to reuse headline wording', async () => {
+    mockLoadLLMConfig.mockReturnValue({ provider: 'apple', apiKey: '' });
+    const copied = { mentions: [[{ story: 1, sentence: 'Chile earthquake: Dozens dead after 7.8 magnitude quake strikes near Santiago.', phrase: 'Chile earthquake' }]] };
+    mockRunAppleStructured.mockReturnValue(copied);
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(await generateRoundupSummary(stories, { now })).toBeNull();
+    expect(mockRunAppleStructured).toHaveBeenCalledTimes(2);
+    expect(mockRunAppleStructured.mock.calls[0][1]).not.toContain('never reuse more than three words');
+    expect(mockRunAppleStructured.mock.calls[1][1]).toContain('never reuse more than three words');
+  });
+
   test('a failed first attempt is replaced by a passing retry', async () => {
     mockLoadLLMConfig.mockReturnValue({ provider: 'anthropic', apiKey: 'k', model: 'm' });
     mockPromptLLM
@@ -806,7 +824,7 @@ describe('generateRoundupSummary', () => {
 
   test('sends the roundup prompt as an instruction (not wrapped as article text to summarize)', async () => {
     mockLoadLLMConfig.mockReturnValue({ provider: 'openai', apiKey: 'k', model: 'gpt-5' });
-    mockPromptLLM.mockResolvedValue({ text: 'A fresh, article-aware blurb.', model: 'gpt-5' });
+    mockPromptLLM.mockResolvedValue({ text: 'Quantum chips finally ship, and the city has a new transit plan.', model: 'gpt-5' });
 
     const articles = [
       article({ title: 'Quantum chips ship', domain: 'chip.news' }),
@@ -815,7 +833,7 @@ describe('generateRoundupSummary', () => {
     const result = await generateRoundupSummary(articles);
 
     // Returns the text plus the model/provider that produced it, for AI disclosure.
-    expect(result).toEqual({ text: 'A fresh, article-aware blurb.', model: 'gpt-5', provider: 'openai' });
+    expect(result).toEqual({ text: 'Quantum chips finally ship, and the city has a new transit plan.', model: 'gpt-5', provider: 'openai' });
     // Must route through promptLLM, which sends the prompt verbatim — NOT summarizeText,
     // which would prepend "Summarize this article…" and yield a near-static blurb.
     expect(mockPromptLLM).toHaveBeenCalledTimes(1);
@@ -882,7 +900,7 @@ describe('buildRoundup', () => {
 
   test('renders article titles and the editorial note into the HTML, and discloses the model', async () => {
     mockLoadLLMConfig.mockReturnValue({ provider: 'openai', apiKey: 'k', model: 'gpt-5' });
-    mockPromptLLM.mockResolvedValue({ text: 'A fresh editorial note.', model: 'gpt-5' });
+    mockPromptLLM.mockResolvedValue({ text: 'Quantum chips finally ship this week, and the new transit plan is out.', model: 'gpt-5' });
 
     const articles = [
       article({ title: 'Quantum chips ship', bookmarked: new Date().toISOString() }),
@@ -890,12 +908,12 @@ describe('buildRoundup', () => {
     ];
     const result = await buildRoundup(cfg(), async () => articles);
 
-    expect(result.summary).toBe('A fresh editorial note.');
+    expect(result.summary).toBe('Quantum chips finally ship this week, and the new transit plan is out.');
     expect(result.summaryCredit).toBe('GPT');
     expect(result.articles).toHaveLength(2);
     expect(result.html).toContain('Quantum chips ship');
     expect(result.html).toContain('New transit plan');
-    expect(result.html).toContain('A fresh editorial note.');
+    expect(result.html).toContain('finally ship this week, and the ');
     // The AI-written intro credits which AI produced it (brand only).
     expect(result.html).toContain('Summary by');
     expect(result.html).toContain('GPT');

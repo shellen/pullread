@@ -208,6 +208,22 @@ describe('checkIntro', () => {
     expect(c.find(x => x.rule === 'Written in its own words')!.passed).toBe(true);
   });
 
+  test('flags the invented intro from an empty day (real macOS 26.6 output) as ungrounded', () => {
+    const invented = "President Biden's administration has announced plans to invest $10 billion in the electric vehicle (EV) sector, aiming to boost domestic EV production and accelerate the transition to cleaner transportation. In a significant development, the U.S. Supreme Court ruled 6-3 in favor of affirmative action in college admissions, overturning a lower court's decision to ban race-conscious admissions practices.\n\nChina has launched a new lunar mission, Chang'e-6, with the goal of collecting and returning samples from the far side of the Moon, marking a significant milestone in China's space exploration efforts. The European Union is set to introduce new regulations on artificial intelligence, aiming to enhance transparency, accountability, and ethical standards in AI technologies. A major oil spill has occurred off the coast of California, resulting in significant environmental damage and prompting urgent response efforts from local authorities and environmental organizations.";
+    const sources = ['Judge Approves $7 Billion Settlement Over Claims That Roundup Caused Cancer', 'BMW Recalls 286 i5 And i7 EVs Over Battery Fire Risk'];
+    const rule = (src: string[]) => checkIntro(invented, { now, storyCount: src.length, sources: src }).find(c => c.rule === "Grounded in today's stories")!;
+    expect(rule(sources).passed).toBe(false);
+    expect(rule(sources).detail).toMatch(/^2 paragraph/);
+    expect(rule([]).passed).toBe(false); // nothing to be about
+  });
+
+  test('a paraphrased paragraph without links is still grounded', () => {
+    const c = checkIntro('Bayer agreed to pay billions over Roundup cancer claims, closing a long fight.', {
+      now, storyCount: 1, sources: ['Judge Approves $7 Billion Settlement Over Claims That Roundup Caused Cancer'],
+    });
+    expect(c.find(x => x.rule === "Grounded in today's stories")!.passed).toBe(true);
+  });
+
   test('a clean intro passes every rule', () => {
     expect(checkIntro(good, { now, storyCount: 8 }).every(c => c.passed)).toBe(true);
   });

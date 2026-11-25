@@ -584,6 +584,10 @@ if (command === 'sync') {
   (async () => {
     const { buildRoundup, filterByLookback, loadEmailConfig } = await import('./email');
     const cfg = loadEmailConfig();
+    // --days N widens the window for a preview (e.g. when nothing was saved today).
+    const daysIndex = args.indexOf('--days');
+    const days = daysIndex !== -1 ? parseInt(args[daysIndex + 1], 10) : NaN;
+    if (days > 0) cfg.lookbackDays = days;
     const fetchArticles = async () => filterByLookback(listFiles(config.outputPath, true), cfg.lookbackDays);
     const result = await buildRoundup(cfg, fetchArticles);
 
@@ -591,9 +595,17 @@ if (command === 'sync') {
     console.log(`Articles in last ${cfg.lookbackDays} day${cfg.lookbackDays === 1 ? '' : 's'}: ${result.articles.length}`);
     console.log(`Editorial note: ${result.summary ?? '(none — no LLM configured, or generation failed)'}`);
     if (result.summaryCredit) console.log(`Summary by: ${result.summaryCredit}`);
+    const r = result.report;
+    if (r) {
+      console.log(`Wider news: ${r.panelFeeds ? `${r.panelFeedsReached.length} of ${r.panelFeeds} outlets reached (${r.panelHeadlines} headlines); ${r.widelyCovered} widely covered, ${r.beyondFeeds} added beyond your feeds` : 'off'}`);
+      if (r.panelFeeds && r.panelFeedsReached.length < r.panelFeeds) {
+        console.log(`  Reached: ${r.panelFeedsReached.join(', ') || 'none'}`);
+      }
+      console.log(`Story grouping: ${r.storyGroups} stories; model grouping ${r.modelGrouping}${r.merges.length ? `, merged ${r.merges.join('; ')}` : ''}`);
+    }
     console.log(`Wrote preview to ${outPath}`);
     if (result.articles.length === 0) {
-      console.log('Note: no bookmarked articles in the window, so the summary will be empty. Bookmark a few recent articles and re-run.');
+      console.log(`Note: no articles saved in the last ${cfg.lookbackDays} day${cfg.lookbackDays === 1 ? '' : 's'}, so there's no intro. Try --days 3.`);
     }
     // Open resources (research DB, etc.) can keep the event loop alive — exit explicitly.
     process.exit(0);
@@ -865,5 +877,6 @@ Commands:
   review --days N         Review the past N days (default: 7)
   preview-rundown         Render the email rundown to an HTML file (no email sent)
   preview-rundown --out <path>  Write the preview to a custom path
+  preview-rundown --days <n>    Look back n days instead of the configured window
 `);
 }

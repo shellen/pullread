@@ -393,6 +393,7 @@ export const BLOCKING_RULES = new Set([
   'No filler opener',
   'Every cited story exists',
   'Written in its own words',
+  "Grounded in today's stories",
 ]);
 
 /** The blocking failures in a set of checks, as "rule — detail" strings. */
@@ -463,6 +464,20 @@ export function checkIntro(text: string, opts: { now: Date; storyCount: number; 
     });
     checks.push({ rule: 'Written in its own words', passed: copied.length === 0,
       detail: copied.length ? `${copied.length} sentence(s) copied from the stories, e.g. "${copied[0].slice(0, 60)}…"` : undefined });
+  }
+
+  // Grounding: every paragraph must cite a story or share at least two
+  // distinctive words with one. Catches an intro about news that isn't in the
+  // list at all (the model inventing a day's headlines from an empty list).
+  if (opts.sources) {
+    const sourceTokens = opts.sources.map(src => storyTokens(src));
+    const ungrounded = text.split(/\n\s*\n/).filter(p => p.trim()).filter(p => {
+      if (/\{\{[^{}|]+\|\d+\}\}/.test(p)) return false;
+      const t = storyTokens(p.replace(/\{\{|\}\}/g, ''));
+      return !sourceTokens.some(st => { let n = 0; for (const w of t) if (st.has(w) && ++n >= 2) return true; return false; });
+    });
+    checks.push({ rule: "Grounded in today's stories", passed: ungrounded.length === 0,
+      detail: ungrounded.length ? `${ungrounded.length} paragraph(s) about none of the stories, e.g. "${ungrounded[0].slice(0, 60)}…"` : undefined });
   }
 
   checks.push({ rule: 'Links at least one story', passed: markers.length > 0,

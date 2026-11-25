@@ -831,6 +831,9 @@ export async function generateRoundupSummary(articles: ArticleMeta[], opts: { no
   const { promptLLM, loadLLMConfig } = await import('./summarizer');
   const config = loadLLMConfig();
   if (!config) return null;
+  // No stories, no intro: given an empty list, the model invents a day of news
+  // (seen live on macOS 26.6: Biden, the Supreme Court, Chang'e-6 — none of it saved).
+  if (!articles.length) return null;
   const now = opts.now ?? new Date();
 
   // The free-text intro (all providers; also Apple's fallback).
@@ -894,17 +897,20 @@ export async function generateRoundupSummary(articles: ArticleMeta[], opts: { no
   // Apple Intelligence: guided generation with per-story sentences, which the
   // on-device model follows far better than a free-form prompt (see
   // src/apple-structured.ts). Falls back to the text prompt on any error.
-  const structuredAppleIntro = async (): Promise<RoundupSummary | null> => {
+  const structuredAppleIntro = async (retry: boolean): Promise<RoundupSummary | null> => {
     const { runAppleStructured } = await import('./apple-structured');
-    const raw = runAppleStructured('intro', appleIntroInstructions(issueDateLine(now)), appleIntroStoryList(articles));
+    // The on-device model sometimes copies headlines verbatim; the retry says so plainly.
+    const instructions = appleIntroInstructions(issueDateLine(now))
+      + (retry ? '\nImportant: never reuse more than three words in a row from any headline or excerpt. Rephrase everything.' : '');
+    const raw = runAppleStructured('intro', instructions, appleIntroStoryList(articles));
     const { text } = structuredIntroToMarkers(parseIntroResponse(raw, articles.map(a => a.title)), articles.length);
     return text.trim() ? { text, model: 'on-device', provider: 'apple' } : null;
   };
 
-  const attempt = async (): Promise<RoundupSummary | null> => {
+  const attempt = async (retry: boolean): Promise<RoundupSummary | null> => {
     if (config.provider === 'apple') {
       try {
-        const r = await structuredAppleIntro();
+        const r = await structuredAppleIntro(retry);
         if (r) return r;
       } catch (err) {
         console.warn('[email] Structured Apple intro failed, using the text prompt:', err instanceof Error ? err.message : err);
@@ -914,11 +920,11 @@ export async function generateRoundupSummary(articles: ArticleMeta[], opts: { no
   };
 
   // Gate: an intro that names the wrong day, uses banned filler, cites a story
-  // that isn't there, or copies the stories gets one retry, then is left out —
-  // no intro beats a wrong one.
+  // that isn't there, copies the stories, or isn't about them at all gets one
+  // retry, then is left out — no intro beats a wrong one.
   const sources = articles.flatMap(a => [a.title, a.summary || a.excerpt || '']).filter(Boolean);
   for (let i = 1; i <= 2; i++) {
-    const result = await attempt();
+    const result = await attempt(i > 1);
     if (!result) return null;
     const failures = blockingFailures(checkIntro(result.text, { now, storyCount: articles.length, sources }));
     if (!failures.length) return result;
@@ -934,6 +940,8 @@ export interface RoundupResult {
   /** Brand-level credit for the AI that wrote the intro (e.g. "Claude"), if any. */
   summaryCredit: string | null;
   articles: ArticleMeta[];
+  /** What story curation did: panel feeds reached, model grouping, merges. */
+  report?: StoryReport;
 }
 
 /** Keep only articles bookmarked within the lookback window. */
@@ -961,6 +969,20 @@ export interface StoryCurationOptions {
    * Errors are caught and the stories stay grouped by word matching alone.
    */
   modelGrouper?: (groups: StoryGroup[]) => string[] | null | Promise<string[] | null>;
+  /** Receives a summary of what curation did (for preview-rundown and logs). */
+  onReport?: (report: StoryReport) => void;
+}
+
+export interface StoryReport {
+  panelFeeds: number;
+  /** Panel outlets that returned at least one recent headline. */
+  panelFeedsReached: string[];
+  panelHeadlines: number;
+  widelyCovered: number;
+  beyondFeeds: number;
+  storyGroups: number;
+  modelGrouping: 'not used' | 'applied' | 'skipped' | 'failed';
+  merges: string[];
 }
 
 /**
@@ -1001,17 +1023,23 @@ export async function curateWithStories(
   const consensus = headlines.length ? findConsensus(headlines, panel) : [];
 
   let groups = groupStories(articles);
+  const storyGroups = groups.length;
   let weighFn = scoreFn;
   let modelLines = opts.modelGroups;
+  let modelGrouping: StoryReport['modelGrouping'] = opts.modelGroups ? 'applied' : 'not used';
+  let merges: string[] = [];
   if (!modelLines && opts.modelGrouper && groups.length > 1) {
     try {
       modelLines = (await opts.modelGrouper(groups)) ?? undefined;
+      modelGrouping = modelLines ? 'applied' : 'skipped';
     } catch (err) {
+      modelGrouping = 'failed';
       console.warn('[email] Model story grouping failed; using word matching only:', err instanceof Error ? err.message : err);
     }
   }
   if (modelLines?.length) {
     const model = applyModelGroups(groups, modelLines);
+    merges = model.merges;
     groups = model.groups.map(g => {
       const label = model.labels.get(g);
       return label ? { ...g, lead: { ...g.lead, categories: [label] } } : g;
@@ -1032,6 +1060,16 @@ export async function curateWithStories(
     return alsoIn.length ? { ...g.lead, story: { top: false, alsoIn, beyondFeeds: false } } : g.lead;
   });
   const others = curateArticles(leads, mentionCounts, watchedEntities, Math.max(0, limit - topArticles.length));
+  opts.onReport?.({
+    panelFeeds: cfg.widerNews || opts.panelHeadlines ? panel.length : 0,
+    panelFeedsReached: [...new Set(headlines.map(h => h.source))],
+    panelHeadlines: headlines.length,
+    widelyCovered: consensus.length,
+    beyondFeeds: top.filter(t => t.beyondFeeds).length,
+    storyGroups,
+    modelGrouping,
+    merges,
+  });
   return [...topArticles, ...others];
 }
 
@@ -1099,8 +1137,10 @@ export async function buildRoundup(
 
   const scoreCtx: ScoreContext = { now: Date.now(), mentionCounts, watchedEntities };
   const scoreFn = (a: ArticleMeta) => scoreArticle(a, scoreCtx);
+  let report: StoryReport | undefined;
   const curated = await curateWithStories(articles, cfg, scoreFn, mentionCounts, watchedEntities, {
     modelGrouper: await appleGrouperIfEnabled(),
+    onReport: r => { report = r; },
   });
 
   // Validate article images — strip broken URLs to avoid broken image icons
@@ -1118,7 +1158,7 @@ export async function buildRoundup(
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   const subject = `The Pull Read Rundown — ${today}`;
 
-  return { html, subject, summary, summaryCredit, articles: curated };
+  return { html, subject, summary, summaryCredit, articles: curated, report };
 }
 
 export async function sendRoundup(
