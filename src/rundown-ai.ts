@@ -282,14 +282,18 @@ export function batches<T>(items: T[], size: number): T[][] {
 /**
  * Combine the tie-breaker answers into "ids|label|importance" lines. Confirmed
  * pairs are joined transitively; a merged story takes the first label among
- * its parts and the highest importance.
+ * its parts and the highest importance. With `useImportance: false` the
+ * ratings are dropped — on macOS 26 the on-device model's ratings were noise
+ * across three live runs (all 4s; mostly 3s; a pile of 5s for niche stories).
  */
 export function groupingLinesFromPairs(
   groupCount: number,
   pairs: Array<[number, number]>,
   sameIds: string[],
   labelLines: string[],
+  opts: { useImportance?: boolean } = {},
 ): string[] {
+  const { useImportance = true } = opts;
   const parent = Array.from({ length: groupCount }, (_, i) => i);
   const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
   for (const id of sameIds) {
@@ -313,7 +317,7 @@ export function groupingLinesFromPairs(
   }
   return [...clusters.values()].map(ids => {
     const label = ids.map(i => info.get(i)?.label).find(Boolean) || '';
-    const imp = Math.max(0, ...ids.map(i => info.get(i)?.imp || 0));
+    const imp = useImportance ? Math.max(0, ...ids.map(i => info.get(i)?.imp || 0)) : 0;
     return `${ids.map(i => i + 1).join(',')}|${label}|${imp || ''}`;
   });
 }

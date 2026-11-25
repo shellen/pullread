@@ -68,7 +68,7 @@ This is the foundation for everything after it, and it works on macOS 26.
 - Other providers keep the current marker path. Claude and OpenAI could also use their own structured-output modes later.
 - **On-device schema (from live runs on macOS 26.6).** Free paragraphs plus a separate links list failed: the model wrote a filler opener and ten one-line paragraphs, with no links. Per-story fields work better: `lead` (1–2) and `more` (2–3) mentions of `{ story, sentence, phrase }`, all bounded. The next run respected the structure and linked every story correctly, but copied titles and excerpts verbatim and linked whole sentences. Now: prompt for own words, ≤5-word links, and code replaces long links with title words.
 - **Gate the intro on the checks (Phase 5).** In production, run `checkIntro()` on the result. Retry once on failure, then leave the intro out. No intro is better than a copied or broken one.
-- **Section labels from a fixed list.** On-device labels were inconsistent ("Tech" vs. "Technology", Roundup as "Health"), so the label schema uses `.anyOf(SECTION_NAMES)` and `.range(1...5)`. Importance ratings were flat or inflated across runs, so they're worth ±0.75 per step, not ±1.5.
+- **Section labels from a fixed list.** On-device labels were inconsistent ("Tech" vs. "Technology", Roundup as "Health"), so the label schema uses `.anyOf(SECTION_NAMES)` and `.range(1...5)`. Importance ratings were noise across three live runs (all 4s, then mostly 3s, then 5/5 for niche stories like a type foundry), so the macOS 26 path ignores them entirely (`useImportance: false`) and keeps only labels and merges. Ratings return with PCC on macOS 27, worth ±0.75 per step.
 - **Demo 1** shows the renderer.
 
 ### Phase 4: Model-assisted story grouping and importance (macOS 26, on-device)
@@ -77,7 +77,7 @@ The on-device model's context is too small for a whole day of headlines, so on m
 
 1. **"Same event?" for candidate pairs.** `candidatePairs()` lists groups that share at least one distinctive word but that word matching didn't merge, most shared words first, capped at 40 pairs. The model answers in batches of 12 (`PAIR_INSTRUCTIONS`, returning `same: ["P3", …]`). Groups that share no word are never asked about, so the model can't group by topic alone. In the demo, only Roundup vs. Weedkiller ("cancer") is asked, and Verge digest apps vs. Bezos never is.
 2. **Labels and importance.** One section label and a 1–5 rating per group, in batches of 20 (`LABEL_INSTRUCTIONS`).
-3. `groupingLinesFromPairs()` joins confirmed pairs transitively and produces "ids|label|importance" lines. `applyModelGroups()` merges and relabels the groups, and `curateWithStories({ modelGroups })` adjusts weight by ±1.5 per importance step. The model can only merge groups, never split ones the word matching joined. Merges with no shared word are still refused, as a backstop.
+3. `groupingLinesFromPairs()` joins confirmed pairs transitively and produces "ids|label|importance" lines (importance left out on macOS 26). `applyModelGroups()` merges and relabels the groups, and `curateWithStories({ modelGroups })` adjusts weight by ±1.5 per importance step. The model can only merge groups, never split ones the word matching joined. Merges with no shared word are still refused, as a backstop.
 
 Still to do:
 - [ ] Include the panel headlines in the label batches, so panel-only stories (the quake) get an importance rating too. The demo doesn't do this yet, which is why Roundup outranks the quake there.

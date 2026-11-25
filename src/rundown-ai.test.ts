@@ -139,6 +139,11 @@ describe('macOS 26 tie-breaker grouping', () => {
     expect(lines).toEqual(['1,2,3|Courts|5', '4|Tech|2']);
   });
 
+  test('can drop the importance ratings and keep labels and merges', () => {
+    expect(groupingLinesFromPairs(3, [[0, 1]], ['P1'], ['1|Courts|5', '2|Business|5', '3|Culture|5'], { useImportance: false }))
+      .toEqual(['1,2|Courts|', '3|Culture|']);
+  });
+
   test('a "no" from the model leaves groups separate', () => {
     expect(groupingLinesFromPairs(2, [[0, 1]], [], [])).toEqual(['1||', '2||']);
   });

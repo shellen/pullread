@@ -157,7 +157,8 @@ if (usePcc) {
     labelLines.push(...(live ? structured(hasFm ? 'groups' : 'labels', labelPrompt(groups, ids), LABEL_INSTRUCTIONS, ['stories']).stories : sampleLabels));
   }
   console.log('Labels:\n' + labelLines.join('\n'));
-  groupingRaw = groupingLinesFromPairs(groups.length, pairs, same, labelLines);
+  // On-device importance ratings proved unreliable (see groupingLinesFromPairs); keep labels and merges only.
+  groupingRaw = groupingLinesFromPairs(groups.length, pairs, same, labelLines, { useImportance: false });
 }
 const before = await curateWithStories(articles, cfg, score, undefined, undefined, { panelHeadlines, panel });
 const after = await curateWithStories(articles, cfg, score, undefined, undefined, { panelHeadlines, panel, modelGroups: groupingRaw });
