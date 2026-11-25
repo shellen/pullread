@@ -1,7 +1,23 @@
-// ABOUTME: macOS 26 stand-in for `fm respond --schema` in the Rundown demos (on-device model only)
-// ABOUTME: Usage: fm-structured <intro|pairs|labels|groups> <instructions-file> <prompt-file>  → JSON on stdout
+// ABOUTME: Structured output from Apple Intelligence (Foundation Models guided generation, macOS 26)
+// ABOUTME: Compiles a small Swift helper once (like the summarizer's) and returns parsed JSON per mode
 
-import Foundation
+import { execFileSync } from 'child_process';
+import { writeFileSync, unlinkSync, mkdirSync } from 'fs';
+import { join } from 'path';
+import { homedir } from 'os';
+import { ensureAppleBinary, isAppleAvailable } from './summarizer';
+
+/*
+ * Lessons from live runs on macOS 26.6 (Nov 2026), built into the helper below:
+ * - The on-device context window is 4,096 tokens for prompt, schema and answer.
+ * - Every [T] field needs a .count/.maximumCount guide, and every call caps
+ *   maximumResponseTokens. An unbounded array ran until the window was full.
+ * - Per-item fields (story number + sentence + phrase) work; free paragraphs
+ *   plus a separate links list did not.
+ * - Section labels are only consistent when chosen from a fixed list (.anyOf).
+ * See docs/plans/2026-11-25-rundown-stories-and-apple-intelligence-plan.md.
+ */
+export const APPLE_STRUCTURED_SWIFT = `import Foundation
 import FoundationModels
 
 @Generable
@@ -63,14 +79,14 @@ func emit(_ object: [String: Any]) throws {
     static func main() async throws {
         let args = CommandLine.arguments
         guard args.count == 4 else {
-            FileHandle.standardError.write(Data("usage: fm-structured <intro|pairs|labels|groups> <instructions-file> <prompt-file>\n".utf8))
+            FileHandle.standardError.write(Data("usage: fm-structured <intro|pairs|labels|groups> <instructions-file> <prompt-file>\\n".utf8))
             exit(2)
         }
         switch SystemLanguageModel.default.availability {
         case .available:
             break
         case .unavailable(let reason):
-            FileHandle.standardError.write(Data("Apple Intelligence model unavailable: \(reason)\n".utf8))
+            FileHandle.standardError.write(Data("Apple Intelligence model unavailable: \\(reason)\\n".utf8))
             exit(3)
         }
 
@@ -90,7 +106,7 @@ func emit(_ object: [String: Any]) throws {
                 try emit(["same": r.content.same])
             } else if args[1] == "labels" {
                 let r = try await session.respond(to: prompt, generating: StoryLabels.self, options: options)
-                try emit(["stories": r.content.labels.map { "\($0.id)|\($0.section)|\($0.importance)" }])
+                try emit(["stories": r.content.labels.map { "\\($0.id)|\\($0.section)|\\($0.importance)" }])
             } else {
                 let r = try await session.respond(to: prompt, generating: StoryGroups.self, options: options)
                 try emit(["stories": r.content.stories])
@@ -98,11 +114,50 @@ func emit(_ object: [String: Any]) throws {
         } catch let error as LanguageModelSession.GenerationError {
             switch error {
             case .exceededContextWindowSize:
-                FileHandle.standardError.write(Data("CONTEXT_WINDOW: prompt + answer exceeded the on-device model's context window (\(error))\n".utf8))
+                FileHandle.standardError.write(Data("CONTEXT_WINDOW: prompt + answer exceeded the on-device model's context window (\\(error))\\n".utf8))
             default:
-                FileHandle.standardError.write(Data("GENERATION: \(error)\n".utf8))
+                FileHandle.standardError.write(Data("GENERATION: \\(error)\\n".utf8))
             }
             exit(4)
         }
     }
+}
+`;
+
+export type AppleStructuredMode = 'intro' | 'pairs' | 'labels';
+
+export class AppleStructuredError extends Error {
+  constructor(message: string, readonly kind: 'unavailable' | 'context' | 'generation' | 'compile' | 'other') {
+    super(message);
+  }
+}
+
+/**
+ * Run one guided-generation request on the on-device model. Throws
+ * AppleStructuredError; callers fall back to their non-structured path.
+ */
+export function runAppleStructured(mode: AppleStructuredMode, instructions: string, prompt: string, timeoutMs = 60_000): any {
+  if (!isAppleAvailable()) throw new AppleStructuredError('Apple Intelligence needs macOS 26', 'unavailable');
+  const binary = ensureAppleBinary(APPLE_STRUCTURED_SWIFT, '.apple-structured');
+  if (!binary) throw new AppleStructuredError('Could not compile the Apple Intelligence helper (xcode-select --install)', 'compile');
+
+  const dir = join(homedir(), '.config', 'pullread');
+  mkdirSync(dir, { recursive: true });
+  const instFile = join(dir, `.apple-structured-${process.pid}-inst.txt`);
+  const promptFile = join(dir, `.apple-structured-${process.pid}-prompt.txt`);
+  writeFileSync(instFile, instructions);
+  writeFileSync(promptFile, prompt);
+  try {
+    const out = execFileSync(binary, [mode, instFile, promptFile], { encoding: 'utf-8', timeout: timeoutMs, stdio: ['pipe', 'pipe', 'pipe'] });
+    return JSON.parse(out.slice(out.indexOf('{'), out.lastIndexOf('}') + 1));
+  } catch (err: any) {
+    const stderr = String(err?.stderr || '');
+    if (/CONTEXT_WINDOW|exceededContextWindowSize/.test(stderr)) throw new AppleStructuredError('Apple Intelligence context window exceeded', 'context');
+    if (/model unavailable/.test(stderr)) throw new AppleStructuredError(stderr.trim().slice(0, 200), 'unavailable');
+    if (/GENERATION:/.test(stderr)) throw new AppleStructuredError(stderr.trim().slice(0, 200), 'generation');
+    throw new AppleStructuredError(stderr.trim().slice(0, 200) || String(err?.message || err), 'other');
+  } finally {
+    try { unlinkSync(instFile); } catch {}
+    try { unlinkSync(promptFile); } catch {}
+  }
 }

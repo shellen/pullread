@@ -92,6 +92,27 @@ export function parseIntroResponse(raw: any, titles: string[]): StructuredIntro 
 }
 
 /**
+ * Instructions for the on-device intro (Apple Intelligence, macOS 26). Pairs
+ * with IntroResult in APPLE_STRUCTURED_SWIFT: per-story sentences in a lead
+ * (1-2) and a second paragraph (2-3), in the model's own words, short links.
+ */
+export function appleIntroInstructions(dateLine: string): string {
+  return `You write the opening note for a daily reading email.
+Pick the 1-2 most important stories for the first paragraph and 2-3 others for the second. For each, write ONE sentence IN YOUR OWN WORDS saying what happened and why it matters, with one concrete detail (a number, a name, a place). Do not copy the headline or the excerpt.
+For each sentence also give the link: 2 to 5 words from your sentence that name the story (for example "Bayer's Roundup deal"), never the whole sentence.
+This note goes out on ${dateLine}. Stories may mention other days; those are not today. Don't name today's weekday or date.
+No greetings, no sign-offs, no "here are the top stories", never "dive in" or "buckle up".`;
+}
+
+/** The numbered story list for the on-device intro: top stories only, short gists (4K window). */
+export function appleIntroStoryList(stories: Array<{ title: string; domain?: string; summary?: string; excerpt?: string }>, max = 6, gistCap = 140): string {
+  return stories.slice(0, max).map((a, i) => {
+    const gist = (a.summary || a.excerpt || '').slice(0, gistCap);
+    return `${i + 1}. ${a.title} (${a.domain || ''})${gist ? ` \u2014 ${gist}` : ''}`;
+  }).join('\n');
+}
+
+/**
  * Turn a structured intro into the `{{phrase|N}}` marker text the existing
  * renderer already links, so links come from the model's citations instead of
  * title matching. A link whose phrase isn't in its paragraph, or whose story
@@ -322,11 +343,63 @@ export function groupingLinesFromPairs(
   });
 }
 
+export type StructuredRunner = (mode: 'pairs' | 'labels', instructions: string, prompt: string) => any;
+
+/**
+ * The macOS 26 grouping pass end to end: "same event?" for candidate pairs in
+ * batches of 12, then fixed-list section labels in batches of 20. Importance
+ * is dropped (unreliable on-device). Returns "ids|label|" lines for
+ * applyModelGroups, or null if the time budget runs out before the pair
+ * questions finish. Labels are optional: if time runs out during labeling,
+ * the merges still count. `run` throws on model errors; callers catch.
+ */
+export function onDeviceGrouping(
+  groups: StoryGroup[],
+  run: StructuredRunner,
+  opts: { budgetMs?: number; clock?: () => number } = {},
+): string[] | null {
+  const { budgetMs = 45_000, clock = Date.now } = opts;
+  const start = clock();
+  const pairs = candidatePairs(groups);
+  const same: string[] = [];
+  const pairBatches = batches(pairs, 12);
+  for (let bi = 0; bi < pairBatches.length; bi++) {
+    if (clock() - start > budgetMs) return null;
+    same.push(...((run('pairs', PAIR_INSTRUCTIONS, pairsPrompt(groups, pairBatches[bi], bi * 12))?.same) || []));
+  }
+  const labels: string[] = [];
+  for (const ids of batches(groups.map((_, i) => i), 20)) {
+    if (clock() - start > budgetMs) break;
+    labels.push(...((run('labels', LABEL_INSTRUCTIONS, labelPrompt(groups, ids))?.stories) || []));
+  }
+  return groupingLinesFromPairs(groups.length, pairs, same, labels, { useImportance: false });
+}
+
 // ---------------------------------------------------------------------------
 // Demo 3 — intro rule checks (Evaluations-style)
 // ---------------------------------------------------------------------------
 
 /** Phrases the intro prompt forbids (kept in sync with roundupSummaryPrompt in email.ts). */
+/**
+ * Rules that block an intro from being sent (retry once, then omit it). The
+ * rest — paragraph count, link length, link count — are logged but allowed:
+ * links can also come from the renderer's title matching, and a long intro is
+ * still a correct one.
+ */
+export const BLOCKING_RULES = new Set([
+  "Doesn't name a day or date as today",
+  'No banned phrases',
+  'No greeting or sign-off',
+  'No filler opener',
+  'Every cited story exists',
+  'Written in its own words',
+]);
+
+/** The blocking failures in a set of checks, as "rule — detail" strings. */
+export function blockingFailures(checks: IntroCheck[]): string[] {
+  return checks.filter(c => !c.passed && BLOCKING_RULES.has(c.rule)).map(c => (c.detail ? `${c.rule} — ${c.detail}` : c.rule));
+}
+
 export const BANNED_PHRASES = [
   'dive in', 'buckle up', 'without further ado', "let's get started", "here's what caught my eye",
   "in today's rundown", 'welcome to', "that's the rundown",
@@ -380,7 +453,8 @@ export function checkIntro(text: string, opts: { now: Date; storyCount: number; 
 
   // Copying: a sentence whose words (8+) nearly all come from one story's title or excerpt.
   if (opts.sources?.length) {
-    const plain = text.replace(/\{\{([^{}|]+)\|\d+\}\}/g, '$1');
+    // Quoted titles are allowed (the strict-titles prompt asks for them); measure the rest.
+    const plain = text.replace(/\{\{([^{}|]+)\|\d+\}\}/g, '$1').replace(/["\u201c][^"\u201d]{12,}["\u201d]/g, ' ');
     const wordsOf = (t: string) => t.toLowerCase().replace(/[\u2018\u2019]/g, "'").match(/[a-z0-9$.']+/g) || [];
     const sourceSets = opts.sources.map(src => new Set(wordsOf(src)));
     const copied = plain.split(/(?<=[.!?])\s+/).filter(sentence => {

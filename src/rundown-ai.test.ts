@@ -1,7 +1,7 @@
 // ABOUTME: Tests for the Rundown structured-output helpers (intro citations, model grouping, intro checks)
 // ABOUTME: Model responses here are recorded samples, not live model output
 
-import { parseFlatIntro, structuredIntroToMarkers, applyModelGroups, groupingPrompt, checkIntro, mentionsToIntro, fallbackPhrase, parseIntroResponse, candidatePairs, pairsPrompt, groupingLinesFromPairs, batches } from './rundown-ai';
+import { parseFlatIntro, structuredIntroToMarkers, applyModelGroups, groupingPrompt, checkIntro, mentionsToIntro, fallbackPhrase, parseIntroResponse, candidatePairs, pairsPrompt, groupingLinesFromPairs, batches, onDeviceGrouping } from './rundown-ai';
 import { groupStories } from './stories';
 import type { ArticleMeta } from './email';
 
@@ -146,6 +146,37 @@ describe('macOS 26 tie-breaker grouping', () => {
 
   test('a "no" from the model leaves groups separate', () => {
     expect(groupingLinesFromPairs(2, [[0, 1]], [], [])).toEqual(['1||', '2||']);
+  });
+});
+
+describe('onDeviceGrouping', () => {
+  const groups = groupStories([
+    article('Judge Approves $7 Billion Settlement Over Claims That Roundup Caused Cancer', 'https://www.nytimes.com/roundup'),
+    article('Weedkiller maker cleared to pay out billions to cancer claimants', 'https://www.theguardian.com/weedkiller'),
+    article('BMW Recalls 286 i5 And i7 EVs Over Battery Fire Risk', 'https://electrek.co/bmw'),
+  ]);
+
+  test('asks pairs then labels, and drops importance', () => {
+    const calls: string[] = [];
+    const run = (mode: 'pairs' | 'labels') => {
+      calls.push(mode);
+      return mode === 'pairs' ? { same: ['P1', 'P7'] } : { stories: ['1|Courts|5', '2|Business|5', '3|Autos|5'] };
+    };
+    expect(onDeviceGrouping(groups, run)).toEqual(['1,2|Courts|', '3|Autos|']);
+    expect(calls).toEqual(['pairs', 'labels']);
+  });
+
+  test('gives up if the time budget runs out before the pair questions finish', () => {
+    let t = 0;
+    const clock = () => (t += 60_000);
+    expect(onDeviceGrouping(groups, () => ({ same: ['P1'] }), { budgetMs: 45_000, clock })).toBeNull();
+  });
+
+  test('keeps the merges if time runs out during labeling', () => {
+    let t = 0;
+    const clock = () => (t += 30_000); // pairs at +30s, labels would start at +60s
+    const run = (mode: 'pairs' | 'labels') => (mode === 'pairs' ? { same: ['P1'] } : { stories: ['1|Courts|3'] });
+    expect(onDeviceGrouping(groups, run, { budgetMs: 45_000, clock })).toEqual(['1,2||', '3||']);
   });
 });
 

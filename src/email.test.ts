@@ -1,7 +1,7 @@
 // ABOUTME: Tests for the email roundup module
 // ABOUTME: Covers HTML generation, escaping, provider resolution, curation, summary, and send logic
 
-import { escapeHtml, buildRoundupHtml, sendTestEmail, sendRoundup, resolveSmtpConfig, SMTP_PROVIDERS, curateArticles, dedupeArticles, generateRoundupSummary, buildRoundup, filterByLookback, formatSummaryCredit, scoreArticle, groupByCategory, issueDateLine } from './email';
+import { escapeHtml, buildRoundupHtml, sendTestEmail, sendRoundup, resolveSmtpConfig, SMTP_PROVIDERS, curateArticles, curateWithStories, dedupeArticles, generateRoundupSummary, buildRoundup, filterByLookback, formatSummaryCredit, scoreArticle, groupByCategory, issueDateLine } from './email';
 import type { EmailConfig, ArticleMeta } from './email';
 
 jest.mock('nodemailer', () => ({
@@ -20,6 +20,12 @@ jest.mock('./summarizer', () => ({
   promptLLM: jest.fn(),
   summarizeText: jest.fn(),
 }));
+jest.mock('./apple-structured', () => ({
+  // Never compile or run Swift in tests; individual tests set a return value.
+  runAppleStructured: jest.fn(() => { throw new Error('apple-structured not mocked for this test'); }),
+}));
+import { runAppleStructured } from './apple-structured';
+const mockRunAppleStructured = runAppleStructured as jest.MockedFunction<typeof runAppleStructured>;
 import { loadLLMConfig, promptLLM } from './summarizer';
 const mockLoadLLMConfig = loadLLMConfig as jest.MockedFunction<typeof loadLLMConfig>;
 const mockPromptLLM = promptLLM as jest.MockedFunction<typeof promptLLM>;
@@ -691,6 +697,97 @@ describe('sendRoundup', () => {
       async () => articles,
     )).rejects.toThrow();
   }, 45000);
+});
+
+describe('roundup intro gate and Apple structured intro', () => {
+  const now = new Date(2026, 10, 24, 18, 0); // a Tuesday evening
+  const stories = [
+    article({ title: 'Chile earthquake: Dozens dead after 7.8 magnitude quake strikes near Santiago', domain: 'bbc.com' }),
+    article({ title: 'Judge Approves $7 Billion Settlement Over Claims That Roundup Caused Cancer', domain: 'nytimes.com' }),
+    article({ title: 'BART suspends service systemwide after power failure', domain: 'kqed.org' }),
+  ];
+
+  beforeEach(() => {
+    mockLoadLLMConfig.mockReset();
+    mockPromptLLM.mockReset();
+    mockRunAppleStructured.mockReset();
+    mockRunAppleStructured.mockImplementation(() => { throw new Error('not mocked'); });
+  });
+
+  test('an intro that names the wrong day is retried once, then left out', async () => {
+    mockLoadLLMConfig.mockReturnValue({ provider: 'anthropic', apiKey: 'k', model: 'm' });
+    mockPromptLLM.mockResolvedValue({ text: "It's Friday the 13th, and the {{Roundup settlement|2}} is done.", model: 'm' });
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(await generateRoundupSummary(stories, { now })).toBeNull();
+    expect(mockPromptLLM).toHaveBeenCalledTimes(2);
+    expect(warn.mock.calls.map(c => String(c[0])).join('\n')).toContain("Doesn't name a day or date as today");
+    warn.mockRestore();
+  });
+
+  test('a failed first attempt is replaced by a passing retry', async () => {
+    mockLoadLLMConfig.mockReturnValue({ provider: 'anthropic', apiKey: 'k', model: 'm' });
+    mockPromptLLM
+      .mockResolvedValueOnce({ text: 'Good evening! Let\u2019s dive in.', model: 'm' })
+      .mockResolvedValueOnce({ text: 'A {{7.8 quake near Santiago|1}} has killed dozens.', model: 'm' });
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const r = await generateRoundupSummary(stories, { now });
+    expect(r?.text).toBe('A {{7.8 quake near Santiago|1}} has killed dozens.');
+    expect(mockPromptLLM).toHaveBeenCalledTimes(2);
+  });
+
+  test('Apple Intelligence uses the structured per-story intro', async () => {
+    mockLoadLLMConfig.mockReturnValue({ provider: 'apple', apiKey: '' });
+    mockRunAppleStructured.mockReturnValue({ mentions: [
+      [{ story: 1, sentence: 'A powerful quake near Santiago has killed dozens of people.', phrase: 'quake near Santiago' }],
+      [{ story: 2, sentence: 'Bayer will pay $7 billion to settle the cancer lawsuits.', phrase: 'Bayer will pay $7 billion to settle the cancer lawsuits' },
+       { story: 3, sentence: 'BART stopped every train during the evening commute.', phrase: 'BART stopped every train' }],
+    ] });
+    const r = await generateRoundupSummary(stories, { now });
+    expect(mockPromptLLM).not.toHaveBeenCalled();
+    expect(r?.provider).toBe('apple');
+    expect(r?.text).toContain('{{quake near Santiago|1}}');
+    expect(r?.text).toContain('{{$7 Billion|2}}'.replace('Billion', 'billion')); // whole-sentence link shortened to title words
+    expect(r?.text).toContain('{{BART stopped every train|3}}');
+    // The instructions carry the issue date, and the story list is capped for the 4K window.
+    const [mode, instructions, prompt] = mockRunAppleStructured.mock.calls[0];
+    expect(mode).toBe('intro');
+    expect(instructions).toContain('Tuesday, November 24, 2026 (evening)');
+    expect(prompt.split('\n')).toHaveLength(3);
+  });
+
+  test('Apple falls back to the text prompt when the structured helper fails', async () => {
+    mockLoadLLMConfig.mockReturnValue({ provider: 'apple', apiKey: '' });
+    mockPromptLLM.mockResolvedValue({ text: 'A quake in "Chile earthquake: Dozens dead after 7.8 magnitude quake strikes near Santiago" leads.', model: 'apple-on-device' });
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const r = await generateRoundupSummary(stories, { now });
+    expect(mockRunAppleStructured).toHaveBeenCalled();
+    expect(mockPromptLLM).toHaveBeenCalledTimes(1);
+    expect(r?.text).toContain('Chile earthquake'); // a quoted exact title is not "copying"
+  });
+});
+
+describe('curateWithStories model grouper', () => {
+  const cfg = { widerNews: false, regionalFeeds: [] };
+  const score = () => 0;
+  const items = [
+    article({ title: 'Judge Approves $7 Billion Settlement Over Claims That Roundup Caused Cancer', url: 'https://www.nytimes.com/roundup', domain: 'nytimes.com', categories: ['Business'] }),
+    article({ title: 'Weedkiller maker cleared to pay out billions to cancer claimants', url: 'https://www.theguardian.com/weedkiller', domain: 'theguardian.com', categories: ['Suits and Litigation (Civil)'] }),
+    article({ title: 'BMW Recalls 286 i5 And i7 EVs Over Battery Fire Risk', url: 'https://electrek.co/bmw', domain: 'electrek.co', categories: ['Business'] }),
+  ];
+
+  test('merges and relabels with the model grouping', async () => {
+    const out = await curateWithStories(items, cfg, score, undefined, undefined, { modelGrouper: () => ['1,2|Courts|', '3|Autos|'] });
+    expect(out).toHaveLength(2);
+    const roundup = out.find(a => a.domain === 'nytimes.com')!;
+    expect(roundup.categories).toEqual(['Courts']);
+    expect(roundup.story?.alsoIn.map(x => x.source)).toEqual(['theguardian.com']);
+  });
+
+  test('a failing grouper leaves word-matching groups in place', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const out = await curateWithStories(items, cfg, score, undefined, undefined, { modelGrouper: () => { throw new Error('context window'); } });
+    expect(out).toHaveLength(3);
+  });
 });
 
 describe('generateRoundupSummary', () => {

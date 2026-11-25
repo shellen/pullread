@@ -1,7 +1,10 @@
 # Rundown Stories + Apple Intelligence (WWDC26) — Plan
 
 **Date**: 2026-11-25
-**Status**: Plan. Phase 1 is prototyped on `claude/lucid-shannon-jkllpp`.
+**Status**: In progress on `claude/lucid-shannon-jkllpp` (0.6.0).
+- Phase 1 is built and still needs a live feed check and a settings screen.
+- The macOS 26 parts of Phases 3–5 are in the app, under "In the app now" below.
+- Phase 2 (helpers built and signed in CI) is next.
 **Ships after**: PR #121 (Rundown fixes) in 0.5.2. This work targets 0.6.0 and later.
 **Target OS**: macOS 26 (Tahoe), which is what we develop and test on (26.6). Everything in Phases 1–5 runs on macOS 26. The macOS 27 features are a separate later section and nothing earlier depends on them.
 
@@ -32,6 +35,17 @@ Not added: embeddings, clustering and ranking APIs. On-device semantic matching 
 **Measured on macOS 26.6 (M4 Pro, Nov 25):** the on-device context window is **4,096 tokens**, covering prompt, schema and answer together. Apple's 8,192 figure is for macOS 27. In guided generation, an unbounded `[T]` field let the model run until the window was full (`exceededContextWindowSize` at 4,091 tokens). Every array field needs a `.count`/`.maximumCount` guide, and every call needs `GenerationOptions(maximumResponseTokens:)`.
 
 Not yet confirmed: the PCC entitlement name and its daily limits (in session 319).
+
+## In the app now (from the demos)
+
+These were proven on macOS 26.6 over four live runs and moved from `scripts/demos/` into the app:
+
+- **`src/apple-structured.ts`.** The guided-generation Swift helper, compiled once with `ensureAppleBinary` like the summarizer's. It covers three modes: `intro`, `pairs` and `labels`. It checks availability first, caps every array and every response length, and names context-window and generation errors. The demos now call this same helper.
+- **Rundown intro for Apple users** (`generateRoundupSummary`). It asks for the per-story structure (`appleIntroInstructions`, top 6 stories, 140-character gists). If that fails, it falls back to the existing text prompt.
+- **Intro gate for every provider.** `checkIntro` plus `blockingFailures`: an intro that names the wrong day, uses banned filler, a greeting or a filler opener, cites a missing story, or copies a story's text is retried once, then left out. Paragraph count and link length are logged only. Quoted exact titles don't count as copying, because the strict-titles prompt asks for them.
+- **On-device grouping for Apple users** (`buildRoundup` → `appleGrouperIfEnabled` → `onDeviceGrouping`). "Same event?" for candidate pairs, plus fixed-list labels, with importance ignored. It runs under a 45-second budget. Each call has a 30-second timeout, and on any error the Rundown keeps word matching only.
+
+Caveat: the helper runs synchronously (`execFileSync`), like the existing Apple summarizer, so the sidecar blocks while it runs. That's acceptable for a scheduled email, but it should go async in Phase 2.
 
 ## Phases
 

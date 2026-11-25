@@ -7,7 +7,11 @@ import { homedir } from 'os';
 import { readFileSync, existsSync } from 'fs';
 import { groupStories, alsoInFor, weighStories, findConsensus, pickTopStories, fetchPanelHeadlines, DEFAULT_PANEL } from './stories';
 import type { PanelSource, Scope } from './stories';
-import { applyModelGroups } from './rundown-ai';
+import {
+  applyModelGroups, checkIntro, blockingFailures, parseIntroResponse, structuredIntroToMarkers,
+  appleIntroInstructions, appleIntroStoryList,
+} from './rundown-ai';
+import type { StoryGroup } from './stories';
 
 const HEADER_IMAGE_PATH = join(__dirname, '..', 'email-header.png');
 
@@ -823,65 +827,104 @@ export interface RoundupSummary {
   provider: string;
 }
 
-export async function generateRoundupSummary(articles: ArticleMeta[]): Promise<RoundupSummary | null> {
+export async function generateRoundupSummary(articles: ArticleMeta[], opts: { now?: Date } = {}): Promise<RoundupSummary | null> {
   const { promptLLM, loadLLMConfig } = await import('./summarizer');
   const config = loadLLMConfig();
   if (!config) return null;
+  const now = opts.now ?? new Date();
 
-  // Number the stories so the model can cite them inline as {{words|N}};
-  // renderSummaryParagraphs maps N back to this same (curated) article order.
-  // Feed each story's summary (or excerpt) like the in-app briefing does —
-  // titles alone push small models toward vague filler prose.
-  const buildList = (maxArticles: number, gistCap: number) => articles
-    .slice(0, maxArticles)
-    .map((a, i) => {
-      const gist = a.summary || a.excerpt || '';
-      const detail = gist && gistCap > 0 ? `\n   ${a.summary ? 'Summary' : 'Excerpt'}: ${gist.slice(0, gistCap)}` : '';
-      return `${i + 1}. "${a.title}" (${a.domain || a.feed || ''})${detail}`;
-    })
-    .join('\n');
+  // The free-text intro (all providers; also Apple's fallback).
+  const textIntro = async (): Promise<RoundupSummary | null> => {
+    // Number the stories so the model can cite them inline as {{words|N}};
+    // renderSummaryParagraphs maps N back to this same (curated) article order.
+    // Feed each story's summary (or excerpt) like the in-app briefing does —
+    // titles alone push small models toward vague filler prose.
+    const buildList = (maxArticles: number, gistCap: number) => articles
+      .slice(0, maxArticles)
+      .map((a, i) => {
+        const gist = a.summary || a.excerpt || '';
+        const detail = gist && gistCap > 0 ? `\n   ${a.summary ? 'Summary' : 'Excerpt'}: ${gist.slice(0, gistCap)}` : '';
+        return `${i + 1}. "${a.title}" (${a.domain || a.feed || ''})${detail}`;
+      })
+      .join('\n');
 
-  const base = roundupSummaryPrompt(config.provider === 'apple');
-  let articleList = buildList(15, 300);
+    const base = roundupSummaryPrompt(config.provider === 'apple');
+    let articleList = buildList(15, 300);
 
-  if (config.provider === 'apple') {
-    // Apple Intelligence has a hard 4096-token window shared with the ~400-token
-    // reply, and roughly 3 chars/token on mixed text — a rich prompt overflows it
-    // and the whole intro is lost. Shrink the story gists (then the list) until
-    // the prompt fits comfortably.
-    const budget = 7000; // total prompt chars
-    for (const [n, cap] of [[15, 120], [12, 80], [10, 40], [8, 0], [5, 0]] as const) {
-      articleList = buildList(n, cap);
-      if (base.length + articleList.length <= budget) break;
-    }
-  }
-
-  // Use promptLLM (not summarizeText): the roundup prompt IS the instruction.
-  // summarizeText would prepend its own "Summarize this article…" wrapper, so the
-  // model would summarize our instructions instead of following them — producing a
-  // near-static blurb anchored on the example lines in the prompt.
-  // A slightly higher token budget lets the model write 2-3 short paragraphs.
-  const run = async (list: string) => {
-    const result = await promptLLM(base + list, config, 400);
-    const text = stripFillerParagraphs(result.text.trim());
-    return text ? { text, model: result.model, provider: config.provider } : null;
-  };
-  try {
-    return await run(articleList);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    // Last resort: a bare titles-only list still beats an email with no intro.
-    if (/context window/i.test(msg)) {
-      try {
-        return await run(buildList(5, 0));
-      } catch (retryErr) {
-        console.warn('[email] Roundup summary retry failed:', retryErr instanceof Error ? retryErr.message : retryErr);
-        return null;
+    if (config.provider === 'apple') {
+      // Apple Intelligence has a hard 4096-token window shared with the ~400-token
+      // reply, and roughly 3 chars/token on mixed text — a rich prompt overflows it
+      // and the whole intro is lost. Shrink the story gists (then the list) until
+      // the prompt fits comfortably.
+      const budget = 7000; // total prompt chars
+      for (const [n, cap] of [[15, 120], [12, 80], [10, 40], [8, 0], [5, 0]] as const) {
+        articleList = buildList(n, cap);
+        if (base.length + articleList.length <= budget) break;
       }
     }
-    console.warn('[email] Failed to generate roundup summary:', msg);
-    return null;
+
+    // Use promptLLM (not summarizeText): the roundup prompt IS the instruction.
+    // summarizeText would prepend its own "Summarize this article…" wrapper, so the
+    // model would summarize our instructions instead of following them — producing a
+    // near-static blurb anchored on the example lines in the prompt.
+    // A slightly higher token budget lets the model write 2-3 short paragraphs.
+    const run = async (list: string) => {
+      const result = await promptLLM(base + list, config, 400);
+      const text = stripFillerParagraphs(result.text.trim());
+      return text ? { text, model: result.model, provider: config.provider } : null;
+    };
+    try {
+      return await run(articleList);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Last resort: a bare titles-only list still beats an email with no intro.
+      if (/context window/i.test(msg)) {
+        try {
+          return await run(buildList(5, 0));
+        } catch (retryErr) {
+          console.warn('[email] Roundup summary retry failed:', retryErr instanceof Error ? retryErr.message : retryErr);
+          return null;
+        }
+      }
+      console.warn('[email] Failed to generate roundup summary:', msg);
+      return null;
+    }
+  };
+
+  // Apple Intelligence: guided generation with per-story sentences, which the
+  // on-device model follows far better than a free-form prompt (see
+  // src/apple-structured.ts). Falls back to the text prompt on any error.
+  const structuredAppleIntro = async (): Promise<RoundupSummary | null> => {
+    const { runAppleStructured } = await import('./apple-structured');
+    const raw = runAppleStructured('intro', appleIntroInstructions(issueDateLine(now)), appleIntroStoryList(articles));
+    const { text } = structuredIntroToMarkers(parseIntroResponse(raw, articles.map(a => a.title)), articles.length);
+    return text.trim() ? { text, model: 'on-device', provider: 'apple' } : null;
+  };
+
+  const attempt = async (): Promise<RoundupSummary | null> => {
+    if (config.provider === 'apple') {
+      try {
+        const r = await structuredAppleIntro();
+        if (r) return r;
+      } catch (err) {
+        console.warn('[email] Structured Apple intro failed, using the text prompt:', err instanceof Error ? err.message : err);
+      }
+    }
+    return textIntro();
+  };
+
+  // Gate: an intro that names the wrong day, uses banned filler, cites a story
+  // that isn't there, or copies the stories gets one retry, then is left out —
+  // no intro beats a wrong one.
+  const sources = articles.flatMap(a => [a.title, a.summary || a.excerpt || '']).filter(Boolean);
+  for (let i = 1; i <= 2; i++) {
+    const result = await attempt();
+    if (!result) return null;
+    const failures = blockingFailures(checkIntro(result.text, { now, storyCount: articles.length, sources }));
+    if (!failures.length) return result;
+    console.warn(`[email] Roundup intro failed checks (attempt ${i} of 2): ${failures.join('; ')}`);
   }
+  return null;
 }
 
 export interface RoundupResult {
@@ -912,6 +955,12 @@ export interface StoryCurationOptions {
    * sections, and nudges weight by importance.
    */
   modelGroups?: string[];
+  /**
+   * Ask a model to group the stories (Apple on-device on macOS 26: see
+   * onDeviceGrouping). Returns "ids|label|importance" lines, or null to skip.
+   * Errors are caught and the stories stay grouped by word matching alone.
+   */
+  modelGrouper?: (groups: StoryGroup[]) => string[] | null | Promise<string[] | null>;
 }
 
 /**
@@ -953,8 +1002,16 @@ export async function curateWithStories(
 
   let groups = groupStories(articles);
   let weighFn = scoreFn;
-  if (opts.modelGroups?.length) {
-    const model = applyModelGroups(groups, opts.modelGroups);
+  let modelLines = opts.modelGroups;
+  if (!modelLines && opts.modelGrouper && groups.length > 1) {
+    try {
+      modelLines = (await opts.modelGrouper(groups)) ?? undefined;
+    } catch (err) {
+      console.warn('[email] Model story grouping failed; using word matching only:', err instanceof Error ? err.message : err);
+    }
+  }
+  if (modelLines?.length) {
+    const model = applyModelGroups(groups, modelLines);
     groups = model.groups.map(g => {
       const label = model.labels.get(g);
       return label ? { ...g, lead: { ...g.lead, categories: [label] } } : g;
@@ -976,6 +1033,23 @@ export async function curateWithStories(
   });
   const others = curateArticles(leads, mentionCounts, watchedEntities, Math.max(0, limit - topArticles.length));
   return [...topArticles, ...others];
+}
+
+/**
+ * On-device story grouping for Apple Intelligence users (macOS 26): merges
+ * reworded copies of the same story and labels sections from a fixed list.
+ * Other providers keep word matching only for now.
+ */
+async function appleGrouperIfEnabled(): Promise<StoryCurationOptions['modelGrouper']> {
+  try {
+    const { loadLLMConfig, isAppleAvailable } = await import('./summarizer');
+    if (loadLLMConfig()?.provider !== 'apple' || !isAppleAvailable()) return undefined;
+    const { runAppleStructured } = await import('./apple-structured');
+    const { onDeviceGrouping } = await import('./rundown-ai');
+    return groups => onDeviceGrouping(groups, (mode, instructions, prompt) => runAppleStructured(mode, instructions, prompt, 30_000));
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -1025,7 +1099,9 @@ export async function buildRoundup(
 
   const scoreCtx: ScoreContext = { now: Date.now(), mentionCounts, watchedEntities };
   const scoreFn = (a: ArticleMeta) => scoreArticle(a, scoreCtx);
-  const curated = await curateWithStories(articles, cfg, scoreFn, mentionCounts, watchedEntities);
+  const curated = await curateWithStories(articles, cfg, scoreFn, mentionCounts, watchedEntities, {
+    modelGrouper: await appleGrouperIfEnabled(),
+  });
 
   // Validate article images — strip broken URLs to avoid broken image icons
   await validateArticleImages(curated);

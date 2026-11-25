@@ -15,17 +15,18 @@
  * Without --live, the model responses are recorded samples from sample-day.ts.
  * With --live they come from Apple's model: on macOS 27 through `fm respond`
  * (demo 2 uses --model pcc unless --on-device is passed); on macOS 26, where
- * there's no `fm`, through fm-structured.swift (compiled once with swiftc,
- * on-device model only — Private Cloud Compute needs macOS 27).
+ * there's no `fm`, through the app's own helper (src/apple-structured.ts,
+ * compiled once with swiftc; on-device only — PCC needs macOS 27).
  */
 
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs';
+import { mkdirSync, writeFileSync } from 'fs';
 import { join, resolve } from 'path';
 import { tmpdir } from 'os';
 import { buildRoundupHtml, curateWithStories, scoreArticle, escapeHtml, issueDateLine } from '../../src/email';
 import type { ArticleMeta } from '../../src/email';
 import { groupStories } from '../../src/stories';
-import { parseFlatIntro, parseIntroResponse, structuredIntroToMarkers, groupingPrompt, GROUPING_INSTRUCTIONS, checkIntro, applyModelGroups, candidatePairs, pairsPrompt, PAIR_INSTRUCTIONS, labelPrompt, LABEL_INSTRUCTIONS, batches, groupingLinesFromPairs } from '../../src/rundown-ai';
+import { appleIntroInstructions, appleIntroStoryList, onDeviceGrouping, parseIntroResponse, structuredIntroToMarkers, groupingPrompt, GROUPING_INSTRUCTIONS, checkIntro, applyModelGroups, candidatePairs, pairsPrompt, groupingLinesFromPairs } from '../../src/rundown-ai';
+import { runAppleStructured, AppleStructuredError } from '../../src/apple-structured';
 import { articles, panel, panelHeadlines, regionalFeeds, sampleIntro, sampleGrouping, sampleSamePairs, sampleLabels, sampleIntrosToCheck } from './sample-day';
 
 const args = process.argv.slice(2);
@@ -76,39 +77,26 @@ function parseJson(out: string): any {
   return JSON.parse(out.slice(out.indexOf('{'), out.lastIndexOf('}') + 1));
 }
 
-/** Compile fm-structured.swift once (cached by source contents) and return the binary path. */
-function swiftHelper(): string {
-  const src = join(import.meta.dir, 'fm-structured.swift');
-  const code = readFileSync(src, 'utf8');
-  const bin = join(tmpdir(), `pullread-fm-structured-${Bun.hash(code).toString(16)}`);
-  if (!existsSync(bin)) {
-    console.log('Compiling the Swift helper (first run only)…');
-    run(['swiftc', '-parse-as-library', '-O', src, '-o', bin]);
-  }
-  return bin;
-}
-
 /** Structured output from Apple's model: `fm` on macOS 27, the Swift helper on macOS 26. */
 function structured(mode: 'intro' | 'pairs' | 'labels' | 'groups', prompt: string, instructions: string, arrays: string[]): any {
   if (hasFm) {
     const schema = fmSchema(mode === 'intro' ? 'RundownIntro' : mode === 'pairs' ? 'SamePairs' : 'StoryGroups', arrays);
     return parseJson(run(['fm', 'respond', ...(usePcc ? ['--model', 'pcc'] : []), '--instructions', instructions, '--schema', schema, prompt]));
   }
-  const instFile = join(tmpdir(), 'pullread-demo-instructions.txt');
-  const promptFile = join(tmpdir(), 'pullread-demo-prompt.txt');
-  writeFileSync(instFile, instructions);
-  writeFileSync(promptFile, prompt);
-  return parseJson(run([swiftHelper(), mode, instFile, promptFile]));
+  // macOS 26: the same helper the app uses (src/apple-structured.ts).
+  try {
+    return runAppleStructured(mode === 'groups' ? 'labels' : mode, instructions, prompt);
+  } catch (err) {
+    const kind = err instanceof AppleStructuredError ? err.kind : 'other';
+    throw new Error(`Apple Intelligence (${kind}): ${err instanceof Error ? err.message : err}`
+      + (kind === 'compile' ? '\nswiftc needs the Xcode command line tools: xcode-select --install' : ''));
+  }
 }
 
 const storyList = (list: ArticleMeta[], excerptMax = 240) => list.map((a, i) => `${i + 1}. ${a.title} (${a.domain})${a.excerpt ? ` — ${a.excerpt.slice(0, excerptMax)}` : ''}`).join('\n');
 
-// macOS 26 / on-device: per-story sentences in two paragraphs (see fm-structured.swift).
-const INTRO_INSTRUCTIONS_ONDEVICE = `You write the opening note for a daily reading email.
-Pick the 1-2 most important stories for the first paragraph and 2-3 others for the second. For each, write ONE sentence IN YOUR OWN WORDS saying what happened and why it matters, with one concrete detail (a number, a name, a place). Do not copy the headline or the excerpt.
-For each sentence also give the link: 2 to 5 words from your sentence that name the story (for example "Bayer's Roundup deal"), never the whole sentence.
-This note goes out on ${issueDateLine()}. Stories may mention other days; those are not today. Don't name today's weekday or date.
-No greetings, no sign-offs, no "here are the top stories", never "dive in" or "buckle up".`;
+// macOS 26 / on-device: the app's own prompt and story list (src/rundown-ai.ts).
+const INTRO_INSTRUCTIONS_ONDEVICE = appleIntroInstructions(issueDateLine());
 
 const INTRO_INSTRUCTIONS = `You write the opening note for a daily reading rundown email: 2-3 SHORT paragraphs, plain and specific, opinions welcome, no clichés.
 This note goes out on ${issueDateLine()}. Stories may mention other days; those are not today. Don't name today's weekday or date.
@@ -121,7 +109,7 @@ const curated = await curateWithStories(articles, cfg, score, undefined, undefin
 // The on-device model sees only the top 6 stories (numbering still matches the email).
 const introStories = hasFm ? curated : curated.slice(0, 6);
 const introRaw = live
-  ? structured('intro', `Stories:\n${storyList(introStories, hasFm ? 240 : 140)}`, hasFm ? INTRO_INSTRUCTIONS : INTRO_INSTRUCTIONS_ONDEVICE, ['paragraphs', 'links'])
+  ? structured('intro', hasFm ? `Stories:\n${storyList(introStories)}` : appleIntroStoryList(curated), hasFm ? INTRO_INSTRUCTIONS : INTRO_INSTRUCTIONS_ONDEVICE, ['paragraphs', 'links'])
   : sampleIntro;
 const parsedIntro = parseIntroResponse(introRaw, curated.map(a => a.title));
 const linkCount = parsedIntro.paragraphs.reduce((n, p) => n + p.links.length, 0);
@@ -142,23 +130,11 @@ if (usePcc) {
   console.log('Sent to the model (full list):\n' + groupingPrompt(groups));
   groupingRaw = structured('groups', groupingPrompt(groups), GROUPING_INSTRUCTIONS, ['stories']).stories;
 } else {
-  // macOS 26 / on-device: narrow questions in small batches.
-  const pairs = candidatePairs(groups);
-  const same: string[] = [];
-  const pairBatches = batches(pairs, 12);
-  pairBatches.forEach((b, bi) => {
-    const prompt = pairsPrompt(groups, b, bi * 12);
-    console.log(`Asked "same event?" (batch ${bi + 1}/${pairBatches.length}):\n${prompt}`);
-    same.push(...(live ? structured('pairs', prompt, PAIR_INSTRUCTIONS, ['same']).same : sampleSamePairs));
-  });
-  console.log(`Model said same event: ${same.join(', ') || 'none'}`);
-  const labelLines: string[] = [];
-  for (const ids of batches(groups.map((_, i) => i), 20)) {
-    labelLines.push(...(live ? structured(hasFm ? 'groups' : 'labels', labelPrompt(groups, ids), LABEL_INSTRUCTIONS, ['stories']).stories : sampleLabels));
-  }
-  console.log('Labels:\n' + labelLines.join('\n'));
-  // On-device importance ratings proved unreliable (see groupingLinesFromPairs); keep labels and merges only.
-  groupingRaw = groupingLinesFromPairs(groups.length, pairs, same, labelLines, { useImportance: false });
+  // macOS 26 / on-device: the app's grouping pass (onDeviceGrouping), or recorded answers.
+  console.log('Candidate pairs:\n' + (pairsPrompt(groups, candidatePairs(groups)) || '(none)'));
+  groupingRaw = live
+    ? (onDeviceGrouping(groups, (mode, instructions, prompt) => structured(mode, prompt, instructions, [])) ?? [])
+    : groupingLinesFromPairs(groups.length, candidatePairs(groups), sampleSamePairs, sampleLabels, { useImportance: false });
 }
 const before = await curateWithStories(articles, cfg, score, undefined, undefined, { panelHeadlines, panel });
 const after = await curateWithStories(articles, cfg, score, undefined, undefined, { panelHeadlines, panel, modelGroups: groupingRaw });
