@@ -3,8 +3,10 @@
 ## Quick Reference
 
 ```bash
-# Check the latest tagged version to determine the next one
-git tag --sort=-v:refname | head -1       # e.g. v0.4.5 → next is 0.4.6
+# Check the current version on main to determine the next one
+node -p "require('./package.json').version"   # e.g. 0.5.1 → next is 0.5.2
+# (Don't use `git tag --sort=-v:refname | head -1`: old v1.x tags from before the
+#  0.x renumbering sort first and suggest the wrong version.)
 
 # 1. Review Guide, FAQ, release notes — draft user-facing bullets
 # 2. Bump version + rebuild + test
