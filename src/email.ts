@@ -933,6 +933,7 @@ export async function generateRoundupSummary(articles: ArticleMeta[], opts: { no
     });
     if (refused) console.warn(`[email] Apple Intelligence declined ${refused} stor${refused === 1 ? 'y' : 'ies'}; writing the intro from the rest`);
     if (built?.copied) console.warn(`[email] Skipped ${built.copied} stor${built.copied === 1 ? 'y' : 'ies'} whose sentence kept copying the headline`);
+    if (built?.invented) console.warn(`[email] Skipped ${built.invented} stor${built.invented === 1 ? 'y' : 'ies'} whose sentence named things the story doesn't mention`);
     if (!built) return null;
     const { text } = structuredIntroToMarkers(mentionsToIntro(built.mentions, articles.map(a => a.title)), articles.length);
     return text.trim() ? { text, model: 'on-device', provider: 'apple' } : null;

@@ -119,7 +119,7 @@ describe('gatherInterestSignals (local files)', () => {
     expect([...engaged]).toEqual(['2026-11-20-why-local-news-matters.md']);
   });
 
-  test("an article note that is just the feed's description is not the reader's note", async () => {
+  test('article notes are ignored: in real libraries they mostly hold imported text', async () => {
     const root = mkdtempSync(join(tmpdir(), 'pr-interests-'));
     const out = join(root, 'library');
     const config = join(root, 'config');
@@ -127,12 +127,10 @@ describe('gatherInterestSignals (local files)', () => {
     const blurb = 'U2 announced a 2027 North American stadium tour on Tuesday, their first since 2018.';
     writeFileSync(join(out, '2026-11-24-u2-tour.md'), `---\ntitle: U2 tour\nannotation: "${blurb}"\n---\nBody`);
     writeFileSync(join(out, '2026-11-24-u2-tour.annot.json'), JSON.stringify({ highlights: [], annotations: [], articleNote: blurb, tags: [], machineTags: [], isFavorite: false }));
-    writeFileSync(join(out, '2026-11-24-mine.md'), `---\ntitle: Mine\nannotation: "${blurb}"\n---\nBody`);
-    writeFileSync(join(out, '2026-11-24-mine.annot.json'), JSON.stringify({ highlights: [], annotations: [], articleNote: 'My own take: stadium tours are a bad deal for fans.', tags: [], machineTags: [], isFavorite: false }));
-
     const { signals, engaged } = await gatherInterestSignals({ outputPath: out, configDir: config });
-    expect(signals.filter(x => x.kind === 'note').map(x => x.text)).toEqual([expect.stringContaining('My own take')]);
-    expect([...engaged]).toEqual(['2026-11-24-mine.md']);
+    expect(signals.filter(x => x.kind === 'note')).toEqual([]);
+    expect([...engaged]).toEqual([]);
+    // The detector stays available for the source fix (feed descriptions copied into notes).
     expect(isImportedDescription(blurb, join(out, '2026-11-24-u2-tour.annot.json'))).toBe(true);
   });
 

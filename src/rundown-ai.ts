@@ -116,6 +116,32 @@ export function copiesSource(sentence: string, sources: string[]): boolean {
   });
 }
 
+// Capitalized words that aren't names (sentence starts are skipped separately).
+const NOT_NAMES = new Set(['the', 'a', 'an', 'in', 'on', 'at', 'it', 'its', 'he', 'she', 'they', 'his', 'her', 'their',
+  'this', 'that', 'these', 'those', 'and', 'but', 'or', 'for', 'with', 'after', 'before', 'as', 'by', 'from', 'to', 'of',
+  'new', 'meanwhile', 'elsewhere', 'also', 'closer', 'home', 'i']);
+
+/**
+ * Names in a sentence that its source doesn't mention: capitalized words
+ * (other than the first) and quoted titles. The on-device model invents
+ * detail despite instructions — live: "John Berger appeared in 'Grand Theft
+ * Auto' as a character named 'The Philosopher'".
+ */
+export function unsupportedNames(sentence: string, source: string): string[] {
+  const src = source.toLowerCase().replace(/[\u2018\u2019]/g, "'");
+  const out: string[] = [];
+  for (const q of sentence.matchAll(/['\u2018"\u201c]([A-Z][^'\u2019"\u201d]{2,60})['\u2019"\u201d]/g)) {
+    if (!src.includes(q[1].toLowerCase())) out.push(q[1]);
+  }
+  const words = sentence.replace(/['\u2018"\u201c][^'\u2019"\u201d]*['\u2019"\u201d]/g, ' ').split(/\s+/);
+  words.forEach((raw, i) => {
+    const w = raw.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9'\u2019]+$/g, '').replace(/['\u2019]s$/, '');
+    if (i === 0 || !/^[A-Z][A-Za-z'\u2019.-]{2,}$/.test(w) || NOT_NAMES.has(w.toLowerCase())) return;
+    if (!src.includes(w.toLowerCase())) out.push(w);
+  });
+  return [...new Set(out)];
+}
+
 /**
  * Instructions for one story's sentence (on-device, one story per request). A
  * refusal then costs one story, not the whole intro: on a real day, Apple's
@@ -140,11 +166,12 @@ export function buildPerStoryIntro(
   stories: Array<{ title: string; domain?: string; summary?: string; excerpt?: string }>,
   ask: (prompt: string, retry: boolean) => { sentence?: string; phrase?: string } | null,
   opts: { want?: number; maxTries?: number; gistCap?: number } = {},
-): { mentions: Mention[][]; skipped: number; copied: number } | null {
+): { mentions: Mention[][]; skipped: number; copied: number; invented: number } | null {
   const { want = 5, maxTries = 8, gistCap = 200 } = opts;
   const got: Mention[] = [];
   let skipped = 0;
   let copied = 0;
+  let invented = 0;
   const firstSentence = (t: string) => t.trim().match(/^.+?[.!?](?=\s+[A-Z"\u201c]|\s*$)/)?.[0] ?? t.trim();
   for (let i = 0; i < Math.min(stories.length, maxTries) && got.length < want; i++) {
     const a = stories[i];
@@ -154,18 +181,23 @@ export function buildPerStoryIntro(
     // One sentence per story: the model often adds "This is significant because…".
     let r = askOnce(false);
     let sentence = r?.sentence?.trim() ? firstSentence(r.sentence) : '';
-    // A sentence that copies its own headline or excerpt gets one more try, then
-    // the story is skipped — instead of one copied sentence sinking the intro.
-    if (sentence && copiesSource(sentence, [a.title, gist])) {
+    // A sentence that copies its own headline or excerpt, or names something
+    // the story doesn't mention, gets one more try, then the story is skipped —
+    // instead of one bad sentence sinking (or misinforming) the intro.
+    const source = `${a.title} ${gist}`;
+    const bad = (t: string) => copiesSource(t, [a.title, gist]) ? 'copied' : unsupportedNames(t, source).length ? 'invented' : '';
+    if (sentence && bad(sentence)) {
       r = askOnce(true);
       sentence = r?.sentence?.trim() ? firstSentence(r.sentence) : '';
-      if (sentence && copiesSource(sentence, [a.title, gist])) { copied++; sentence = ''; }
+      const why = sentence ? bad(sentence) : '';
+      if (why === 'copied') { copied++; sentence = ''; }
+      if (why === 'invented') { invented++; sentence = ''; }
     }
     if (!sentence) { skipped++; continue; }
     got.push({ story: i + 1, sentence, phrase: r?.phrase });
   }
   if (got.length < 3) return null;
-  return { mentions: [got.slice(0, 2), got.slice(2)], skipped, copied };
+  return { mentions: [got.slice(0, 2), got.slice(2)], skipped, copied, invented };
 }
 
 /** The numbered story list for the on-device intro: top stories only, short gists (4K window). */

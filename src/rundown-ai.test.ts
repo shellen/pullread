@@ -1,7 +1,7 @@
 // ABOUTME: Tests for the Rundown structured-output helpers (intro citations, model grouping, intro checks)
 // ABOUTME: Model responses here are recorded samples, not live model output
 
-import { parseFlatIntro, structuredIntroToMarkers, applyModelGroups, groupingPrompt, checkIntro, buildPerStoryIntro, mentionsToIntro, fallbackPhrase, parseIntroResponse, candidatePairs, pairsPrompt, groupingLinesFromPairs, batches, onDeviceGrouping, commonWords } from './rundown-ai';
+import { parseFlatIntro, structuredIntroToMarkers, applyModelGroups, groupingPrompt, checkIntro, buildPerStoryIntro, unsupportedNames, mentionsToIntro, fallbackPhrase, parseIntroResponse, candidatePairs, pairsPrompt, groupingLinesFromPairs, batches, onDeviceGrouping, commonWords } from './rundown-ai';
 import { groupStories } from './stories';
 import type { ArticleMeta } from './email';
 
@@ -79,7 +79,8 @@ describe('buildPerStoryIntro', () => {
   });
 
   test('keeps only the first sentence of each story', () => {
-    const r = buildPerStoryIntro(stories.slice(0, 3), () => ({
+    const ineos = [1, 2, 3].map(n => ({ title: `The BMW-Powered Ineos Grenadier Will Be Made In America (${n})`, domain: 'x.com' }));
+    const r = buildPerStoryIntro(ineos, () => ({
       sentence: 'The BMW-powered Ineos Grenadier will be built in America. This development is significant as it marks a major step.',
       phrase: 'Ineos Grenadier',
     }));
@@ -99,6 +100,26 @@ describe('buildPerStoryIntro', () => {
     });
     expect(calls.filter(c => c[0].includes('Nvidia'))).toEqual([[expect.any(String), false], [expect.any(String), true]]);
     expect(r!.copied).toBe(1);
+    expect(r!.mentions.flat().map(m => m.story)).toEqual([2, 3, 4]);
+  });
+
+  test('unsupportedNames catches invented names and quoted titles (real Nov 25 sentence)', () => {
+    const sentence = "John Berger appeared in 'Grand Theft Auto' as a character named 'The Philosopher' and was involved in a crime spree.";
+    const source = 'Remembering John Berger, the critic who taught us how to look Ways of Seeing turns 50';
+    expect(unsupportedNames(sentence, source)).toEqual(['Grand Theft Auto', 'The Philosopher']);
+    expect(unsupportedNames('Bayer will pay billions to settle Roundup claims.', 'Judge Approves $7 Billion Settlement Over Claims That Roundup Caused Cancer, Bayer says')).toEqual([]);
+    expect(unsupportedNames('Elsewhere, Google will open its first store in San Francisco.', 'Google to open its first retail store in San Francisco')).toEqual([]);
+  });
+
+  test('a story whose sentence keeps inventing names is skipped', () => {
+    const real = [
+      { title: 'Remembering John Berger, the critic', domain: 'x.com' },
+      { title: 'Story B', domain: 'x.com' }, { title: 'Story C', domain: 'x.com' }, { title: 'Story D', domain: 'x.com' },
+    ];
+    const r = buildPerStoryIntro(real, p => p.includes('Berger')
+      ? { sentence: 'John Berger appeared in Grand Theft Auto as The Philosopher.', phrase: 'John Berger' }
+      : { sentence: `Something specific happened in ${p.split('\n')[0].slice(10)} today.`, phrase: 'Something specific' });
+    expect(r!.invented).toBe(1);
     expect(r!.mentions.flat().map(m => m.story)).toEqual([2, 3, 4]);
   });
 

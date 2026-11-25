@@ -98,17 +98,17 @@ export async function gatherInterestSignals(opts: GatherOptions): Promise<{ sign
       const title = titleFromFilename(filename);
       let mtime: string | undefined;
       try { mtime = statSync(ann.annotationPath(outputPath, filename)).mtime.toISOString(); } catch {}
-      // Older builds copied each feed item's description into articleNote
-      // (viewer/13-init.js migration). Those aren't the reader's notes.
-      const realNote = !!data.articleNote?.trim() && !isImportedDescription(data.articleNote, ann.annotationPath(outputPath, filename));
-      if (full.highlights.length || data.annotations.length || realNote) engaged.add(filename);
+      // articleNote is NOT used: in real libraries it mostly holds imported text
+      // (feed descriptions copied by the viewer/13-init.js migration, whole
+      // article bodies, old bookmark-service blurbs), indistinguishable from the
+      // reader's own notes. Live sample, Nov 25: a 59,059-character article body.
+      if (full.highlights.length || data.annotations.length) engaged.add(filename);
       for (const h of full.highlights as Array<{ text?: string; note?: string; createdAt?: string }>) {
         if (h.text) signals.push({ text: `${h.text} ${h.note || ''}`, kind: 'highlight', at: h.createdAt });
       }
       for (const a of data.annotations as Array<{ note?: string; anchorText?: string; createdAt?: string }>) {
         if (a.note || a.anchorText) signals.push({ text: `${a.note || ''} ${a.anchorText || ''}`, kind: 'note', at: a.createdAt });
       }
-      if (realNote) signals.push({ text: `${data.articleNote} ${title}`, kind: 'note', at: mtime });
       if (data.isFavorite) signals.push({ text: title, kind: 'favorite', at: mtime });
       for (const t of data.tags || []) {
         if (t && !/^(classicbooks|gutenberg)$/i.test(t)) signals.push({ text: t.replace(/[-_]/g, ' '), kind: 'tag', at: mtime });
