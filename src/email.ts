@@ -5,7 +5,7 @@ import { createTransport } from 'nodemailer';
 import { join } from 'path';
 import { homedir } from 'os';
 import { readFileSync, existsSync } from 'fs';
-import { groupStories, alsoInFor, weighStories, findConsensus, pickTopStories, fetchPanelHeadlines, DEFAULT_PANEL } from './stories';
+import { groupStories, alsoInFor, biggestPanelStories, weighStories, findConsensus, pickTopStories, fetchPanelHeadlines, DEFAULT_PANEL } from './stories';
 import type { PanelSource, Scope } from './stories';
 import {
   applyModelGroups, checkIntro, blockingFailures, parseIntroResponse, structuredIntroToMarkers,
@@ -979,6 +979,8 @@ export interface StoryReport {
   panelFeedsReached: string[];
   panelHeadlines: number;
   widelyCovered: number;
+  /** Panel stories run by the most outlets, even below the bar (diagnostics). */
+  biggestPanelStories: Array<{ title: string; sources: string[]; titles: string[] }>;
   beyondFeeds: number;
   storyGroups: number;
   modelGrouping: 'not used' | 'applied' | 'skipped' | 'failed';
@@ -1065,6 +1067,7 @@ export async function curateWithStories(
     panelFeedsReached: [...new Set(headlines.map(h => h.source))],
     panelHeadlines: headlines.length,
     widelyCovered: consensus.length,
+    biggestPanelStories: biggestPanelStories(headlines),
     beyondFeeds: top.filter(t => t.beyondFeeds).length,
     storyGroups,
     modelGrouping,

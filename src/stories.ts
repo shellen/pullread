@@ -227,11 +227,8 @@ export interface ConsensusOptions {
  * per story, and a story must be run by a meaningful share of the panel across
  * at least two leans — so one outlet's obsession, or one side's, doesn't count.
  */
-export function findConsensus(headlines: PanelHeadline[], panel: PanelSource[], opts: ConsensusOptions = {}): ConsensusStory[] {
-  const { minShare = 0.4, minLeans = 2, minRegional = 2 } = opts;
-  const wideSize = panel.filter(p => p.scope !== 'regional').length;
-  const regionalSize = panel.filter(p => p.scope === 'regional').length;
-
+/** Cluster panel headlines that look like the same story (first headline anchors each cluster). */
+export function clusterHeadlines(headlines: PanelHeadline[]): Array<{ headlines: PanelHeadline[]; tokens: Set<string> }> {
   const clusters: Array<{ headlines: PanelHeadline[]; tokens: Set<string> }> = [];
   for (const h of headlines) {
     const tokens = storyTokens(`${h.title}`);
@@ -240,6 +237,26 @@ export function findConsensus(headlines: PanelHeadline[], panel: PanelSource[], 
     if (c) c.headlines.push(h);
     else clusters.push({ headlines: [h], tokens });
   }
+  return clusters;
+}
+
+/**
+ * The panel stories run by the most outlets, whether or not they clear the
+ * consensus bar — for diagnosing matching on real headlines.
+ */
+export function biggestPanelStories(headlines: PanelHeadline[], n = 5): Array<{ title: string; sources: string[]; titles: string[] }> {
+  return clusterHeadlines(headlines)
+    .map(c => ({ title: c.headlines[0].title, sources: [...new Set(c.headlines.map(h => h.source))], titles: c.headlines.map(h => `${h.source}: ${h.title}`) }))
+    .sort((a, b) => b.sources.length - a.sources.length)
+    .slice(0, n);
+}
+
+export function findConsensus(headlines: PanelHeadline[], panel: PanelSource[], opts: ConsensusOptions = {}): ConsensusStory[] {
+  const { minShare = 0.4, minLeans = 2, minRegional = 2 } = opts;
+  const wideSize = panel.filter(p => p.scope !== 'regional').length;
+  const regionalSize = panel.filter(p => p.scope === 'regional').length;
+
+  const clusters = clusterHeadlines(headlines);
 
   const out: ConsensusStory[] = [];
   for (const c of clusters) {
