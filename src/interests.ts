@@ -53,12 +53,32 @@ const PROFILE_STOPWORDS = new Set([
   'know', 'knew', 'new', 'old', 'big', 'small', 'high', 'low', 'long', 'day', 'days', 'month',
   'months', 'today', 'tonight', 'tomorrow', 'yesterday', 'monday', 'tuesday', 'wednesday',
   'thursday', 'friday', 'saturday', 'sunday', 'work', 'world', 'state', 'part', 'show', 'shows',
+  // Common English (fourth live profile, Nov 25: "solved", "problem", "based" picked an
+  // Illustrator template over a Riemann hypothesis explainer that matched the Notebook).
+  'what', 'whats', 'that', 'thats', 'with', 'about', 'because', 'right', 'left', 'before', 'after',
+  'talking', 'without', 'including', 'such', 'same', 'down', 'little', 'read', 'wrote', 'write',
+  'against', 'fact', 'latest', 'asking', 'ask', 'asked', 'based', 'problem', 'problems', 'solved',
+  'solve', 'question', 'questions', 'answer', 'reason', 'reasons', 'example', 'point', 'case', 'kind',
+  'sort', 'lot', 'lots', 'bit', 'better', 'best', 'worse', 'worst', 'less', 'least', 'enough', 'quite',
+  'probably', 'maybe', 'perhaps', 'actually', 'basically', 'certainly', 'clearly', 'simply', 'pretty',
+  'sure', 'real', 'true', 'whole', 'different', 'important', 'possible', 'able', 'early', 'late',
+  'recent', 'recently', 'current', 'currently', 'start', 'started', 'end', 'ended', 'keep', 'kept',
+  'give', 'gave', 'given', 'find', 'found', 'feel', 'felt', 'seem', 'seems', 'seemed', 'try', 'tried',
+  'call', 'called', 'mean', 'means', 'meant', 'help', 'helps', 'turn', 'turned', 'move', 'moved',
+  'change', 'changed', 'open', 'close', 'thought', 'idea', 'ideas', 'note', 'notes', 'post', 'posts',
+  'link', 'links', 'page', 'site', 'thing', 'stuff', 'okay', 'yes', 'no', 'not', 'also', 'via', 'per',
+  'weve', 'youre', 'theyre', 'dont', 'didnt', 'doesnt', 'isnt', 'wasnt', 'cant', 'wont', 'ive', 'id',
+  'ill', 'lets', 'heres', 'theres', 'whos', 'january', 'february', 'march', 'april', 'june', 'july',
+  'august', 'september', 'october', 'november', 'december', 'headline', 'headlines', 'story', 'stories',
+  'article', 'articles', 'news', 'update', 'updates', 'report', 'reports', 'video', 'watch',
+  'listen', 'episode', 'review', 'today', 'whether', 'nothing', 'everything', 'anything',
 ]);
 
 function interestTokens(text: string): Set<string> {
   const out = new Set<string>();
   for (const t of storyTokens(text)) {
-    if (t.length < 3 || PROFILE_STOPWORDS.has(t) || /^\d+$/.test(t)) continue;
+    // Numbers, times ("11pm"), ordinals ("25th"), decades ("1990s") carry no interest.
+    if (t.length < 3 || PROFILE_STOPWORDS.has(t) || /^\d+(am|pm|th|st|nd|rd|s)?$/.test(t)) continue;
     out.add(t);
   }
   return out;

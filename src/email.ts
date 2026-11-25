@@ -986,6 +986,8 @@ export interface RoundupResult {
     history: Array<{ date: string; title: string; opened: boolean; finished: boolean }>;
     /** Articles in the reading history (all skipped). */
     readCount: number;
+    /** Strongest words contributed by each kind of signal. */
+    bySource: Record<string, string[]>;
   };
 }
 
@@ -1231,6 +1233,9 @@ export async function buildRoundup(
         runnersUp: ranked.slice(1, 6).map(c => ({ title: c.article.title, score: c.score, terms: c.terms.slice(0, 4) })),
         signals: profile.counts,
         topInterests: [...profile.weights].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([t]) => t),
+        bySource: Object.fromEntries(Object.keys(profile.counts).map(kind => [kind,
+          [...profile.sources].map(([t, m]) => [t, m.get(kind as never) || 0] as const)
+            .filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([t]) => t)])),
         history: history.map(h => ({ date: h.date, title: h.title, opened: h.opened, finished: h.finished })),
         readCount: read.size,
         sampleNotes: signals.filter(x => x.kind === 'note').sort((a, b) => b.text.length - a.text.length)

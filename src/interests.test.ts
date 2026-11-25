@@ -92,6 +92,19 @@ describe('rankForInterests and the pick', () => {
     expect(pick?.why).toMatch(/^Because of your /);
   });
 
+  test('common English cannot win the pick (real Nov 25 case: Illustrator template vs Riemann hypothesis)', () => {
+    const p = buildInterestProfile([
+      { text: "What's going on with the Riemann hypothesis? Has it been solved? The problem is based on primes", kind: 'notebook', at: daysAgo(3) },
+      { text: 'We\u2019ve got the 11pm NPR headline for November', kind: 'notebook', at: daysAgo(3) },
+    ], now);
+    const { pick } = pickOneRead([
+      art('A Grid-Based Presentation Template for Illustrator That Makes Alignment a Solved Problem'),
+      art("What's going on with the Riemann hypothesis?", { excerpt: 'A century-old problem about primes.' }),
+    ], p);
+    expect(pick?.article.title).toBe("What's going on with the Riemann hypothesis?");
+    for (const junk of ['11pm', 'weve', 'november', 'headline', 'what', 'solved', 'problem', 'based']) expect(p.weights.has(junk)).toBe(false);
+  });
+
   test('no signals, no pick', () => {
     expect(pickOneRead([art('Anything')], buildInterestProfile([], now)).pick).toBeNull();
   });
