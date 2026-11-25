@@ -1022,7 +1022,10 @@ export async function curateWithStories(
       headlines = []; // offline or every feed failed — rank on your feeds alone
     }
   }
-  const consensus = headlines.length ? findConsensus(headlines, panel) : [];
+  // Measure coverage against the outlets that answered, so a dead feed doesn't raise the bar.
+  const reached = [...new Set(headlines.map(h => h.source))];
+  const consensus = headlines.length && !opts.panelHeadlines ? findConsensus(headlines, panel, { reached })
+    : headlines.length ? findConsensus(headlines, panel) : [];
 
   let groups = groupStories(articles);
   const storyGroups = groups.length;

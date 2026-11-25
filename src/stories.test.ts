@@ -1,7 +1,7 @@
 // ABOUTME: Tests for story grouping, weighing and the wider-news panel
 // ABOUTME: Uses real-world-shaped headlines; the Chile quake is a made-up sample story
 
-import { groupStories, weighStories, findConsensus, pickTopStories, fetchPanelHeadlines, storyTokens, relatedStory } from './stories';
+import { groupStories, weighStories, findConsensus, pickTopStories, fetchPanelHeadlines, storyTokens, relatedStory, clusterHeadlines } from './stories';
 import type { PanelSource, PanelHeadline } from './stories';
 import type { ArticleMeta } from './email';
 
@@ -113,6 +113,41 @@ describe('findConsensus', () => {
     ], panel);
     expect(c).toHaveLength(1);
     expect(c[0].scope).toBe('regional');
+  });
+});
+
+// Headlines from the first live panel run (Nov 25, 2026). Feeds reached 8 of 9 outlets and the
+// best-covered stories had 3 outlets. Where the first headline's outlet wasn't shown, one is assumed.
+describe('real headlines from the first live run', () => {
+  const reached = PANEL.map(p => p.name).filter(n => n !== 'The Wall Street Journal'); // WSJ's feed didn't answer
+
+  test('a story three outlets across two leans ran counts as widely covered', () => {
+    const c = findConsensus([
+      h('NPR', 'Al Gore buys local, family-owned newspaper in central Tennessee'),
+      h('The Hill', 'Al Gore plans to buy Tennessee newspaper'),
+      h('Fox News', "Al Gore buys hometown Tennessee newspaper, vows to preserve local outlet's 'independent voice'"),
+    ], PANEL, { reached });
+    expect(c).toHaveLength(1);
+    expect(c[0].sources).toHaveLength(3);
+    expect(c[0].strength).toBeCloseTo(3 / 8); // measured against the 8 outlets that answered
+  });
+
+  test('a headline joins a cluster by matching any member, not only the first', () => {
+    const clusters = clusterHeadlines([
+      h('NPR', 'Jensen Huang returns to Nvidia. And, Rep. Gomez resigns amid alleged sexual misconduct'),
+      h('The New York Times', 'Jensen Huang Apologizes to Nvidia Employees, Says He Is in Therapy'),
+      h('Fox News', 'Huang apologizes to employees, says he is in therapy'), // shares one word with NPR's, four with NYT's
+      h('BBC News', "What Jensen Huang's return teaches China's Xi about Trump"),
+    ]);
+    expect(clusters).toHaveLength(1);
+    expect(new Set(clusters[0].headlines.map(x => x.source)).size).toBe(4);
+  });
+
+  test('two outlets is not enough', () => {
+    expect(findConsensus([
+      h('The New York Times', 'Sullivan Concedes Alaska Senate Race to Peltola'),
+      h('The Hill', 'Sullivan concedes to Peltola nearly a week after Alaska Senate race called'),
+    ], PANEL, { reached })).toHaveLength(0);
   });
 });
 

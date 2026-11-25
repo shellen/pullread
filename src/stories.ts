@@ -184,7 +184,8 @@ export const DEFAULT_PANEL: PanelSource[] = [
   { name: 'The Guardian', feedUrl: 'https://www.theguardian.com/world/rss', lean: 'left', scope: 'global' },
   { name: 'The New York Times', feedUrl: 'https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml', lean: 'left', scope: 'national' },
   { name: 'BBC News', feedUrl: 'https://feeds.bbci.co.uk/news/world/rss.xml', lean: 'center', scope: 'global' },
-  { name: 'The Wall Street Journal', feedUrl: 'https://feeds.a.dj.com/rss/RSSWorldNews.xml', lean: 'center', scope: 'global' },
+  // Replaced The Wall Street Journal (feeds.a.dj.com didn't respond in the first live run, Nov 25, 2026).
+  { name: 'The Christian Science Monitor', feedUrl: 'https://rss.csmonitor.com/feeds/all', lean: 'center', scope: 'global' },
   { name: 'The Hill', feedUrl: 'https://thehill.com/feed/', lean: 'center', scope: 'national' },
   { name: 'Fox News', feedUrl: 'https://moxie.foxnews.com/google-publisher/latest.xml', lean: 'right', scope: 'national' },
   { name: 'Washington Examiner', feedUrl: 'https://www.washingtonexaminer.com/feed/', lean: 'right', scope: 'national' },
@@ -211,31 +212,56 @@ export interface ConsensusStory {
   /** Share of the relevant panel (national/global, or regional) that ran it, 0–1. */
   strength: number;
   tokens: Set<string>;
+  /** Every headline's tokens: your story matches the consensus if it matches any of them. */
+  memberTokens: Set<string>[];
 }
 
 export interface ConsensusOptions {
-  /** Minimum share of the national/global panel for a story to count as widely covered. Default 0.4. */
+  /**
+   * Minimum share of the reached national/global panel for a story to count
+   * as widely covered. Default 0.3, and never fewer than `minOutlets`.
+   * (First live run: outlet feeds carry only their latest ~20-40 headlines,
+   * so the best-covered stories of the day reached 3 of 8 outlets.)
+   */
   minShare?: number;
+  /** Absolute minimum outlets for a wide story. Default 3. */
+  minOutlets?: number;
+  /**
+   * Panel outlets that actually returned headlines this time. Shares are
+   * measured against these, so a dead feed doesn't raise the bar. Defaults
+   * to the whole panel.
+   */
+  reached?: string[];
   /** Minimum distinct leans that must cover it. Default 2. */
   minLeans?: number;
   /** Minimum regional outlets for a regional story. Default 2. */
   minRegional?: number;
 }
 
+export interface HeadlineCluster {
+  headlines: PanelHeadline[];
+  /** The first headline's tokens. */
+  tokens: Set<string>;
+  /** Every member's tokens, for matching against any of them. */
+  memberTokens: Set<string>[];
+}
+
 /**
- * Find the stories the panel agrees on. Each panel outlet only gets one vote
- * per story, and a story must be run by a meaningful share of the panel across
- * at least two leans — so one outlet's obsession, or one side's, doesn't count.
+ * Cluster panel headlines that look like the same story. A headline joins a
+ * cluster when it matches any member, not just the first: the first can be an
+ * odd one (NPR's "Jensen Huang returns to Nvidia. And, Rep. Gomez resigns…").
  */
-/** Cluster panel headlines that look like the same story (first headline anchors each cluster). */
-export function clusterHeadlines(headlines: PanelHeadline[]): Array<{ headlines: PanelHeadline[]; tokens: Set<string> }> {
-  const clusters: Array<{ headlines: PanelHeadline[]; tokens: Set<string> }> = [];
+export function clusterHeadlines(headlines: PanelHeadline[]): HeadlineCluster[] {
+  const clusters: HeadlineCluster[] = [];
   for (const h of headlines) {
     const tokens = storyTokens(`${h.title}`);
-    // Compare against each cluster's first headline only, so clusters can't drift.
-    const c = clusters.find(k => relatedStory(k.tokens, tokens));
-    if (c) c.headlines.push(h);
-    else clusters.push({ headlines: [h], tokens });
+    const c = clusters.find(k => k.memberTokens.some(m => relatedStory(m, tokens)));
+    if (c) {
+      c.headlines.push(h);
+      c.memberTokens.push(tokens);
+    } else {
+      clusters.push({ headlines: [h], tokens, memberTokens: [tokens] });
+    }
   }
   return clusters;
 }
@@ -251,10 +277,17 @@ export function biggestPanelStories(headlines: PanelHeadline[], n = 5): Array<{ 
     .slice(0, n);
 }
 
+/**
+ * Find the stories the panel agrees on. Each panel outlet only gets one vote
+ * per story, and a story must be run by a meaningful share of the reached
+ * panel across at least two leans — so one outlet's obsession, or one side's,
+ * doesn't count.
+ */
 export function findConsensus(headlines: PanelHeadline[], panel: PanelSource[], opts: ConsensusOptions = {}): ConsensusStory[] {
-  const { minShare = 0.4, minLeans = 2, minRegional = 2 } = opts;
-  const wideSize = panel.filter(p => p.scope !== 'regional').length;
-  const regionalSize = panel.filter(p => p.scope === 'regional').length;
+  const { minShare = 0.3, minOutlets = 3, minLeans = 2, minRegional = 2, reached } = opts;
+  const live = reached ? panel.filter(p => reached.includes(p.name)) : panel;
+  const wideSize = live.filter(p => p.scope !== 'regional').length;
+  const regionalSize = live.filter(p => p.scope === 'regional').length;
 
   const clusters = clusterHeadlines(headlines);
 
@@ -268,7 +301,7 @@ export function findConsensus(headlines: PanelHeadline[], panel: PanelSource[], 
 
     let scope: Scope | null = null;
     let strength = 0;
-    if (wideSize > 0 && wideSources.size / wideSize >= minShare && leans.length >= minLeans) {
+    if (wideSize > 0 && wideSources.size >= Math.max(minOutlets, Math.ceil(minShare * wideSize)) && leans.length >= minLeans) {
       scope = wide.every(h => h.scope === 'global') ? 'global' : 'national';
       strength = wideSources.size / wideSize;
     } else if (regionalSize > 0 && regionalSources.size >= Math.min(minRegional, regionalSize)) {
@@ -283,6 +316,7 @@ export function findConsensus(headlines: PanelHeadline[], panel: PanelSource[], 
       scope,
       strength,
       tokens: c.tokens,
+      memberTokens: c.memberTokens,
     });
   }
   return out.sort((a, b) => b.strength - a.strength);
@@ -320,7 +354,7 @@ export function weighStories(
     const coverage = Math.min(COVERAGE_CAP, COVERAGE_POINTS * (group.sources.length - 1));
     const tokens = new Set<string>();
     for (const m of group.members) for (const t of storyTokens(m.title)) tokens.add(t);
-    const match = consensus.find(c => relatedStory(c.tokens, tokens)
+    const match = consensus.find(c => c.memberTokens.some(m => relatedStory(m, tokens))
       || c.headlines.some(h => canonicalUrl(h.url) === canonicalUrl(group.lead.url)));
     const wider = match ? WIDER_POINTS * match.strength : 0;
     return { group, base, coverage, wider, weight: base + coverage + wider, consensus: match };

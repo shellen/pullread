@@ -608,9 +608,9 @@ if (command === 'sync') {
         console.log(`  Reached: ${r.panelFeedsReached.join(', ') || 'none'}`);
       }
       if (r.biggestPanelStories.length) {
-        console.log('  Most-covered panel stories (widely covered needs 4+ outlets across 2+ leans):');
+        console.log('  Most-covered panel stories (widely covered needs 3+ outlets across 2+ leans):');
         for (const st of r.biggestPanelStories) {
-          console.log(`    ${st.sources.length} outlet${st.sources.length === 1 ? '' : 's'}: ${st.title.slice(0, 90)}`);
+          console.log(`    ${st.sources.length} outlet${st.sources.length === 1 ? '' : 's'} (${st.sources.join(', ')}): ${st.title.slice(0, 90)}`);
           for (const t of st.titles.slice(1, 6)) console.log(`        · ${t.slice(0, 100)}`);
         }
       }
