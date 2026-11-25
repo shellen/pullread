@@ -166,6 +166,20 @@ describe('onDeviceGrouping', () => {
     expect(calls).toEqual(['pairs', 'labels']);
   });
 
+  test('a refused batch is skipped and the rest still count', () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const run = (mode: 'pairs' | 'labels') => {
+      if (mode === 'pairs') throw new Error('Apple Intelligence declined this request (safety guardrails)');
+      return { stories: ['1|Courts|3', '3|Autos|3'] };
+    };
+    expect(onDeviceGrouping(groups, run)).toEqual(['1|Courts|', '2||', '3|Autos|']);
+  });
+
+  test('throws when every call fails, so the caller reports grouping as failed', () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(() => onDeviceGrouping(groups, () => { throw new Error('refused'); })).toThrow('every model call failed');
+  });
+
   test('gives up if the time budget runs out before the pair questions finish', () => {
     let t = 0;
     const clock = () => (t += 60_000);
@@ -222,6 +236,14 @@ describe('checkIntro', () => {
       now, storyCount: 1, sources: ['Judge Approves $7 Billion Settlement Over Claims That Roundup Caused Cancer'],
     });
     expect(c.find(x => x.rule === "Grounded in today's stories")!.passed).toBe(true);
+  });
+
+  test('flags the real text-prompt fallback intro (Nov 25) for stock filler', () => {
+    const c = checkIntro("The tension is palpable as the holiday season approaches, and it's no surprise that political and cultural shifts are making headlines. On one hand, the unexpected return of Jensen Huang to Nvidia has sent ripples through Silicon Valley, as seen in \"Trump Made Up to $15M on Nvidia Stock After Huang\u2019s Return,\" where Trump's financial gain is tied to Huang's comeback.\n\nLastly, in the realm of health and wellness, a study reveals that more American women are turning to natural family planning, as reported in \"More American Women Are Turning to Natural Family Planning, Study Shows.\" As we navigate these complex issues, it's important to stay informed and engaged in the conversations that shape our communities and society as a whole.", { now, storyCount: 12 });
+    const rule = c.find(x => x.rule === 'No stock filler')!;
+    expect(rule.passed).toBe(false);
+    expect(rule.detail).toContain('the tension is palpable');
+    expect(rule.detail).toContain('as we navigate');
   });
 
   test('a clean intro passes every rule', () => {

@@ -588,17 +588,18 @@ if (command === 'sync') {
     const daysIndex = args.indexOf('--days');
     const days = daysIndex !== -1 ? parseInt(args[daysIndex + 1], 10) : NaN;
     if (days > 0) cfg.lookbackDays = days;
-    let library = { total: 0, newest: '' };
+    let library = { total: 0, newest: '', inWindow: 0 };
     const fetchArticles = async () => {
       const all = listFiles(config.outputPath, true);
-      library = { total: all.length, newest: all.map(a => a.bookmarked || '').filter(Boolean).sort().pop() || '' };
-      return filterByLookback(all, cfg.lookbackDays);
+      const inWindow = filterByLookback(all, cfg.lookbackDays);
+      library = { total: all.length, newest: all.map(a => a.bookmarked || '').filter(Boolean).sort().pop() || '', inWindow: inWindow.length };
+      return inWindow;
     };
     const result = await buildRoundup(cfg, fetchArticles);
 
     writeFileSync(outPath, result.html);
     console.log(`Library: ${config.outputPath} — ${library.total} article${library.total === 1 ? '' : 's'}${library.newest ? `, newest saved ${library.newest.slice(0, 10)}` : ''}`);
-    console.log(`Articles in last ${cfg.lookbackDays} day${cfg.lookbackDays === 1 ? '' : 's'}: ${result.articles.length}`);
+    console.log(`Articles in last ${cfg.lookbackDays} day${cfg.lookbackDays === 1 ? '' : 's'}: ${library.inWindow} (${result.articles.length} in the email)`);
     console.log(`Editorial note: ${result.summary ?? (result.articles.length === 0 ? '(none — no articles in the window)' : '(none — no LLM configured, or the intro failed its checks; see [email] lines above)')}`);
     if (result.summaryCredit) console.log(`Summary by: ${result.summaryCredit}`);
     const r = result.report;
@@ -617,7 +618,7 @@ if (command === 'sync') {
       console.log(`Story grouping: ${r.storyGroups} stories; model grouping ${r.modelGrouping}${r.merges.length ? `, merged ${r.merges.join('; ')}` : ''}`);
     }
     console.log(`Wrote preview to ${outPath}`);
-    if (result.articles.length === 0) {
+    if (library.inWindow === 0) {
       console.log(`Note: no articles saved in the last ${cfg.lookbackDays} day${cfg.lookbackDays === 1 ? '' : 's'}, so there's no intro. Try --days ${Math.max(3, cfg.lookbackDays * 2)}.`);
     }
     // Open resources (research DB, etc.) can keep the event loop alive — exit explicitly.

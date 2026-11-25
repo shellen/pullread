@@ -363,15 +363,27 @@ export function onDeviceGrouping(
   const pairs = candidatePairs(groups);
   const same: string[] = [];
   const pairBatches = batches(pairs, 12);
+  // A batch the model refuses (sensitive headlines) or fails is skipped, not fatal.
+  let failed = 0;
+  let calls = 0;
+  const tryRun = (mode: 'pairs' | 'labels', instructions: string, prompt: string): any => {
+    calls++;
+    try { return run(mode, instructions, prompt); } catch (err) {
+      failed++;
+      console.warn(`[email] Skipped a ${mode} batch: ${err instanceof Error ? err.message : err}`);
+      return null;
+    }
+  };
   for (let bi = 0; bi < pairBatches.length; bi++) {
     if (clock() - start > budgetMs) return null;
-    same.push(...((run('pairs', PAIR_INSTRUCTIONS, pairsPrompt(groups, pairBatches[bi], bi * 12))?.same) || []));
+    same.push(...(tryRun('pairs', PAIR_INSTRUCTIONS, pairsPrompt(groups, pairBatches[bi], bi * 12))?.same || []));
   }
   const labels: string[] = [];
   for (const ids of batches(groups.map((_, i) => i), 20)) {
     if (clock() - start > budgetMs) break;
-    labels.push(...((run('labels', LABEL_INSTRUCTIONS, labelPrompt(groups, ids))?.stories) || []));
+    labels.push(...(tryRun('labels', LABEL_INSTRUCTIONS, labelPrompt(groups, ids))?.stories || []));
   }
+  if (calls > 0 && failed === calls) throw new Error(`every model call failed (${failed})`);
   return groupingLinesFromPairs(groups.length, pairs, same, labels, { useImportance: false });
 }
 
@@ -394,7 +406,20 @@ export const BLOCKING_RULES = new Set([
   'Every cited story exists',
   'Written in its own words',
   "Grounded in today's stories",
+  'No stock filler',
 ]);
+
+/**
+ * Small-model filler tells, from a real on-device intro (Nov 25, 2026) that
+ * passed every other check: "The tension is palpable", "As we navigate these
+ * complex issues, it's important to stay informed…".
+ */
+export const STOCK_FILLER: RegExp[] = [
+  /\bthe tension is palpable\b/i, /\bas we navigate\b/i, /\bit'?s important to stay informed\b/i,
+  /\bstay informed and engaged\b/i, /\bin the (world|realm) of\b/i, /\bon one hand\b/i,
+  /\bit'?s no surprise\b/i, /\bsent ripples through\b/i, /\bshape our communities\b/i,
+  /\bin today'?s fast-paced\b/i, /\bonly time will tell\b/i, /^lastly,/im,
+];
 
 /** The blocking failures in a set of checks, as "rule — detail" strings. */
 export function blockingFailures(checks: IntroCheck[]): string[] {
@@ -441,6 +466,9 @@ export function checkIntro(text: string, opts: { now: Date; storyCount: number; 
   const bad = markers.filter(m => { const n = parseInt(m[2], 10); return n < 1 || n > opts.storyCount; });
   checks.push({ rule: 'Every cited story exists', passed: bad.length === 0,
     detail: bad.length ? bad.map(m => `"${m[1]}" → story ${m[2]}`).join(', ') : undefined });
+
+  const filler = STOCK_FILLER.map(re => lower.match(re)?.[0]).filter(Boolean) as string[];
+  checks.push({ rule: 'No stock filler', passed: filler.length === 0, detail: filler.length ? filler.map(f => `"${f}"`).join(', ') : undefined });
 
   const preamble = text.trim().split(/\n/)[0].match(/^(here (are|is)|here's|below (are|is)|these are|today's (top )?stories|in this (issue|edition))\b[^.!?\n]*[.!?:]?/i);
   checks.push({ rule: 'No filler opener', passed: !preamble, detail: preamble ? `"${preamble[0]}"` : undefined });

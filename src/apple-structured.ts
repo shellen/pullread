@@ -82,7 +82,11 @@ func emit(_ object: [String: Any]) throws {
             FileHandle.standardError.write(Data("usage: fm-structured <intro|pairs|labels|groups> <instructions-file> <prompt-file>\\n".utf8))
             exit(2)
         }
-        switch SystemLanguageModel.default.availability {
+        // News is user content to transform, not a request for new content:
+        // the permissive guardrails are meant for exactly this. (First run with
+        // 246 real stories: default guardrails refused both intro and grouping.)
+        let model = SystemLanguageModel(guardrails: .permissiveContentTransformations)
+        switch model.availability {
         case .available:
             break
         case .unavailable(let reason):
@@ -92,7 +96,7 @@ func emit(_ object: [String: Any]) throws {
 
         let instructions = try String(contentsOfFile: args[2], encoding: .utf8)
         let prompt = try String(contentsOfFile: args[3], encoding: .utf8)
-        let session = LanguageModelSession(instructions: instructions)
+        let session = LanguageModelSession(model: model, instructions: instructions)
         // Cap the answer so a runaway response fails fast instead of filling the 4K window.
         let options = GenerationOptions(maximumResponseTokens: args[1] == "intro" ? 600 : 500)
 
@@ -115,6 +119,10 @@ func emit(_ object: [String: Any]) throws {
             switch error {
             case .exceededContextWindowSize:
                 FileHandle.standardError.write(Data("CONTEXT_WINDOW: prompt + answer exceeded the on-device model's context window (\\(error))\\n".utf8))
+            case .refusal:
+                FileHandle.standardError.write(Data("REFUSAL: the model declined this request\\n".utf8))
+            case .guardrailViolation:
+                FileHandle.standardError.write(Data("REFUSAL: guardrail violation\\n".utf8))
             default:
                 FileHandle.standardError.write(Data("GENERATION: \\(error)\\n".utf8))
             }
@@ -127,7 +135,7 @@ func emit(_ object: [String: Any]) throws {
 export type AppleStructuredMode = 'intro' | 'pairs' | 'labels';
 
 export class AppleStructuredError extends Error {
-  constructor(message: string, readonly kind: 'unavailable' | 'context' | 'generation' | 'compile' | 'other') {
+  constructor(message: string, readonly kind: 'unavailable' | 'context' | 'refusal' | 'generation' | 'compile' | 'other') {
     super(message);
   }
 }
@@ -154,6 +162,7 @@ export function runAppleStructured(mode: AppleStructuredMode, instructions: stri
     const stderr = String(err?.stderr || '');
     if (/CONTEXT_WINDOW|exceededContextWindowSize/.test(stderr)) throw new AppleStructuredError('Apple Intelligence context window exceeded', 'context');
     if (/model unavailable/.test(stderr)) throw new AppleStructuredError(stderr.trim().slice(0, 200), 'unavailable');
+    if (/REFUSAL:|refusal\(|guardrailViolation/.test(stderr)) throw new AppleStructuredError('Apple Intelligence declined this request (safety guardrails)', 'refusal');
     if (/GENERATION:/.test(stderr)) throw new AppleStructuredError(stderr.trim().slice(0, 200), 'generation');
     throw new AppleStructuredError(stderr.trim().slice(0, 200) || String(err?.message || err), 'other');
   } finally {

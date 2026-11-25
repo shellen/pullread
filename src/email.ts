@@ -987,6 +987,9 @@ export interface StoryReport {
   merges: string[];
 }
 
+/** Stories sent to the model for grouping: the strongest by score and coverage. */
+const MODEL_GROUPING_MAX = 40;
+
 /**
  * Weight per importance step away from the middle (3): a 5 adds 1.5, a 1 takes
  * 1.5 off. Kept small: on macOS 26 the on-device model's ratings were flat or
@@ -1035,7 +1038,19 @@ export async function curateWithStories(
   let merges: string[] = [];
   if (!modelLines && opts.modelGrouper && groups.length > 1) {
     try {
-      modelLines = (await opts.modelGrouper(groups)) ?? undefined;
+      // Only the strongest stories can make a 12-story email, so only they go to
+      // the model (a live 3-day window had 246 stories — ~17 on-device calls).
+      const ranked = groups
+        .map((g, i) => ({ i, w: scoreFn(g.lead) + 2.5 * (g.sources.length - 1) }))
+        .sort((a, b) => b.w - a.w)
+        .slice(0, MODEL_GROUPING_MAX);
+      const subLines = await opts.modelGrouper(ranked.map(r => groups[r.i]));
+      // Map the model's ids (positions in the shortlist) back to positions in `groups`.
+      modelLines = subLines?.map(line => {
+        const [ids, ...rest] = line.split('|');
+        const mapped = ids.split(',').map(n => ranked[parseInt(n, 10) - 1]?.i).filter(i => i !== undefined).map(i => i! + 1);
+        return [mapped.join(','), ...rest].join('|');
+      }).filter(line => !line.startsWith('|'));
       modelGrouping = modelLines ? 'applied' : 'skipped';
     } catch (err) {
       modelGrouping = 'failed';

@@ -801,6 +801,18 @@ describe('curateWithStories model grouper', () => {
     expect(roundup.story?.alsoIn.map(x => x.source)).toEqual(['theguardian.com']);
   });
 
+  test('the model sees a shortlist ranked by score, and its ids map back to the right stories', async () => {
+    const byScore = (a: ArticleMeta) => (a.domain === 'electrek.co' ? 10 : 0); // BMW ranks first in the shortlist
+    let seen: string[] = [];
+    const out = await curateWithStories(items, cfg, byScore, undefined, undefined, {
+      modelGrouper: groups => { seen = groups.map(g => g.lead.domain); return ['2,3|Courts|', '1|Autos|']; },
+    });
+    expect(seen).toEqual(['electrek.co', 'nytimes.com', 'theguardian.com']);
+    expect(out).toHaveLength(2);
+    expect(out.find(a => a.domain === 'nytimes.com')!.categories).toEqual(['Courts']);
+    expect(out.find(a => a.domain === 'electrek.co')!.categories).toEqual(['Autos']);
+  });
+
   test('a failing grouper leaves word-matching groups in place', async () => {
     jest.spyOn(console, 'warn').mockImplementation(() => {});
     const out = await curateWithStories(items, cfg, score, undefined, undefined, { modelGrouper: () => { throw new Error('context window'); } });
