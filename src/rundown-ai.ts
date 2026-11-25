@@ -104,6 +104,45 @@ This note goes out on ${dateLine}. Stories may mention other days; those are not
 No greetings, no sign-offs, no "here are the top stories", never "dive in" or "buckle up".`;
 }
 
+/**
+ * Instructions for one story's sentence (on-device, one story per request). A
+ * refusal then costs one story, not the whole intro: on a real day, Apple's
+ * guardrails refused the six-story request outright (Nov 25, 2026).
+ */
+export function appleSentenceInstructions(dateLine: string, retry = false): string {
+  return `You write one sentence for a daily reading email about the story below.
+Say what happened and why it matters, IN YOUR OWN WORDS, with one concrete detail (a number, a name, a place). Do not copy the headline or the excerpt.
+Also give 2 to 5 words from your sentence that name the story, never the whole sentence.
+This email goes out on ${dateLine}. Don't name today's weekday or date, and don't call past events upcoming. No greetings, no hype.`
+    + (retry ? '\nImportant: never reuse more than three words in a row from the headline or excerpt.' : '');
+}
+
+/**
+ * Build the intro one story at a time: up to `want` sentences from the top
+ * stories, the first two as the lead paragraph and the rest as the second.
+ * Stories the model refuses or fails on are skipped (up to `maxTries` stories
+ * are tried). Returns null if fewer than 3 sentences came back.
+ */
+export function buildPerStoryIntro(
+  stories: Array<{ title: string; domain?: string; summary?: string; excerpt?: string }>,
+  ask: (prompt: string) => { sentence?: string; phrase?: string } | null,
+  opts: { want?: number; maxTries?: number; gistCap?: number } = {},
+): { mentions: Mention[][]; skipped: number } | null {
+  const { want = 5, maxTries = 8, gistCap = 200 } = opts;
+  const got: Mention[] = [];
+  let skipped = 0;
+  for (let i = 0; i < Math.min(stories.length, maxTries) && got.length < want; i++) {
+    const a = stories[i];
+    const gist = (a.summary || a.excerpt || '').slice(0, gistCap);
+    let r: { sentence?: string; phrase?: string } | null = null;
+    try { r = ask(`Headline: ${a.title}\nSource: ${a.domain || ''}${gist ? `\nExcerpt: ${gist}` : ''}`); } catch { r = null; }
+    if (!r?.sentence?.trim()) { skipped++; continue; }
+    got.push({ story: i + 1, sentence: r.sentence.trim(), phrase: r.phrase });
+  }
+  if (got.length < 3) return null;
+  return { mentions: [got.slice(0, 2), got.slice(2)], skipped };
+}
+
 /** The numbered story list for the on-device intro: top stories only, short gists (4K window). */
 export function appleIntroStoryList(stories: Array<{ title: string; domain?: string; summary?: string; excerpt?: string }>, max = 6, gistCap = 140): string {
   return stories.slice(0, max).map((a, i) => {
@@ -252,15 +291,24 @@ function groupTokens(g: StoryGroup): Set<string> {
   return t;
 }
 
-/** Pairs of group indexes (0-based) worth asking about, most shared words first. */
+/**
+ * Pairs of group indexes (0-based) worth asking about, most shared words
+ * first. A pair needs at least two shared uncommon words — words that appear
+ * in only a few of the day's stories. A word that runs through the whole day
+ * ("BMW" for a reader of BMW BLOG) is not evidence of the same event: on a
+ * real day the model merged three unrelated BMW stories that shared it.
+ */
 export function candidatePairs(groups: StoryGroup[], max = 40): Array<[number, number]> {
   const tokens = groups.map(groupTokens);
+  const df = new Map<string, number>();
+  for (const t of tokens) for (const w of t) df.set(w, (df.get(w) || 0) + 1);
+  const commonAbove = Math.max(3, Math.ceil(groups.length * 0.02));
   const pairs: Array<{ pair: [number, number]; shared: number }> = [];
   for (let i = 0; i < groups.length; i++) {
     for (let j = i + 1; j < groups.length; j++) {
       let shared = 0;
-      for (const w of tokens[i]) if (tokens[j].has(w)) shared++;
-      if (shared > 0) pairs.push({ pair: [i, j], shared });
+      for (const w of tokens[i]) if (tokens[j].has(w) && (df.get(w) || 0) <= commonAbove) shared++;
+      if (shared >= 2) pairs.push({ pair: [i, j], shared });
     }
   }
   return pairs.sort((a, b) => b.shared - a.shared).slice(0, max).map(p => p.pair);
@@ -315,12 +363,22 @@ export function groupingLinesFromPairs(
   opts: { useImportance?: boolean } = {},
 ): string[] {
   const { useImportance = true } = opts;
-  const parent = Array.from({ length: groupCount }, (_, i) => i);
-  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  // No chaining: two clusters join only if the model confirmed every cross
+  // pair. (A~C and B~C alone does not make A, B and C one story.)
+  const confirmed = new Set<string>();
   for (const id of sameIds) {
-    const n = parseInt(String(id).replace(/^\s*P/i, ''), 10) - 1;
-    const pair = pairs[n];
-    if (pair) parent[find(pair[1])] = find(pair[0]);
+    const pair = pairs[parseInt(String(id).replace(/^\s*P/i, ''), 10) - 1];
+    if (pair) confirmed.add(`${Math.min(...pair)},${Math.max(...pair)}`);
+  }
+  const isConfirmed = (a: number, b: number) => confirmed.has(`${Math.min(a, b)},${Math.max(a, b)}`);
+  const clusterOf = Array.from({ length: groupCount }, (_, i) => [i]);
+  for (const key of confirmed) {
+    const [a, b] = key.split(',').map(Number);
+    const ca = clusterOf[a], cb = clusterOf[b];
+    if (ca === cb) continue;
+    if (!ca.every(x => cb.every(y => isConfirmed(x, y)))) continue;
+    const merged = [...ca, ...cb].sort((x, y) => x - y);
+    for (const x of merged) clusterOf[x] = merged;
   }
 
   const info = new Map<number, { label: string; imp: number }>();
@@ -330,13 +388,7 @@ export function groupingLinesFromPairs(
     if (i >= 0 && i < groupCount && !info.has(i)) info.set(i, { label, imp: parseInt(imp, 10) || 0 });
   }
 
-  const clusters = new Map<number, number[]>();
-  for (let i = 0; i < groupCount; i++) {
-    const r = find(i);
-    if (!clusters.has(r)) clusters.set(r, []);
-    clusters.get(r)!.push(i);
-  }
-  return [...clusters.values()].map(ids => {
+  return [...new Set(clusterOf)].map(ids => {
     const label = ids.map(i => info.get(i)?.label).find(Boolean) || '';
     const imp = useImportance ? Math.max(0, ...ids.map(i => info.get(i)?.imp || 0)) : 0;
     return `${ids.map(i => i + 1).join(',')}|${label}|${imp || ''}`;

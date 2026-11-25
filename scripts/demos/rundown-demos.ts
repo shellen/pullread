@@ -25,7 +25,7 @@ import { tmpdir } from 'os';
 import { buildRoundupHtml, curateWithStories, scoreArticle, escapeHtml, issueDateLine } from '../../src/email';
 import type { ArticleMeta } from '../../src/email';
 import { groupStories } from '../../src/stories';
-import { appleIntroInstructions, appleIntroStoryList, onDeviceGrouping, parseIntroResponse, structuredIntroToMarkers, groupingPrompt, GROUPING_INSTRUCTIONS, checkIntro, applyModelGroups, candidatePairs, pairsPrompt, groupingLinesFromPairs } from '../../src/rundown-ai';
+import { appleSentenceInstructions, buildPerStoryIntro, onDeviceGrouping, parseIntroResponse, structuredIntroToMarkers, groupingPrompt, GROUPING_INSTRUCTIONS, checkIntro, applyModelGroups, candidatePairs, pairsPrompt, groupingLinesFromPairs } from '../../src/rundown-ai';
 import { runAppleStructured, AppleStructuredError } from '../../src/apple-structured';
 import { articles, panel, panelHeadlines, regionalFeeds, sampleIntro, sampleGrouping, sampleSamePairs, sampleLabels, sampleIntrosToCheck } from './sample-day';
 
@@ -95,8 +95,6 @@ function structured(mode: 'intro' | 'pairs' | 'labels' | 'groups', prompt: strin
 
 const storyList = (list: ArticleMeta[], excerptMax = 240) => list.map((a, i) => `${i + 1}. ${a.title} (${a.domain})${a.excerpt ? ` — ${a.excerpt.slice(0, excerptMax)}` : ''}`).join('\n');
 
-// macOS 26 / on-device: the app's own prompt and story list (src/rundown-ai.ts).
-const INTRO_INSTRUCTIONS_ONDEVICE = appleIntroInstructions(issueDateLine());
 
 const INTRO_INSTRUCTIONS = `You write the opening note for a daily reading rundown email: 2-3 SHORT paragraphs, plain and specific, opinions welcome, no clichés.
 This note goes out on ${issueDateLine()}. Stories may mention other days; those are not today. Don't name today's weekday or date.
@@ -106,11 +104,20 @@ Return "paragraphs" (one string per paragraph) and "links": for each story you m
 // --- Demo 1 ------------------------------------------------------------------
 
 const curated = await curateWithStories(articles, cfg, score, undefined, undefined, { panelHeadlines, panel });
-// The on-device model sees only the top 6 stories (numbering still matches the email).
-const introStories = hasFm ? curated : curated.slice(0, 6);
-const introRaw = live
-  ? structured('intro', hasFm ? `Stories:\n${storyList(introStories)}` : appleIntroStoryList(curated), hasFm ? INTRO_INSTRUCTIONS : INTRO_INSTRUCTIONS_ONDEVICE, ['paragraphs', 'links'])
-  : sampleIntro;
+// macOS 27 (fm): one request for the whole intro. macOS 26: the app's path, one story per request.
+let introRaw: any = sampleIntro;
+if (live && hasFm) {
+  introRaw = structured('intro', `Stories:\n${storyList(curated)}`, INTRO_INSTRUCTIONS, ['paragraphs', 'links']);
+} else if (live) {
+  const instructions = appleSentenceInstructions(issueDateLine());
+  const built = buildPerStoryIntro(curated, prompt => {
+    try { return runAppleStructured('sentence', instructions, prompt, 30_000); } catch (err) {
+      console.log(`  (story skipped: ${err instanceof Error ? err.message : err})`);
+      return null;
+    }
+  });
+  introRaw = { mentions: built?.mentions ?? [] };
+}
 const parsedIntro = parseIntroResponse(introRaw, curated.map(a => a.title));
 const linkCount = parsedIntro.paragraphs.reduce((n, p) => n + p.links.length, 0);
 const { text: introText, dropped } = structuredIntroToMarkers(parsedIntro, curated.length);

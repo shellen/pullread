@@ -65,6 +65,14 @@ struct StoryLabel {
 }
 
 @Generable
+struct StorySentence {
+    @Guide(description: "One sentence in your own words saying what happened and why it matters, with one concrete detail. Do not copy the headline.")
+    var sentence: String
+    @Guide(description: "2 to 5 words from your sentence that name the story.")
+    var phrase: String
+}
+
+@Generable
 struct StoryLabels {
     @Guide(description: "One entry per headline.", .maximumCount(25))
     var labels: [StoryLabel]
@@ -79,7 +87,7 @@ func emit(_ object: [String: Any]) throws {
     static func main() async throws {
         let args = CommandLine.arguments
         guard args.count == 4 else {
-            FileHandle.standardError.write(Data("usage: fm-structured <intro|pairs|labels|groups> <instructions-file> <prompt-file>\\n".utf8))
+            FileHandle.standardError.write(Data("usage: fm-structured <intro|sentence|pairs|labels|groups> <instructions-file> <prompt-file>\\n".utf8))
             exit(2)
         }
         // News is user content to transform, not a request for new content:
@@ -98,13 +106,16 @@ func emit(_ object: [String: Any]) throws {
         let prompt = try String(contentsOfFile: args[3], encoding: .utf8)
         let session = LanguageModelSession(model: model, instructions: instructions)
         // Cap the answer so a runaway response fails fast instead of filling the 4K window.
-        let options = GenerationOptions(maximumResponseTokens: args[1] == "intro" ? 600 : 500)
+        let options = GenerationOptions(maximumResponseTokens: args[1] == "intro" ? 600 : args[1] == "sentence" ? 200 : 500)
 
         do {
             if args[1] == "intro" {
                 let r = try await session.respond(to: prompt, generating: IntroResult.self, options: options)
                 let para = { (ms: [Mention]) in ms.map { ["story": $0.story, "sentence": $0.sentence, "phrase": $0.phrase] as [String: Any] } }
                 try emit(["mentions": [para(r.content.lead), para(r.content.more)]])
+            } else if args[1] == "sentence" {
+                let r = try await session.respond(to: prompt, generating: StorySentence.self, options: options)
+                try emit(["sentence": r.content.sentence, "phrase": r.content.phrase])
             } else if args[1] == "pairs" {
                 let r = try await session.respond(to: prompt, generating: SamePairs.self, options: options)
                 try emit(["same": r.content.same])
@@ -132,7 +143,7 @@ func emit(_ object: [String: Any]) throws {
 }
 `;
 
-export type AppleStructuredMode = 'intro' | 'pairs' | 'labels';
+export type AppleStructuredMode = 'intro' | 'sentence' | 'pairs' | 'labels';
 
 export class AppleStructuredError extends Error {
   constructor(message: string, readonly kind: 'unavailable' | 'context' | 'refusal' | 'generation' | 'compile' | 'other') {

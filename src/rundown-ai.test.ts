@@ -1,7 +1,7 @@
 // ABOUTME: Tests for the Rundown structured-output helpers (intro citations, model grouping, intro checks)
 // ABOUTME: Model responses here are recorded samples, not live model output
 
-import { parseFlatIntro, structuredIntroToMarkers, applyModelGroups, groupingPrompt, checkIntro, mentionsToIntro, fallbackPhrase, parseIntroResponse, candidatePairs, pairsPrompt, groupingLinesFromPairs, batches, onDeviceGrouping } from './rundown-ai';
+import { parseFlatIntro, structuredIntroToMarkers, applyModelGroups, groupingPrompt, checkIntro, buildPerStoryIntro, mentionsToIntro, fallbackPhrase, parseIntroResponse, candidatePairs, pairsPrompt, groupingLinesFromPairs, batches, onDeviceGrouping } from './rundown-ai';
 import { groupStories } from './stories';
 import type { ArticleMeta } from './email';
 
@@ -69,6 +69,20 @@ describe('per-story intro (macOS 26 shape)', () => {
   });
 });
 
+describe('buildPerStoryIntro', () => {
+  const stories = [1, 2, 3, 4, 5, 6, 7].map(n => ({ title: `Story ${n}`, domain: 'x.com' }));
+
+  test('lead gets two sentences, the second paragraph the rest, refusals skipped', () => {
+    const r = buildPerStoryIntro(stories, p => (p.includes('Story 2') ? (() => { throw new Error('refused'); })() : { sentence: `About ${p.split('\n')[0].slice(10)}.`, phrase: 'About' }));
+    expect(r!.mentions.map(p => p.map(m => m.story))).toEqual([[1, 3], [4, 5, 6]]);
+    expect(r!.skipped).toBe(1);
+  });
+
+  test('returns null when fewer than three stories come back', () => {
+    expect(buildPerStoryIntro(stories, p => (p.includes('Story 1') ? { sentence: 'One.', phrase: 'One' } : null))).toBeNull();
+  });
+});
+
 describe('model grouping', () => {
   const articles = [
     article('Judge Approves $7 Billion Settlement Over Claims That Roundup Caused Cancer', 'https://www.nytimes.com/roundup', { image: 'https://img/r', excerpt: 'x' }),
@@ -133,10 +147,27 @@ describe('macOS 26 tie-breaker grouping', () => {
     expect(batches([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
   });
 
-  test('turns pair answers and labels into grouping lines, transitively', () => {
+  test('does not chain merges: A~B and B~C without A~C merges only one pair', () => {
     const pairs: Array<[number, number]> = [[0, 1], [1, 2]];
     const lines = groupingLinesFromPairs(4, pairs, ['P1', 'p2'], ['1|Courts|3', '2|Law|5', '[4] | Tech | 2', 'garbage']);
-    expect(lines).toEqual(['1,2,3|Courts|5', '4|Tech|2']);
+    expect(lines).toEqual(['1,2|Courts|5', '3||', '4|Tech|2']);
+  });
+
+  test('merges three when every pair is confirmed', () => {
+    const pairs: Array<[number, number]> = [[0, 1], [1, 2], [0, 2]];
+    expect(groupingLinesFromPairs(3, pairs, ['P1', 'P2', 'P3'], ['1|Courts|3'])).toEqual(['1,2,3|Courts|3']);
+  });
+
+  test('real BMW BLOG day: stories that only share the brand are never asked about', () => {
+    const bmw = groupStories([
+      article('The BMW-Powered Ineos Grenadier Will Be Made In America', 'https://bmwblog.com/1'),
+      article('The BMW M350 Costs Just $250 More Than The Last M340i xDrive. Here’s Which One We’d Buy While Stock Lasts', 'https://bmwblog.com/2'),
+      article('Nearly 1,000 km On A Tank: The BMW 540d Touring Is The Road-Trip Wagon America Can’t Buy', 'https://bmwblog.com/3'),
+      article('BMW iX3 Gets A Software Update', 'https://bmwblog.com/4'),
+      article('BMW Recalls 286 i5 And i7 EVs Over Battery Fire Risk', 'https://electrek.co/bmw'),
+    ]);
+    // "bmw" is in all five stories, so it doesn't count; no pair shares two uncommon words.
+    expect(candidatePairs(bmw)).toEqual([]);
   });
 
   test('can drop the importance ratings and keep labels and merges', () => {

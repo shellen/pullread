@@ -48,13 +48,13 @@ function P(source: string, title: string, url: string, extra: Partial<PanelHeadl
 /** The wider-news panel's last 24 hours. */
 export const panelHeadlines: PanelHeadline[] = [
   P('BBC News', 'Chile earthquake: Dozens dead after 7.8 magnitude quake strikes near Santiago', 'https://www.bbc.com/news/world-latin-america-chile-quake', { image: img('quake'), excerpt: 'Rescuers are searching collapsed buildings in the capital after the strongest quake to hit the country in more than a decade.' }),
-  P('The Wall Street Journal', 'Powerful 7.8 Earthquake Hits Central Chile, Killing Dozens', 'https://www.wsj.com/world/chile-quake'),
+  P('The Christian Science Monitor', 'Powerful 7.8 Earthquake Hits Central Chile, Killing Dozens', 'https://www.csmonitor.com/World/chile-quake'),
   P('NPR', 'A 7.8 magnitude earthquake strikes central Chile, killing dozens', 'https://www.npr.org/chile-quake'),
   P('Fox News', 'Massive 7.8 earthquake rocks Chile, dozens killed', 'https://www.foxnews.com/world/chile-quake'),
   P('The Guardian', 'Chile earthquake: rescuers search rubble after 7.8 quake kills dozens', 'https://www.theguardian.com/world/chile-quake'),
   P('The Hill', 'Chile hit by 7.8 earthquake; dozens dead', 'https://thehill.com/chile-quake'),
   P('The New York Times', roundup, 'https://www.nytimes.com/2026/11/20/business/judge-approves-7-billion-settlement.html'),
-  P('The Wall Street Journal', 'Bayer Wins Approval for $7 Billion Roundup Cancer Settlement', 'https://www.wsj.com/business/bayer-roundup'),
+  P('The Christian Science Monitor', 'Bayer Wins Approval for $7 Billion Roundup Cancer Settlement', 'https://www.csmonitor.com/Business/bayer-roundup'),
   P('Fox News', 'Judge approves Bayer $7 billion Roundup cancer settlement', 'https://www.foxnews.com/roundup'),
   P('The Hill', 'Judge signs off on $7 billion Roundup settlement over cancer claims', 'https://thehill.com/roundup'),
   P('NPR', 'How a small Ohio town saved its last bookstore', 'https://www.npr.org/bookstore'),

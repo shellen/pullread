@@ -8,8 +8,8 @@ import { readFileSync, existsSync } from 'fs';
 import { groupStories, alsoInFor, biggestPanelStories, weighStories, findConsensus, pickTopStories, fetchPanelHeadlines, DEFAULT_PANEL } from './stories';
 import type { PanelSource, Scope } from './stories';
 import {
-  applyModelGroups, checkIntro, blockingFailures, parseIntroResponse, structuredIntroToMarkers,
-  appleIntroInstructions, appleIntroStoryList,
+  applyModelGroups, checkIntro, blockingFailures, structuredIntroToMarkers,
+  appleSentenceInstructions, buildPerStoryIntro, mentionsToIntro,
 } from './rundown-ai';
 import type { StoryGroup } from './stories';
 
@@ -899,11 +899,21 @@ export async function generateRoundupSummary(articles: ArticleMeta[], opts: { no
   // src/apple-structured.ts). Falls back to the text prompt on any error.
   const structuredAppleIntro = async (retry: boolean): Promise<RoundupSummary | null> => {
     const { runAppleStructured } = await import('./apple-structured');
-    // The on-device model sometimes copies headlines verbatim; the retry says so plainly.
-    const instructions = appleIntroInstructions(issueDateLine(now))
-      + (retry ? '\nImportant: never reuse more than three words in a row from any headline or excerpt. Rephrase everything.' : '');
-    const raw = runAppleStructured('intro', instructions, appleIntroStoryList(articles));
-    const { text } = structuredIntroToMarkers(parseIntroResponse(raw, articles.map(a => a.title)), articles.length);
+    // One story per request: a refusal (Apple's guardrails, on sensitive news)
+    // drops that story instead of the whole intro, and each request is tiny.
+    const instructions = appleSentenceInstructions(issueDateLine(now), retry);
+    let refused = 0;
+    const built = buildPerStoryIntro(articles, prompt => {
+      try {
+        return runAppleStructured('sentence', instructions, prompt, 30_000);
+      } catch (err) {
+        if ((err as { kind?: string }).kind === 'refusal') refused++;
+        throw err;
+      }
+    });
+    if (refused) console.warn(`[email] Apple Intelligence declined ${refused} stor${refused === 1 ? 'y' : 'ies'}; writing the intro from the rest`);
+    if (!built) return null;
+    const { text } = structuredIntroToMarkers(mentionsToIntro(built.mentions, articles.map(a => a.title)), articles.length);
     return text.trim() ? { text, model: 'on-device', provider: 'apple' } : null;
   };
 

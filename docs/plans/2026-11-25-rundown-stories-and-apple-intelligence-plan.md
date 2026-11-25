@@ -51,6 +51,10 @@ These were proven on macOS 26.6 over four live runs and moved from `scripts/demo
   - A refused grouping batch is now skipped instead of failing the whole pass.
   - Only the top 40 stories go to the model, keeping it to about 6 calls.
   - The intro fell back to the text prompt, which wrote stock filler ("The tension is palpable…") and got a fact wrong: it said both Santa Cruz candidates declared victory, when one conceded. The new "No stock filler" rule blocks the filler. **Open question:** should on-device users get the text-prompt fallback at all, since the checks can't catch factual errors?
+- **Second real-article run (266 stories, Nov 25).**
+  - Permissive guardrails did **not** stop the refusal of the six-story intro. The text fallback then failed the checks twice, so the gate correctly sent no intro.
+  - **The Apple intro is now one story per request** (`sentence` mode, `buildPerStoryIntro`). A refused story is skipped, and the intro is written from up to 5 others. It needs at least 3 sentences.
+  - Grouping ran, but merged three unrelated BMW BLOG stories that shared only "BMW", and the merges chained. Now a pair is only asked about if it shares at least **two uncommon words** (words in more than `max(3, 2%)` of the day's stories don't count). Clusters merge only when the model confirmed **every** cross pair.
 - **`preview-rundown` report and `--days N`.** It prints panel outlets reached, widely covered stories, story count and the model grouping outcome (`StoryReport`), so a live run shows whether each part worked.
 - **On-device grouping for Apple users** (`buildRoundup` → `appleGrouperIfEnabled` → `onDeviceGrouping`). "Same event?" for candidate pairs, plus fixed-list labels, with importance ignored. It runs under a 45-second budget. Each call has a 30-second timeout, and on any error the Rundown keeps word matching only.
 

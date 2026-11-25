@@ -733,13 +733,17 @@ describe('roundup intro gate and Apple structured intro', () => {
 
   test('Apple retry tells the model not to reuse headline wording', async () => {
     mockLoadLLMConfig.mockReturnValue({ provider: 'apple', apiKey: '' });
-    const copied = { mentions: [[{ story: 1, sentence: 'Chile earthquake: Dozens dead after 7.8 magnitude quake strikes near Santiago.', phrase: 'Chile earthquake' }]] };
-    mockRunAppleStructured.mockReturnValue(copied);
+    // Every sentence copies its headline, so both attempts fail the checks.
+    mockRunAppleStructured.mockImplementation(((_mode: string, _inst: string, prompt: string) => {
+      const title = prompt.split('\n')[0].replace('Headline: ', '');
+      return { sentence: `${title}.`, phrase: title.split(' ').slice(0, 3).join(' ') };
+    }) as any);
+    mockPromptLLM.mockResolvedValue({ text: 'Good evening! Let\u2019s dive in.', model: 'apple-on-device' });
     jest.spyOn(console, 'warn').mockImplementation(() => {});
     expect(await generateRoundupSummary(stories, { now })).toBeNull();
-    expect(mockRunAppleStructured).toHaveBeenCalledTimes(2);
-    expect(mockRunAppleStructured.mock.calls[0][1]).not.toContain('never reuse more than three words');
-    expect(mockRunAppleStructured.mock.calls[1][1]).toContain('never reuse more than three words');
+    const instructions = mockRunAppleStructured.mock.calls.map(c => c[1]);
+    expect(instructions[0]).not.toContain('never reuse more than three words');
+    expect(instructions[instructions.length - 1]).toContain('never reuse more than three words');
   });
 
   test('a failed first attempt is replaced by a passing retry', async () => {
@@ -753,24 +757,38 @@ describe('roundup intro gate and Apple structured intro', () => {
     expect(mockPromptLLM).toHaveBeenCalledTimes(2);
   });
 
-  test('Apple Intelligence uses the structured per-story intro', async () => {
+  test('Apple Intelligence writes the intro one story per request', async () => {
     mockLoadLLMConfig.mockReturnValue({ provider: 'apple', apiKey: '' });
-    mockRunAppleStructured.mockReturnValue({ mentions: [
-      [{ story: 1, sentence: 'A powerful quake near Santiago has killed dozens of people.', phrase: 'quake near Santiago' }],
-      [{ story: 2, sentence: 'Bayer will pay $7 billion to settle the cancer lawsuits.', phrase: 'Bayer will pay $7 billion to settle the cancer lawsuits' },
-       { story: 3, sentence: 'BART stopped every train during the evening commute.', phrase: 'BART stopped every train' }],
-    ] });
+    const answers: Record<string, { sentence: string; phrase: string }> = {
+      Chile: { sentence: 'A powerful quake near Santiago has killed dozens of people.', phrase: 'quake near Santiago' },
+      Judge: { sentence: 'Bayer will pay $7 billion to settle the cancer lawsuits.', phrase: 'Bayer will pay $7 billion to settle the cancer lawsuits' },
+      BART: { sentence: 'BART stopped every train during the evening commute.', phrase: 'BART stopped every train' },
+    };
+    mockRunAppleStructured.mockImplementation(((_mode: string, _inst: string, prompt: string) =>
+      answers[prompt.split('\n')[0].replace('Headline: ', '').split(/[ :]/)[0]]) as any);
     const r = await generateRoundupSummary(stories, { now });
     expect(mockPromptLLM).not.toHaveBeenCalled();
     expect(r?.provider).toBe('apple');
-    expect(r?.text).toContain('{{quake near Santiago|1}}');
-    expect(r?.text).toContain('{{$7 Billion|2}}'.replace('Billion', 'billion')); // whole-sentence link shortened to title words
-    expect(r?.text).toContain('{{BART stopped every train|3}}');
-    // The instructions carry the issue date, and the story list is capped for the 4K window.
-    const [mode, instructions, prompt] = mockRunAppleStructured.mock.calls[0];
-    expect(mode).toBe('intro');
-    expect(instructions).toContain('Tuesday, November 24, 2026 (evening)');
-    expect(prompt.split('\n')).toHaveLength(3);
+    expect(r?.text).toBe('A powerful {{quake near Santiago|1}} has killed dozens of people. Bayer will pay {{$7 billion|2}} to settle the cancer lawsuits.\n\n{{BART stopped every train|3}} during the evening commute.');
+    expect(mockRunAppleStructured.mock.calls.map(c => c[0])).toEqual(['sentence', 'sentence', 'sentence']);
+    expect(mockRunAppleStructured.mock.calls[0][1]).toContain('Tuesday, November 24, 2026 (evening)');
+  });
+
+  test('a story Apple refuses is skipped and the intro is written from the rest', async () => {
+    mockLoadLLMConfig.mockReturnValue({ provider: 'apple', apiKey: '' });
+    const four = [...stories, article({ title: 'Al Gore buys hometown Tennessee newspaper', domain: 'foxnews.com' })];
+    mockRunAppleStructured.mockImplementation(((_mode: string, _inst: string, prompt: string) => {
+      if (prompt.includes('Chile')) throw Object.assign(new Error('declined'), { kind: 'refusal' });
+      if (prompt.includes('Judge')) return { sentence: 'Bayer will pay billions to end the Roundup cancer cases.', phrase: 'Roundup cancer cases' };
+      if (prompt.includes('BART')) return { sentence: 'BART halted all trains in a systemwide power failure.', phrase: 'BART halted all trains' };
+      return { sentence: 'Al Gore is buying the paper he grew up reading in Tennessee.', phrase: 'Al Gore is buying' };
+    }) as any);
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const r = await generateRoundupSummary(four, { now });
+    expect(r?.text).not.toContain('|1}}');
+    expect(r?.text).toContain('{{Roundup cancer cases|2}}');
+    expect(r?.text).toContain('{{Al Gore is buying|4}}');
+    expect(warn.mock.calls.map(c => String(c[0])).join('\n')).toContain('declined 1 story');
   });
 
   test('Apple falls back to the text prompt when the structured helper fails', async () => {
