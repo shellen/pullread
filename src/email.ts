@@ -5,6 +5,13 @@ import { createTransport } from 'nodemailer';
 import { join } from 'path';
 import { homedir } from 'os';
 import { readFileSync, existsSync } from 'fs';
+import { PANEL_CATALOG, panelFor, groupStories, withOtherCopies, storyMatcher, alsoInFor, biggestPanelStories, weighStories, findConsensus, pickTopStories, fetchPanelHeadlines } from './stories';
+import type { PanelSource, Scope } from './stories';
+import {
+  applyModelGroups, checkIntro, blockingFailures, structuredIntroToMarkers,
+  appleSentenceInstructions, buildPerStoryIntro, mentionsToIntro,
+} from './rundown-ai';
+import type { StoryGroup } from './stories';
 
 const HEADER_IMAGE_PATH = join(__dirname, '..', 'email-header.png');
 
@@ -22,6 +29,14 @@ export interface EmailConfig {
   sendTime: string;
   sendTime2: string;
   lookbackDays: number;
+  /** Read a balanced panel of broad news outlets so major stories surface even outside your feeds. */
+  widerNews: boolean;
+  /** Local outlets for the "Near you" check, e.g. [{ name: 'KQED', feedUrl: '…' }]. Two or more must agree. */
+  regionalFeeds: Array<{ name: string; feedUrl: string }>;
+  /** Lead with Today's one read: the day's best match for your highlights, notes, favorites and watches. */
+  oneRead: boolean;
+  /** Wider-news outlets the reader turned on (catalog names), or null for the defaults. */
+  panelEnabled: string[] | null;
 }
 
 const DEFAULT_CONFIG: EmailConfig = {
@@ -38,7 +53,56 @@ const DEFAULT_CONFIG: EmailConfig = {
   sendTime: '08:00',
   sendTime2: '17:00',
   lookbackDays: 1,
+  widerNews: true,
+  regionalFeeds: [],
+  oneRead: true,
+  panelEnabled: null,
 };
+
+/** Rundown content settings the Settings page edits (the rest of EmailConfig is delivery). */
+export interface RundownContentSettings {
+  oneRead?: boolean;
+  widerNews?: boolean;
+  regionalFeeds?: Array<{ name: string; feedUrl: string }>;
+  /** Catalog outlet names, or null to go back to the defaults. */
+  panelEnabled?: string[] | null;
+}
+
+const MAX_REGIONAL_FEEDS = 10;
+
+/**
+ * Validate the content settings from a Settings-page POST. Only fields that
+ * are present and valid are returned, so a partial update never clobbers the
+ * rest. Regional feeds must be http(s) URLs; a missing name becomes the host.
+ */
+export function sanitizeRundownContentSettings(body: unknown): RundownContentSettings {
+  const b = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
+  const out: RundownContentSettings = {};
+  if (typeof b.oneRead === 'boolean') out.oneRead = b.oneRead;
+  if (typeof b.widerNews === 'boolean') out.widerNews = b.widerNews;
+  if (b.panelEnabled === null) out.panelEnabled = null;
+  else if (Array.isArray(b.panelEnabled)) {
+    const known = new Set(PANEL_CATALOG.map(p => p.name));
+    out.panelEnabled = [...new Set(b.panelEnabled.filter((n): n is string => typeof n === 'string' && known.has(n)))];
+  }
+  if (Array.isArray(b.regionalFeeds)) {
+    const seen = new Set<string>();
+    out.regionalFeeds = [];
+    for (const f of b.regionalFeeds) {
+      const raw = f && typeof f === 'object' ? (f as Record<string, unknown>) : {};
+      const feedUrl = typeof raw.feedUrl === 'string' ? raw.feedUrl.trim() : '';
+      let parsed: URL;
+      try { parsed = new URL(feedUrl); } catch { continue; }
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') continue;
+      if (seen.has(parsed.href)) continue;
+      seen.add(parsed.href);
+      const name = (typeof raw.name === 'string' ? raw.name.trim() : '').slice(0, 60) || parsed.hostname.replace(/^www\./, '');
+      out.regionalFeeds.push({ name, feedUrl: parsed.href });
+      if (out.regionalFeeds.length >= MAX_REGIONAL_FEEDS) break;
+    }
+  }
+  return out;
+}
 
 function settingsPath(): string {
   return join(homedir(), '.config', 'pullread', 'settings.json');
@@ -114,6 +178,16 @@ export interface ArticleMeta {
   summary?: string;
   image?: string;
   categories?: string[];
+  /** Set on stories in the Top stories block: who else ran it, and whether the wider news did. */
+  story?: StoryCoverage;
+}
+
+export interface StoryCoverage {
+  /** In the Top stories block (vs. a multi-source story shown in its section). */
+  top: boolean;
+  alsoIn: Array<{ source: string; url: string }>;
+  wider?: { sources: string[]; scope: Scope };
+  beyondFeeds: boolean;
 }
 
 function truncateExcerpt(text: string, max = 120): string {
@@ -194,6 +268,32 @@ function metaLine(article: ArticleMeta): string {
   return `<div style="font-size:12px;color:#9a938c;margin-top:5px">${source}${author}</div>`;
 }
 
+/**
+ * "Also in pitchfork.com, stereogum.com" / "Widely covered · BBC News, Fox News, NPR +3"
+ * under a top story, so the reader can see why it's at the top.
+ */
+function coverageLine(article: ArticleMeta): string {
+  const s = article.story;
+  if (!s) return '';
+  const parts: string[] = [];
+  if (s.beyondFeeds) {
+    const label = s.wider?.scope === 'regional' ? 'Near you' : 'Beyond your feeds';
+    parts.push(`<span style="color:#b45535;font-weight:600">${label}</span>`);
+  }
+  if (s.alsoIn.length) {
+    const links = s.alsoIn.slice(0, 3).map(o =>
+      `<a href="${escapeHtml(o.url)}" style="color:#7d746b;text-decoration:underline;text-underline-offset:2px">${escapeHtml(o.source)}</a>`);
+    const more = s.alsoIn.length > 3 ? ` +${s.alsoIn.length - 3}` : '';
+    parts.push(`Also in ${links.join(', ')}${more}`);
+  }
+  if (s.wider) {
+    const names = s.wider.sources.slice(0, 3).map(escapeHtml).join(', ');
+    const more = s.wider.sources.length > 3 ? ` +${s.wider.sources.length - 3}` : '';
+    parts.push(s.beyondFeeds ? `Covered by ${names}${more}` : `Widely covered: ${names}${more}`);
+  }
+  return `<div style="font-size:12px;color:#9a938c;margin-top:4px;line-height:1.5">${parts.join(' &middot; ')}</div>`;
+}
+
 // The whole headline is the link, straight to the source — no per-item CTA. On
 // mobile the image stacks above the text (.hero-cell / .hero-img in the head).
 function heroArticleHtml(article: ArticleMeta): string {
@@ -210,7 +310,7 @@ function heroArticleHtml(article: ArticleMeta): string {
 <td class="hero-cell" valign="top">
 <a href="${link}" style="font-size:17px;color:#1a1a1a;text-decoration:none;font-weight:600;line-height:1.35">${escapeHtml(article.title)}</a>
 ${excerpt ? `<div style="font-size:13.5px;color:#6b6560;margin-top:6px;line-height:1.55">${escapeHtml(excerpt)}</div>` : ''}
-${metaLine(article)}
+${metaLine(article)}${coverageLine(article)}
 </td>
 </tr></table>`;
   }
@@ -219,7 +319,7 @@ ${metaLine(article)}
   return `<div style="margin-bottom:22px">
 <a href="${link}" style="font-size:17px;color:#1a1a1a;text-decoration:none;font-weight:600;line-height:1.35">${escapeHtml(article.title)}</a>
 ${excerpt ? `<div style="font-size:13.5px;color:#6b6560;margin-top:6px;line-height:1.55">${escapeHtml(excerpt)}</div>` : ''}
-${metaLine(article)}
+${metaLine(article)}${coverageLine(article)}
 </div>`;
 }
 
@@ -229,7 +329,7 @@ function compactArticleHtml(article: ArticleMeta): string {
   return `<div style="padding:16px 0;border-top:1px solid #f0ebe6">
 <a href="${link}" style="font-size:15px;color:#1a1a1a;text-decoration:none;font-weight:600;line-height:1.4">${escapeHtml(article.title)}</a>
 ${excerpt ? `<div style="font-size:13px;color:#6b6560;margin-top:5px;line-height:1.5">${escapeHtml(excerpt)}</div>` : ''}
-${metaLine(article)}
+${metaLine(article)}${coverageLine(article)}
 </div>`;
 }
 
@@ -470,6 +570,7 @@ export function buildRoundupHtml(
   summary?: string | null,
   summaryCredit?: string | null,
   scoreFn?: ((a: ArticleMeta) => number) | null,
+  extras: { oneRead?: { article: ArticleMeta; why: string } | null } = {},
 ): string {
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
@@ -503,14 +604,31 @@ export function buildRoundupHtml(
 </div>
 `;
 
+  if (extras.oneRead) {
+    // Today's one read: the reader's own pick, above the day's news. The "why"
+    // names the signals it matched, so the choice is never a mystery.
+    html += `<div style="margin:0 0 30px;padding:0 0 26px;border-bottom:1px solid #ece7e2">
+<div style="font-size:11px;font-weight:700;color:#b45535;letter-spacing:0.12em;text-transform:uppercase;padding-bottom:12px">Today\u2019s one read</div>
+${heroArticleHtml(extras.oneRead.article).replace(/margin-bottom:22px/, 'margin-bottom:10px')}
+<div style="font-size:12.5px;color:#7d746b;font-style:italic;line-height:1.5">${escapeHtml(extras.oneRead.why)}</div>
+</div>
+`;
+  }
+
   if (summary) {
     // The note reads as a newsletter lede straight on the card — no bounding box.
     // Story references written as {{words|N}} link to the Nth article below.
     const citations = articles.map(a => ({ title: a.title, url: a.url }));
+    // The on-device model can misstate facts in ways the intro checks can't
+    // catch (live runs: a losing candidate "declaring victory", a man called
+    // "her"), so its credit says so plainly. Cloud models keep the plain credit.
+    const onDevice = summaryCredit === 'Apple Intelligence';
     const credit = summaryCredit
       ? `\n<div style="margin-top:16px;font-size:12px;color:#a99f95;letter-spacing:0.01em">`
-        + `<span style="color:#b45535">&#10022;</span> Summary by `
-        + `<span style="color:#7d746b;font-weight:600">${escapeHtml(summaryCredit)}</span></div>`
+        + `<span style="color:#b45535">&#10022;</span> ${onDevice ? 'Written on-device by ' : 'Summary by '}`
+        + `<span style="color:#7d746b;font-weight:600">${escapeHtml(summaryCredit)}</span>`
+        + (onDevice ? ' &middot; may contain errors, so check the stories below' : '')
+        + `</div>`
       : '';
     html += `<div style="margin:0 0 6px">
 ${renderSummaryParagraphs(summary, citations)}${credit}
@@ -525,7 +643,16 @@ ${renderSummaryParagraphs(summary, citations)}${credit}
   } else {
     // Rank sections by the day's signal (seed = today's date) so the lead
     // section changes with the news instead of freezing alphabetically.
-    const groups = groupByCategory(articles, scoreFn ? { score: scoreFn, seed: today } : {});
+    // Top stories (marked with .story by buildRoundup) lead, in weight order;
+    // every one gets the hero treatment so they read as the day's headlines.
+    const top = articles.filter(a => a.story?.top);
+    if (top.length) {
+      html += `<div style="margin:38px 0 20px">
+<div style="font-size:11px;font-weight:700;color:#b45535;letter-spacing:0.12em;text-transform:uppercase;padding-bottom:10px;border-bottom:1px solid #ece7e2">Top stories</div>
+</div>`;
+      for (const a of top) html += heroArticleHtml(a);
+    }
+    const groups = groupByCategory(articles.filter(a => !a.story?.top), scoreFn ? { score: scoreFn, seed: today } : {});
     for (const [cat, catArticles] of groups) {
       html += categorySection(cat, catArticles);
     }
@@ -651,64 +778,14 @@ export function scoreArticle(a: ArticleMeta, ctx: ScoreContext): number {
   return score;
 }
 
-/** Lowercased host (no www) + path (no trailing slash); query and hash dropped. */
-function canonicalUrl(url: string): string {
-  try {
-    const u = new URL(url);
-    return u.hostname.replace(/^www\./, '').toLowerCase() + u.pathname.replace(/\/+$/, '');
-  } catch {
-    return url.trim().toLowerCase();
-  }
-}
-
-const DEDUPE_STOPWORDS = new Set(['the', 'a', 'an', 'of', 'to', 'in', 'on', 'at', 'and', 'or', 'for', 'with', 'by', 'is', 'are', 'was', 'up', 'its', 'it', 'as', 'from', 'over', 'that']);
-
-function titleTokens(title: string): Set<string> {
-  const words = normalizeForTitleMatch(titleCore(title))
-    .replace(/['"]/g, '')
-    .split(/[^a-z0-9$]+/)
-    .filter(w => w && !DEDUPE_STOPWORDS.has(w));
-  return new Set(words);
-}
-
-/**
- * Two titles name the same story when their distinctive words overlap heavily:
- * at least 4 shared words and a Jaccard overlap of 0.5 or more. Catches the same
- * news from two outlets ("Julien Baker Lines Up New Album…" / "Julien Baker
- * Announces New Album…") without merging unrelated stories that share a name.
- */
-function sameStory(a: Set<string>, b: Set<string>): boolean {
-  let shared = 0;
-  for (const w of a) if (b.has(w)) shared++;
-  if (shared < 4) return false;
-  const union = a.size + b.size - shared;
-  return shared / union >= 0.5;
-}
-
-function richness(a: ArticleMeta): number {
-  return (a.image?.startsWith('http') ? 1 : 0) + (a.summary || a.excerpt ? 1 : 0);
-}
-
 /**
  * Drop duplicate stories: the same URL (ignoring query, hash, www and trailing
  * slash), the same title, or near-identical titles from different outlets.
  * Keeps the first occurrence unless a later copy has a real image or excerpt the
- * first lacks.
+ * first lacks. (groupStories keeps the extra copies; this keeps only the leads.)
  */
 export function dedupeArticles(articles: ArticleMeta[]): ArticleMeta[] {
-  const kept: Array<{ article: ArticleMeta; url: string; tokens: Set<string> }> = [];
-  for (const article of articles) {
-    const url = canonicalUrl(article.url);
-    const tokens = titleTokens(article.title);
-    const dup = kept.find(k => k.url === url || sameStory(k.tokens, tokens)
-      || normalizeForTitleMatch(k.article.title) === normalizeForTitleMatch(article.title));
-    if (!dup) {
-      kept.push({ article, url, tokens });
-    } else if (richness(article) > richness(dup.article)) {
-      dup.article = article;
-    }
-  }
-  return kept.map(k => k.article);
+  return groupStories(articles).map(g => g.lead);
 }
 
 export function curateArticles(
@@ -819,68 +896,122 @@ export interface RoundupSummary {
   provider: string;
 }
 
-export async function generateRoundupSummary(articles: ArticleMeta[]): Promise<RoundupSummary | null> {
+export async function generateRoundupSummary(articles: ArticleMeta[], opts: { now?: Date } = {}): Promise<RoundupSummary | null> {
   const { promptLLM, loadLLMConfig } = await import('./summarizer');
   const config = loadLLMConfig();
   if (!config) return null;
   // No stories, no intro: given an empty list, the model invents a day of news
-  // that isn't in the reader's library, and the email would still go out.
+  // that isn't in the reader's library, and the email would still go out
+  // (seen live on macOS 26.6: Biden, the Supreme Court, Chang'e-6 — none of it saved).
   if (!articles.length) return null;
+  const now = opts.now ?? new Date();
 
-  // Number the stories so the model can cite them inline as {{words|N}};
-  // renderSummaryParagraphs maps N back to this same (curated) article order.
-  // Feed each story's summary (or excerpt) like the in-app briefing does —
-  // titles alone push small models toward vague filler prose.
-  const buildList = (maxArticles: number, gistCap: number) => articles
-    .slice(0, maxArticles)
-    .map((a, i) => {
-      const gist = a.summary || a.excerpt || '';
-      const detail = gist && gistCap > 0 ? `\n   ${a.summary ? 'Summary' : 'Excerpt'}: ${gist.slice(0, gistCap)}` : '';
-      return `${i + 1}. "${a.title}" (${a.domain || a.feed || ''})${detail}`;
-    })
-    .join('\n');
+  // The free-text intro (all providers; also Apple's fallback).
+  const textIntro = async (): Promise<RoundupSummary | null> => {
+    // Number the stories so the model can cite them inline as {{words|N}};
+    // renderSummaryParagraphs maps N back to this same (curated) article order.
+    // Feed each story's summary (or excerpt) like the in-app briefing does —
+    // titles alone push small models toward vague filler prose.
+    const buildList = (maxArticles: number, gistCap: number) => articles
+      .slice(0, maxArticles)
+      .map((a, i) => {
+        const gist = a.summary || a.excerpt || '';
+        const detail = gist && gistCap > 0 ? `\n   ${a.summary ? 'Summary' : 'Excerpt'}: ${gist.slice(0, gistCap)}` : '';
+        return `${i + 1}. "${a.title}" (${a.domain || a.feed || ''})${detail}`;
+      })
+      .join('\n');
 
-  const base = roundupSummaryPrompt(config.provider === 'apple');
-  let articleList = buildList(15, 300);
+    const base = roundupSummaryPrompt(config.provider === 'apple');
+    let articleList = buildList(15, 300);
 
-  if (config.provider === 'apple') {
-    // Apple Intelligence has a hard 4096-token window shared with the ~400-token
-    // reply, and roughly 3 chars/token on mixed text — a rich prompt overflows it
-    // and the whole intro is lost. Shrink the story gists (then the list) until
-    // the prompt fits comfortably.
-    const budget = 7000; // total prompt chars
-    for (const [n, cap] of [[15, 120], [12, 80], [10, 40], [8, 0], [5, 0]] as const) {
-      articleList = buildList(n, cap);
-      if (base.length + articleList.length <= budget) break;
-    }
-  }
-
-  // Use promptLLM (not summarizeText): the roundup prompt IS the instruction.
-  // summarizeText would prepend its own "Summarize this article…" wrapper, so the
-  // model would summarize our instructions instead of following them — producing a
-  // near-static blurb anchored on the example lines in the prompt.
-  // A slightly higher token budget lets the model write 2-3 short paragraphs.
-  const run = async (list: string) => {
-    const result = await promptLLM(base + list, config, 400);
-    const text = stripFillerParagraphs(result.text.trim());
-    return text ? { text, model: result.model, provider: config.provider } : null;
-  };
-  try {
-    return await run(articleList);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    // Last resort: a bare titles-only list still beats an email with no intro.
-    if (/context window/i.test(msg)) {
-      try {
-        return await run(buildList(5, 0));
-      } catch (retryErr) {
-        console.warn('[email] Roundup summary retry failed:', retryErr instanceof Error ? retryErr.message : retryErr);
-        return null;
+    if (config.provider === 'apple') {
+      // Apple Intelligence has a hard 4096-token window shared with the ~400-token
+      // reply, and roughly 3 chars/token on mixed text — a rich prompt overflows it
+      // and the whole intro is lost. Shrink the story gists (then the list) until
+      // the prompt fits comfortably.
+      const budget = 7000; // total prompt chars
+      for (const [n, cap] of [[15, 120], [12, 80], [10, 40], [8, 0], [5, 0]] as const) {
+        articleList = buildList(n, cap);
+        if (base.length + articleList.length <= budget) break;
       }
     }
-    console.warn('[email] Failed to generate roundup summary:', msg);
-    return null;
+
+    // Use promptLLM (not summarizeText): the roundup prompt IS the instruction.
+    // summarizeText would prepend its own "Summarize this article…" wrapper, so the
+    // model would summarize our instructions instead of following them — producing a
+    // near-static blurb anchored on the example lines in the prompt.
+    // A slightly higher token budget lets the model write 2-3 short paragraphs.
+    const run = async (list: string) => {
+      const result = await promptLLM(base + list, config, 400);
+      const text = stripFillerParagraphs(result.text.trim());
+      return text ? { text, model: result.model, provider: config.provider } : null;
+    };
+    try {
+      return await run(articleList);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Last resort: a bare titles-only list still beats an email with no intro.
+      if (/context window/i.test(msg)) {
+        try {
+          return await run(buildList(5, 0));
+        } catch (retryErr) {
+          console.warn('[email] Roundup summary retry failed:', retryErr instanceof Error ? retryErr.message : retryErr);
+          return null;
+        }
+      }
+      console.warn('[email] Failed to generate roundup summary:', msg);
+      return null;
+    }
+  };
+
+  // Apple Intelligence: guided generation with per-story sentences, which the
+  // on-device model follows far better than a free-form prompt (see
+  // src/apple-structured.ts). Falls back to the text prompt on any error.
+  const structuredAppleIntro = async (retry: boolean): Promise<RoundupSummary | null> => {
+    const { runAppleStructured } = await import('./apple-structured');
+    // One story per request: a refusal (Apple's guardrails, on sensitive news)
+    // drops that story instead of the whole intro, and each request is tiny.
+    let refused = 0;
+    const built = await buildPerStoryIntro(articles, async (prompt, retryStory) => {
+      try {
+        return await runAppleStructured('sentence', appleSentenceInstructions(issueDateLine(now), retry || retryStory), prompt, 30_000);
+      } catch (err) {
+        if ((err as { kind?: string }).kind === 'refusal') refused++;
+        throw err;
+      }
+    });
+    if (refused) console.warn(`[email] Apple Intelligence declined ${refused} stor${refused === 1 ? 'y' : 'ies'}; writing the intro from the rest`);
+    if (built?.copied) console.warn(`[email] Skipped ${built.copied} stor${built.copied === 1 ? 'y' : 'ies'} whose sentence kept copying the headline`);
+    if (built?.invented) console.warn(`[email] Skipped ${built.invented} stor${built.invented === 1 ? 'y' : 'ies'} whose sentence named things the story doesn't mention`);
+    if (!built) return null;
+    const { text } = structuredIntroToMarkers(mentionsToIntro(built.mentions, articles.map(a => a.title)), articles.length);
+    return text.trim() ? { text, model: 'on-device', provider: 'apple' } : null;
+  };
+
+  const attempt = async (retry: boolean): Promise<RoundupSummary | null> => {
+    if (config.provider === 'apple') {
+      try {
+        const r = await structuredAppleIntro(retry);
+        if (r) return r;
+      } catch (err) {
+        console.warn('[email] Structured Apple intro failed, using the text prompt:', err instanceof Error ? err.message : err);
+      }
+    }
+    return textIntro();
+  };
+
+  // Gate: an intro that names the wrong day, uses banned filler, cites a story
+  // that isn't there, copies the stories, or isn't about them at all gets one
+  // retry, then is left out — no intro beats a wrong one.
+  const sources = articles.flatMap(a => [a.title, a.summary || a.excerpt || '']).filter(Boolean);
+  for (let i = 1; i <= 2; i++) {
+    const result = await attempt(i > 1);
+    if (!result) return null;
+    const failures = blockingFailures(checkIntro(result.text, { now, storyCount: articles.length, sources }));
+    if (!failures.length) return result;
+    console.warn(`[email] Roundup intro failed checks (attempt ${i} of 2): ${failures.join('; ')}`);
   }
+  return null;
 }
 
 export interface RoundupResult {
@@ -890,6 +1021,23 @@ export interface RoundupResult {
   /** Brand-level credit for the AI that wrote the intro (e.g. "Claude"), if any. */
   summaryCredit: string | null;
   articles: ArticleMeta[];
+  /** What story curation did: panel feeds reached, model grouping, merges. */
+  report?: StoryReport;
+  /** Today's one read, its runners-up and the profile it came from (for preview-rundown). */
+  oneRead?: {
+    pick: { article: ArticleMeta; why: string; score: number; terms: string[] } | null;
+    runnersUp: Array<{ title: string; score: number; terms: string[] }>;
+    signals: Partial<Record<string, number>>;
+    topInterests: string[];
+    /** A few of the notes, to spot imported text masquerading as notes. */
+    sampleNotes: string[];
+    /** Recent picks and whether the reader opened or finished them. */
+    history: Array<{ date: string; title: string; opened: boolean; finished: boolean }>;
+    /** Articles in the reading history (all skipped). */
+    readCount: number;
+    /** Strongest words contributed by each kind of signal. */
+    bySource: Record<string, string[]>;
+  };
 }
 
 /** Keep only articles bookmarked within the lookback window. */
@@ -898,6 +1046,168 @@ export function filterByLookback(articles: ArticleMeta[], lookbackDays: number):
   cutoff.setDate(cutoff.getDate() - lookbackDays);
   const cutoffStr = cutoff.toISOString();
   return articles.filter(a => a.bookmarked && a.bookmarked >= cutoffStr);
+}
+
+export interface StoryCurationOptions {
+  /** Supply panel headlines directly (tests, previews); otherwise they're fetched when widerNews is on. */
+  panelHeadlines?: import('./stories').PanelHeadline[];
+  panel?: PanelSource[];
+  limit?: number;
+  /**
+   * Model grouping as "ids|label|importance" lines (Phase 4 / demo 2), ids being
+   * 1-based positions in groupingPrompt(groups). Merges groups, relabels their
+   * sections, and nudges weight by importance.
+   */
+  modelGroups?: string[];
+  /**
+   * Ask a model to group the stories (Apple on-device on macOS 26: see
+   * onDeviceGrouping). Returns "ids|label|importance" lines, or null to skip.
+   * Errors are caught and the stories stay grouped by word matching alone.
+   */
+  modelGrouper?: (groups: StoryGroup[], context: { allGroups: StoryGroup[] }) => string[] | null | Promise<string[] | null>;
+  /** Receives a summary of what curation did (for preview-rundown and logs). */
+  onReport?: (report: StoryReport) => void;
+}
+
+export interface StoryReport {
+  panelFeeds: number;
+  /** Panel outlets that returned at least one recent headline. */
+  panelFeedsReached: string[];
+  panelHeadlines: number;
+  widelyCovered: number;
+  /** Panel stories run by the most outlets, even below the bar (diagnostics). */
+  biggestPanelStories: Array<{ title: string; sources: string[]; titles: string[] }>;
+  beyondFeeds: number;
+  storyGroups: number;
+  modelGrouping: 'not used' | 'applied' | 'skipped' | 'failed';
+  merges: string[];
+}
+
+/** Stories sent to the model for grouping: the strongest by score and coverage. */
+const MODEL_GROUPING_MAX = 40;
+
+/**
+ * Weight per importance step away from the middle (3): a 5 adds 1.5, a 1 takes
+ * 1.5 off. Kept small: on macOS 26 the on-device model's ratings were flat or
+ * inflated across runs (Nov 25), so they nudge rather than reorder.
+ */
+const IMPORTANCE_POINTS = 0.75;
+
+/**
+ * Group the day's articles into stories, weigh them (your sources' coverage +
+ * the wider-news panel), pull out the Top stories, and curate the rest. Top
+ * stories come first in the returned list, marked with `.story`.
+ */
+export async function curateWithStories(
+  articles: ArticleMeta[],
+  cfg: Pick<EmailConfig, 'widerNews' | 'regionalFeeds'> & Partial<Pick<EmailConfig, 'panelEnabled'>>,
+  scoreFn: (a: ArticleMeta) => number,
+  mentionCounts?: Map<string, number>,
+  watchedEntities?: Set<string>,
+  opts: StoryCurationOptions = {},
+): Promise<ArticleMeta[]> {
+  const limit = opts.limit ?? MAX_ROUNDUP_ARTICLES;
+  // Near you works on its own: local feeds are read even with Wider news off.
+  const panel = opts.panel ?? [
+    ...(cfg.widerNews ? panelFor(cfg.panelEnabled) : []),
+    ...(cfg.regionalFeeds || []).map(f => ({ ...f, lean: 'center' as const, scope: 'regional' as const })),
+  ];
+
+  let headlines = opts.panelHeadlines ?? [];
+  if (!opts.panelHeadlines && panel.length) {
+    try {
+      const { fetchFeed } = await import('./feed');
+      headlines = await fetchPanelHeadlines(panel, fetchFeed);
+    } catch {
+      headlines = []; // offline or every feed failed — rank on your feeds alone
+    }
+  }
+  // Measure coverage against the outlets that answered, so a dead feed doesn't raise the bar.
+  const reached = [...new Set(headlines.map(h => h.source))];
+  const consensus = headlines.length && !opts.panelHeadlines ? findConsensus(headlines, panel, { reached })
+    : headlines.length ? findConsensus(headlines, panel) : [];
+
+  let groups = groupStories(articles);
+  const storyGroups = groups.length;
+  let weighFn = scoreFn;
+  let modelLines = opts.modelGroups;
+  let modelGrouping: StoryReport['modelGrouping'] = opts.modelGroups ? 'applied' : 'not used';
+  let merges: string[] = [];
+  if (!modelLines && opts.modelGrouper && groups.length > 1) {
+    try {
+      // Only the strongest stories can make a 12-story email, so only they go to
+      // the model (a live 3-day window had 246 stories — ~17 on-device calls).
+      const ranked = groups
+        .map((g, i) => ({ i, w: scoreFn(g.lead) + 2.5 * (g.sources.length - 1) }))
+        .sort((a, b) => b.w - a.w)
+        .slice(0, MODEL_GROUPING_MAX);
+      const subLines = await opts.modelGrouper(ranked.map(r => groups[r.i]), { allGroups: groups });
+      // Map the model's ids (positions in the shortlist) back to positions in `groups`.
+      modelLines = subLines?.map(line => {
+        const [ids, ...rest] = line.split('|');
+        const mapped = ids.split(',').map(n => ranked[parseInt(n, 10) - 1]?.i).filter(i => i !== undefined).map(i => i! + 1);
+        return [mapped.join(','), ...rest].join('|');
+      }).filter(line => !line.startsWith('|'));
+      modelGrouping = modelLines ? 'applied' : 'skipped';
+    } catch (err) {
+      modelGrouping = 'failed';
+      console.warn('[email] Model story grouping failed; using word matching only:', err instanceof Error ? err.message : err);
+    }
+  }
+  if (modelLines?.length) {
+    const model = applyModelGroups(groups, modelLines);
+    merges = model.merges;
+    groups = model.groups.map(g => {
+      const label = model.labels.get(g);
+      return label ? { ...g, lead: { ...g.lead, categories: [label] } } : g;
+    });
+    const importanceByUrl = new Map(model.groups.map((g, i) => [groups[i].lead.url, model.importance.get(g)]));
+    weighFn = (a: ArticleMeta) => scoreFn(a) + IMPORTANCE_POINTS * ((importanceByUrl.get(a.url) ?? 3) - 3);
+  }
+  const weighed = weighStories(groups, consensus, weighFn);
+  const { top, rest } = pickTopStories(weighed, consensus, { baseScore: weighFn });
+
+  const topArticles = top.map(t => ({
+    ...t.article,
+    story: { top: true, alsoIn: t.alsoIn, wider: t.wider, beyondFeeds: t.beyondFeeds },
+  }));
+  // Stories outside the top block still show who else ran them.
+  const leads = rest.map(g => {
+    const alsoIn = alsoInFor(g);
+    return alsoIn.length ? { ...g.lead, story: { top: false, alsoIn, beyondFeeds: false } } : g.lead;
+  });
+  const others = curateArticles(leads, mentionCounts, watchedEntities, Math.max(0, limit - topArticles.length));
+  opts.onReport?.({
+    panelFeeds: panel.length,
+    panelFeedsReached: [...new Set(headlines.map(h => h.source))],
+    panelHeadlines: headlines.length,
+    widelyCovered: consensus.length,
+    biggestPanelStories: biggestPanelStories(headlines),
+    beyondFeeds: top.filter(t => t.beyondFeeds).length,
+    storyGroups,
+    modelGrouping,
+    merges,
+  });
+  return [...topArticles, ...others];
+}
+
+/**
+ * On-device story grouping for Apple Intelligence users (macOS 26): merges
+ * reworded copies of the same story and labels sections from a fixed list.
+ * Other providers keep word matching only for now.
+ */
+async function appleGrouperIfEnabled(): Promise<StoryCurationOptions['modelGrouper']> {
+  try {
+    const { loadLLMConfig, isAppleAvailable } = await import('./summarizer');
+    if (loadLLMConfig()?.provider !== 'apple' || !isAppleAvailable()) return undefined;
+    const { runAppleStructured } = await import('./apple-structured');
+    const { onDeviceGrouping, commonWords } = await import('./rundown-ai');
+    return (groups, { allGroups }) => onDeviceGrouping(groups, (mode, instructions, prompt) => runAppleStructured(mode, instructions, prompt, 30_000), {
+      common: commonWords(allGroups), // measured over the whole day, not the shortlist
+    });
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -911,6 +1221,7 @@ export async function buildRoundup(
   cfg: EmailConfig,
   fetchArticles?: () => Promise<ArticleMeta[]>,
   port = 7777,
+  opts: { outputPath?: string; recordPick?: boolean } = {},
 ): Promise<RoundupResult> {
   let articles: ArticleMeta[] = [];
   if (fetchArticles) {
@@ -945,7 +1256,73 @@ export async function buildRoundup(
     // Research module not available — curate without it
   }
 
-  const curated = curateArticles(articles, mentionCounts, watchedEntities);
+  const scoreCtx: ScoreContext = { now: Date.now(), mentionCounts, watchedEntities };
+  const scoreFn = (a: ArticleMeta) => scoreArticle(a, scoreCtx);
+  // Today's one read: the best match for the reader's own signals, picked from
+  // the whole window before curation, then kept out of the rest of the email
+  // (with any other copies of the same story).
+  let oneRead: RoundupResult['oneRead'];
+  if (cfg.oneRead && articles.length) {
+    try {
+      const { gatherInterestSignals, buildInterestProfile, pickOneRead, titleFromFilename } = await import('./interests');
+      const { signals, engaged, read } = await gatherInterestSignals({
+        outputPath: opts.outputPath || '',
+        watches: [...(watchedEntities || [])],
+      });
+      const profile = buildInterestProfile(signals);
+      // Skip what the reader already opened (reading history) or highlighted,
+      // noted or favorited, and every other copy of those stories: on Nov 26 the
+      // pick was another outlet's copy of an obituary the reader had favorited.
+      // Also skip any story picked in the last week, so an unopened pick doesn't
+      // come back the next day as another outlet's copy.
+      const { loadReading, saveReading, recordPick, pickOutcomes, recentPicks } = await import('./reading');
+      const stories = groupStories(articles);
+      const seen = new Set([...engaged, ...read, ...recentPicks(loadReading())]);
+      const skip = withOtherCopies(stories, seen);
+      // Copies saved outside the window count too: on Nov 27 the pick was a newer
+      // copy of an Ars Technica article the reader had already finished.
+      const alreadySeen = storyMatcher([...seen].map(titleFromFilename));
+      for (const a of articles) if (!skip.has(a.filename) && alreadySeen(a.title)) skip.add(a.filename);
+      const storyOf = new Map<string, number>();
+      stories.forEach((g, gi) => { for (const m of g.members) storyOf.set(m.filename, gi); });
+      const { pick, ranked } = pickOneRead(articles, profile, skip);
+      if (pick && opts.recordPick) {
+        const date = new Date().toISOString().slice(0, 10);
+        saveReading(recordPick(loadReading(), { date, filename: pick.article.filename, title: pick.article.title }));
+      }
+      const history = pickOutcomes(loadReading());
+      oneRead = {
+        pick,
+        // One runner-up per story, not four copies of the pick.
+        runnersUp: ranked.filter((c, i, all) => all.findIndex(o => storyOf.get(o.article.filename) === storyOf.get(c.article.filename)) === i)
+          .slice(1, 6).map(c => ({ title: c.article.title, score: c.score, terms: c.terms.slice(0, 4) })),
+        signals: profile.counts,
+        topInterests: [...profile.weights].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([t]) => t),
+        bySource: Object.fromEntries(Object.keys(profile.counts).map(kind => [kind,
+          [...profile.sources].map(([t, m]) => [t, m.get(kind as never) || 0] as const)
+            .filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([t]) => t)])),
+        history: history.map(h => ({ date: h.date, title: h.title, opened: h.opened, finished: h.finished })),
+        readCount: read.size,
+        sampleNotes: signals.filter(x => x.kind === 'note').sort((a, b) => b.text.length - a.text.length)
+          .filter((_, i, arr) => i === 0 || i === Math.floor(arr.length / 2) || i === arr.length - 1)
+          .map(x => `${x.text.length} chars: ${x.text.replace(/\s+/g, ' ').slice(0, 110)}`),
+      };
+      if (pick) {
+        const sameStory = groupStories(articles).find(g => g.members.includes(pick.article));
+        const remove = new Set((sameStory?.members ?? [pick.article]).map(a => a.filename));
+        articles = articles.filter(a => !remove.has(a.filename));
+        await validateArticleImages([pick.article]);
+      }
+    } catch (err) {
+      console.warn("[email] Today's one read skipped:", err instanceof Error ? err.message : err);
+    }
+  }
+
+  let report: StoryReport | undefined;
+  const curated = await curateWithStories(articles, cfg, scoreFn, mentionCounts, watchedEntities, {
+    modelGrouper: await appleGrouperIfEnabled(),
+    onReport: r => { report = r; },
+  });
 
   // Validate article images — strip broken URLs to avoid broken image icons
   await validateArticleImages(curated);
@@ -958,13 +1335,13 @@ export async function buildRoundup(
     : null;
 
   // Rank sections by the day's relevance/freshness so the lead changes daily.
-  const scoreCtx: ScoreContext = { now: Date.now(), mentionCounts, watchedEntities };
-  const scoreFn = (a: ArticleMeta) => scoreArticle(a, scoreCtx);
-  const html = buildRoundupHtml(curated, cfg.lookbackDays, summary, summaryCredit, scoreFn);
+  const html = buildRoundupHtml(curated, cfg.lookbackDays, summary, summaryCredit, scoreFn, {
+    oneRead: oneRead?.pick ? { article: oneRead.pick.article, why: oneRead.pick.why } : null,
+  });
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   const subject = `The Pull Read Rundown — ${today}`;
 
-  return { html, subject, summary, summaryCredit, articles: curated };
+  return { html, subject, summary, summaryCredit, articles: curated, report, oneRead };
 }
 
 export async function sendRoundup(
@@ -978,7 +1355,7 @@ export async function sendRoundup(
     throw new Error('Email not configured: missing SMTP host or recipient');
   }
 
-  const { html, subject, articles } = await buildRoundup(cfg, fetchArticles, port);
+  const { html, subject, articles } = await buildRoundup(cfg, fetchArticles, port, { recordPick: true });
 
   const transport = createSmtpTransport(cfg);
   const mailOptions: Record<string, unknown> = {

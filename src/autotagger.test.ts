@@ -39,6 +39,7 @@ jest.mock('./summarizer', () => ({
   loadLLMConfig: jest.fn(),
   getDefaultModel: jest.fn(),
   ensureAppleBinary: jest.fn(),
+  withAppleModel: (fn: () => Promise<unknown>) => fn(),
 }));
 jest.mock('./writer', () => ({
   listMarkdownFiles: jest.fn(),
@@ -127,7 +128,7 @@ describe('autotagBatchApple', () => {
   ];
 
   test('builds JSONL input with id and prompt for each article', async () => {
-    mockEnsureBinary.mockReturnValue('/mock/.config/pullread/.apple-batch-autotag');
+    mockEnsureBinary.mockResolvedValue('/mock/.config/pullread/.apple-batch-autotag');
     mockBatchOutput =
       '{"id":"article-one.md","response":"{\\"tags\\":[\\"ai\\"],\\"section\\":\\"tech\\"}"}\n' +
       '{"id":"article-two.md","response":"{\\"tags\\":[\\"climate\\"],\\"section\\":\\"science\\"}"}\n';
@@ -150,7 +151,7 @@ describe('autotagBatchApple', () => {
   });
 
   test('parses responses and saves tags via parseAutotagResponse', async () => {
-    mockEnsureBinary.mockReturnValue('/mock/.config/pullread/.apple-batch-autotag');
+    mockEnsureBinary.mockResolvedValue('/mock/.config/pullread/.apple-batch-autotag');
     mockBatchOutput =
       '{"id":"article-one.md","response":"{\\"tags\\":[\\"ai\\",\\"machinelearning\\"],\\"section\\":\\"tech\\"}"}\n' +
       '{"id":"article-two.md","response":"{\\"tags\\":[\\"climate\\",\\"policy\\"],\\"section\\":\\"science\\"}"}\n';
@@ -164,7 +165,7 @@ describe('autotagBatchApple', () => {
   });
 
   test('counts errors in batch output as failed', async () => {
-    mockEnsureBinary.mockReturnValue('/mock/.config/pullread/.apple-batch-autotag');
+    mockEnsureBinary.mockResolvedValue('/mock/.config/pullread/.apple-batch-autotag');
     mockBatchOutput =
       '{"id":"article-one.md","response":"{\\"tags\\":[\\"ai\\"],\\"section\\":\\"tech\\"}"}\n' +
       '{"id":"article-two.md","error":"model not available"}\n';
@@ -177,7 +178,7 @@ describe('autotagBatchApple', () => {
   });
 
   test('returns null when ensureAppleBinary fails', async () => {
-    mockEnsureBinary.mockReturnValue(null);
+    mockEnsureBinary.mockResolvedValue(null);
 
     const result = await autotagBatchApple(articles, { provider: 'apple', apiKey: '' });
 
@@ -185,7 +186,7 @@ describe('autotagBatchApple', () => {
   });
 
   test('truncates article text to fit Apple context window', async () => {
-    mockEnsureBinary.mockReturnValue('/mock/.config/pullread/.apple-batch-autotag');
+    mockEnsureBinary.mockResolvedValue('/mock/.config/pullread/.apple-batch-autotag');
     mockBatchOutput =
       '{"id":"long-article.md","response":"{\\"tags\\":[\\"ai\\"],\\"section\\":\\"tech\\"}"}\n';
 

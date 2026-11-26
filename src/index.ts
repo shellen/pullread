@@ -584,16 +584,62 @@ if (command === 'sync') {
   (async () => {
     const { buildRoundup, filterByLookback, loadEmailConfig } = await import('./email');
     const cfg = loadEmailConfig();
-    const fetchArticles = async () => filterByLookback(listFiles(config.outputPath, true), cfg.lookbackDays);
-    const result = await buildRoundup(cfg, fetchArticles);
+    // --days N widens the window for a preview (e.g. when nothing was saved today).
+    const daysIndex = args.indexOf('--days');
+    const days = daysIndex !== -1 ? parseInt(args[daysIndex + 1], 10) : NaN;
+    if (days > 0) cfg.lookbackDays = days;
+    let library = { total: 0, newest: '', inWindow: 0 };
+    const fetchArticles = async () => {
+      const all = listFiles(config.outputPath, true);
+      const inWindow = filterByLookback(all, cfg.lookbackDays);
+      library = { total: all.length, newest: all.map(a => a.bookmarked || '').filter(Boolean).sort().pop() || '', inWindow: inWindow.length };
+      return inWindow;
+    };
+    const result = await buildRoundup(cfg, fetchArticles, undefined, { outputPath: config.outputPath });
 
     writeFileSync(outPath, result.html);
-    console.log(`Articles in last ${cfg.lookbackDays} day${cfg.lookbackDays === 1 ? '' : 's'}: ${result.articles.length}`);
-    console.log(`Editorial note: ${result.summary ?? '(none — no LLM configured, or generation failed)'}`);
+    console.log(`Library: ${config.outputPath} — ${library.total} article${library.total === 1 ? '' : 's'}${library.newest ? `, newest saved ${library.newest.slice(0, 10)}` : ''}`);
+    console.log(`Articles in last ${cfg.lookbackDays} day${cfg.lookbackDays === 1 ? '' : 's'}: ${library.inWindow} (${result.articles.length} in the email)`);
+    console.log(`Editorial note: ${result.summary ?? (result.articles.length === 0 ? '(none — no articles in the window)' : '(none — no LLM configured, or the intro failed its checks; see [email] lines above)')}`);
     if (result.summaryCredit) console.log(`Summary by: ${result.summaryCredit}`);
+    const o = result.oneRead;
+    if (o) {
+      const sig = Object.entries(o.signals).map(([k, n]) => `${n} ${k}${n === 1 ? '' : 's'}`).join(', ');
+      console.log(`Today's one read: ${o.pick ? `"${o.pick.article.title}" (${o.pick.article.domain}) — ${o.pick.why} [score ${o.pick.score.toFixed(1)}]` : '(none — no article matched your interests)'}`);
+      console.log(`  Interest profile: ${sig || 'no signals found'}${o.topInterests.length ? `; strongest: ${o.topInterests.join(', ')}` : ''}`);
+      for (const r of o.runnersUp) console.log(`  runner-up [${r.score.toFixed(1)}]: ${r.title.slice(0, 80)} (${r.terms.join(', ')})`);
+      for (const [kind, words] of Object.entries(o.bySource)) if (words.length) console.log(`    from ${kind}: ${words.join(', ')}`);
+      console.log(`  Reading history: ${o.readCount} article${o.readCount === 1 ? '' : 's'} opened (skipped)${o.readCount === 0 ? ' — open Pull Read once so it can send your history' : ''}`);
+      if (o.history.length) {
+        const opened = o.history.filter(h => h.opened).length;
+        console.log(`  Recent picks: ${opened} of ${o.history.length} opened`);
+        for (const h of o.history) console.log(`    ${h.date} ${h.finished ? 'finished' : h.opened ? 'opened  ' : 'not yet '} ${h.title.slice(0, 80)}`);
+      }
+      if (o.sampleNotes.length) {
+        console.log('  Sample notes (longest, middle, shortest):');
+        for (const n of o.sampleNotes) console.log(`    ${n}`);
+      }
+    } else if (!cfg.oneRead) {
+      console.log("Today's one read: off");
+    }
+    const r = result.report;
+    if (r) {
+      console.log(`Wider news: ${r.panelFeeds ? `${r.panelFeedsReached.length} of ${r.panelFeeds} outlets reached (${r.panelHeadlines} headlines); ${r.widelyCovered} widely covered, ${r.beyondFeeds} added beyond your feeds` : 'off'}`);
+      if (r.panelFeeds && r.panelFeedsReached.length < r.panelFeeds) {
+        console.log(`  Reached: ${r.panelFeedsReached.join(', ') || 'none'}`);
+      }
+      if (r.biggestPanelStories.length) {
+        console.log('  Most-covered panel stories (widely covered needs 3+ outlets across 2+ leans):');
+        for (const st of r.biggestPanelStories) {
+          console.log(`    ${st.sources.length} outlet${st.sources.length === 1 ? '' : 's'} (${st.sources.join(', ')}): ${st.title.slice(0, 90)}`);
+          for (const t of st.titles.slice(1, 6)) console.log(`        · ${t.slice(0, 100)}`);
+        }
+      }
+      console.log(`Story grouping: ${r.storyGroups} stories; model grouping ${r.modelGrouping}${r.merges.length ? `, merged ${r.merges.join('; ')}` : ''}`);
+    }
     console.log(`Wrote preview to ${outPath}`);
-    if (result.articles.length === 0) {
-      console.log('Note: no bookmarked articles in the window, so the summary will be empty. Bookmark a few recent articles and re-run.');
+    if (library.inWindow === 0) {
+      console.log(`Note: no articles saved in the last ${cfg.lookbackDays} day${cfg.lookbackDays === 1 ? '' : 's'}, so there's no intro. Try --days ${Math.max(3, cfg.lookbackDays * 2)}.`);
     }
     // Open resources (research DB, etc.) can keep the event loop alive — exit explicitly.
     process.exit(0);
@@ -865,5 +911,6 @@ Commands:
   review --days N         Review the past N days (default: 7)
   preview-rundown         Render the email rundown to an HTML file (no email sent)
   preview-rundown --out <path>  Write the preview to a custom path
+  preview-rundown --days <n>    Look back n days instead of the configured window
 `);
 }

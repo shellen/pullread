@@ -1641,6 +1641,7 @@ function saveScrollPosition() {
     const scrollHeight = pane.scrollHeight - pane.clientHeight;
     if (scrollHeight <= 0) return;
     const pct = pane.scrollTop / scrollHeight;
+    if (typeof queueReadingEvent === 'function') queueReadingEvent({ filename: activeFile, type: 'progress', progress: pct, at: Date.now() });
     const positions = JSON.parse(localStorage.getItem('pr-scroll-positions') || '{}');
     positions[activeFile] = { pct, ts: Date.now() };
     // Keep only last 100 positions

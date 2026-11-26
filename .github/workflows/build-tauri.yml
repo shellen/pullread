@@ -100,6 +100,14 @@ jobs:
       - name: Prepare sidecar
         run: bash scripts/prepare-sidecar.sh ${{ matrix.target }}
 
+      # Apple Intelligence helpers (Swift, FoundationModels): compiled here and
+      # bundled so users don't need Xcode command line tools. Apple Silicon only;
+      # skips (built=false) if the runner's Xcode lacks the macOS 26 SDK, and the
+      # app then compiles them on first use as before.
+      - name: Build Apple Intelligence helpers
+        id: helpers
+        run: bun scripts/build-apple-helpers.ts ${{ matrix.target }}
+
       - name: Import Apple certificate
         if: startsWith(matrix.platform, 'macos')
         env:
@@ -138,6 +146,14 @@ jobs:
             --entitlements src-tauri/entitlements.plist \
             src-tauri/binaries/pullread-cli-${{ matrix.target }}
 
+      - name: Sign Apple Intelligence helpers
+        if: env.HAS_SIGNING_CERT == 'true' && steps.helpers.outputs.built == 'true'
+        run: |
+          for f in src-tauri/binaries/pullread-apple-*-${{ matrix.target }}; do
+            codesign --force --options runtime --timestamp \
+              --sign "Developer ID Application" "$f"
+          done
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -156,7 +172,8 @@ jobs:
           releaseBody: 'See the assets to download and install this version.'
           releaseDraft: ${{ startsWith(github.ref, 'refs/tags/') }}
           prerelease: false
-          args: --target ${{ matrix.target }}
+          # The helpers config adds the Apple Intelligence helpers to externalBin (Apple Silicon only).
+          args: --target ${{ matrix.target }}${{ steps.helpers.outputs.built == 'true' && ' --config src-tauri/tauri.apple-helpers.conf.json' || '' }}
 
       - name: Upload build artifacts
         if: "!startsWith(github.ref, 'refs/tags/')"

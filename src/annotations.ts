@@ -79,6 +79,14 @@ export function initAnnotations(outputPath: string, configDir: string): void {
 }
 
 /** Load annotation data for a single article */
+/**
+ * Has initAnnotations run in this process (the viewer does at startup; CLI
+ * commands may not), and for this library if one is given?
+ */
+export function annotationsInitialized(outputPath?: string): boolean {
+  return _outputPath !== '' && (!outputPath || _outputPath === outputPath);
+}
+
 export function loadAnnotation(filename: string): AnnotationData {
   return _cache[filename] || { ...EMPTY_ANNOTATION, highlights: [], annotations: [], tags: [], machineTags: [] };
 }

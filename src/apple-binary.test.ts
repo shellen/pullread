@@ -39,9 +39,16 @@ jest.mock('child_process', () => {
   const real = jest.requireActual('child_process');
   return {
     ...real,
-    execFileSync: (...args: any[]) => {
-      if (args[0] === 'swiftc') return mockExecFileSync(...args);
-      return real.execFileSync(...args);
+    // ensureAppleBinary compiles with async execFile (callback form).
+    execFile: (...args: any[]) => {
+      if (args[0] !== 'swiftc') return real.execFile(...args);
+      const cb = args[args.length - 1];
+      try {
+        mockExecFileSync(...args.slice(0, -1));
+        cb(null, '', '');
+      } catch (err) {
+        cb(err, '', '');
+      }
     },
   };
 });
@@ -70,21 +77,21 @@ describe('ensureAppleBinary', () => {
   const swiftPath = join(configDir, '.apple-test.swift');
   const binaryPath = join(configDir, '.apple-test');
 
-  test('returns cached binary path when source matches', () => {
+  test('returns cached binary path when source matches', async () => {
     mockExistsSync.mockReturnValue(true);
     mockReadFileSync.mockReturnValue(scriptContent);
 
-    const result = ensureAppleBinary(scriptContent, binaryName);
+    const result = await ensureAppleBinary(scriptContent, binaryName);
 
     expect(result).toBe(binaryPath);
     expect(mockExecFileSync).not.toHaveBeenCalled();
     expect(mockWriteFileSync).not.toHaveBeenCalled();
   });
 
-  test('compiles when no binary exists', () => {
+  test('compiles when no binary exists', async () => {
     mockExistsSync.mockReturnValue(false);
 
-    const result = ensureAppleBinary(scriptContent, binaryName);
+    const result = await ensureAppleBinary(scriptContent, binaryName);
 
     expect(mockWriteFileSync).toHaveBeenCalledWith(swiftPath, scriptContent);
     expect(mockExecFileSync).toHaveBeenCalledWith(
@@ -95,27 +102,28 @@ describe('ensureAppleBinary', () => {
     expect(result).toBe(binaryPath);
   });
 
-  test('recompiles when source has changed', () => {
+  test('recompiles when source has changed', async () => {
     mockExistsSync.mockReturnValue(true);
     mockReadFileSync.mockReturnValue('old script content');
 
-    const result = ensureAppleBinary(scriptContent, binaryName);
+    const result = await ensureAppleBinary(scriptContent, binaryName);
 
     expect(mockWriteFileSync).toHaveBeenCalledWith(swiftPath, scriptContent);
     expect(mockExecFileSync).toHaveBeenCalled();
     expect(result).toBe(binaryPath);
   });
 
-  test('returns null when swiftc fails', () => {
+  test('returns null when swiftc fails', async () => {
     mockExistsSync.mockReturnValue(false);
     mockExecFileSync.mockImplementation(() => { throw new Error('compilation failed'); });
 
-    const result = ensureAppleBinary(scriptContent, binaryName);
+    // A failed compile is remembered per source, so use a source no other test compiles.
+    const result = await ensureAppleBinary(scriptContent + '\n// fails', binaryName);
 
     expect(result).toBeNull();
   });
 
-  test('checks both binary and swift source exist for cache hit', () => {
+  test('checks both binary and swift source exist for cache hit', async () => {
     // Binary exists but .swift source doesn't
     mockExistsSync.mockImplementation((path: string) => {
       if (path === binaryPath) return true;
@@ -123,7 +131,7 @@ describe('ensureAppleBinary', () => {
       return false;
     });
 
-    const result = ensureAppleBinary(scriptContent, binaryName);
+    const result = await ensureAppleBinary(scriptContent, binaryName);
 
     // Should compile since source file is missing
     expect(mockWriteFileSync).toHaveBeenCalled();

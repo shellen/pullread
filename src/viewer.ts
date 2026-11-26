@@ -686,6 +686,16 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
+/**
+ * Is a request from the viewer's own origin? Same-origin GETs often carry no
+ * Origin header; anything with one must be the viewer's localhost or 127.0.0.1
+ * address (the app window and the browser fallback, see src-tauri commands.rs).
+ */
+export function isSameOrigin(origin: string | undefined, port: number): boolean {
+  if (!origin) return true;
+  return origin === `http://localhost:${port}` || origin === `http://127.0.0.1:${port}`;
+}
+
 function sendJson(res: ServerResponse, data: unknown) {
   res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
   res.end(JSON.stringify(data));
@@ -1125,6 +1135,35 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
     }
 
     // Notes API
+    // Reading history from the viewer (opens, progress, finishes) for Today's one read.
+    if (url.pathname === '/api/reading') {
+      // Reading history is private: only the viewer itself (the app window or
+      // the browser fallback) may read or write it, not other websites.
+      res.removeHeader('Access-Control-Allow-Origin');
+      if (!isSameOrigin(req.headers.origin, port)) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'forbidden' }));
+        return;
+      }
+      const { loadReading, saveReading, applyReadingEvents } = await import('./reading');
+      if (req.method === 'GET') {
+        sendJson(res, loadReading(CONFIG_DIR));
+        return;
+      }
+      if (req.method === 'POST') {
+        try {
+          const body = JSON.parse(await readBody(req));
+          const events = Array.isArray(body?.events) ? body.events : [];
+          saveReading(applyReadingEvents(loadReading(CONFIG_DIR), events), CONFIG_DIR);
+          sendJson(res, { ok: true, received: events.length });
+        } catch (err) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : 'bad request' }));
+        }
+        return;
+      }
+    }
+
     if (url.pathname === '/api/notes') {
       if (req.method === 'GET') {
         const name = url.searchParams.get('name');
@@ -1541,17 +1580,29 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
     if (url.pathname === '/api/email-settings') {
       if (req.method === 'GET') {
         const appSettings = loadJsonFile(APP_SETTINGS_PATH);
-        sendJson(res, (appSettings.emailRoundup as Record<string, unknown>) || {
-          enabled: false,
-          smtpHost: '',
-          smtpPort: 587,
-          smtpUser: '',
-          smtpPass: '',
-          useTls: true,
-          fromAddress: '',
-          toAddress: '',
-          sendTime: '08:00',
-          lookbackDays: 1
+        const { PANEL_CATALOG, panelFor } = await import('./stories');
+        const saved = (appSettings.emailRoundup as Record<string, unknown>) || {};
+        const enabledNames = new Set(panelFor(Array.isArray(saved.panelEnabled) ? saved.panelEnabled as string[] : null).map(p => p.name));
+        sendJson(res, {
+          // Content defaults (on unless turned off), so the Settings page shows the real state.
+          oneRead: true,
+          widerNews: true,
+          regionalFeeds: [],
+          ...((appSettings.emailRoundup as Record<string, unknown>) || {
+            enabled: false,
+            smtpHost: '',
+            smtpPort: 587,
+            smtpUser: '',
+            smtpPass: '',
+            useTls: true,
+            fromAddress: '',
+            toAddress: '',
+            sendTime: '08:00',
+            lookbackDays: 1
+          }),
+          // Read-only: every wider-news outlet, and whether it's on, for the Settings checklist.
+          panelCatalog: PANEL_CATALOG.map(p => ({ name: p.name, lean: p.lean, scope: p.scope, defaultOn: !!p.defaultOn, enabled: enabledNames.has(p.name) })),
+          panelCustom: Array.isArray(saved.panelEnabled),
         });
         return;
       }
@@ -1566,6 +1617,9 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
           for (const f of fields) {
             if (body[f] !== undefined) updated[f] = body[f];
           }
+          // Rundown content settings (Today's one read, wider news, Near you feeds), validated.
+          const { sanitizeRundownContentSettings } = await import('./email');
+          Object.assign(updated, sanitizeRundownContentSettings(body));
           appSettings.emailRoundup = updated;
           saveJsonFile(APP_SETTINGS_PATH, appSettings);
           sendJson(res, { ok: true });

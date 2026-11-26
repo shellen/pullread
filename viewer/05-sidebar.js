@@ -404,6 +404,8 @@ function _flushReadArticles() {
 
 function markAsRead(filename) {
   readArticles.add(filename);
+  // Tell the local sidecar too (viewer/20-reading.js), so the Rundown can learn from it.
+  if (typeof queueReadingEvent === 'function') queueReadingEvent({ filename: filename, type: 'open', at: Date.now() });
   if (readArticles.size > 5000) {
     var arr = Array.from(readArticles);
     readArticles = new Set(arr.slice(arr.length - 5000));

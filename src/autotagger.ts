@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync } from 'fs';
 import { basename, join } from 'path';
 import { homedir } from 'os';
 import { execFile, ExecFileOptions } from 'child_process';
-import { summarizeText, loadLLMConfig, LLMConfig, Provider, getDefaultModel, ensureAppleBinary } from './summarizer';
+import { summarizeText, loadLLMConfig, LLMConfig, Provider, getDefaultModel, ensureAppleBinary, withAppleModel } from './summarizer';
 import { listMarkdownFiles, resolveFilePath } from './writer';
 import { loadAnnotation, saveAnnotation, allNotes } from './annotations';
 
@@ -150,7 +150,7 @@ export function migrateDashedTags(): number {
 // Compiled Swift binary for batch autotagging via JSONL.
 // Reads JSONL input (one {"id","prompt"} per line), processes each with an independent
 // LanguageModelSession, and writes JSONL output ({"id","response"} or {"id","error"}).
-const BATCH_AUTOTAG_SWIFT = `import Foundation
+export const BATCH_AUTOTAG_SWIFT = `import Foundation
 import FoundationModels
 
 @main struct Run {
@@ -194,11 +194,11 @@ export async function autotagBatchApple(
   articles: BatchArticle[],
   llmConfig: LLMConfig
 ): Promise<{ tagged: number; failed: number } | null> {
-  const binary = ensureAppleBinary(BATCH_AUTOTAG_SWIFT, '.apple-batch-autotag');
+  const binary = await ensureAppleBinary(BATCH_AUTOTAG_SWIFT, '.apple-batch-autotag');
   if (!binary) return null;
 
   const configDir = join(homedir(), '.config', 'pullread');
-  const inputPath = join(configDir, '.autotag-batch-input.jsonl');
+  const inputPath = join(configDir, `.autotag-batch-input-${process.pid}-${Date.now()}.jsonl`);
 
   // Build JSONL input — truncate to fit Apple's 4096-token context window
   const jsonlLines = articles.map(article => {
@@ -213,7 +213,8 @@ export async function autotagBatchApple(
 
   try {
     const timeout = articles.length * 15_000 + 60_000;
-    const output = await new Promise<string>((resolve, reject) => {
+    // Queued behind any other on-device model call (one at a time).
+    const output = await withAppleModel(() => new Promise<string>((resolve, reject) => {
       execFile(binary, [inputPath], {
         encoding: 'utf-8',
         timeout,
@@ -222,7 +223,7 @@ export async function autotagBatchApple(
         if (err) reject(err);
         else resolve(stdout as string);
       });
-    });
+    }));
 
     const outputLines = output.trim().split('\n').filter(l => l.trim());
     for (const line of outputLines) {

@@ -1140,6 +1140,9 @@ function showSettingsPage(scrollToSection) {
       h += '</div><input type="hidden" id="sp-email-lookback" value="' + lookbackDays + '"></div>';
       h += '</div>';
 
+      // What goes in: Today's one read, wider news, Near you (viewer/21-rundown-settings.js)
+      h += renderRundownContentSettings(data);
+
       // Email provider
       h += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">';
       h += '<div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em">Email Provider</div>';
