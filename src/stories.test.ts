@@ -267,6 +267,18 @@ describe('grouping real reworded copies (Nov 26)', () => {
     expect(g[0].sources).toHaveLength(5);
   });
 
+  test('the result does not depend on arrival order (the BBC appreciation arrived first)', () => {
+    const titles = [
+      // These two share only andy/taylor/duran, so they start separate groups…
+      "Andy Taylor: Duran Duran's livewire guitarist who was a Wild Boy on stage and off",
+      'Duran Duran\u2019s Andy Taylor Dead At 65',
+      // …and this one matches both, so it joins them into one.
+      'Duran Duran guitarist Andy Taylor dies, aged 65',
+    ];
+    expect(groupStories(titles.map(at))).toHaveLength(1);
+    expect(groupStories([...titles].reverse().map(at))).toHaveLength(1);
+  });
+
   test('two mayor’s race stories merge; a business digest that shares the place does not', () => {
     const g = groupStories([
       'Ryan Coonerty declares victory in Santa Cruz mayor’s race as vote count nears end',

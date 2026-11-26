@@ -159,11 +159,23 @@ export function groupStories(articles: ArticleMeta[]): StoryGroup[] {
     // Compared with every copy already in the group, not just the first: on Nov 26,
     // "Duran Duran's Andy Taylor Dead At 65" matched the group's second headline but
     // not its first, and showed up in the email as a separate story.
-    const g = groups.find(k => k.urls.has(url) || k.titles.has(title)
+    const matches = groups.filter(k => k.urls.has(url) || k.titles.has(title)
       || k.tokens.some(t => sameStory(t, tokens)) || k.loose.some(t => rewordedStory(t, loose)));
-    if (!g) {
+    if (!matches.length) {
       groups.push({ lead: article, members: [article], sources: [], urls: new Set([url]), tokens: [tokens], loose: [loose], titles: new Set([title]) });
       continue;
+    }
+    // An article that matches several groups joins them into one, so the result
+    // doesn't depend on arrival order: on Nov 26 the BBC's Andy Taylor appreciation
+    // arrived before the headline linking it to the other obituaries, and stayed apart.
+    const [g, ...others] = matches;
+    for (const o of others) {
+      for (const m of o.members) { g.members.push(m); if (richness(m) > richness(g.lead)) g.lead = m; }
+      o.urls.forEach(u => g.urls.add(u));
+      o.titles.forEach(t => g.titles.add(t));
+      g.tokens.push(...o.tokens);
+      g.loose.push(...o.loose);
+      groups.splice(groups.indexOf(o), 1);
     }
     g.members.push(article);
     g.urls.add(url);

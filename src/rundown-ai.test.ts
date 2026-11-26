@@ -1,7 +1,7 @@
 // ABOUTME: Tests for the Rundown structured-output helpers (intro citations, model grouping, intro checks)
 // ABOUTME: Model responses here are recorded samples, not live model output
 
-import { parseFlatIntro, structuredIntroToMarkers, applyModelGroups, groupingPrompt, checkIntro, buildPerStoryIntro, unsupportedNames, unsupportedRoles, mentionsToIntro, fallbackPhrase, parseIntroResponse, candidatePairs, pairsPrompt, groupingLinesFromPairs, batches, onDeviceGrouping, commonWords } from './rundown-ai';
+import { parseFlatIntro, structuredIntroToMarkers, applyModelGroups, groupingPrompt, checkIntro, buildPerStoryIntro, unsupportedNames, unsupportedRoles, unsupportedNumbers, mentionsToIntro, fallbackPhrase, parseIntroResponse, candidatePairs, pairsPrompt, groupingLinesFromPairs, batches, onDeviceGrouping, commonWords } from './rundown-ai';
 import { groupStories } from './stories';
 import type { ArticleMeta } from './email';
 
@@ -405,5 +405,41 @@ describe('real Nov 26 intro and grouping failures', () => {
     ]);
     expect(groups).toHaveLength(2);
     expect(candidatePairs(groups, 40, new Set())).toEqual([]);
+  });
+});
+
+describe('real Nov 26 second-run failures', () => {
+  test('unsupportedNumbers catches a number the story never states', () => {
+    expect(unsupportedNumbers('U2 will play a 2028 tour in 14 cities.', 'U2 announces 2028 North American tour: 11 cities')).toEqual(['14']);
+    expect(unsupportedNumbers('Bayer will pay $7 billion to settle 1,200 claims.', 'Judge approves $7 billion settlement of 1200 claims')).toEqual([]);
+    expect(unsupportedNumbers('Michael Giles died at the age of 84.', 'Michael Giles, King Crimson co-founder, dies at 84')).toEqual([]);
+  });
+
+  test('a refused batch is split and retried, so only the sensitive pair is lost', async () => {
+    const groups = groupStories([
+      // Four pairs that share just two words each, so only the model can decide them.
+      article('Judge Approves $7 Billion Settlement Over Claims That Roundup Caused Cancer', 'https://www.nytimes.com/roundup'),
+      article('Weedkiller maker cleared to pay out billions to cancer claimants', 'https://www.theguardian.com/weedkiller'),
+      article('Ohio mall gunman arrested after standoff', 'https://a.com/mall'),
+      article('Families grieve in Ohio after mall tragedy', 'https://b.com/mall'),
+      article('Lakers stun Celtics in overtime thriller', 'https://c.com/nba'),
+      article('Celtics coach blames fatigue after Lakers loss', 'https://d.com/nba'),
+      article('SpaceX Starship reaches orbit on fifth try', 'https://e.com/space'),
+      article('Starship test flight: SpaceX engineers celebrate', 'https://f.com/space'),
+    ]);
+    const refusal = Object.assign(new Error('Apple Intelligence declined this request (safety guardrails)'), { kind: 'refusal' });
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const asked: string[] = [];
+    const run = (mode: 'pairs' | 'labels', _i: string, prompt: string) => {
+      asked.push(mode);
+      if (/mall|Gunman/i.test(prompt)) throw refusal;
+      if (mode === 'labels') return { stories: [] };
+      return { same: [...prompt.matchAll(/^(P\d+):/gm)].map(m => m[1]) };
+    };
+    const lines = await onDeviceGrouping(groups, run, { common: new Set() });
+    expect(asked.filter(m => m === 'pairs').length).toBeGreaterThan(1);
+    // Every pair but the mall one survives the refusal.
+    expect(groups).toHaveLength(8);
+    expect(lines!.filter(l => l.split('|')[0].includes(','))).toHaveLength(3);
   });
 });

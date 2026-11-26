@@ -159,6 +159,17 @@ export function unsupportedRoles(sentence: string, source: string): string[] {
   return ROLE_WORDS.filter(r => new RegExp(`\\b${r}s?\\b`).test(text) && !new RegExp(`\\b${r}`).test(src));
 }
 
+/**
+ * Numbers in a sentence that the story doesn't state. On Nov 26 two runs gave
+ * one U2 tour 11 cities and 14 cities. Ages like "at the age of 84" count only
+ * if 84 is in the story too.
+ */
+export function unsupportedNumbers(sentence: string, source: string): string[] {
+  const nums = (t: string) => (t.match(/\d[\d,.]*/g) || []).map(n => n.replace(/[,.]+$/, '').replace(/,/g, ''));
+  const have = new Set(nums(source));
+  return [...new Set(nums(sentence).filter(n => !have.has(n)))];
+}
+
 export function unsupportedNames(sentence: string, source: string): string[] {
   const src = source.toLowerCase().replace(/[\u2018\u2019]/g, "'");
   const out: string[] = [];
@@ -220,7 +231,7 @@ export async function buildPerStoryIntro(
     // instead of one bad sentence sinking (or misinforming) the intro.
     const source = `${a.title} ${gist}`;
     const bad = (t: string) => copiesSource(t, [a.title, gist]) ? 'copied'
-      : unsupportedNames(t, source).length || unsupportedRoles(t, source).length ? 'invented' : '';
+      : unsupportedNames(t, source).length || unsupportedRoles(t, source).length || unsupportedNumbers(t, source).length ? 'invented' : '';
     if (sentence && bad(sentence)) {
       r = await askOnce(true);
       sentence = r?.sentence?.trim() ? firstSentence(r.sentence) : '';
@@ -533,27 +544,43 @@ export async function onDeviceGrouping(
   const { budgetMs = 45_000, clock = Date.now, common } = opts;
   const start = clock();
   const pairs = candidatePairs(groups, 40, common);
-  const same: string[] = [];
-  const pairBatches = batches(pairs, 12);
-  // A batch the model refuses (sensitive headlines) or fails is skipped, not fatal.
+  // A batch the model refuses (sensitive headlines) is split in half and each half
+  // retried, down to single items, so one obituary doesn't cost the whole batch:
+  // on Nov 26 every batch was refused and grouping fell back to word matching.
+  // Other failures skip the batch.
   let failed = 0;
   let calls = 0;
-  const tryRun = async (mode: 'pairs' | 'labels', instructions: string, prompt: string): Promise<any> => {
+  let outOfTime = false;
+  const MIN_SPLIT = 2; // down to single items; the time budget still caps the calls
+  const ask = async <T>(mode: 'pairs' | 'labels', items: T[], prompt: (part: T[], offset: number) => string, offset: number, pick: (r: any) => string[]): Promise<string[]> => {
+    if (clock() - start > budgetMs) { outOfTime = true; return []; }
     calls++;
-    try { return await run(mode, instructions, prompt); } catch (err) {
+    try {
+      return pick(await run(mode, mode === 'pairs' ? PAIR_INSTRUCTIONS : LABEL_INSTRUCTIONS, prompt(items, offset)));
+    } catch (err) {
       failed++;
-      console.warn(`[email] Skipped a ${mode} batch: ${err instanceof Error ? err.message : err}`);
-      return null;
+      const refused = (err as { kind?: string })?.kind === 'refusal';
+      if (refused && items.length >= MIN_SPLIT) {
+        const mid = Math.ceil(items.length / 2);
+        return [
+          ...await ask(mode, items.slice(0, mid), prompt, offset, pick),
+          ...await ask(mode, items.slice(mid), prompt, offset + mid, pick),
+        ];
+      }
+      console.warn(`[email] Skipped ${items.length} ${mode === 'pairs' ? 'pair' : 'label'}${items.length === 1 ? '' : 's'}: ${err instanceof Error ? err.message : err}`);
+      return [];
     }
   };
+  const same: string[] = [];
+  const pairBatches = batches(pairs, 12);
   for (let bi = 0; bi < pairBatches.length; bi++) {
-    if (clock() - start > budgetMs) return null;
-    same.push(...((await tryRun('pairs', PAIR_INSTRUCTIONS, pairsPrompt(groups, pairBatches[bi], bi * 12)))?.same || []));
+    same.push(...await ask('pairs', pairBatches[bi], (part, offset) => pairsPrompt(groups, part, offset), bi * 12, r => r?.same || []));
+    if (outOfTime) return null;
   }
   const labels: string[] = [];
   for (const ids of batches(groups.map((_, i) => i), 20)) {
-    if (clock() - start > budgetMs) break;
-    labels.push(...((await tryRun('labels', LABEL_INSTRUCTIONS, labelPrompt(groups, ids)))?.stories || []));
+    labels.push(...await ask('labels', ids, part => labelPrompt(groups, part), 0, r => r?.stories || []));
+    if (outOfTime) break;
   }
   if (calls > 0 && failed === calls) throw new Error(`every model call failed (${failed})`);
   return groupingLinesFromPairs(groups.length, pairs, same, labels, { useImportance: false });
