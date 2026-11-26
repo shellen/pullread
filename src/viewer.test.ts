@@ -1194,9 +1194,8 @@ describe('Email settings persistence', () => {
 
   test('email-settings POST handler persists smtpProvider, frequency, and sendTime2', () => {
     const viewer = readFileSync(join(rootDir, 'src', 'viewer.ts'), 'utf-8');
-    // Find the fields array in the email-settings POST handler
-    const emailSection = viewer.slice(viewer.indexOf("'/api/email-settings'"));
-    const fieldsMatch = emailSection.match(/const fields = \[([^\]]+)\]/);
+    // Find the fields array used by the email-settings POST handler
+    const fieldsMatch = viewer.match(/const EMAIL_SETTINGS_FIELDS = \[([^\]]+)\]/);
     expect(fieldsMatch).toBeTruthy();
     const fields = fieldsMatch![1];
     expect(fields).toContain('smtpProvider');

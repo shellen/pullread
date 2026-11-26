@@ -2,6 +2,7 @@
 // ABOUTME: Serves viewer UI and provides API for listing/reading articles
 
 import { createServer, IncomingMessage, ServerResponse } from 'http';
+import type { AddressInfo } from 'net';
 import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, mkdirSync, watch, unlinkSync, copyFileSync } from 'fs';
 import { join, extname, dirname } from 'path';
 import { exec, execFile, execFileSync } from 'child_process';
@@ -686,6 +687,58 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
+// Requests from the viewer itself (Tauri webview on localhost, browser
+// fallback on 127.0.0.1) or from non-browser clients (no Origin header) are
+// allowed. Any other Origin is another website and must not touch settings
+// or credentials.
+export function isSameOrigin(origin: string | undefined, port: number): boolean {
+  if (!origin) return true;
+  return origin === `http://localhost:${port}` || origin === `http://127.0.0.1:${port}`;
+}
+
+// Endpoints that return or change credentials, settings, or the whole config.
+const SENSITIVE_PATHS = new Set([
+  '/api/email-settings',
+  '/api/email/test',
+  '/api/email/send-roundup',
+  '/api/settings',
+  '/api/tts-settings',
+  '/api/site-logins',
+  '/api/config',
+  '/api/backup',
+  '/api/restore',
+]);
+
+const EMAIL_SETTINGS_FIELDS = ['enabled', 'smtpProvider', 'smtpHost', 'smtpPort', 'smtpUser', 'smtpPass', 'useTls', 'fromAddress', 'toAddress', 'frequency', 'sendTime', 'sendTime2', 'lookbackDays'];
+
+/** Email settings as returned to the UI: the SMTP password is replaced by a flag. */
+export function publicEmailSettings(saved: Record<string, unknown> | undefined): Record<string, unknown> {
+  const base: Record<string, unknown> = saved || {
+    enabled: false,
+    smtpHost: '',
+    smtpPort: 587,
+    smtpUser: '',
+    useTls: true,
+    fromAddress: '',
+    toAddress: '',
+    sendTime: '08:00',
+    lookbackDays: 1
+  };
+  const { smtpPass, ...rest } = base;
+  return { ...rest, smtpPassSet: typeof smtpPass === 'string' && smtpPass.length > 0 };
+}
+
+/** Merge a POST body into saved email settings. A blank smtpPass keeps the saved one. */
+export function mergeEmailSettings(existing: Record<string, unknown>, body: Record<string, unknown>): Record<string, unknown> {
+  const updated: Record<string, unknown> = { ...existing };
+  for (const f of EMAIL_SETTINGS_FIELDS) {
+    if (body[f] === undefined) continue;
+    if (f === 'smtpPass' && (typeof body[f] !== 'string' || body[f] === '')) continue;
+    updated[f] = body[f];
+  }
+  return updated;
+}
+
 function sendJson(res: ServerResponse, data: unknown) {
   res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
   res.end(JSON.stringify(data));
@@ -845,10 +898,16 @@ export function startViewer(initialOutputPath: string, port = 7777, openBrowser 
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url || '/', `http://localhost:${port}`);
 
-    // CORS for local dev
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    // No CORS headers: the viewer is served from this same origin (Tauri
+    // webview and browser fallback), and native clients (Rust timers, curl)
+    // don't need them. A wildcard here would let any website read the API.
+
+    const boundPort = (server.address() as AddressInfo | null)?.port || port;
+    if (SENSITIVE_PATHS.has(url.pathname) && !isSameOrigin(req.headers.origin, boundPort)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'forbidden' }));
+      return;
+    }
 
     if (req.method === 'OPTIONS') {
       res.writeHead(204);
@@ -1541,18 +1600,7 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
     if (url.pathname === '/api/email-settings') {
       if (req.method === 'GET') {
         const appSettings = loadJsonFile(APP_SETTINGS_PATH);
-        sendJson(res, (appSettings.emailRoundup as Record<string, unknown>) || {
-          enabled: false,
-          smtpHost: '',
-          smtpPort: 587,
-          smtpUser: '',
-          smtpPass: '',
-          useTls: true,
-          fromAddress: '',
-          toAddress: '',
-          sendTime: '08:00',
-          lookbackDays: 1
-        });
+        sendJson(res, publicEmailSettings(appSettings.emailRoundup as Record<string, unknown> | undefined));
         return;
       }
       if (req.method === 'POST') {
@@ -1560,13 +1608,9 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
           const body = JSON.parse(await readBody(req));
           const appSettings = loadJsonFile(APP_SETTINGS_PATH);
           const existing = (appSettings.emailRoundup as Record<string, unknown>) || {};
-          // Merge — only update fields that are present in the request
-          const updated: Record<string, unknown> = { ...existing };
-          const fields = ['enabled', 'smtpProvider', 'smtpHost', 'smtpPort', 'smtpUser', 'smtpPass', 'useTls', 'fromAddress', 'toAddress', 'frequency', 'sendTime', 'sendTime2', 'lookbackDays'];
-          for (const f of fields) {
-            if (body[f] !== undefined) updated[f] = body[f];
-          }
-          appSettings.emailRoundup = updated;
+          // Merge — only update fields that are present in the request;
+          // a blank password keeps the saved one.
+          appSettings.emailRoundup = mergeEmailSettings(existing, body);
           saveJsonFile(APP_SETTINGS_PATH, appSettings);
           sendJson(res, { ok: true });
         } catch (err) {

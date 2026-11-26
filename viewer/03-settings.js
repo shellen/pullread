@@ -540,9 +540,12 @@ function settingsSaveEmailConfig() {
     smtpHost: provider === 'custom' ? ((document.getElementById('sp-email-smtp-host') || {}).value || '') : '',
     smtpPort: provider === 'custom' ? parseInt((document.getElementById('sp-email-smtp-port') || {}).value || '587', 10) : 587,
     smtpUser: (document.getElementById('sp-email-smtp-user') || {}).value || '',
-    smtpPass: (document.getElementById('sp-email-smtp-pass') || {}).value || '',
     useTls: provider === 'custom' ? (document.getElementById('sp-email-tls') ? document.getElementById('sp-email-tls').checked : true) : true
   };
+  // The saved password is never sent to the UI. Only send one when the user
+  // typed a new value; a blank field keeps the saved password.
+  var passValue = (document.getElementById('sp-email-smtp-pass') || {}).value || '';
+  if (passValue) body.smtpPass = passValue;
   return fetch('/api/email-settings', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1180,7 +1183,7 @@ function showSettingsPage(scrollToSection) {
 
       h += '<div class="setting-row">';
       h += '<div class="setting-label"><label>App password</label></div>';
-      h += '<div class="setting-control"><div class="input-wrap"><input type="password" id="sp-email-smtp-pass" value="' + escapeHtml(data.smtpPass || '') + '" placeholder="xxxx xxxx xxxx xxxx" class="input-field" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveEmail(this)"><span class="save-indicator">\u2713</span></div></div>';
+      h += '<div class="setting-control"><div class="input-wrap"><input type="password" id="sp-email-smtp-pass" value="" autocomplete="new-password" placeholder="' + (data.smtpPassSet ? 'Saved \u2014 leave blank to keep' : 'xxxx xxxx xxxx xxxx') + '" class="input-field" onfocus="settingsClearSave(this)" onblur="settingsAutoSaveEmail(this)"><span class="save-indicator">\u2713</span></div></div>';
       h += '</div>';
 
       // Custom SMTP fields (only shown for custom provider)
