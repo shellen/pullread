@@ -1,11 +1,10 @@
 // ABOUTME: Structured output from Apple Intelligence (Foundation Models guided generation, macOS 26)
 // ABOUTME: Compiles a small Swift helper once (like the summarizer's) and returns parsed JSON per mode
 
-import { execFileSync } from 'child_process';
 import { writeFileSync, unlinkSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { ensureAppleBinary, isAppleAvailable } from './summarizer';
+import { ensureAppleBinary, isAppleAvailable, runProcess, withAppleModel, appleTempPath } from './summarizer';
 
 /*
  * Lessons from live runs on macOS 26.6 (Nov 2026), built into the helper below:
@@ -155,19 +154,23 @@ export class AppleStructuredError extends Error {
  * Run one guided-generation request on the on-device model. Throws
  * AppleStructuredError; callers fall back to their non-structured path.
  */
-export function runAppleStructured(mode: AppleStructuredMode, instructions: string, prompt: string, timeoutMs = 60_000): any {
+export function runAppleStructured(mode: AppleStructuredMode, instructions: string, prompt: string, timeoutMs = 60_000): Promise<any> {
+  return withAppleModel(() => runAppleStructuredNow(mode, instructions, prompt, timeoutMs));
+}
+
+async function runAppleStructuredNow(mode: AppleStructuredMode, instructions: string, prompt: string, timeoutMs: number): Promise<any> {
   if (!isAppleAvailable()) throw new AppleStructuredError('Apple Intelligence needs macOS 26', 'unavailable');
-  const binary = ensureAppleBinary(APPLE_STRUCTURED_SWIFT, '.apple-structured');
+  const binary = await ensureAppleBinary(APPLE_STRUCTURED_SWIFT, '.apple-structured');
   if (!binary) throw new AppleStructuredError('Could not compile the Apple Intelligence helper (xcode-select --install)', 'compile');
 
   const dir = join(homedir(), '.config', 'pullread');
   mkdirSync(dir, { recursive: true });
-  const instFile = join(dir, `.apple-structured-${process.pid}-inst.txt`);
-  const promptFile = join(dir, `.apple-structured-${process.pid}-prompt.txt`);
+  const instFile = appleTempPath('.apple-structured-inst');
+  const promptFile = appleTempPath('.apple-structured-prompt');
   writeFileSync(instFile, instructions);
   writeFileSync(promptFile, prompt);
   try {
-    const out = execFileSync(binary, [mode, instFile, promptFile], { encoding: 'utf-8', timeout: timeoutMs, stdio: ['pipe', 'pipe', 'pipe'] });
+    const out = await runProcess(binary, [mode, instFile, promptFile], { timeout: timeoutMs });
     return JSON.parse(out.slice(out.indexOf('{'), out.lastIndexOf('}') + 1));
   } catch (err: any) {
     const stderr = String(err?.stderr || '');

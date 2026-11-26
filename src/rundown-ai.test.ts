@@ -72,28 +72,28 @@ describe('per-story intro (macOS 26 shape)', () => {
 describe('buildPerStoryIntro', () => {
   const stories = [1, 2, 3, 4, 5, 6, 7].map(n => ({ title: `Story ${n}`, domain: 'x.com' }));
 
-  test('lead gets two sentences, the second paragraph the rest, refusals skipped', () => {
-    const r = buildPerStoryIntro(stories, p => (p.includes('Story 2') ? (() => { throw new Error('refused'); })() : { sentence: `About ${p.split('\n')[0].slice(10)}.`, phrase: 'About' }));
+  test('lead gets two sentences, the second paragraph the rest, refusals skipped', async () => {
+    const r = await buildPerStoryIntro(stories, p => (p.includes('Story 2') ? (() => { throw new Error('refused'); })() : { sentence: `About ${p.split('\n')[0].slice(10)}.`, phrase: 'About' }));
     expect(r!.mentions.map(p => p.map(m => m.story))).toEqual([[1, 3], [4, 5, 6]]);
     expect(r!.skipped).toBe(1);
   });
 
-  test('keeps only the first sentence of each story', () => {
+  test('keeps only the first sentence of each story', async () => {
     const ineos = [1, 2, 3].map(n => ({ title: `The BMW-Powered Ineos Grenadier Will Be Made In America (${n})`, domain: 'x.com' }));
-    const r = buildPerStoryIntro(ineos, () => ({
+    const r = await buildPerStoryIntro(ineos, () => ({
       sentence: 'The BMW-powered Ineos Grenadier will be built in America. This development is significant as it marks a major step.',
       phrase: 'Ineos Grenadier',
     }));
     expect(r!.mentions[0][0].sentence).toBe('The BMW-powered Ineos Grenadier will be built in America.');
   });
 
-  test('a sentence that copies its headline is retried once, then the story is skipped', () => {
+  test('a sentence that copies its headline is retried once, then the story is skipped', async () => {
     const real = [
       { title: "Trump Made Up to $15M on Nvidia Stock After Huang's Return", domain: 'x.com' },
       { title: 'Story B', domain: 'x.com' }, { title: 'Story C', domain: 'x.com' }, { title: 'Story D', domain: 'x.com' },
     ];
     const calls: Array<[string, boolean]> = [];
-    const r = buildPerStoryIntro(real, (p, retry) => {
+    const r = await buildPerStoryIntro(real, (p, retry) => {
       calls.push([p.split('\n')[0], retry]);
       if (p.includes('Nvidia')) return { sentence: "Trump made up to $15M on Nvidia stock after Huang's return.", phrase: 'Nvidia stock' };
       return { sentence: `Something specific happened in ${p.split('\n')[0].slice(10)} today.`, phrase: 'Something specific' };
@@ -103,7 +103,7 @@ describe('buildPerStoryIntro', () => {
     expect(r!.mentions.flat().map(m => m.story)).toEqual([2, 3, 4]);
   });
 
-  test('unsupportedNames catches invented names and quoted titles (real Nov 25 sentence)', () => {
+  test('unsupportedNames catches invented names and quoted titles (real Nov 25 sentence)', async () => {
     const sentence = "John Berger appeared in 'Grand Theft Auto' as a character named 'The Philosopher' and was involved in a crime spree.";
     const source = 'Remembering John Berger, the critic who taught us how to look Ways of Seeing turns 50';
     expect(unsupportedNames(sentence, source)).toEqual(['Grand Theft Auto', 'The Philosopher']);
@@ -111,20 +111,20 @@ describe('buildPerStoryIntro', () => {
     expect(unsupportedNames('Elsewhere, Google will open its first store in San Francisco.', 'Google to open its first retail store in San Francisco')).toEqual([]);
   });
 
-  test('a story whose sentence keeps inventing names is skipped', () => {
+  test('a story whose sentence keeps inventing names is skipped', async () => {
     const real = [
       { title: 'Remembering John Berger, the critic', domain: 'x.com' },
       { title: 'Story B', domain: 'x.com' }, { title: 'Story C', domain: 'x.com' }, { title: 'Story D', domain: 'x.com' },
     ];
-    const r = buildPerStoryIntro(real, p => p.includes('Berger')
+    const r = await buildPerStoryIntro(real, p => p.includes('Berger')
       ? { sentence: 'John Berger appeared in Grand Theft Auto as The Philosopher.', phrase: 'John Berger' }
       : { sentence: `Something specific happened in ${p.split('\n')[0].slice(10)} today.`, phrase: 'Something specific' });
     expect(r!.invented).toBe(1);
     expect(r!.mentions.flat().map(m => m.story)).toEqual([2, 3, 4]);
   });
 
-  test('returns null when fewer than three stories come back', () => {
-    expect(buildPerStoryIntro(stories, p => (p.includes('Story 1') ? { sentence: 'One.', phrase: 'One' } : null))).toBeNull();
+  test('returns null when fewer than three stories come back', async () => {
+    expect(await buildPerStoryIntro(stories, p => (p.includes('Story 1') ? { sentence: 'One.', phrase: 'One' } : null))).toBeNull();
   });
 });
 
@@ -135,11 +135,11 @@ describe('model grouping', () => {
     article('BMW Recalls 286 i5 And i7 EVs Over Battery Fire Risk', 'https://electrek.co/bmw'),
   ];
 
-  test('word overlap alone misses the reworded story', () => {
+  test('word overlap alone misses the reworded story', async () => {
     expect(groupStories(articles)).toHaveLength(3);
   });
 
-  test('the model merges it, labels sections and rates importance', () => {
+  test('the model merges it, labels sections and rates importance', async () => {
     const groups = groupStories(articles);
     expect(groupingPrompt(groups).split('\n')[1]).toBe('[2] Weedkiller maker cleared to pay out billions to cancer claimants (theguardian.com)');
     const r = applyModelGroups(groups, ['1,2|Courts|4', '3|Autos|2']);
@@ -151,7 +151,7 @@ describe('model grouping', () => {
     expect(r.merges).toHaveLength(1);
   });
 
-  test('refuses a merge of different events that only share a topic', () => {
+  test('refuses a merge of different events that only share a topic', async () => {
     const groups = groupStories([
       article('Why every app suddenly wants to be your daily newspaper', 'https://www.theverge.com/digest'),
       article('Bezos shrugs off blue wave, warns politicians not to make tech a villain', 'https://www.cnbc.com/bezos'),
@@ -162,7 +162,7 @@ describe('model grouping', () => {
     expect(r.labels.get(r.groups[1])).toBe('Tech');
   });
 
-  test('cannot split groups, ignores bad ids, and keeps groups the model skipped', () => {
+  test('cannot split groups, ignores bad ids, and keeps groups the model skipped', async () => {
     const pair = groupStories([
       article('Julien Baker Lines Up New Album This World or the Next', 'https://pitchfork.com/baker'),
       article('Julien Baker Announces New Album This World Or The Next', 'https://stereogum.com/baker'),
@@ -183,27 +183,27 @@ describe('macOS 26 tie-breaker grouping', () => {
     article('Bezos shrugs off blue wave, warns politicians not to make tech a villain', 'https://www.cnbc.com/bezos'),
   ]);
 
-  test('only asks about groups that share a distinctive word', () => {
+  test('only asks about groups that share a distinctive word', async () => {
     expect(candidatePairs(groups)).toEqual([[0, 1]]); // "cancer"; digest apps vs Bezos is never asked
   });
 
-  test('numbers pairs across batches so ids stay unique', () => {
+  test('numbers pairs across batches so ids stay unique', async () => {
     expect(pairsPrompt(groups, [[0, 1]], 12)).toMatch(/^P13: "Judge Approves/);
     expect(batches([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
   });
 
-  test('does not chain merges: A~B and B~C without A~C merges only one pair', () => {
+  test('does not chain merges: A~B and B~C without A~C merges only one pair', async () => {
     const pairs: Array<[number, number]> = [[0, 1], [1, 2]];
     const lines = groupingLinesFromPairs(4, pairs, ['P1', 'p2'], ['1|Courts|3', '2|Law|5', '[4] | Tech | 2', 'garbage']);
     expect(lines).toEqual(['1,2|Courts|5', '3||', '4|Tech|2']);
   });
 
-  test('merges three when every pair is confirmed', () => {
+  test('merges three when every pair is confirmed', async () => {
     const pairs: Array<[number, number]> = [[0, 1], [1, 2], [0, 2]];
     expect(groupingLinesFromPairs(3, pairs, ['P1', 'P2', 'P3'], ['1|Courts|3'])).toEqual(['1,2,3|Courts|3']);
   });
 
-  test('common words are measured over the whole day, not the shortlist (from the real Black Friday/BMW merges)', () => {
+  test('common words are measured over the whole day, not the shortlist (from the real Black Friday/BMW merges)', async () => {
     const shortlist = groupStories([
       article('Acme Widget recall expands across Europe', 'https://a.com/1'),
       article('Acme Widget pricing leaks ahead of launch', 'https://b.com/2'),
@@ -216,7 +216,7 @@ describe('macOS 26 tie-breaker grouping', () => {
     expect(candidatePairs(shortlist, 40, commonWords(day))).toEqual([]);
   });
 
-  test('everyday words are not evidence (real Nov 25 merge: Berger/GTA + Life Time Grand Prix)', () => {
+  test('everyday words are not evidence (real Nov 25 merge: Berger/GTA + Life Time Grand Prix)', async () => {
     const g = groupStories([
       article("That Time John Berger Was in \u2018Grand Theft Auto\u2019", 'https://a.com/berger'),
       article('Life Time Announces a Record $800,000 Prize Purse for Its 2027 Grand Prix Series', 'https://b.com/lifetime'),
@@ -224,7 +224,7 @@ describe('macOS 26 tie-breaker grouping', () => {
     expect(candidatePairs(g)).toEqual([]); // "time" is everyday; "grand" alone is one word
   });
 
-  test('a year is never evidence of the same event', () => {
+  test('a year is never evidence of the same event', async () => {
     const g = groupStories([
       article('Alpha Corp 2026 outlook raised', 'https://a.com/1'),
       article('Beta Inc 2026 outlook cut', 'https://b.com/2'),
@@ -232,7 +232,7 @@ describe('macOS 26 tie-breaker grouping', () => {
     expect(candidatePairs(g)).toEqual([]); // shares "2026" and "outlook" only — the year doesn't count
   });
 
-  test('real BMW BLOG day: stories that only share the brand are never asked about', () => {
+  test('real BMW BLOG day: stories that only share the brand are never asked about', async () => {
     const bmw = groupStories([
       article('The BMW-Powered Ineos Grenadier Will Be Made In America', 'https://bmwblog.com/1'),
       article('The BMW M350 Costs Just $250 More Than The Last M340i xDrive. Here’s Which One We’d Buy While Stock Lasts', 'https://bmwblog.com/2'),
@@ -244,12 +244,12 @@ describe('macOS 26 tie-breaker grouping', () => {
     expect(candidatePairs(bmw)).toEqual([]);
   });
 
-  test('can drop the importance ratings and keep labels and merges', () => {
+  test('can drop the importance ratings and keep labels and merges', async () => {
     expect(groupingLinesFromPairs(3, [[0, 1]], ['P1'], ['1|Courts|5', '2|Business|5', '3|Culture|5'], { useImportance: false }))
       .toEqual(['1,2|Courts|', '3|Culture|']);
   });
 
-  test('a "no" from the model leaves groups separate', () => {
+  test('a "no" from the model leaves groups separate', async () => {
     expect(groupingLinesFromPairs(2, [[0, 1]], [], [])).toEqual(['1||', '2||']);
   });
 });
@@ -261,41 +261,41 @@ describe('onDeviceGrouping', () => {
     article('BMW Recalls 286 i5 And i7 EVs Over Battery Fire Risk', 'https://electrek.co/bmw'),
   ]);
 
-  test('asks pairs then labels, and drops importance', () => {
+  test('asks pairs then labels, and drops importance', async () => {
     const calls: string[] = [];
     const run = (mode: 'pairs' | 'labels') => {
       calls.push(mode);
       return mode === 'pairs' ? { same: ['P1', 'P7'] } : { stories: ['1|Courts|5', '2|Business|5', '3|Autos|5'] };
     };
-    expect(onDeviceGrouping(groups, run)).toEqual(['1,2|Courts|', '3|Autos|']);
+    expect(await onDeviceGrouping(groups, run)).toEqual(['1,2|Courts|', '3|Autos|']);
     expect(calls).toEqual(['pairs', 'labels']);
   });
 
-  test('a refused batch is skipped and the rest still count', () => {
+  test('a refused batch is skipped and the rest still count', async () => {
     jest.spyOn(console, 'warn').mockImplementation(() => {});
     const run = (mode: 'pairs' | 'labels') => {
       if (mode === 'pairs') throw new Error('Apple Intelligence declined this request (safety guardrails)');
       return { stories: ['1|Courts|3', '3|Autos|3'] };
     };
-    expect(onDeviceGrouping(groups, run)).toEqual(['1|Courts|', '2||', '3|Autos|']);
+    expect(await onDeviceGrouping(groups, run)).toEqual(['1|Courts|', '2||', '3|Autos|']);
   });
 
-  test('throws when every call fails, so the caller reports grouping as failed', () => {
+  test('throws when every call fails, so the caller reports grouping as failed', async () => {
     jest.spyOn(console, 'warn').mockImplementation(() => {});
-    expect(() => onDeviceGrouping(groups, () => { throw new Error('refused'); })).toThrow('every model call failed');
+    await expect(onDeviceGrouping(groups, () => { throw new Error('refused'); })).rejects.toThrow('every model call failed');
   });
 
-  test('gives up if the time budget runs out before the pair questions finish', () => {
+  test('gives up if the time budget runs out before the pair questions finish', async () => {
     let t = 0;
     const clock = () => (t += 60_000);
-    expect(onDeviceGrouping(groups, () => ({ same: ['P1'] }), { budgetMs: 45_000, clock })).toBeNull();
+    expect(await onDeviceGrouping(groups, () => ({ same: ['P1'] }), { budgetMs: 45_000, clock })).toBeNull();
   });
 
-  test('keeps the merges if time runs out during labeling', () => {
+  test('keeps the merges if time runs out during labeling', async () => {
     let t = 0;
     const clock = () => (t += 30_000); // pairs at +30s, labels would start at +60s
     const run = (mode: 'pairs' | 'labels') => (mode === 'pairs' ? { same: ['P1'] } : { stories: ['1|Courts|3'] });
-    expect(onDeviceGrouping(groups, run, { budgetMs: 45_000, clock })).toEqual(['1,2||', '3||']);
+    expect(await onDeviceGrouping(groups, run, { budgetMs: 45_000, clock })).toEqual(['1,2||', '3||']);
   });
 });
 

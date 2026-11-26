@@ -78,14 +78,14 @@ function parseJson(out: string): any {
 }
 
 /** Structured output from Apple's model: `fm` on macOS 27, the Swift helper on macOS 26. */
-function structured(mode: 'intro' | 'pairs' | 'labels' | 'groups', prompt: string, instructions: string, arrays: string[]): any {
+async function structured(mode: 'intro' | 'pairs' | 'labels' | 'groups', prompt: string, instructions: string, arrays: string[]): Promise<any> {
   if (hasFm) {
     const schema = fmSchema(mode === 'intro' ? 'RundownIntro' : mode === 'pairs' ? 'SamePairs' : 'StoryGroups', arrays);
     return parseJson(run(['fm', 'respond', ...(usePcc ? ['--model', 'pcc'] : []), '--instructions', instructions, '--schema', schema, prompt]));
   }
   // macOS 26: the same helper the app uses (src/apple-structured.ts).
   try {
-    return runAppleStructured(mode === 'groups' ? 'labels' : mode, instructions, prompt);
+    return await runAppleStructured(mode === 'groups' ? 'labels' : mode, instructions, prompt);
   } catch (err) {
     const kind = err instanceof AppleStructuredError ? err.kind : 'other';
     throw new Error(`Apple Intelligence (${kind}): ${err instanceof Error ? err.message : err}`
@@ -107,10 +107,10 @@ const curated = await curateWithStories(articles, cfg, score, undefined, undefin
 // macOS 27 (fm): one request for the whole intro. macOS 26: the app's path, one story per request.
 let introRaw: any = sampleIntro;
 if (live && hasFm) {
-  introRaw = structured('intro', `Stories:\n${storyList(curated)}`, INTRO_INSTRUCTIONS, ['paragraphs', 'links']);
+  introRaw = await structured('intro', `Stories:\n${storyList(curated)}`, INTRO_INSTRUCTIONS, ['paragraphs', 'links']);
 } else if (live) {
-  const built = buildPerStoryIntro(curated, (prompt, retry) => {
-    try { return runAppleStructured('sentence', appleSentenceInstructions(issueDateLine(), retry), prompt, 30_000); } catch (err) {
+  const built = await buildPerStoryIntro(curated, async (prompt, retry) => {
+    try { return await runAppleStructured('sentence', appleSentenceInstructions(issueDateLine(), retry), prompt, 30_000); } catch (err) {
       console.log(`  (story skipped: ${err instanceof Error ? err.message : err})`);
       return null;
     }
@@ -134,12 +134,12 @@ let groupingRaw: string[];
 if (usePcc) {
   // macOS 27 + PCC: the whole day fits in 32K, so send the full list once.
   console.log('Sent to the model (full list):\n' + groupingPrompt(groups));
-  groupingRaw = structured('groups', groupingPrompt(groups), GROUPING_INSTRUCTIONS, ['stories']).stories;
+  groupingRaw = (await structured('groups', groupingPrompt(groups), GROUPING_INSTRUCTIONS, ['stories'])).stories;
 } else {
   // macOS 26 / on-device: the app's grouping pass (onDeviceGrouping), or recorded answers.
   console.log('Candidate pairs:\n' + (pairsPrompt(groups, candidatePairs(groups)) || '(none)'));
   groupingRaw = live
-    ? (onDeviceGrouping(groups, (mode, instructions, prompt) => structured(mode, prompt, instructions, [])) ?? [])
+    ? ((await onDeviceGrouping(groups, (mode, instructions, prompt) => structured(mode, prompt, instructions, []))) ?? [])
     : groupingLinesFromPairs(groups.length, candidatePairs(groups), sampleSamePairs, sampleLabels, { useImportance: false });
 }
 const before = await curateWithStories(articles, cfg, score, undefined, undefined, { panelHeadlines, panel });

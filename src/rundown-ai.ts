@@ -175,11 +175,13 @@ This email goes out on ${dateLine}. Don't name today's weekday or date, and don'
  * Stories the model refuses or fails on are skipped (up to `maxTries` stories
  * are tried). Returns null if fewer than 3 sentences came back.
  */
-export function buildPerStoryIntro(
+type StorySentence = { sentence?: string; phrase?: string } | null;
+
+export async function buildPerStoryIntro(
   stories: Array<{ title: string; domain?: string; summary?: string; excerpt?: string }>,
-  ask: (prompt: string, retry: boolean) => { sentence?: string; phrase?: string } | null,
+  ask: (prompt: string, retry: boolean) => StorySentence | Promise<StorySentence>,
   opts: { want?: number; maxTries?: number; gistCap?: number } = {},
-): { mentions: Mention[][]; skipped: number; copied: number; invented: number } | null {
+): Promise<{ mentions: Mention[][]; skipped: number; copied: number; invented: number } | null> {
   const { want = 5, maxTries = 8, gistCap = 200 } = opts;
   const got: Mention[] = [];
   let skipped = 0;
@@ -190,9 +192,9 @@ export function buildPerStoryIntro(
     const a = stories[i];
     const gist = (a.summary || a.excerpt || '').slice(0, gistCap);
     const prompt = `Headline: ${a.title}\nSource: ${a.domain || ''}${gist ? `\nExcerpt: ${gist}` : ''}`;
-    const askOnce = (retry: boolean) => { try { return ask(prompt, retry); } catch { return null; } };
+    const askOnce = async (retry: boolean): Promise<StorySentence> => { try { return await ask(prompt, retry); } catch { return null; } };
     // One sentence per story: the model often adds "This is significant because…".
-    let r = askOnce(false);
+    let r = await askOnce(false);
     let sentence = r?.sentence?.trim() ? firstSentence(r.sentence) : '';
     // A sentence that copies its own headline or excerpt, or names something
     // the story doesn't mention, gets one more try, then the story is skipped —
@@ -200,7 +202,7 @@ export function buildPerStoryIntro(
     const source = `${a.title} ${gist}`;
     const bad = (t: string) => copiesSource(t, [a.title, gist]) ? 'copied' : unsupportedNames(t, source).length ? 'invented' : '';
     if (sentence && bad(sentence)) {
-      r = askOnce(true);
+      r = await askOnce(true);
       sentence = r?.sentence?.trim() ? firstSentence(r.sentence) : '';
       const why = sentence ? bad(sentence) : '';
       if (why === 'copied') { copied++; sentence = ''; }
@@ -487,7 +489,7 @@ export function groupingLinesFromPairs(
   });
 }
 
-export type StructuredRunner = (mode: 'pairs' | 'labels', instructions: string, prompt: string) => any;
+export type StructuredRunner = (mode: 'pairs' | 'labels', instructions: string, prompt: string) => any | Promise<any>;
 
 /**
  * The macOS 26 grouping pass end to end: "same event?" for candidate pairs in
@@ -497,11 +499,11 @@ export type StructuredRunner = (mode: 'pairs' | 'labels', instructions: string, 
  * questions finish. Labels are optional: if time runs out during labeling,
  * the merges still count. `run` throws on model errors; callers catch.
  */
-export function onDeviceGrouping(
+export async function onDeviceGrouping(
   groups: StoryGroup[],
   run: StructuredRunner,
   opts: { budgetMs?: number; clock?: () => number; common?: Set<string> } = {},
-): string[] | null {
+): Promise<string[] | null> {
   const { budgetMs = 45_000, clock = Date.now, common } = opts;
   const start = clock();
   const pairs = candidatePairs(groups, 40, common);
@@ -510,9 +512,9 @@ export function onDeviceGrouping(
   // A batch the model refuses (sensitive headlines) or fails is skipped, not fatal.
   let failed = 0;
   let calls = 0;
-  const tryRun = (mode: 'pairs' | 'labels', instructions: string, prompt: string): any => {
+  const tryRun = async (mode: 'pairs' | 'labels', instructions: string, prompt: string): Promise<any> => {
     calls++;
-    try { return run(mode, instructions, prompt); } catch (err) {
+    try { return await run(mode, instructions, prompt); } catch (err) {
       failed++;
       console.warn(`[email] Skipped a ${mode} batch: ${err instanceof Error ? err.message : err}`);
       return null;
@@ -520,12 +522,12 @@ export function onDeviceGrouping(
   };
   for (let bi = 0; bi < pairBatches.length; bi++) {
     if (clock() - start > budgetMs) return null;
-    same.push(...(tryRun('pairs', PAIR_INSTRUCTIONS, pairsPrompt(groups, pairBatches[bi], bi * 12))?.same || []));
+    same.push(...((await tryRun('pairs', PAIR_INSTRUCTIONS, pairsPrompt(groups, pairBatches[bi], bi * 12)))?.same || []));
   }
   const labels: string[] = [];
   for (const ids of batches(groups.map((_, i) => i), 20)) {
     if (clock() - start > budgetMs) break;
-    labels.push(...(tryRun('labels', LABEL_INSTRUCTIONS, labelPrompt(groups, ids))?.stories || []));
+    labels.push(...((await tryRun('labels', LABEL_INSTRUCTIONS, labelPrompt(groups, ids)))?.stories || []));
   }
   if (calls > 0 && failed === calls) throw new Error(`every model call failed (${failed})`);
   return groupingLinesFromPairs(groups.length, pairs, same, labels, { useImportance: false });

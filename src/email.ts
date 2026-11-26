@@ -972,9 +972,9 @@ export async function generateRoundupSummary(articles: ArticleMeta[], opts: { no
     // One story per request: a refusal (Apple's guardrails, on sensitive news)
     // drops that story instead of the whole intro, and each request is tiny.
     let refused = 0;
-    const built = buildPerStoryIntro(articles, (prompt, retryStory) => {
+    const built = await buildPerStoryIntro(articles, async (prompt, retryStory) => {
       try {
-        return runAppleStructured('sentence', appleSentenceInstructions(issueDateLine(now), retry || retryStory), prompt, 30_000);
+        return await runAppleStructured('sentence', appleSentenceInstructions(issueDateLine(now), retry || retryStory), prompt, 30_000);
       } catch (err) {
         if ((err as { kind?: string }).kind === 'refusal') refused++;
         throw err;

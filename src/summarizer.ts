@@ -5,7 +5,8 @@ import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { request } from 'https';
-import { execFileSync } from 'child_process';
+import { execFileSync, execFile } from 'child_process';
+import { createHash } from 'crypto';
 import { saveToKeychain, loadFromKeychain } from './keychain';
 import { bundledHelperPath } from './apple-helpers';
 
@@ -453,12 +454,65 @@ import FoundationModels
 }
 `;
 
-// Compile a Swift script to a binary, caching by source content.
-// Returns the binary path on success, null on compilation failure.
-export function ensureAppleBinary(scriptContent: string, binaryName: string): string | null {
+// ---------------------------------------------------------------------------
+// Running Apple Intelligence helpers without blocking the sidecar
+// ---------------------------------------------------------------------------
+//
+// The sidecar is one process that also serves the viewer, so a synchronous
+// helper call froze every viewer request until it finished (up to minutes for
+// a Rundown). Everything below is async; a small queue still sends the
+// on-device model one request at a time, as before.
+
+/** Run a program asynchronously; rejects with an error carrying stdout/stderr. */
+export function runProcess(cmd: string, args: string[], opts: { timeout: number; maxBuffer?: number }): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(cmd, args, { encoding: 'utf-8', env: process.env, timeout: opts.timeout, maxBuffer: opts.maxBuffer ?? 16 * 1024 * 1024 }, (err, stdout, stderr) => {
+      if (err) {
+        Object.assign(err, { stdout: String(stdout ?? ''), stderr: String(stderr ?? '') });
+        reject(err);
+      } else {
+        resolve(String(stdout));
+      }
+    });
+  });
+}
+
+let appleQueue: Promise<unknown> = Promise.resolve();
+
+/** Run `fn` after any Apple Intelligence call already in progress (one at a time). */
+export function withAppleModel<T>(fn: () => Promise<T>): Promise<T> {
+  const run = appleQueue.then(fn, fn);
+  appleQueue = run.then(() => undefined, () => undefined);
+  return run;
+}
+
+let tmpCounter = 0;
+
+/** A temp file path that concurrent calls can't collide on. */
+export function appleTempPath(prefix: string): string {
+  tmpCounter = (tmpCounter + 1) % 1_000_000;
+  return join(homedir(), '.config', 'pullread', `${prefix}-${process.pid}-${tmpCounter}-${Math.random().toString(36).slice(2, 8)}.txt`);
+}
+
+const compiling = new Map<string, Promise<string | null>>();
+const failedCompiles = new Set<string>();
+
+/**
+ * The helper binary for a Swift source: the one CI bundled into the app if
+ * present, else a cached or freshly compiled copy in ~/.config/pullread.
+ * Concurrent requests share one compile, and a failed compile is remembered
+ * for this process, so it isn't retried on every call (each attempt can take
+ * up to two minutes).
+ */
+export async function ensureAppleBinary(scriptContent: string, binaryName: string): Promise<string | null> {
   // Prefer the helper CI built and signed into the app bundle (no Xcode tools needed).
   const bundled = bundledHelperPath(binaryName);
   if (bundled) return bundled;
+
+  const key = `${binaryName}:${createHash('sha1').update(scriptContent).digest('hex')}`;
+  if (failedCompiles.has(key)) return null;
+  const inFlight = compiling.get(key);
+  if (inFlight) return inFlight;
 
   const configDir = join(homedir(), '.config', 'pullread');
   const swiftPath = join(configDir, binaryName + '.swift');
@@ -472,17 +526,20 @@ export function ensureAppleBinary(scriptContent: string, binaryName: string): st
     } catch {}
   }
 
-  // Write source and compile
-  try {
-    writeFileSync(swiftPath, scriptContent);
-    execFileSync('swiftc', ['-parse-as-library', swiftPath, '-o', binaryPath], {
-      timeout: 120_000,
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-    return binaryPath;
-  } catch {
-    return null;
-  }
+  const job = (async () => {
+    try {
+      writeFileSync(swiftPath, scriptContent);
+      await runProcess('swiftc', ['-parse-as-library', swiftPath, '-o', binaryPath], { timeout: 120_000 });
+      return binaryPath;
+    } catch {
+      failedCompiles.add(key);
+      return null;
+    } finally {
+      compiling.delete(key);
+    }
+  })();
+  compiling.set(key, job);
+  return job;
 }
 
 // Interpret Apple Intelligence error stderr and throw descriptive errors
@@ -510,21 +567,20 @@ function throwAppleError(stderr: string, fallbackMessage: string): never {
 
 // Low-level helper: run a prompt through Apple Intelligence via Foundation Models.
 // Tries compiled binary first for speed, falls back to swift interpreter.
-function runApplePrompt(prompt: string): string {
+function runApplePrompt(prompt: string): Promise<string> {
+  return withAppleModel(() => runApplePromptNow(prompt));
+}
+
+async function runApplePromptNow(prompt: string): Promise<string> {
   const configDir = join(homedir(), '.config', 'pullread');
-  const tmpPrompt = join(configDir, '.apple-prompt.txt');
+  const tmpPrompt = appleTempPath('.apple-prompt');
 
   writeFileSync(tmpPrompt, prompt);
 
   try {
-    const binary = ensureAppleBinary(SUMMARIZE_SWIFT, '.apple-summarize');
+    const binary = await ensureAppleBinary(SUMMARIZE_SWIFT, '.apple-summarize');
     if (binary) {
-      const result = execFileSync(binary, [tmpPrompt], {
-        encoding: 'utf-8',
-        timeout: 90_000,
-        stdio: ['pipe', 'pipe', 'pipe']
-      });
-      return result.trim();
+      return (await runProcess(binary, [tmpPrompt], { timeout: 90_000 })).trim();
     }
 
     // Fallback: write interpreter script and run with swift
@@ -541,12 +597,7 @@ function runApplePrompt(prompt: string): string {
     ].join('\n');
     writeFileSync(swiftScript, scriptContent);
 
-    const result = execFileSync('swift', [swiftScript, tmpPrompt], {
-      encoding: 'utf-8',
-      timeout: 90_000,
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-    return result.trim();
+    return (await runProcess('swift', [swiftScript, tmpPrompt], { timeout: 90_000 })).trim();
   } catch (err: any) {
     const stderr = err.stderr || '';
     return throwAppleError(stderr, err.message);
@@ -561,21 +612,20 @@ const APPLE_SECTION_WORD_LIMIT = 600;
 
 // Multi-turn summarization for long articles.
 // Tries compiled binary first, falls back to swift interpreter.
-function runAppleRLM(articleText: string): string {
+function runAppleRLM(articleText: string): Promise<string> {
+  return withAppleModel(() => runAppleRLMNow(articleText));
+}
+
+async function runAppleRLMNow(articleText: string): Promise<string> {
   const configDir = join(homedir(), '.config', 'pullread');
-  const tmpArticle = join(configDir, '.apple-article.txt');
+  const tmpArticle = appleTempPath('.apple-article');
 
   writeFileSync(tmpArticle, articleText);
 
   try {
-    const binary = ensureAppleBinary(RLM_SWIFT, '.apple-rlm');
+    const binary = await ensureAppleBinary(RLM_SWIFT, '.apple-rlm');
     if (binary) {
-      const result = execFileSync(binary, [tmpArticle], {
-        encoding: 'utf-8',
-        timeout: 180_000,
-        stdio: ['pipe', 'pipe', 'pipe']
-      });
-      return result.trim();
+      return (await runProcess(binary, [tmpArticle], { timeout: 180_000 })).trim();
     }
 
     // Fallback: write interpreter script and run with swift
@@ -656,12 +706,7 @@ function runAppleRLM(articleText: string): string {
 
     writeFileSync(swiftScript, scriptContent);
 
-    const result = execFileSync('swift', [swiftScript, tmpArticle], {
-      encoding: 'utf-8',
-      timeout: 180_000,
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-    return result.trim();
+    return (await runProcess('swift', [swiftScript, tmpArticle], { timeout: 180_000 })).trim();
   } catch (err: any) {
     const stderr = err.stderr || '';
     return throwAppleError(stderr, err.message);
@@ -681,21 +726,21 @@ async function callApple(articleText: string): Promise<SummarizeResult> {
   // Truncate to fit Apple Intelligence's 4096-token context window if needed.
   if (words.length <= APPLE_MAX_INPUT_WORDS) {
     const prompt = `${SUMMARIZE_PROMPT}\n\n---\n\n${words.join(' ')}`;
-    return { summary: runApplePrompt(prompt), model: 'apple-on-device' };
+    return { summary: await runApplePrompt(prompt), model: 'apple-on-device' };
   }
 
   // Text too long for single prompt — try truncated version first
   try {
     const truncated = words.slice(0, APPLE_MAX_INPUT_WORDS).join(' ');
     const prompt = `${SUMMARIZE_PROMPT}\n\n---\n\n${truncated}`;
-    return { summary: runApplePrompt(prompt), model: 'apple-on-device' };
+    return { summary: await runApplePrompt(prompt), model: 'apple-on-device' };
   } catch (err: any) {
     // If truncated single-prompt also fails, fall back to RLM for long articles
     if (!err.message?.includes('context window')) throw err;
   }
 
   // Multi-turn conversation with section recycling for very long texts
-  const summary = runAppleRLM(articleText);
+  const summary = await runAppleRLM(articleText);
   return { summary, model: 'apple-on-device' };
 }
 
@@ -712,7 +757,7 @@ export async function promptLLM(
   }
 
   if (llmConfig.provider === 'apple') {
-    return { text: runApplePrompt(prompt), model: 'apple-on-device' };
+    return { text: await runApplePrompt(prompt), model: 'apple-on-device' };
   }
 
   const call = makeProviderCallFn(llmConfig.provider, llmConfig.apiKey, model);

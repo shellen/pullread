@@ -27,13 +27,13 @@ describe('bundledHelperPath', () => {
     expect(bundledHelperPath('.something-else', join(dir, 'pullread-cli'))).toBeNull();
   });
 
-  test('ensureAppleBinary uses the bundled helper instead of compiling', () => {
+  test('ensureAppleBinary uses the bundled helper instead of compiling', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'pr-helpers-'));
     writeFileSync(join(dir, 'pullread-apple-summarize'), '#!/bin/sh\n');
     chmodSync(join(dir, 'pullread-apple-summarize'), 0o755);
     process.env.PULLREAD_HELPERS_DIR = dir;
     // No swiftc here (Linux CI): only the bundled lookup can return a path.
-    expect(ensureAppleBinary('import Foundation', '.apple-summarize')).toBe(join(dir, 'pullread-apple-summarize'));
+    expect(await ensureAppleBinary('import Foundation', '.apple-summarize')).toBe(join(dir, 'pullread-apple-summarize'));
   });
 });
 
