@@ -48,6 +48,7 @@ const baseConfig: EmailConfig = {
   widerNews: false,
   regionalFeeds: [],
   oneRead: false,
+  panelEnabled: null,
 };
 
 function article(overrides: Partial<ArticleMeta> = {}): ArticleMeta {

@@ -168,29 +168,79 @@ export interface PanelSource {
   /**
    * Rough editorial lean, used only to require that a "major story" is covered
    * across the spectrum rather than by one side. Loosely based on public media
-   * bias ratings (e.g. AllSides); users can edit the panel.
+   * bias ratings (e.g. AllSides); readers can switch outlets on and off.
    */
   lean: Lean;
   scope: Scope;
+  /** On unless the reader changes their outlet list. */
+  defaultOn?: boolean;
 }
 
 /**
- * Default panel: three outlets per lean so no side dominates the vote. Headlines
- * only — nothing from the panel is saved to the library. Regional sources are
- * added from the user's region setting.
+ * Every outlet the reader can choose from. The nine on by default are three
+ * per lean, so no side dominates the vote. Headlines only — nothing from the
+ * panel is saved to the library. Feeds marked "unverified" haven't yet been
+ * fetched live; preview-rundown's "outlets reached" line shows which answer.
  */
-export const DEFAULT_PANEL: PanelSource[] = [
-  { name: 'NPR', feedUrl: 'https://feeds.npr.org/1001/rss.xml', lean: 'left', scope: 'national' },
-  { name: 'The Guardian', feedUrl: 'https://www.theguardian.com/world/rss', lean: 'left', scope: 'global' },
-  { name: 'The New York Times', feedUrl: 'https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml', lean: 'left', scope: 'national' },
-  { name: 'BBC News', feedUrl: 'https://feeds.bbci.co.uk/news/world/rss.xml', lean: 'center', scope: 'global' },
+export const PANEL_CATALOG: PanelSource[] = [
+  // Left-leaning
+  { name: 'NPR', feedUrl: 'https://feeds.npr.org/1001/rss.xml', lean: 'left', scope: 'national', defaultOn: true },
+  { name: 'The Guardian', feedUrl: 'https://www.theguardian.com/world/rss', lean: 'left', scope: 'global', defaultOn: true },
+  { name: 'The New York Times', feedUrl: 'https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml', lean: 'left', scope: 'national', defaultOn: true },
+  { name: 'The Washington Post', feedUrl: 'https://feeds.washingtonpost.com/rss/national', lean: 'left', scope: 'national' }, // unverified
+  { name: 'The Atlantic', feedUrl: 'https://www.theatlantic.com/feed/all/', lean: 'left', scope: 'national' }, // unverified
+  { name: 'ProPublica', feedUrl: 'https://feeds.propublica.org/propublica/main', lean: 'left', scope: 'national' }, // unverified
+  { name: 'Vox', feedUrl: 'https://www.vox.com/rss/index.xml', lean: 'left', scope: 'national' }, // unverified
+  { name: 'Los Angeles Times', feedUrl: 'https://www.latimes.com/world-nation/rss2.0.xml', lean: 'left', scope: 'national' }, // unverified
+  // Center
+  { name: 'BBC News', feedUrl: 'https://feeds.bbci.co.uk/news/world/rss.xml', lean: 'center', scope: 'global', defaultOn: true },
   // Replaced The Wall Street Journal (feeds.a.dj.com didn't respond in the first live run, Nov 25, 2026).
-  { name: 'The Christian Science Monitor', feedUrl: 'https://rss.csmonitor.com/feeds/all', lean: 'center', scope: 'global' },
-  { name: 'The Hill', feedUrl: 'https://thehill.com/feed/', lean: 'center', scope: 'national' },
-  { name: 'Fox News', feedUrl: 'https://moxie.foxnews.com/google-publisher/latest.xml', lean: 'right', scope: 'national' },
-  { name: 'Washington Examiner', feedUrl: 'https://www.washingtonexaminer.com/feed/', lean: 'right', scope: 'national' },
-  { name: 'New York Post', feedUrl: 'https://nypost.com/feed/', lean: 'right', scope: 'national' },
+  { name: 'The Christian Science Monitor', feedUrl: 'https://rss.csmonitor.com/feeds/all', lean: 'center', scope: 'global', defaultOn: true },
+  { name: 'The Hill', feedUrl: 'https://thehill.com/feed/', lean: 'center', scope: 'national', defaultOn: true },
+  { name: 'Axios', feedUrl: 'https://api.axios.com/feed/', lean: 'center', scope: 'national' }, // unverified
+  { name: 'NewsNation', feedUrl: 'https://www.newsnationnow.com/feed/', lean: 'center', scope: 'national' }, // unverified
+  { name: 'Deutsche Welle', feedUrl: 'https://rss.dw.com/rdf/rss-en-all', lean: 'center', scope: 'global' }, // unverified
+  { name: 'France 24', feedUrl: 'https://www.france24.com/en/rss', lean: 'center', scope: 'global' }, // unverified
+  // Right-leaning
+  { name: 'Fox News', feedUrl: 'https://moxie.foxnews.com/google-publisher/latest.xml', lean: 'right', scope: 'national', defaultOn: true },
+  { name: 'Washington Examiner', feedUrl: 'https://www.washingtonexaminer.com/feed/', lean: 'right', scope: 'national', defaultOn: true },
+  { name: 'New York Post', feedUrl: 'https://nypost.com/feed/', lean: 'right', scope: 'national', defaultOn: true },
+  { name: 'National Review', feedUrl: 'https://www.nationalreview.com/feed/', lean: 'right', scope: 'national' }, // unverified
+  { name: 'The Dispatch', feedUrl: 'https://thedispatch.com/feed/', lean: 'right', scope: 'national' }, // unverified
+  { name: 'Reason', feedUrl: 'https://reason.com/feed/', lean: 'right', scope: 'national' }, // unverified
+  { name: 'The Free Press', feedUrl: 'https://www.thefp.com/feed', lean: 'right', scope: 'national' }, // unverified
+  { name: 'The Daily Wire', feedUrl: 'https://www.dailywire.com/feeds/rss.xml', lean: 'right', scope: 'national' }, // unverified
 ];
+
+/** The outlets on by default. */
+export const DEFAULT_PANEL: PanelSource[] = PANEL_CATALOG.filter(p => p.defaultOn);
+
+/**
+ * The reader's outlets: the catalog entries named in `enabled` (in catalog
+ * order), or the defaults when they haven't chosen. Unknown names are ignored.
+ */
+export function panelFor(enabled?: string[] | null): PanelSource[] {
+  if (!Array.isArray(enabled)) return DEFAULT_PANEL;
+  const on = new Set(enabled);
+  return PANEL_CATALOG.filter(p => on.has(p.name));
+}
+
+/**
+ * Outlets a story needs to count as widely covered, for n outlets reached:
+ * at least 3, growing with √n (3 at 9 outlets, 5 at 24). A flat share would
+ * ask 8 of 24 — too high when each feed carries only its latest headlines.
+ */
+export function wideBar(n: number): number {
+  return Math.max(3, Math.ceil(Math.sqrt(n)));
+}
+
+/**
+ * Outlets a story you don't follow needs before it's added: 60% of up to 12
+ * outlets (6 at 9, 8 at 12 or more), and never fewer than 4.
+ */
+export function beyondBar(n: number): number {
+  return Math.max(4, Math.ceil(0.6 * Math.min(n, 12)));
+}
 
 export interface PanelHeadline {
   title: string;
@@ -211,6 +261,8 @@ export interface ConsensusStory {
   scope: Scope;
   /** Share of the relevant panel (national/global, or regional) that ran it, 0–1. */
   strength: number;
+  /** National/global outlets reached when this was measured (for the "beyond your feeds" bar). */
+  panelSize: number;
   tokens: Set<string>;
   /** Every headline's tokens: your story matches the consensus if it matches any of them. */
   memberTokens: Set<string>[];
@@ -218,8 +270,8 @@ export interface ConsensusStory {
 
 export interface ConsensusOptions {
   /**
-   * Minimum share of the reached national/global panel for a story to count
-   * as widely covered. Default 0.3, and never fewer than `minOutlets`.
+   * Optional extra: a minimum share of the reached national/global panel. By
+   * default the bar is wideBar(n) (√n, at least 3), never fewer than `minOutlets`.
    * (First live run: outlet feeds carry only their latest ~20-40 headlines,
    * so the best-covered stories of the day reached 3 of 8 outlets.)
    */
@@ -284,7 +336,7 @@ export function biggestPanelStories(headlines: PanelHeadline[], n = 5): Array<{ 
  * doesn't count.
  */
 export function findConsensus(headlines: PanelHeadline[], panel: PanelSource[], opts: ConsensusOptions = {}): ConsensusStory[] {
-  const { minShare = 0.3, minOutlets = 3, minLeans = 2, minRegional = 2, reached } = opts;
+  const { minShare, minOutlets = 3, minLeans = 2, minRegional = 2, reached } = opts;
   const live = reached ? panel.filter(p => reached.includes(p.name)) : panel;
   const wideSize = live.filter(p => p.scope !== 'regional').length;
   const regionalSize = live.filter(p => p.scope === 'regional').length;
@@ -301,7 +353,8 @@ export function findConsensus(headlines: PanelHeadline[], panel: PanelSource[], 
 
     let scope: Scope | null = null;
     let strength = 0;
-    if (wideSize > 0 && wideSources.size >= Math.max(minOutlets, Math.ceil(minShare * wideSize)) && leans.length >= minLeans) {
+    const needed = Math.max(minOutlets, wideBar(wideSize), minShare ? Math.ceil(minShare * wideSize) : 0);
+    if (wideSize > 0 && wideSources.size >= needed && leans.length >= minLeans) {
       scope = wide.every(h => h.scope === 'global') ? 'global' : 'national';
       strength = wideSources.size / wideSize;
     } else if (regionalSize > 0 && regionalSources.size >= Math.min(minRegional, regionalSize)) {
@@ -315,6 +368,7 @@ export function findConsensus(headlines: PanelHeadline[], panel: PanelSource[], 
       leans,
       scope,
       strength,
+      panelSize: wideSize,
       tokens: c.tokens,
       memberTokens: c.memberTokens,
     });
@@ -377,7 +431,7 @@ export interface PickOptions {
   maxTop?: number;
   /** Max stories from outside your feeds. Default 2. */
   maxBeyond?: number;
-  /** Panel share a story needs to be added from outside your feeds. Default 0.6. */
+  /** Panel share a story needs to be added from outside your feeds. Default: beyondBar() of the outlets reached. */
   beyondShare?: number;
   /** Base score (freshness, image, excerpt) for stories pulled in from the panel, same as your own get. */
   baseScore?: (a: ArticleMeta) => number;
@@ -420,7 +474,10 @@ export function pickTopStories(
   consensus: ConsensusStory[],
   opts: PickOptions = {},
 ): { top: TopStory[]; rest: StoryGroup[] } {
-  const { maxTop = 3, maxBeyond = 2, beyondShare = 0.6, baseScore = () => 0 } = opts;
+  const { maxTop = 3, maxBeyond = 2, beyondShare, baseScore = () => 0 } = opts;
+  const clearsBeyondBar = (c: ConsensusStory) => beyondShare !== undefined
+    ? c.strength >= beyondShare
+    : c.headlines.filter(h => h.scope !== 'regional').map(h => h.source).filter((v, i, a) => a.indexOf(v) === i).length >= beyondBar(c.panelSize);
 
   const fromFeeds: TopStory[] = weighed
     .filter(w => w.group.sources.length > 1 || w.consensus)
@@ -434,7 +491,7 @@ export function pickTopStories(
 
   const matched = new Set(weighed.map(w => w.consensus).filter(Boolean));
   const beyond: TopStory[] = consensus
-    .filter(c => !matched.has(c) && (c.scope === 'regional' || c.strength >= beyondShare))
+    .filter(c => !matched.has(c) && (c.scope === 'regional' || clearsBeyondBar(c)))
     .slice(0, maxBeyond)
     .map(c => {
       const h = bestHeadline(c);

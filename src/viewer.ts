@@ -1562,7 +1562,9 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
     if (url.pathname === '/api/email-settings') {
       if (req.method === 'GET') {
         const appSettings = loadJsonFile(APP_SETTINGS_PATH);
-        const { DEFAULT_PANEL } = await import('./stories');
+        const { PANEL_CATALOG, panelFor } = await import('./stories');
+        const saved = (appSettings.emailRoundup as Record<string, unknown>) || {};
+        const enabledNames = new Set(panelFor(Array.isArray(saved.panelEnabled) ? saved.panelEnabled as string[] : null).map(p => p.name));
         sendJson(res, {
           // Content defaults (on unless turned off), so the Settings page shows the real state.
           oneRead: true,
@@ -1580,8 +1582,9 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
             sendTime: '08:00',
             lookbackDays: 1
           }),
-          // Read-only: the wider-news outlets, for the Settings page's "Which outlets?" list.
-          panelOutlets: DEFAULT_PANEL.map(p => ({ name: p.name, lean: p.lean })),
+          // Read-only: every wider-news outlet, and whether it's on, for the Settings checklist.
+          panelCatalog: PANEL_CATALOG.map(p => ({ name: p.name, lean: p.lean, scope: p.scope, defaultOn: !!p.defaultOn, enabled: enabledNames.has(p.name) })),
+          panelCustom: Array.isArray(saved.panelEnabled),
         });
         return;
       }

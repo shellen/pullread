@@ -1,7 +1,7 @@
 // ABOUTME: Tests for story grouping, weighing and the wider-news panel
 // ABOUTME: Uses real-world-shaped headlines; the Chile quake is a made-up sample story
 
-import { groupStories, weighStories, findConsensus, pickTopStories, fetchPanelHeadlines, storyTokens, relatedStory, clusterHeadlines } from './stories';
+import { groupStories, weighStories, findConsensus, pickTopStories, fetchPanelHeadlines, storyTokens, relatedStory, clusterHeadlines, PANEL_CATALOG, DEFAULT_PANEL, panelFor, wideBar, beyondBar } from './stories';
 import type { PanelSource, PanelHeadline } from './stories';
 import type { ArticleMeta } from './email';
 
@@ -148,6 +148,34 @@ describe('real headlines from the first live run', () => {
       h('The New York Times', 'Sullivan Concedes Alaska Senate Race to Peltola'),
       h('The Hill', 'Sullivan concedes to Peltola nearly a week after Alaska Senate race called'),
     ], PANEL, { reached })).toHaveLength(0);
+  });
+});
+
+describe('outlet catalog and scaled thresholds', () => {
+  test('the defaults are the original nine, three per lean, and every outlet is well formed', () => {
+    expect(DEFAULT_PANEL.map(p => p.name)).toEqual(['NPR', 'The Guardian', 'The New York Times', 'BBC News', 'The Christian Science Monitor', 'The Hill', 'Fox News', 'Washington Examiner', 'New York Post']);
+    for (const lean of ['left', 'center', 'right']) expect(DEFAULT_PANEL.filter(p => p.lean === lean)).toHaveLength(3);
+    expect(new Set(PANEL_CATALOG.map(p => p.name)).size).toBe(PANEL_CATALOG.length);
+    expect(PANEL_CATALOG.length).toBeGreaterThanOrEqual(20);
+    for (const p of PANEL_CATALOG) expect(new URL(p.feedUrl).protocol).toBe('https:');
+  });
+
+  test('panelFor: the reader\u2019s outlets in catalog order, or the defaults', () => {
+    expect(panelFor(null)).toBe(DEFAULT_PANEL);
+    expect(panelFor(['Reason', 'NPR', 'Nope']).map(p => p.name)).toEqual(['NPR', 'Reason']);
+  });
+
+  test('bars scale gently with the number of outlets', () => {
+    expect([wideBar(3), wideBar(9), wideBar(16), wideBar(24)]).toEqual([3, 3, 4, 5]);
+    expect([beyondBar(5), beyondBar(9), beyondBar(12), beyondBar(24)]).toEqual([4, 6, 8, 8]);
+  });
+
+  test('with 24 outlets, a story run by 5 across leans is widely covered; 4 is not', () => {
+    const panel = PANEL_CATALOG;
+    const lean = (n: string) => panel.find(p => p.name === n)!;
+    const mk = (names: string[]) => names.map(n => ({ title: 'Senate passes the farm bill after a long standoff', url: `https://x/${n}`, source: n, lean: lean(n).lean, scope: lean(n).scope }));
+    expect(findConsensus(mk(['NPR', 'Vox', 'Axios', 'Reason']), panel)).toHaveLength(0);
+    expect(findConsensus(mk(['NPR', 'Vox', 'Axios', 'Reason', 'Fox News']), panel)).toHaveLength(1);
   });
 });
 

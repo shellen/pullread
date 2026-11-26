@@ -5,7 +5,7 @@ import { createTransport } from 'nodemailer';
 import { join } from 'path';
 import { homedir } from 'os';
 import { readFileSync, existsSync } from 'fs';
-import { groupStories, alsoInFor, biggestPanelStories, weighStories, findConsensus, pickTopStories, fetchPanelHeadlines, DEFAULT_PANEL } from './stories';
+import { PANEL_CATALOG, panelFor, groupStories, alsoInFor, biggestPanelStories, weighStories, findConsensus, pickTopStories, fetchPanelHeadlines } from './stories';
 import type { PanelSource, Scope } from './stories';
 import {
   applyModelGroups, checkIntro, blockingFailures, structuredIntroToMarkers,
@@ -35,6 +35,8 @@ export interface EmailConfig {
   regionalFeeds: Array<{ name: string; feedUrl: string }>;
   /** Lead with Today's one read: the day's best match for your highlights, notes, favorites and watches. */
   oneRead: boolean;
+  /** Wider-news outlets the reader turned on (catalog names), or null for the defaults. */
+  panelEnabled: string[] | null;
 }
 
 const DEFAULT_CONFIG: EmailConfig = {
@@ -54,6 +56,7 @@ const DEFAULT_CONFIG: EmailConfig = {
   widerNews: true,
   regionalFeeds: [],
   oneRead: true,
+  panelEnabled: null,
 };
 
 /** Rundown content settings the Settings page edits (the rest of EmailConfig is delivery). */
@@ -61,6 +64,8 @@ export interface RundownContentSettings {
   oneRead?: boolean;
   widerNews?: boolean;
   regionalFeeds?: Array<{ name: string; feedUrl: string }>;
+  /** Catalog outlet names, or null to go back to the defaults. */
+  panelEnabled?: string[] | null;
 }
 
 const MAX_REGIONAL_FEEDS = 10;
@@ -75,6 +80,11 @@ export function sanitizeRundownContentSettings(body: unknown): RundownContentSet
   const out: RundownContentSettings = {};
   if (typeof b.oneRead === 'boolean') out.oneRead = b.oneRead;
   if (typeof b.widerNews === 'boolean') out.widerNews = b.widerNews;
+  if (b.panelEnabled === null) out.panelEnabled = null;
+  else if (Array.isArray(b.panelEnabled)) {
+    const known = new Set(PANEL_CATALOG.map(p => p.name));
+    out.panelEnabled = [...new Set(b.panelEnabled.filter((n): n is string => typeof n === 'string' && known.has(n)))];
+  }
   if (Array.isArray(b.regionalFeeds)) {
     const seen = new Set<string>();
     out.regionalFeeds = [];
@@ -1090,7 +1100,7 @@ const IMPORTANCE_POINTS = 0.75;
  */
 export async function curateWithStories(
   articles: ArticleMeta[],
-  cfg: Pick<EmailConfig, 'widerNews' | 'regionalFeeds'>,
+  cfg: Pick<EmailConfig, 'widerNews' | 'regionalFeeds'> & Partial<Pick<EmailConfig, 'panelEnabled'>>,
   scoreFn: (a: ArticleMeta) => number,
   mentionCounts?: Map<string, number>,
   watchedEntities?: Set<string>,
@@ -1098,7 +1108,7 @@ export async function curateWithStories(
 ): Promise<ArticleMeta[]> {
   const limit = opts.limit ?? MAX_ROUNDUP_ARTICLES;
   const panel = opts.panel ?? [
-    ...DEFAULT_PANEL,
+    ...panelFor(cfg.panelEnabled),
     ...(cfg.regionalFeeds || []).map(f => ({ ...f, lean: 'center' as const, scope: 'regional' as const })),
   ];
 

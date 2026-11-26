@@ -118,7 +118,9 @@ Next:
 Remaining before merge:
 - [ ] Fetch the nine panel feeds live on a Mac. None have been checked yet.
 - [x] Settings UI: The Rundown card → "What goes in" has toggles for Today's one read and Wider news (with a "Which outlets?" list from `DEFAULT_PANEL`), and a Near you feed editor. It saves through `/api/email-settings`, validated by `sanitizeRundownContentSettings`.
-- [ ] Decide the panel lineup, the 40%/60% thresholds, and whether the panel is on by default.
+- [x] Outlets: a catalog of 23 (`PANEL_CATALOG`; the original nine are on by default, three per lean). Readers switch outlets on and off in Settings, stored as `panelEnabled` (null means the defaults). The 14 added feeds are unverified until a live preview reaches them.
+- [x] Thresholds scale with outlet count: widely covered needs `wideBar(n)` = max(3, ⌈√n⌉) outlets across 2+ leans, and beyond-your-feeds needs `beyondBar(n)` = max(4, ⌈0.6·min(n,12)⌉). Both are unchanged at 9 outlets.
+- [ ] Decide whether the panel is on by default.
 - [ ] Cache panel headlines (about 1h) so twice-daily sends and previews don't refetch.
 
 ### Phase 2: Build the Swift helpers in CI, and switch to real availability and token checks
