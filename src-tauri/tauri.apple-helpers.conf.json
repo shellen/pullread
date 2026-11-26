@@ -1,0 +1,11 @@
+{
+  "bundle": {
+    "externalBin": [
+      "binaries/pullread-cli",
+      "binaries/pullread-apple-summarize",
+      "binaries/pullread-apple-rlm",
+      "binaries/pullread-apple-batch-autotag",
+      "binaries/pullread-apple-structured"
+    ]
+  }
+}

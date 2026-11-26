@@ -7,6 +7,7 @@ import { homedir } from 'os';
 import { request } from 'https';
 import { execFileSync } from 'child_process';
 import { saveToKeychain, loadFromKeychain } from './keychain';
+import { bundledHelperPath } from './apple-helpers';
 
 export type Provider = 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'apple';
 
@@ -359,7 +360,7 @@ async function callOpenRouter(apiKey: string, model: string, articleText: string
 
 // Compiled Swift binary for single-prompt Apple Intelligence calls.
 // Uses @main entry point required by swiftc (the interpreter handles top-level await differently).
-const SUMMARIZE_SWIFT = `import Foundation
+export const SUMMARIZE_SWIFT = `import Foundation
 import FoundationModels
 
 @main struct Run {
@@ -376,7 +377,7 @@ import FoundationModels
 // Compiled Swift binary for multi-turn RLM summarization of long articles.
 // Reads article from file, splits into sections, progressively builds notes
 // via multi-turn LanguageModelSession, then synthesizes a final summary.
-const RLM_SWIFT = `import Foundation
+export const RLM_SWIFT = `import Foundation
 import FoundationModels
 
 @main struct Run {
@@ -455,6 +456,10 @@ import FoundationModels
 // Compile a Swift script to a binary, caching by source content.
 // Returns the binary path on success, null on compilation failure.
 export function ensureAppleBinary(scriptContent: string, binaryName: string): string | null {
+  // Prefer the helper CI built and signed into the app bundle (no Xcode tools needed).
+  const bundled = bundledHelperPath(binaryName);
+  if (bundled) return bundled;
+
   const configDir = join(homedir(), '.config', 'pullread');
   const swiftPath = join(configDir, binaryName + '.swift');
   const binaryPath = join(configDir, binaryName);

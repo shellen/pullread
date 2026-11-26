@@ -150,7 +150,7 @@ export function migrateDashedTags(): number {
 // Compiled Swift binary for batch autotagging via JSONL.
 // Reads JSONL input (one {"id","prompt"} per line), processes each with an independent
 // LanguageModelSession, and writes JSONL output ({"id","response"} or {"id","error"}).
-const BATCH_AUTOTAG_SWIFT = `import Foundation
+export const BATCH_AUTOTAG_SWIFT = `import Foundation
 import FoundationModels
 
 @main struct Run {
