@@ -49,7 +49,7 @@ describe('per-story intro (macOS 26 shape)', () => {
       'A 7.8 quake near Santiago has killed dozens.',
       'Bayer will pay $7 billion over Roundup. A new album by Julien Baker arrives in February.',
     ]);
-    expect(intro.paragraphs[1].links).toEqual([{ story: 2, phrase: '$7 billion' }, { story: 3, phrase: 'Julien Baker' }]);
+    expect(intro.paragraphs[1].links).toMatchObject([{ story: 2, phrase: '$7 billion' }, { story: 3, phrase: 'Julien Baker' }]);
   });
 
   test('a whole-sentence link is replaced by a short title-word link', () => {

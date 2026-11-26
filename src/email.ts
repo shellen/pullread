@@ -1107,13 +1107,14 @@ export async function curateWithStories(
   opts: StoryCurationOptions = {},
 ): Promise<ArticleMeta[]> {
   const limit = opts.limit ?? MAX_ROUNDUP_ARTICLES;
+  // Near you works on its own: local feeds are read even with Wider news off.
   const panel = opts.panel ?? [
-    ...panelFor(cfg.panelEnabled),
+    ...(cfg.widerNews ? panelFor(cfg.panelEnabled) : []),
     ...(cfg.regionalFeeds || []).map(f => ({ ...f, lean: 'center' as const, scope: 'regional' as const })),
   ];
 
   let headlines = opts.panelHeadlines ?? [];
-  if (!opts.panelHeadlines && cfg.widerNews) {
+  if (!opts.panelHeadlines && panel.length) {
     try {
       const { fetchFeed } = await import('./feed');
       headlines = await fetchPanelHeadlines(panel, fetchFeed);
@@ -1177,7 +1178,7 @@ export async function curateWithStories(
   });
   const others = curateArticles(leads, mentionCounts, watchedEntities, Math.max(0, limit - topArticles.length));
   opts.onReport?.({
-    panelFeeds: cfg.widerNews || opts.panelHeadlines ? panel.length : 0,
+    panelFeeds: panel.length,
     panelFeedsReached: [...new Set(headlines.map(h => h.source))],
     panelHeadlines: headlines.length,
     widelyCovered: consensus.length,

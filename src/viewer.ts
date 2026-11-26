@@ -686,6 +686,16 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
+/**
+ * Is a request from the viewer's own origin? Same-origin GETs often carry no
+ * Origin header; anything with one must be the viewer's localhost or 127.0.0.1
+ * address (the app window and the browser fallback, see src-tauri commands.rs).
+ */
+export function isSameOrigin(origin: string | undefined, port: number): boolean {
+  if (!origin) return true;
+  return origin === `http://localhost:${port}` || origin === `http://127.0.0.1:${port}`;
+}
+
 function sendJson(res: ServerResponse, data: unknown) {
   res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
   res.end(JSON.stringify(data));
@@ -1127,6 +1137,14 @@ iframe{width:100%;height:100%;border:none;position:absolute;top:0;left:0}
     // Notes API
     // Reading history from the viewer (opens, progress, finishes) for Today's one read.
     if (url.pathname === '/api/reading') {
+      // Reading history is private: only the viewer itself (the app window or
+      // the browser fallback) may read or write it, not other websites.
+      res.removeHeader('Access-Control-Allow-Origin');
+      if (!isSameOrigin(req.headers.origin, port)) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'forbidden' }));
+        return;
+      }
       const { loadReading, saveReading, applyReadingEvents } = await import('./reading');
       if (req.method === 'GET') {
         sendJson(res, loadReading(CONFIG_DIR));

@@ -357,7 +357,9 @@ export function findConsensus(headlines: PanelHeadline[], panel: PanelSource[], 
     if (wideSize > 0 && wideSources.size >= needed && leans.length >= minLeans) {
       scope = wide.every(h => h.scope === 'global') ? 'global' : 'national';
       strength = wideSources.size / wideSize;
-    } else if (regionalSize > 0 && regionalSources.size >= Math.min(minRegional, regionalSize)) {
+    } else if (regionalSize >= minRegional && regionalSources.size >= minRegional) {
+      // "Near you" needs at least two local outlets to agree. With one feed (or only
+      // one answering), every headline would otherwise count as agreement.
       scope = 'regional';
       strength = regionalSources.size / regionalSize;
     }

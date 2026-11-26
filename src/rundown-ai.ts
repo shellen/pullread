@@ -14,6 +14,13 @@ export interface IntroLink {
   phrase: string;
   /** 1-based story number from the list the model was given. */
   story: number;
+  /**
+   * Where this story's own sentence sits in the paragraph text ([start, end)).
+   * When set, the phrase is only looked for there, so a word shared by two
+   * sentences can't put one story's link in another story's sentence.
+   */
+  start?: number;
+  end?: number;
 }
 
 export interface StructuredIntro {
@@ -72,18 +79,23 @@ export function fallbackPhrase(sentence: string, title: string): string {
  */
 export function mentionsToIntro(paragraphs: Mention[][], titles: string[]): StructuredIntro {
   return {
-    paragraphs: paragraphs.filter(p => p.length).map(mentions => ({
-      text: mentions.map(m => m.sentence.trim()).join(' '),
-      links: mentions.map(m => {
+    paragraphs: paragraphs.filter(p => p.length).map(mentions => {
+      let offset = 0;
+      const links: IntroLink[] = [];
+      const sentences = mentions.map(m => {
+        const sentence = m.sentence.trim();
         const title = titles[m.story - 1] || '';
         const phrase = (m.phrase || '').trim();
         const words = phrase.split(/\s+/).filter(Boolean).length;
         // Small models often "link" the whole sentence; keep links to a few words.
-        const usable = phrase && words <= 6 && phrase.length < m.sentence.trim().length * 0.8
-          && m.sentence.toLowerCase().includes(phrase.toLowerCase());
-        return { story: m.story, phrase: usable ? phrase : fallbackPhrase(m.sentence, title) };
-      }),
-    })),
+        const usable = phrase && words <= 6 && phrase.length < sentence.length * 0.8
+          && sentence.toLowerCase().includes(phrase.toLowerCase());
+        links.push({ story: m.story, phrase: usable ? phrase : fallbackPhrase(sentence, title), start: offset, end: offset + sentence.length });
+        offset += sentence.length + 1; // the joining space
+        return sentence;
+      });
+      return { text: sentences.join(' '), links };
+    }),
   };
 }
 
@@ -219,12 +231,19 @@ export function structuredIntroToMarkers(intro: StructuredIntro, storyCount: num
   const dropped: string[] = [];
   const paras = intro.paragraphs.map((p, pi) => {
     let text = p.text.replace(/\{\{|\}\}/g, '');
-    for (const link of p.links) {
+    // Links tied to their own sentence go last-to-first, so inserting a marker
+    // never shifts the offsets of the sentences still to be linked.
+    const located = p.links.every(l => l.start !== undefined);
+    const links = located ? [...p.links].sort((a, b) => (b.start ?? 0) - (a.start ?? 0)) : p.links;
+    for (const link of links) {
       if (link.story < 1 || link.story > storyCount) {
         dropped.push(`paragraph ${pi + 1}: story ${link.story} doesn't exist`);
         continue;
       }
-      const idx = text.toLowerCase().indexOf(link.phrase.toLowerCase());
+      const from = located ? link.start! : 0;
+      const to = located ? (link.end ?? text.length) : text.length;
+      const found = text.slice(from, to).toLowerCase().indexOf(link.phrase.toLowerCase());
+      const idx = found === -1 ? -1 : from + found;
       // Skip phrases already inside a marker from an earlier link.
       if (idx === -1 || /\{\{[^}]*$/.test(text.slice(0, idx))) {
         dropped.push(`paragraph ${pi + 1}: "${link.phrase}" isn't in the text`);
@@ -573,12 +592,16 @@ export function checkIntro(text: string, opts: { now: Date; storyCount: number; 
   const monthDay = opts.now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }).toLowerCase();
   const checks: IntroCheck[] = [];
 
-  // Today's weekday or date anywhere, or any day presented as today ("It's Friday the 13th").
+  // Blocking: a day presented as today ("It's Friday the 13th", "Happy Monday").
+  // Not blocking: today's weekday or date merely mentioned — stories legitimately
+  // say "Tuesday's count" on a Tuesday, and blocking that dropped accurate intros.
   const days = 'monday|tuesday|wednesday|thursday|friday|saturday|sunday';
   const asToday = lower.match(new RegExp(`\\b(?:it's|it is|today is|this|happy)\\s+(?:${days})\\b[^.,;:!?]*`));
-  const namesToday = new RegExp(`\\b${weekday}\\b`).test(lower) || lower.includes(monthDay) || !!asToday;
-  checks.push({ rule: "Doesn't name a day or date as today", passed: !namesToday,
-    detail: namesToday ? `"${asToday ? asToday[0].trim() : lower.includes(monthDay) ? monthDay : weekday}"` : undefined });
+  checks.push({ rule: "Doesn't name a day or date as today", passed: !asToday,
+    detail: asToday ? `"${asToday[0].trim()}"` : undefined });
+  const mentionsToday = new RegExp(`\\b${weekday}\\b`).test(lower) || lower.includes(monthDay);
+  checks.push({ rule: "Doesn't mention today's weekday or date", passed: !mentionsToday,
+    detail: mentionsToday ? `"${lower.includes(monthDay) ? monthDay : weekday}"` : undefined });
 
   const banned = BANNED_PHRASES.filter(p => lower.includes(p));
   checks.push({ rule: 'No banned phrases', passed: banned.length === 0, detail: banned.length ? banned.join(', ') : undefined });
