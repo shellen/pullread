@@ -1273,12 +1273,14 @@ export async function buildRoundup(
       // Skip what the reader already opened (reading history) or highlighted,
       // noted or favorited, and every other copy of those stories: on Nov 26 the
       // pick was another outlet's copy of an obituary the reader had favorited.
+      // Also skip any story picked in the last week, so an unopened pick doesn't
+      // come back the next day as another outlet's copy.
+      const { loadReading, saveReading, recordPick, pickOutcomes, recentPicks } = await import('./reading');
       const stories = groupStories(articles);
-      const skip = withOtherCopies(stories, new Set([...engaged, ...read]));
+      const skip = withOtherCopies(stories, new Set([...engaged, ...read, ...recentPicks(loadReading())]));
       const storyOf = new Map<string, number>();
       stories.forEach((g, gi) => { for (const m of g.members) storyOf.set(m.filename, gi); });
       const { pick, ranked } = pickOneRead(articles, profile, skip);
-      const { loadReading, saveReading, recordPick, pickOutcomes } = await import('./reading');
       if (pick && opts.recordPick) {
         const date = new Date().toISOString().slice(0, 10);
         saveReading(recordPick(loadReading(), { date, filename: pick.article.filename, title: pick.article.title }));

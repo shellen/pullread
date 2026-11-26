@@ -1,7 +1,7 @@
 // ABOUTME: Tests for the Rundown structured-output helpers (intro citations, model grouping, intro checks)
 // ABOUTME: Model responses here are recorded samples, not live model output
 
-import { parseFlatIntro, structuredIntroToMarkers, applyModelGroups, groupingPrompt, checkIntro, buildPerStoryIntro, unsupportedNames, unsupportedRoles, unsupportedNumbers, mentionsToIntro, fallbackPhrase, parseIntroResponse, candidatePairs, pairsPrompt, groupingLinesFromPairs, batches, onDeviceGrouping, commonWords } from './rundown-ai';
+import { parseFlatIntro, structuredIntroToMarkers, applyModelGroups, groupingPrompt, checkIntro, buildPerStoryIntro, unsupportedNames, unsupportedRoles, unsupportedNumbers, isDigestTitle, mentionsToIntro, fallbackPhrase, parseIntroResponse, candidatePairs, pairsPrompt, groupingLinesFromPairs, batches, onDeviceGrouping, commonWords } from './rundown-ai';
 import { groupStories } from './stories';
 import type { ArticleMeta } from './email';
 
@@ -441,5 +441,14 @@ describe('real Nov 26 second-run failures', () => {
     // Every pair but the mall one survives the refusal.
     expect(groups).toHaveLength(8);
     expect(lines!.filter(l => l.split('|')[0].includes(','))).toHaveLength(3);
+  });
+});
+
+describe('isDigestTitle', () => {
+  test('spots headlines that list several stories (real Nov 26 headlines)', () => {
+    expect(isDigestTitle('Army to detonate tons of lead azide after delays. And, Abrego Garcia leaves U.S.')).toBe(true);
+    expect(isDigestTitle('Santa Cruz County business: Capstan completes first U.S. heart valve procedure; Driscoll\u2019s wins injunction')).toBe(true);
+    expect(isDigestTitle('Lead azide detonation sends clouds over Iowa as questions of health risks swirl')).toBe(false);
+    expect(isDigestTitle('Andy Taylor, versatile guitarist for Duran Duran, dies at 65')).toBe(false);
   });
 });

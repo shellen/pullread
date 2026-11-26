@@ -4,7 +4,7 @@
 import { mkdtempSync, writeFileSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { applyReadingEvents, loadReading, saveReading, recordPick, pickOutcomes, readingPath } from './reading';
+import { applyReadingEvents, loadReading, saveReading, recordPick, pickOutcomes, recentPicks, readingPath } from './reading';
 import type { ReadingState } from './reading';
 
 const now = Date.parse('2026-11-25T18:00:00Z');
@@ -60,6 +60,14 @@ describe('picks and outcomes', () => {
       { date: '2026-11-24', filename: 'c.md', title: 'C', opened: false, finished: false },
       { date: '2026-11-23', filename: 'a.md', title: 'A', opened: true, finished: true },
     ]);
+  });
+});
+
+describe('recentPicks', () => {
+  test('returns picks from the last week only', () => {
+    let s = recordPick(empty(), { date: '2026-11-10', filename: 'old.md', title: 'Old' });
+    s = recordPick(s, { date: '2026-11-25', filename: 'andy.md', title: 'Andy Taylor dies' });
+    expect([...recentPicks(s, new Date('2026-11-26T12:00:00Z'))]).toEqual(['andy.md']);
   });
 });
 

@@ -136,6 +136,12 @@ export interface PickOutcome extends PickRecord {
 }
 
 /** Recent picks and whether the reader opened or finished them. */
+/** Filenames picked as Today's one read in the last `days` days. */
+export function recentPicks(state: ReadingState, now: Date = new Date(), days = 7): Set<string> {
+  const cutoff = new Date(now.getTime() - days * 86_400_000).toISOString().slice(0, 10);
+  return new Set(state.picks.filter(p => p.date >= cutoff).map(p => p.filename));
+}
+
 export function pickOutcomes(state: ReadingState, n = 7): PickOutcome[] {
   return state.picks.slice(-n).reverse().map(p => {
     const rec = state.articles[p.filename];

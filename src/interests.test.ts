@@ -134,6 +134,17 @@ describe('gatherInterestSignals (local files)', () => {
     expect([...engaged]).toEqual(['2026-11-20-why-local-news-matters.md']);
   });
 
+  test('a favorite alone counts as engaged, so its story is never the one read', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'pr-interests-'));
+    const out = join(root, 'library');
+    const config = join(root, 'config');
+    mkdirSync(out); mkdirSync(config);
+    writeFileSync(join(out, '2026-11-26-andy-taylor-dies.md'), '---\ntitle: Andy Taylor dies\n---\n');
+    writeFileSync(join(out, '2026-11-26-andy-taylor-dies.annot.json'), JSON.stringify({ highlights: [], annotations: [], articleNote: '', tags: [], machineTags: [], isFavorite: true }));
+    const { engaged } = await gatherInterestSignals({ outputPath: out, configDir: config });
+    expect([...engaged]).toEqual(['2026-11-26-andy-taylor-dies.md']);
+  });
+
   test('article notes are ignored: in real libraries they mostly hold imported text', async () => {
     const root = mkdtempSync(join(tmpdir(), 'pr-interests-'));
     const out = join(root, 'library');

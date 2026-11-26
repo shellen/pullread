@@ -111,7 +111,7 @@ export interface GatherOptions {
 export async function gatherInterestSignals(opts: GatherOptions): Promise<{ signals: InterestSignal[]; engaged: Set<string>; read: Set<string> }> {
   const { outputPath, configDir = join(homedir(), '.config', 'pullread'), watches = [] } = opts;
   const signals: InterestSignal[] = [];
-  /** Articles the reader already highlighted or noted: treated as already read. */
+  /** Articles the reader already highlighted, noted or favorited: treated as already read. */
   const engaged = new Set<string>();
 
   // Highlights, inline notes, article notes, favorites, tags (.annot.json sidecars).
@@ -127,7 +127,9 @@ export async function gatherInterestSignals(opts: GatherOptions): Promise<{ sign
       // (feed descriptions copied by the viewer/13-init.js migration, whole
       // article bodies, old bookmark-service blurbs), indistinguishable from the
       // reader's own notes. Live sample, Nov 25: a 59,059-character article body.
-      if (full.highlights.length || data.annotations.length) engaged.add(filename);
+      // A favorite counts too: on Nov 26 a favorited obituary made its story the top
+      // interest, and the one read kept picking other outlets' copies of it.
+      if (full.highlights.length || data.annotations.length || data.isFavorite) engaged.add(filename);
       for (const h of full.highlights as Array<{ text?: string; note?: string; createdAt?: string }>) {
         if (h.text) signals.push({ text: `${h.text} ${h.note || ''}`, kind: 'highlight', at: h.createdAt });
       }

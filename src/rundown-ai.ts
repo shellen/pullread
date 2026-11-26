@@ -423,12 +423,18 @@ export function commonWords(groups: StoryGroup[]): Set<string> {
  * ("BMW" for a reader of BMW BLOG) is not evidence of the same event: on a
  * real day the model merged three unrelated BMW stories that shared it.
  */
+/** A headline that lists several stories: "A; B" or NPR's "A. And, B". */
+export function isDigestTitle(title: string): boolean {
+  return title.includes(';') || /\.\s+And,?\s/.test(title);
+}
+
 export function candidatePairs(groups: StoryGroup[], max = 40, common: Set<string> = commonWords(groups)): Array<[number, number]> {
   const tokens = groups.map(groupTokens);
   // A headline that lists several stories ("Santa Cruz County business: Capstan …;
   // Driscoll's wins …") is a digest, never the same event as one story: on Nov 26
   // the model merged one into two mayor's-race stories over "Santa Cruz".
-  const digest = groups.map(g => g.members.some(m => m.title.includes(';')));
+  // NPR's newsletter headlines do the same with ". And, …".
+  const digest = groups.map(g => g.members.some(m => isDigestTitle(m.title)));
   const pairs: Array<{ pair: [number, number]; shared: number }> = [];
   for (let i = 0; i < groups.length; i++) {
     if (digest[i]) continue;
@@ -551,6 +557,8 @@ export async function onDeviceGrouping(
   let failed = 0;
   let calls = 0;
   let outOfTime = false;
+  const skipped = { pairs: 0, labels: 0 };
+  const reasons = new Set<string>();
   const MIN_SPLIT = 2; // down to single items; the time budget still caps the calls
   const ask = async <T>(mode: 'pairs' | 'labels', items: T[], prompt: (part: T[], offset: number) => string, offset: number, pick: (r: any) => string[]): Promise<string[]> => {
     if (clock() - start > budgetMs) { outOfTime = true; return []; }
@@ -567,7 +575,8 @@ export async function onDeviceGrouping(
           ...await ask(mode, items.slice(mid), prompt, offset + mid, pick),
         ];
       }
-      console.warn(`[email] Skipped ${items.length} ${mode === 'pairs' ? 'pair' : 'label'}${items.length === 1 ? '' : 's'}: ${err instanceof Error ? err.message : err}`);
+      skipped[mode] += items.length;
+      reasons.add(err instanceof Error ? err.message : String(err));
       return [];
     }
   };
@@ -581,6 +590,10 @@ export async function onDeviceGrouping(
   for (const ids of batches(groups.map((_, i) => i), 20)) {
     labels.push(...await ask('labels', ids, part => labelPrompt(groups, part), 0, r => r?.stories || []));
     if (outOfTime) break;
+  }
+  if (skipped.pairs || skipped.labels) {
+    const parts = [skipped.pairs && `${skipped.pairs} pair${skipped.pairs === 1 ? '' : 's'}`, skipped.labels && `${skipped.labels} label${skipped.labels === 1 ? '' : 's'}`].filter(Boolean);
+    console.warn(`[email] Grouping skipped ${parts.join(' and ')}: ${[...reasons].join('; ')}`);
   }
   if (calls > 0 && failed === calls) throw new Error(`every model call failed (${failed})`);
   return groupingLinesFromPairs(groups.length, pairs, same, labels, { useImportance: false });
