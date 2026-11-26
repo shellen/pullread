@@ -1,7 +1,7 @@
 // ABOUTME: Tests for story grouping, weighing and the wider-news panel
 // ABOUTME: Uses real-world-shaped headlines; the Chile quake is a made-up sample story
 
-import { groupStories, weighStories, findConsensus, pickTopStories, fetchPanelHeadlines, storyTokens, relatedStory, clusterHeadlines, PANEL_CATALOG, DEFAULT_PANEL, panelFor, wideBar, beyondBar } from './stories';
+import { groupStories, withOtherCopies, weighStories, findConsensus, pickTopStories, fetchPanelHeadlines, storyTokens, relatedStory, clusterHeadlines, PANEL_CATALOG, DEFAULT_PANEL, panelFor, wideBar, beyondBar } from './stories';
 import type { PanelSource, PanelHeadline } from './stories';
 import type { ArticleMeta } from './email';
 
@@ -248,5 +248,49 @@ describe('fetchPanelHeadlines', () => {
     const out = await fetchPanelHeadlines(PANEL.slice(5, 7), fetchFn, 24, now); // The Hill + Fox
     expect(out.map(x => [x.source, x.title])).toEqual([['The Hill', 'Fresh']]);
     expect(out[0].excerpt).toBe('Hello & welcome');
+  });
+});
+
+describe('grouping real reworded copies (Nov 26)', () => {
+  const at = (title: string, i: number) => article({ title, url: `https://outlet${i}.com/${i}`, domain: `outlet${i}.com`, filename: `${i}.md` });
+
+  test('five outlets’ Andy Taylor obituaries are one story', () => {
+    const g = groupStories([
+      'Andy Taylor, versatile guitarist for Duran Duran, dies at 65',
+      'Duran Duran’s Andy Taylor Dies at 65',
+      // Matches the second headline but not the first: compared with every copy.
+      'Duran Duran’s Andy Taylor Dead At 65',
+      'Duran Duran guitarist Andy Taylor dies, aged 65',
+      "Andy Taylor: Duran Duran's livewire guitarist who was a Wild Boy on stage and off",
+    ].map(at));
+    expect(g).toHaveLength(1);
+    expect(g[0].sources).toHaveLength(5);
+  });
+
+  test('two mayor’s race stories merge; a business digest that shares the place does not', () => {
+    const g = groupStories([
+      'Ryan Coonerty declares victory in Santa Cruz mayor’s race as vote count nears end',
+      'Ami Chen Mills concedes Santa Cruz mayor’s race after latest vote count',
+      'Santa Cruz County business: Capstan completes first U.S. heart valve procedure; Driscoll’s wins injunction in legal fight',
+    ].map(at));
+    expect(g.map(x => x.members.length)).toEqual([2, 1]);
+  });
+
+  test('different stories about the same brand stay apart', () => {
+    const g = groupStories([
+      'BMW Recalls 286 i5 And i7 EVs Over Battery Fire Risk',
+      'BMW i5 review: the electric 5 Series grows up',
+      'BMW i7 M70 first drive: a 650-hp electric limo',
+    ].map(at));
+    expect(g).toHaveLength(3);
+  });
+
+  test('withOtherCopies adds every copy of a story the reader already engaged with', () => {
+    const g = groupStories([
+      'Duran Duran’s Andy Taylor Dies at 65',
+      'Duran Duran guitarist Andy Taylor dies, aged 65',
+      'What’s going on with the Riemann hypothesis?',
+    ].map(at));
+    expect([...withOtherCopies(g, new Set(['0.md']))].sort()).toEqual(['0.md', '1.md']);
   });
 });

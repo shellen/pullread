@@ -46,6 +46,9 @@ export const PROFILE_STOPWORDS = new Set([
   'could', 'would', 'should', 'might', 'there', 'their', 'they', 'them', 'these', 'those', 'into',
   'only', 'some', 'most', 'more', 'than', 'then', 'when', 'where', 'which', 'while', 'your', 'you',
   'our', 'can', 'get', 'got', 'see', 'use', 'used', 'using', 'here', 'all', 'any', 'each', 'own',
+  // News-event words, not interests: on Nov 26 "dead" was a top interest
+  // because a favorite was an obituary.
+  'dead', 'dies', 'died', 'death', 'deaths', 'killed', 'aged',
   // From the first live profile (Nov 25), where they topped the "interests":
   'now', 'been', 'back', 'had', 'did', 'does', 'done', 'around', 'through', 'next', 'look', 'looks',
   'another', 'over', 'under', 'again', 'ever', 'never', 'always', 'already', 'yet', 'soon', 'since',

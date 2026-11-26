@@ -5,7 +5,7 @@ import { createTransport } from 'nodemailer';
 import { join } from 'path';
 import { homedir } from 'os';
 import { readFileSync, existsSync } from 'fs';
-import { PANEL_CATALOG, panelFor, groupStories, alsoInFor, biggestPanelStories, weighStories, findConsensus, pickTopStories, fetchPanelHeadlines } from './stories';
+import { PANEL_CATALOG, panelFor, groupStories, withOtherCopies, alsoInFor, biggestPanelStories, weighStories, findConsensus, pickTopStories, fetchPanelHeadlines } from './stories';
 import type { PanelSource, Scope } from './stories';
 import {
   applyModelGroups, checkIntro, blockingFailures, structuredIntroToMarkers,
@@ -1270,8 +1270,14 @@ export async function buildRoundup(
         watches: [...(watchedEntities || [])],
       });
       const profile = buildInterestProfile(signals);
-      // Skip what the reader already opened (reading history) or highlighted/noted.
-      const { pick, ranked } = pickOneRead(articles, profile, new Set([...engaged, ...read]));
+      // Skip what the reader already opened (reading history) or highlighted,
+      // noted or favorited, and every other copy of those stories: on Nov 26 the
+      // pick was another outlet's copy of an obituary the reader had favorited.
+      const stories = groupStories(articles);
+      const skip = withOtherCopies(stories, new Set([...engaged, ...read]));
+      const storyOf = new Map<string, number>();
+      stories.forEach((g, gi) => { for (const m of g.members) storyOf.set(m.filename, gi); });
+      const { pick, ranked } = pickOneRead(articles, profile, skip);
       const { loadReading, saveReading, recordPick, pickOutcomes } = await import('./reading');
       if (pick && opts.recordPick) {
         const date = new Date().toISOString().slice(0, 10);
@@ -1280,7 +1286,9 @@ export async function buildRoundup(
       const history = pickOutcomes(loadReading());
       oneRead = {
         pick,
-        runnersUp: ranked.slice(1, 6).map(c => ({ title: c.article.title, score: c.score, terms: c.terms.slice(0, 4) })),
+        // One runner-up per story, not four copies of the pick.
+        runnersUp: ranked.filter((c, i, all) => all.findIndex(o => storyOf.get(o.article.filename) === storyOf.get(c.article.filename)) === i)
+          .slice(1, 6).map(c => ({ title: c.article.title, score: c.score, terms: c.terms.slice(0, 4) })),
         signals: profile.counts,
         topInterests: [...profile.weights].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([t]) => t),
         bySource: Object.fromEntries(Object.keys(profile.counts).map(kind => [kind,

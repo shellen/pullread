@@ -1,7 +1,7 @@
 // ABOUTME: Tests for the Rundown structured-output helpers (intro citations, model grouping, intro checks)
 // ABOUTME: Model responses here are recorded samples, not live model output
 
-import { parseFlatIntro, structuredIntroToMarkers, applyModelGroups, groupingPrompt, checkIntro, buildPerStoryIntro, unsupportedNames, mentionsToIntro, fallbackPhrase, parseIntroResponse, candidatePairs, pairsPrompt, groupingLinesFromPairs, batches, onDeviceGrouping, commonWords } from './rundown-ai';
+import { parseFlatIntro, structuredIntroToMarkers, applyModelGroups, groupingPrompt, checkIntro, buildPerStoryIntro, unsupportedNames, unsupportedRoles, mentionsToIntro, fallbackPhrase, parseIntroResponse, candidatePairs, pairsPrompt, groupingLinesFromPairs, batches, onDeviceGrouping, commonWords } from './rundown-ai';
 import { groupStories } from './stories';
 import type { ArticleMeta } from './email';
 
@@ -376,5 +376,34 @@ describe('checkIntro', () => {
     const c = checkIntro('Good evening! Let’s dive in: the {{Roundup settlement|11}}.', { now, storyCount: 8 });
     const failed = c.filter(x => !x.passed).map(x => x.rule);
     expect(failed).toEqual(expect.arrayContaining(['No banned phrases', 'No greeting or sign-off', 'Every cited story exists']));
+  });
+});
+
+describe('real Nov 26 intro and grouping failures', () => {
+  test('unsupportedRoles catches a role the story never mentions', () => {
+    const source = 'Duran Duran\u2019s Andy Taylor Dead At 65';
+    expect(unsupportedRoles("Andy Taylor, Duran Duran's drummer, died at the age of 65.", source)).toEqual(['drummer']);
+    expect(unsupportedRoles('Andy Taylor, the guitarist, died at 65.', 'Andy Taylor, versatile guitarist for Duran Duran, dies at 65')).toEqual([]);
+  });
+
+  test('a sentence with an invented role is retried, then the story is skipped', async () => {
+    const stories = [
+      { title: 'Duran Duran\u2019s Andy Taylor Dead At 65', domain: 'x.com' },
+      { title: 'Story B', domain: 'x.com' }, { title: 'Story C', domain: 'x.com' }, { title: 'Story D', domain: 'x.com' },
+    ];
+    const r = await buildPerStoryIntro(stories, p => p.includes('Taylor')
+      ? { sentence: "Andy Taylor, Duran Duran's drummer, died at the age of 65.", phrase: 'Andy Taylor' }
+      : { sentence: `Something specific happened in ${p.split('\n')[0].slice(10)} today.`, phrase: 'Something specific' });
+    expect(r!.invented).toBe(1);
+    expect(r!.mentions.flat().map(m => m.story)).toEqual([2, 3, 4]);
+  });
+
+  test('a digest headline (several stories) is never offered to the model as a pair', () => {
+    const groups = groupStories([
+      article('Ryan Coonerty declares victory in Santa Cruz mayor\u2019s race', 'https://a.com/1'),
+      article('Santa Cruz County business: Capstan completes heart valve procedure; Driscoll\u2019s wins injunction', 'https://b.com/2'),
+    ]);
+    expect(groups).toHaveLength(2);
+    expect(candidatePairs(groups, 40, new Set())).toEqual([]);
   });
 });

@@ -45,12 +45,17 @@ const STOPWORDS = new Set([
   'about', 'more', 'than', 'his', 'her', 'their', 'out', 'off', 'amid', 'hear', 'watch', 'live',
 ]);
 
+/** Words that report a death, folded together so "dies" and "dead" match. */
+const DEATH_WORDS = new Set(['dies', 'died', 'dead', 'death', 'deaths', 'killed']);
+
 /** Distinctive words of a title (the strict tokenizer used for exact-story dedupe). */
 export function titleTokens(title: string): Set<string> {
   const words = normalizeTitle(titleCore(title))
+    .replace(/'s\b/g, '') // "Duran Duran's" matches "Duran Duran"
     .replace(/['"]/g, '')
     .split(/[^a-z0-9$]+/)
-    .filter(w => w && !STOPWORDS.has(w));
+    .filter(w => w && !STOPWORDS.has(w))
+    .map(w => (DEATH_WORDS.has(w) ? 'dead' : w));
   return new Set(words);
 }
 
@@ -99,6 +104,18 @@ export function sameStory(a: Set<string>, b: Set<string>): boolean {
 }
 
 /**
+ * Same story, by wording that differs a lot: at least 4 shared words (loose
+ * tokens) covering half of the shorter headline. "Andy Taylor: Duran Duran's
+ * livewire guitarist who was a Wild Boy on stage" and "Duran Duran guitarist
+ * Andy Taylor dies, aged 65" (Nov 26) share andy/taylor/duran/guitarist.
+ * Two shared words, like a place name, are never enough.
+ */
+export function rewordedStory(a: Set<string>, b: Set<string>): boolean {
+  const shared = sharedCount(a, b);
+  return shared >= 4 && shared / Math.min(a.size, b.size) >= 0.5;
+}
+
+/**
  * Same story, loose — for matching outlet headlines against each other, where
  * wording differs more ("7.8 quake hits Chile" / "Chile earthquake: dozens
  * dead"). At least 3 shared words covering half of the shorter headline.
@@ -133,19 +150,26 @@ function richness(a: ArticleMeta): number {
  * many of your sources ran a story is the best sign of how much it matters.
  */
 export function groupStories(articles: ArticleMeta[]): StoryGroup[] {
-  const groups: Array<StoryGroup & { urls: Set<string>; tokens: Set<string>; titles: Set<string> }> = [];
+  const groups: Array<StoryGroup & { urls: Set<string>; tokens: Set<string>[]; loose: Set<string>[]; titles: Set<string> }> = [];
   for (const article of articles) {
     const url = canonicalUrl(article.url);
     const tokens = titleTokens(article.title);
+    const loose = storyTokens(article.title);
     const title = normalizeTitle(article.title);
-    const g = groups.find(k => k.urls.has(url) || k.titles.has(title) || sameStory(k.tokens, tokens));
+    // Compared with every copy already in the group, not just the first: on Nov 26,
+    // "Duran Duran's Andy Taylor Dead At 65" matched the group's second headline but
+    // not its first, and showed up in the email as a separate story.
+    const g = groups.find(k => k.urls.has(url) || k.titles.has(title)
+      || k.tokens.some(t => sameStory(t, tokens)) || k.loose.some(t => rewordedStory(t, loose)));
     if (!g) {
-      groups.push({ lead: article, members: [article], sources: [], urls: new Set([url]), tokens, titles: new Set([title]) });
+      groups.push({ lead: article, members: [article], sources: [], urls: new Set([url]), tokens: [tokens], loose: [loose], titles: new Set([title]) });
       continue;
     }
     g.members.push(article);
     g.urls.add(url);
     g.titles.add(title);
+    g.tokens.push(tokens);
+    g.loose.push(loose);
     if (richness(article) > richness(g.lead)) g.lead = article;
   }
   return groups.map(({ lead, members }) => ({
@@ -153,6 +177,15 @@ export function groupStories(articles: ArticleMeta[]): StoryGroup[] {
     members,
     sources: [...new Set(members.map(m => m.domain || domainOf(m.url)).filter(Boolean))],
   }));
+}
+
+/** The given filenames plus every other copy of the same stories. */
+export function withOtherCopies(groups: StoryGroup[], filenames: Set<string>): Set<string> {
+  const out = new Set(filenames);
+  for (const g of groups) {
+    if (g.members.some(m => filenames.has(m.filename))) for (const m of g.members) out.add(m.filename);
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------

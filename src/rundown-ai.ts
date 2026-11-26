@@ -140,6 +140,25 @@ const NOT_NAMES = new Set(['the', 'a', 'an', 'in', 'on', 'at', 'it', 'its', 'he'
  * detail despite instructions — live: "John Berger appeared in 'Grand Theft
  * Auto' as a character named 'The Philosopher'".
  */
+/**
+ * Roles the model likes to guess. A sentence that gives someone a role the
+ * story never mentions is invented: on Nov 26 it called Andy Taylor "Duran
+ * Duran's drummer" (he was the guitarist).
+ */
+const ROLE_WORDS = [
+  'drummer', 'guitarist', 'bassist', 'singer', 'frontman', 'keyboardist', 'rapper', 'actor', 'actress',
+  'director', 'producer', 'author', 'novelist', 'poet', 'comedian', 'founder', 'cofounder', 'co-founder',
+  'ceo', 'cfo', 'chairman', 'chairwoman', 'president', 'vice president', 'senator', 'governor', 'mayor',
+  'congressman', 'congresswoman', 'representative', 'judge', 'justice', 'minister', 'prime minister',
+  'coach', 'quarterback', 'pitcher', 'striker', 'goalkeeper', 'manager', 'owner', 'professor', 'scientist',
+];
+
+export function unsupportedRoles(sentence: string, source: string): string[] {
+  const src = source.toLowerCase();
+  const text = sentence.toLowerCase();
+  return ROLE_WORDS.filter(r => new RegExp(`\\b${r}s?\\b`).test(text) && !new RegExp(`\\b${r}`).test(src));
+}
+
 export function unsupportedNames(sentence: string, source: string): string[] {
   const src = source.toLowerCase().replace(/[\u2018\u2019]/g, "'");
   const out: string[] = [];
@@ -200,7 +219,8 @@ export async function buildPerStoryIntro(
     // the story doesn't mention, gets one more try, then the story is skipped —
     // instead of one bad sentence sinking (or misinforming) the intro.
     const source = `${a.title} ${gist}`;
-    const bad = (t: string) => copiesSource(t, [a.title, gist]) ? 'copied' : unsupportedNames(t, source).length ? 'invented' : '';
+    const bad = (t: string) => copiesSource(t, [a.title, gist]) ? 'copied'
+      : unsupportedNames(t, source).length || unsupportedRoles(t, source).length ? 'invented' : '';
     if (sentence && bad(sentence)) {
       r = await askOnce(true);
       sentence = r?.sentence?.trim() ? firstSentence(r.sentence) : '';
@@ -394,9 +414,15 @@ export function commonWords(groups: StoryGroup[]): Set<string> {
  */
 export function candidatePairs(groups: StoryGroup[], max = 40, common: Set<string> = commonWords(groups)): Array<[number, number]> {
   const tokens = groups.map(groupTokens);
+  // A headline that lists several stories ("Santa Cruz County business: Capstan …;
+  // Driscoll's wins …") is a digest, never the same event as one story: on Nov 26
+  // the model merged one into two mayor's-race stories over "Santa Cruz".
+  const digest = groups.map(g => g.members.some(m => m.title.includes(';')));
   const pairs: Array<{ pair: [number, number]; shared: number }> = [];
   for (let i = 0; i < groups.length; i++) {
+    if (digest[i]) continue;
     for (let j = i + 1; j < groups.length; j++) {
+      if (digest[j]) continue;
       let shared = 0;
       // Everyday words ("time", "latest", "review") aren't evidence either, however rare
       // they are that day: "That Time John Berger Was in 'Grand Theft Auto'" merged with
