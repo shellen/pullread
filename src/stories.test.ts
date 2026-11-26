@@ -1,7 +1,7 @@
 // ABOUTME: Tests for story grouping, weighing and the wider-news panel
 // ABOUTME: Uses real-world-shaped headlines; the Chile quake is a made-up sample story
 
-import { groupStories, withOtherCopies, weighStories, findConsensus, pickTopStories, fetchPanelHeadlines, storyTokens, relatedStory, clusterHeadlines, PANEL_CATALOG, DEFAULT_PANEL, panelFor, wideBar, beyondBar } from './stories';
+import { groupStories, withOtherCopies, storyMatcher, weighStories, findConsensus, pickTopStories, fetchPanelHeadlines, storyTokens, relatedStory, clusterHeadlines, PANEL_CATALOG, DEFAULT_PANEL, panelFor, wideBar, beyondBar } from './stories';
 import type { PanelSource, PanelHeadline } from './stories';
 import type { ArticleMeta } from './email';
 
@@ -304,5 +304,16 @@ describe('grouping real reworded copies (Nov 26)', () => {
       'What’s going on with the Riemann hypothesis?',
     ].map(at));
     expect([...withOtherCopies(g, new Set(['0.md']))].sort()).toEqual(['0.md', '1.md']);
+  });
+});
+
+describe('storyMatcher', () => {
+  test('matches a newer copy of an article read earlier, by its filename-derived title', () => {
+    // titleFromFilename turns "2026-11-20-a-familiar-iranian-hacking-group-has-found-a-new-way-to-cause-chaos.md" into this:
+    const seen = storyMatcher(['a familiar iranian hacking group has found a new way to cause chaos', 'whats going on with the riemann hypothesis']);
+    expect(seen('A familiar Iranian hacking group has found a new way to cause chaos')).toBe(true);
+    expect(seen('What\u2019s going on with the Riemann hypothesis?')).toBe(true);
+    expect(seen('Iran\u2019s oil exports hit a new high')).toBe(false);
+    expect(seen('Advocates claim AC Transit board violated the Brown Act')).toBe(false);
   });
 });

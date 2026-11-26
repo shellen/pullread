@@ -208,6 +208,14 @@ export interface InterestProfile {
   sources: Map<string, Map<SignalKind, number>>;
   /** How many signals of each kind went in. */
   counts: Partial<Record<SignalKind, number>>;
+  /**
+   * Words that are real interests: from the reader's own words (highlights,
+   * notes, the Notebook) or explicit choices (watches, tags), or in two or more
+   * signals. Favorites and finished reads contribute whole headlines, so one of
+   * their words alone is often a coincidence ("familiar", "claim").
+   * Optional for hand-built profiles.
+   */
+  recurring?: Set<string>;
 }
 
 export function buildInterestProfile(signals: InterestSignal[], now = Date.now()): InterestProfile {
@@ -245,7 +253,12 @@ export function buildInterestProfile(signals: InterestSignal[], now = Date.now()
       m.set(sig.kind, (m.get(sig.kind) || 0) + add);
     }
   });
-  return { weights, sources, counts };
+  const recurring = new Set<string>();
+  tokenSets.forEach((t, i) => {
+    const explicit = signals[i].kind !== 'favorite' && signals[i].kind !== 'read';
+    for (const w of t) if (explicit || (df.get(w) || 0) >= 2) recurring.add(w);
+  });
+  return { weights, sources, counts, recurring };
 }
 
 export interface OneReadCandidate {
@@ -280,7 +293,10 @@ export function rankForInterests(candidates: ArticleMeta[], profile: InterestPro
     for (const t of docTokens[i].title) { const w = profile.weights.get(t); if (w) contrib.set(t, 2 * w * idf(t)); }
     for (const t of docTokens[i].body) { const w = profile.weights.get(t); if (w && !contrib.has(t)) contrib.set(t, w * idf(t)); }
     const terms = [...contrib].sort((a, b) => b[1] - a[1]).map(([t]) => t);
-    const score = terms.length >= 2 ? [...contrib.values()].reduce((s, v) => s + v, 0) : 0;
+    // At least one matching word must be a real interest, not a word that
+    // happens to appear in one saved title (Nov 27: "claim, brown, advocate").
+    const grounded = !profile.recurring || terms.some(t => profile.recurring!.has(t));
+    const score = terms.length >= 2 && grounded ? [...contrib.values()].reduce((s, v) => s + v, 0) : 0;
     return { article, score, terms };
   }).filter(c => c.score > 0).sort((a, b) => b.score - a.score);
 }

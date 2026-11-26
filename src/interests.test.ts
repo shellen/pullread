@@ -107,6 +107,21 @@ describe('rankForInterests and the pick', () => {
     for (const junk of ['11pm', 'weve', 'november', 'headline', 'what', 'solved', 'problem', 'based']) expect(p.weights.has(junk)).toBe(false);
   });
 
+  test('a word from a single favorited or finished headline is not an interest (real Nov 27 runners-up)', () => {
+    const p = buildInterestProfile([
+      { text: 'Advocates claim the Brown Act was ignored', kind: 'favorite', at: daysAgo(2) },
+      { text: 'A familiar Iranian hacking group has found a new way to cause chaos', kind: 'read', at: daysAgo(2) },
+      { text: 'Trump pardons allies', kind: 'favorite', at: daysAgo(3) },
+      { text: 'Trump tariffs hit farmers', kind: 'favorite', at: daysAgo(4) },
+    ], now);
+    const ranked = rankForInterests([
+      art('Advocates claim AC Transit board violated the Brown Act'),
+      art('A familiar group returns to chaos'),
+      art('Trump tariffs: farmers brace for another season'),
+    ], p);
+    expect(ranked.map(c => c.article.title)).toEqual(['Trump tariffs: farmers brace for another season']);
+  });
+
   test('no signals, no pick', () => {
     expect(pickOneRead([art('Anything')], buildInterestProfile([], now)).pick).toBeNull();
   });

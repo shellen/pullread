@@ -5,7 +5,7 @@ import { createTransport } from 'nodemailer';
 import { join } from 'path';
 import { homedir } from 'os';
 import { readFileSync, existsSync } from 'fs';
-import { PANEL_CATALOG, panelFor, groupStories, withOtherCopies, alsoInFor, biggestPanelStories, weighStories, findConsensus, pickTopStories, fetchPanelHeadlines } from './stories';
+import { PANEL_CATALOG, panelFor, groupStories, withOtherCopies, storyMatcher, alsoInFor, biggestPanelStories, weighStories, findConsensus, pickTopStories, fetchPanelHeadlines } from './stories';
 import type { PanelSource, Scope } from './stories';
 import {
   applyModelGroups, checkIntro, blockingFailures, structuredIntroToMarkers,
@@ -1264,7 +1264,7 @@ export async function buildRoundup(
   let oneRead: RoundupResult['oneRead'];
   if (cfg.oneRead && articles.length) {
     try {
-      const { gatherInterestSignals, buildInterestProfile, pickOneRead } = await import('./interests');
+      const { gatherInterestSignals, buildInterestProfile, pickOneRead, titleFromFilename } = await import('./interests');
       const { signals, engaged, read } = await gatherInterestSignals({
         outputPath: opts.outputPath || '',
         watches: [...(watchedEntities || [])],
@@ -1277,7 +1277,12 @@ export async function buildRoundup(
       // come back the next day as another outlet's copy.
       const { loadReading, saveReading, recordPick, pickOutcomes, recentPicks } = await import('./reading');
       const stories = groupStories(articles);
-      const skip = withOtherCopies(stories, new Set([...engaged, ...read, ...recentPicks(loadReading())]));
+      const seen = new Set([...engaged, ...read, ...recentPicks(loadReading())]);
+      const skip = withOtherCopies(stories, seen);
+      // Copies saved outside the window count too: on Nov 27 the pick was a newer
+      // copy of an Ars Technica article the reader had already finished.
+      const alreadySeen = storyMatcher([...seen].map(titleFromFilename));
+      for (const a of articles) if (!skip.has(a.filename) && alreadySeen(a.title)) skip.add(a.filename);
       const storyOf = new Map<string, number>();
       stories.forEach((g, gi) => { for (const m of g.members) storyOf.set(m.filename, gi); });
       const { pick, ranked } = pickOneRead(articles, profile, skip);

@@ -191,6 +191,30 @@ export function groupStories(articles: ArticleMeta[]): StoryGroup[] {
   }));
 }
 
+/**
+ * A test for "same story as one of these titles", by the same rules grouping
+ * uses. For titles outside the day's window, like articles read last week.
+ */
+export function storyMatcher(titles: string[]): (title: string) => boolean {
+  const known = titles.map(t => ({ strict: titleTokens(t), loose: storyTokens(t) }));
+  // Indexed by word, so a long reading history only compares titles that share one.
+  const byWord = new Map<string, number[]>();
+  known.forEach((k, i) => {
+    for (const w of new Set([...k.strict, ...k.loose])) {
+      if (!byWord.has(w)) byWord.set(w, []);
+      byWord.get(w)!.push(i);
+    }
+  });
+  return title => {
+    const strict = titleTokens(title);
+    const loose = storyTokens(title);
+    const near = new Set<number>();
+    for (const w of new Set([...strict, ...loose])) for (const i of byWord.get(w) || []) near.add(i);
+    for (const i of near) if (sameStory(known[i].strict, strict) || rewordedStory(known[i].loose, loose)) return true;
+    return false;
+  };
+}
+
 /** The given filenames plus every other copy of the same stories. */
 export function withOtherCopies(groups: StoryGroup[], filenames: Set<string>): Set<string> {
   const out = new Set(filenames);
